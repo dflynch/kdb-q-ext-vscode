@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg
    height="16"
-   viewBox="0 0 16 16"
+   viewBox="0 0 32 32"
    width="16"
    version="1.1"
    id="svg1"
@@ -24,12 +24,12 @@
      inkscape:deskcolor="#d1d1d1"
      inkscape:zoom="17.920737"
      inkscape:cx="10.183733"
-     inkscape:cy="18.80503"
-     inkscape:window-width="1280"
-     inkscape:window-height="747"
-     inkscape:window-x="0"
-     inkscape:window-y="305"
-     inkscape:window-maximized="0"
+     inkscape:cy="18.77713"
+     inkscape:window-width="1920"
+     inkscape:window-height="954"
+     inkscape:window-x="1280"
+     inkscape:window-y="25"
+     inkscape:window-maximized="1"
      inkscape:current-layer="svg1" />
   <path
      d="m13.688 21.906q-2.969 0-4.656-2.438t-1.688-6.703q0-4.313 1.727-6.75t4.711-2.438q3.203 0 4.828 2.5h.125l.453-2.188h5.281v25.391h-6.109v-7.328q0-.531.188-2.594h-.188q-1.5 2.547-4.672 2.547zm2.484-4.734q1.391 0 2.023-.859t.633-2.906v-.734q0-2.344-.641-3.352t-2.109-1.008q-2.531 0-2.531 4.547 0 2.313.641 3.313t1.984 1z"

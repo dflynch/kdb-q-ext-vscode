@@ -2,7 +2,8 @@
   "name": "kdb-q-ext-vscode",
   "displayName": "kdb-q-ext-vscode",
   "description": "A lightweight extension for kdb+/q programming",
-  "version": "1.0.0",
+  "icon": "./icons/purple-q.png",
+  "version": "1.0.1",
   "publisher": "dflynch3",
   "repository": {
     "type": "git",
