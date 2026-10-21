@@ -45,11 +45,11 @@ export async function toggleBlockComment(editor: vscode.TextEditor) {
       "kdb+/q: A \\ on its own line ends the script, so everything from it on is already commented out.",
     );
   } else if (toggle.kind === "add") {
-    const eol = document.eol === vscode.EndOfLine.CRLF ? "\r\n" : "\n";
     const last = document.lineAt(toggle.end);
+    // VS Code converts "\n" to the document's line endings
     const applied = await editor.edit((edit) => {
-      edit.insert(new vscode.Position(toggle.start, 0), `/${eol}`);
-      edit.insert(last.range.end, `${eol}\\`);
+      edit.insert(new vscode.Position(toggle.start, 0), "/\n");
+      edit.insert(last.range.end, "\n\\");
     });
     if (!applied) {
       return;
