@@ -5,8 +5,23 @@
 export function flatten(text: string): string[] {
   const statements: string[] = [];
   let inBlockComment = false;
+  // Whether the last statement ends inside a string
+  let inString = false;
 
   for (const line of text.split(/\r\n|\n|\r/)) {
+    // A line at column 0 begins a new statement, so ends any string
+    if (/^\S/.test(line)) {
+      inString = false;
+    }
+    // A string continues onto the next line, keeping the line break and the
+    // indentation. As in a q script, trailing whitespace is dropped and a tab
+    // at column 0 reads as a space.
+    if (inString) {
+      const scanned = stripComment(line.replace(/^\t/, " "), true);
+      statements[statements.length - 1] += `\\n${scanned.code.trimEnd()}`;
+      inString = scanned.inString;
+      continue;
+    }
     // A lone "\" closes a block comment, otherwise it comments out the rest
     if (/^\\\s*$/.test(line)) {
       if (inBlockComment) {
@@ -30,7 +45,7 @@ export function flatten(text: string): string[] {
       continue;
     }
 
-    const code = stripComment(line);
+    const { code, inString: endsInString } = stripComment(line, false);
     const trimmed = code.trim();
     if (!trimmed) {
       continue;
@@ -41,15 +56,19 @@ export function flatten(text: string): string[] {
     } else {
       statements.push(trimmed);
     }
+    inString = endsInString;
   }
 
   return statements;
 }
 
 // Remove a trailing comment, i.e. a "/" at the start of the line or preceded
-// by whitespace, ignoring any that appear within strings
-function stripComment(line: string): string {
-  let inString = false;
+// by whitespace, ignoring any that appear within strings. Also returns
+// whether the line ends inside a string.
+function stripComment(
+  line: string,
+  inString: boolean,
+): { code: string; inString: boolean } {
   for (let i = 0; i < line.length; i++) {
     const c = line[i];
     if (inString) {
@@ -64,8 +83,8 @@ function stripComment(line: string): string {
       c === "/" &&
       (i === 0 || line[i - 1] === " " || line[i - 1] === "\t")
     ) {
-      return line.slice(0, i);
+      return { code: line.slice(0, i), inString: false };
     }
   }
-  return line;
+  return { code: line, inString };
 }

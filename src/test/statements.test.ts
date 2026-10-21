@@ -43,6 +43,40 @@ suite("statements.flatten", () => {
     ["unterminated block comment", "a:1\n/\nnote\nb:2", ["a:1"]],
     ["end-of-file comment", "a:1\n\\\nb:2", ["a:1"]],
 
+    // Multi-line strings
+    ["multi-line string", 'a:"x\n  y"\nb:2', ['a:"x\\n  y"', "b:2"]],
+    [
+      "slash in a multi-line string",
+      'a:"x\n  y / z" / note',
+      ['a:"x\\n  y / z"'],
+    ],
+    [
+      "block comment marker in a multi-line string",
+      'a:"x\n  /\n  y"',
+      ['a:"x\\n  /\\n  y"'],
+    ],
+    [
+      "blank lines in a multi-line string",
+      'a:"x\n\n  \n  y"',
+      ['a:"x\\n\\n\\n  y"'],
+    ],
+    [
+      "trailing whitespace in a multi-line string",
+      'a:"x  \n  y\t\n  z"',
+      ['a:"x\\n  y\\n  z"'],
+    ],
+    [
+      "tab at column 0 in a multi-line string",
+      'a:"x\n\t\ty"',
+      ['a:"x\\n \ty"'],
+    ],
+    [
+      "multi-line string in a function",
+      'f:{\n  "p\n  q";\n  x}',
+      ['f:{ "p\\n  q"; x}'],
+    ],
+    ["string ended by a new statement", 'a:"x\nb:"/"', ['a:"x', 'b:"/"']],
+
     // System commands
     ["system command with path", "\\l /a/b.q", ["\\l /a/b.q"]],
     [

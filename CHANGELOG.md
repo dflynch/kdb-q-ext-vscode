@@ -14,6 +14,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - Run Selected Text preserves whitespace in strings
 - Run Selected Text sends system commands, such as `\l /path/to/file.q`, as is
 - Run Selected Text ignores the rest of an unterminated block comment
+- Run Selected Text keeps the line breaks in a string that spans lines
 - Highlighting no longer splits typed nulls and infinities (`0Ni`, `-0Wf`),
   timespans (`1D02:00:00`), bytes (`0x0`), dotted names (`a.b.c`) or file
   handles with paths (`` `:data/trades.csv ``)
