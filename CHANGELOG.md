@@ -18,6 +18,7 @@ All notable changes to the extension are documented in this file.
 
 ### Changed
 
+- The extension is now named kdb+/q in the Marketplace and Extensions view
 - Highlighting colors: control flow, qSQL, built-in functions, `.Q`/`.z`,
   symbols, file handles and strings are now distinct in VS Code's default
   themes, and names, including function names, are no longer colored. See
