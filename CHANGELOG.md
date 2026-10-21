@@ -14,11 +14,38 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - Run Selected Text preserves whitespace in strings
 - Run Selected Text sends system commands, such as `\l /path/to/file.q`, as is
 - Run Selected Text ignores the rest of an unterminated block comment
+- Highlighting no longer splits typed nulls and infinities (`0Ni`, `-0Wf`),
+  timespans (`1D02:00:00`), bytes (`0x0`), dotted names (`a.b.c`) or file
+  handles with paths (`` `:data/trades.csv ``)
+- `.`, `,` and `_` are highlighted as operators, and `-` as part of a
+  negative number where q reads it that way (`x -1`, but `x-1` is minus)
+- All string escapes q accepts are highlighted: `\n`, `\t`, `\r` and octal
+- Every name in a `{[a;b]}` parameter list is highlighted as a parameter
+- System command arguments, such as the path in `\cd /tmp`, are no longer
+  highlighted as comments
+- Pressing Enter between brackets no longer moves the closing bracket to
+  column 0, where q would read it as a new statement
+- Toggle Block Comment no longer produces invalid q
+
+### Added
+
+- q 5 (KDB-X) keywords and namespace members: `use`, 25 `.Q` members and
+  `.h.ka`
+- Highlighting for signal (`'`), `x`/`y`/`z` as implicit parameters, and
+  `k)` lines
+- Folding for `/` … `\` block comments
+- A README section on customizing colors, with the scope for each kind of
+  token
 
 ### Changed
 
 - Run Selected Text warns when there is no active terminal
 - The Ctrl/Cmd + Enter keybinding only applies when the editor has focus
+- Highlighting scopes were reworked so control flow, qSQL, built-in
+  functions, `.Q`/`.z`, symbols, file handles and strings are distinct in
+  VS Code's default themes; names, including function names, are no
+  longer colored
+- `.Q.Cf` and `.Q.Xf`, removed in q 5, are no longer highlighted
 
 ## [1.0.2]
 
