@@ -52,11 +52,44 @@
       "patterns": [
         {
           "name": "entity.other.load.q",
-          "match": "^\\\\l\\s*.*"
+          "match": "^\\\\l(?=\\s|$).*"
         },
         {
-          "name": "entity.other.command.q",
-          "match": "^\\\\(?:cd|ts|[abBcCdefgopPrsStTuvwWxz12_\\\\])"
+          "match": "^(\\\\(?:cd|[12_]))(?=\\s|$).*",
+          "captures": {
+            "1": {
+              "name": "entity.other.command.q"
+            }
+          }
+        },
+        {
+          "begin": "^(\\\\(?:ts|[abBcCdefgopPrsStTuvwWxz\\\\]))(?=\\s|$)",
+          "beginCaptures": {
+            "1": {
+              "name": "entity.other.command.q"
+            }
+          },
+          "end": "$",
+          "patterns": [
+            {
+              "include": "#strings"
+            },
+            {
+              "include": "#keywords"
+            },
+            {
+              "include": "#literals"
+            },
+            {
+              "include": "#namespaces"
+            },
+            {
+              "include": "#variables"
+            },
+            {
+              "include": "#punctuation"
+            }
+          ]
         }
       ]
     },
@@ -69,7 +102,7 @@
           "patterns": [
             {
               "name": "constant.character.escape.q",
-              "match": "\\\\[\"\\\\]"
+              "match": "\\\\(?:[\"\\\\nrt]|[0-3][0-7]{2})"
             }
           ]
         }
@@ -95,7 +128,7 @@
         },
         {
           "name": "keyword.operator.q",
-          "match": "(?:^[a-zA-Z_0-9]\\.^[a-zA-Z_0-9]|\\@|\\$|\\!|\\?|\\+|\\-|\\*|\\%|\\=|\\<|\\>|~|\\||\\&|\\#|\\^|^[a-zA-Z_0-9][012]:)"
+          "match": "(?:(?<=[\\w)\\]}\"])-|-(?!\\.?\\d)|\\.(?![\\w.])|[@$!?+*%=<>~|&#^,_])"
         },
         {
           "name": "keyword.other.q",
@@ -107,6 +140,10 @@
       "patterns": [
         {
           "name": "support.type.symbol.q",
+          "match": "`:[.:/\\w]*"
+        },
+        {
+          "name": "support.type.symbol.q",
           "match": "`[.:\\w]*"
         },
         {
@@ -115,7 +152,7 @@
         },
         {
           "name": "constant.numeric.timestamp.q",
-          "match": "\\d{4}\\.\\d{2}\\.\\d{2}D(?:\\d{2}:){1,2}\\d{2}\\.?\\d*"
+          "match": "\\d{4}\\.\\d{2}\\.\\d{2}D(?:\\d{2}(?::\\d{2}(?::\\d{2}(?:\\.\\d*)?)?)?)?"
         },
         {
           "name": "constant.numeric.date.q",
@@ -126,16 +163,20 @@
           "match": "\\d{4}\\.\\d{2}m"
         },
         {
+          "name": "constant.numeric.timespan.q",
+          "match": "-?\\d+D(?:\\d{2}(?::\\d{2}(?::\\d{2}(?:\\.\\d*)?)?)?)?"
+        },
+        {
           "name": "constant.numeric.time.q",
-          "match": "(?:0D)?(?:\\d{2}:){1,2}\\d{2}\\.?\\d*"
+          "match": "(?:\\d{2}:){1,2}\\d{2}(?:\\.\\d*)?"
         },
         {
           "name": "constant.numeric.file.q",
-          "match": "[012]:"
+          "match": "(?<![\\w.])[012]:"
         },
         {
           "name": "constant.language.infinity.q",
-          "match": "(?:0N[deghjmnptuvz]?|-?0[wW]|0n)"
+          "match": "(?:-?0W[hijefcpmdznuvt]?|0N[hijefcpmdznuvtg]?|-?0[nw])(?!\\w)"
         },
         {
           "name": "constant.numeric.binary.q",
@@ -143,11 +184,11 @@
         },
         {
           "name": "constant.numeric.byte.q",
-          "match": "0x(?:[0-9a-fA-F]{2})+"
+          "match": "0x[0-9a-fA-F]*"
         },
         {
           "name": "constant.numeric.number.q",
-          "match": "-?(?:\\d+\\.\\d+|\\.\\d+|\\d+\\.|\\d+)(?:e[+-]?\\d?\\d)?[jhife]?"
+          "match": "-?(?:\\d+\\.\\d*|\\.\\d+|\\d+)(?:e[+-]?\\d+)?[jhife]?"
         }
       ]
     },
@@ -175,19 +216,28 @@
       "patterns": [
         {
           "name": "entity.name.function.q",
-          "match": "(?:(?:\\.[a-zA-Z_0-9]+)+|[a-zA-Z][a-zA-Z_0-9]*)(?=\\s*:\\s*\\{)"
+          "match": "\\.?[a-zA-Z][a-zA-Z0-9_]*(?:\\.[a-zA-Z0-9_]+)*(?=\\s*::?\\s*\\{)"
         }
       ]
     },
     "variables": {
       "patterns": [
         {
-          "name": "variable.parameter.q",
-          "match": "(?<=\\{\\s*\\[)((?:(?:\\.[a-zA-Z_0-9]+)+|[a-zA-Z][a-zA-Z_0-9]*)\\b)+(?=\\])"
+          "begin": "(?<=\\{)\\s*\\[",
+          "end": "\\]",
+          "patterns": [
+            {
+              "name": "variable.parameter.q",
+              "match": "\\.?[a-zA-Z][a-zA-Z0-9_]*(?:\\.[a-zA-Z0-9_]+)*"
+            },
+            {
+              "include": "#punctuation"
+            }
+          ]
         },
         {
           "name": "variable.other.q",
-          "match": "(?:(?:\\.[a-zA-Z_0-9]+)+|[a-zA-Z][a-zA-Z_0-9]*)\\b"
+          "match": "\\.?[a-zA-Z][a-zA-Z0-9_]*(?:\\.[a-zA-Z0-9_]+)*"
         }
       ]
     },
