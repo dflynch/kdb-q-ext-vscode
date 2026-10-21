@@ -7,7 +7,12 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      # Finish every OS, so one failure doesn't hide another
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -15,6 +20,10 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      # The tests run inside VS Code, which needs a display
+      # The tests run inside VS Code, which needs a display on Linux
       - run: xvfb-run -a npm test
+        if: runner.os == 'Linux'
+      - run: npm test
+        if: runner.os != 'Linux'
       - run: npx vsce package
+        if: runner.os == 'Linux'
