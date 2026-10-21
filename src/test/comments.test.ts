@@ -48,6 +48,20 @@ suite("comments.toggleBlockComment", () => {
         { kind: "remove", lines: [0, 2, 4, 6] },
       ],
       [
+        "inside a nested block",
+        "a\n/\nb\n/\nc\n\\\nd\n\\\ne",
+        4,
+        4,
+        { kind: "remove", lines: [1, 7] },
+      ],
+      [
+        "after nested blocks",
+        "a\n/\nb\n/\nc\n\\\nd\n\\\ne",
+        8,
+        8,
+        { kind: "add", start: 8, end: 8 },
+      ],
+      [
         "inside an unterminated block",
         "a:1\n/\nb:2",
         2,

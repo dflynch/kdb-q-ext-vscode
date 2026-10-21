@@ -126,6 +126,32 @@ suite("q grammar", () => {
       ],
     ],
     [
+      "nested block comments",
+      "a\n/\nb\n/\nc\n\\\nd\n\\\ne",
+      [
+        ["a", "source.q"],
+        ["/", "comment.block.q"],
+        ["b", "comment.block.q"],
+        ["/", "comment.block.q"],
+        ["c", "comment.block.q"],
+        ["\\", "comment.block.q"],
+        ["d", "comment.block.q"],
+        ["\\", "comment.block.q"],
+        ["e", "source.q"],
+      ],
+    ],
+    [
+      "indented slash in a block comment is not a marker",
+      "/\nb\n  /\n\\\nc",
+      [
+        ["/", "comment.block.q"],
+        ["b", "comment.block.q"],
+        ["/", "comment.block.q"],
+        ["\\", "comment.block.q"],
+        ["c", "source.q"],
+      ],
+    ],
+    [
       "end-of-file comment",
       "a\n\\\nb:1",
       [

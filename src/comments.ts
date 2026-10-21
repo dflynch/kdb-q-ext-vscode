@@ -1,41 +1,47 @@
 // How to toggle a block comment over a range of lines: add "/" and "\" marker
-// lines around them, remove the markers of the blocks they touch, or nothing
-// when they are already commented out by a "\" ending the script
+// lines around them, remove the markers of the outermost blocks they touch, or
+// nothing when they are already commented out by a "\" ending the script
 export type BlockCommentToggle =
   | { kind: "add"; start: number; end: number }
   | { kind: "remove"; lines: number[] }
   | { kind: "none" };
 
-// A block comment from its "/" line to its "\" line, or to the end when it
-// is left open
+// An outermost block comment from its "/" line to its "\" line, or to the end
+// when it is left open
 export type BlockComment = { open: number; close?: number };
 
 const blockStart = /^\/\s*$/;
 const blockEnd = /^\\\s*$/;
 
-// Find block comments as q reads them: a lone "\" closes an open block,
-// otherwise it comments out the rest of the script, from scriptEnd on
+// Find block comments as q reads them: blocks nest, so a lone "/" inside a
+// block opens another and a lone "\" closes the innermost. Outside a block, a
+// lone "\" comments out the rest of the script, from scriptEnd on.
 export function findBlockComments(lines: string[]): {
   blocks: BlockComment[];
   scriptEnd: number;
 } {
   const blocks: BlockComment[] = [];
-  let open: number | undefined;
+  let open = 0;
+  let depth = 0;
   let scriptEnd = lines.length;
   for (let i = 0; i < lines.length; i++) {
-    if (open !== undefined) {
-      if (blockEnd.test(lines[i])) {
-        blocks.push({ open, close: i });
-        open = undefined;
+    if (blockStart.test(lines[i])) {
+      if (depth === 0) {
+        open = i;
       }
-    } else if (blockStart.test(lines[i])) {
-      open = i;
+      depth++;
     } else if (blockEnd.test(lines[i])) {
-      scriptEnd = i;
-      break;
+      if (depth === 0) {
+        scriptEnd = i;
+        break;
+      }
+      depth--;
+      if (depth === 0) {
+        blocks.push({ open, close: i });
+      }
     }
   }
-  if (open !== undefined) {
+  if (depth > 0) {
     blocks.push({ open });
   }
   return { blocks, scriptEnd };
