@@ -1,14 +1,18 @@
+import * as comments from "./comments";
+
 // Flatten each multi-line statement in q source onto a single line, as the q
 // REPL only accepts single-line input. As in a q script, a line starting at
 // column 0 begins a new statement and an indented line continues the previous
 // one. Comments are removed, so that joining lines cannot comment out code.
 export function flatten(text: string): string[] {
+  const lines = text.split(/\r\n|\n|\r/);
+  const { blocks, scriptEnd } = comments.findBlockComments(lines);
   const statements: string[] = [];
-  let inBlockComment = false;
   // Whether the last statement ends inside a string
   let inString = false;
 
-  for (const line of text.split(/\r\n|\n|\r/)) {
+  for (let i = 0; i < scriptEnd; i++) {
+    const line = lines[i];
     // A line at column 0 begins a new statement, so ends any string
     if (/^\S/.test(line)) {
       inString = false;
@@ -22,20 +26,8 @@ export function flatten(text: string): string[] {
       inString = scanned.inString;
       continue;
     }
-    // A lone "\" closes a block comment, otherwise it comments out the rest
-    if (/^\\\s*$/.test(line)) {
-      if (inBlockComment) {
-        inBlockComment = false;
-        continue;
-      }
-      break;
-    }
-    if (inBlockComment) {
-      continue;
-    }
-    // A lone "/" opens a block comment, which may be left unterminated
-    if (/^\/\s*$/.test(line)) {
-      inBlockComment = true;
+    // Skip block comments, including their marker lines
+    if (blocks.some((b) => b.open <= i && i <= (b.close ?? scriptEnd))) {
       continue;
     }
     // System commands are sent verbatim, as paths such as "\l /a/b.q" may
