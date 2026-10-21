@@ -1,10 +1,16 @@
 {
 	"compilerOptions": {
-		"module": "Node16",
-		"target": "ES2022",
+		"module": "nodenext",
+		"moduleResolution": "nodenext",
+		"target": "ES2024", /* VS Code >= 1.140 runs Node 24 */
 		"outDir": "out",
 		"lib": [
-			"ES2022"
+			"ES2024"
+		],
+		"types": [
+			"node",
+			"mocha",
+			"vscode"
 		],
 		"sourceMap": true,
 		"rootDir": "src",
