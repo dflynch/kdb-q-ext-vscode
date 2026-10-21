@@ -277,7 +277,7 @@
         },
         {
           "name": "support.class.namespace.dotz.q",
-          "match": "\\.z\\.(?:D|H|K|N|P|T|W|X|Z|a|ac|b|bm|c|d|e|ex|exit|ey|f|h|i|k|l|n|o|p|pc|pd|pg|ph|pi|pm|po|pp|pq|ps|pw|q|r|s|t|ts|u|vs|w|wc|wo|ws|x|z|zd)\\b"
+          "match": "\\.z\\.(?:A|D|H|K|M|N|P|T|W|X|Z|a|ac|b|bm|c|d|e|ex|exit|ey|f|h|i|k|l|m|n|o|p|pc|pd|pg|ph|pi|pm|po|pp|pq|ps|pw|q|r|s|t|ts|u|v|vs|w|wc|wo|ws|x|z|zd)\\b"
         }
       ]
     },

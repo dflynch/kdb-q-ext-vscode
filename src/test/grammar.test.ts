@@ -763,12 +763,16 @@ suite("q grammar", () => {
     ],
     [
       "q 5 namespace members",
-      ".Q.sx .Q.L1 .Q.trpd .h.ka",
+      ".Q.sx .Q.L1 .Q.trpd .h.ka .z.A .z.M .z.m .z.v",
       [
         [".Q.sx", "support.class.namespace.utilities.q"],
         [".Q.L1", "support.class.namespace.utilities.q"],
         [".Q.trpd", "support.class.namespace.utilities.q"],
         [".h.ka", "support.class.namespace.http.q"],
+        [".z.A", "support.class.namespace.dotz.q"],
+        [".z.M", "support.class.namespace.dotz.q"],
+        [".z.m", "support.class.namespace.dotz.q"],
+        [".z.v", "support.class.namespace.dotz.q"],
       ],
     ],
     [
