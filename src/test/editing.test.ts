@@ -81,6 +81,13 @@ suite("q editing", () => {
       [1, 0, 3, 0],
     ],
     [
+      "comment out lines up to a \\ ending the script",
+      "a\n\\\nb",
+      [0, 0, 2, 1],
+      "/\na\n\\\n\\\nb",
+      [1, 0, 4, 1],
+    ],
+    [
       "uncomment a block",
       "a:1\n/\nb:2\n\\\nc:3",
       [2, 1, 2, 1],

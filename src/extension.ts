@@ -63,19 +63,34 @@ async function toggleBlockComment(editor: vscode.TextEditor) {
 
   if (toggle.kind === "none") {
     vscode.window.showInformationMessage(
-      "kdb+/q: These lines are already commented out by the \\ above them.",
+      "kdb+/q: A \\ on its own line ends the script, so everything from it on is already commented out.",
     );
   } else if (toggle.kind === "add") {
     const eol = document.eol === vscode.EndOfLine.CRLF ? "\r\n" : "\n";
     const last = document.lineAt(toggle.end);
-    await editor.edit((edit) => {
+    const applied = await editor.edit((edit) => {
       edit.insert(new vscode.Position(toggle.start, 0), `/${eol}`);
       edit.insert(last.range.end, `${eol}\\`);
     });
-    // Keep the same text selected, now one line further down
+    if (!applied) {
+      return;
+    }
+    // Keep the same text selected: lines in the block move down past the "/",
+    // and lines after it past the "\" too (when the block stopped early). A
+    // selection ending at column 0 just after the block selects whole lines,
+    // so it ends before the "\".
+    const moved = (p: vscode.Position) => {
+      if (p.line <= toggle.end) {
+        return p.translate(1);
+      }
+      if (p.line === toggle.end + 1 && p.character === 0) {
+        return new vscode.Position(toggle.end + 2, 0);
+      }
+      return p.translate(2);
+    };
     editor.selection = new vscode.Selection(
-      selection.anchor.translate(1),
-      selection.active.translate(1),
+      moved(selection.anchor),
+      moved(selection.active),
     );
   } else {
     // Merge adjacent marker lines into one range, as edits may not overlap
