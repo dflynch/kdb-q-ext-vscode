@@ -38,20 +38,23 @@ its own scope, so you can give it a color of your own in `settings.json`:
 }
 ```
 
-| Tokens                                                  | Scope                                 |
-| ------------------------------------------------------- | ------------------------------------- |
-| `if`, `$[`, `do`, `while`, `exit`, `'` (signal)         | `keyword.control.*.q`                 |
-| `select`, `from`, `by`, `where`, …                      | `keyword.other.qsql.q`                |
-| `count`, `each`, `0:`, `-11!`, …                        | `support.function.builtin.*.q`        |
-| `` `int$ ``, `"j"$`, `` `$ `` (casts)                   | `support.type.cast.q`                 |
-| `` `s# ``, `` `u# ``, `` `p# ``, `` `g# `` (attributes) | `storage.modifier.attribute.q`        |
-| `.Q.dd`, `.z.p`, `.h.ht`, `.j.j`                        | `support.class.namespace.*.q`         |
-| `` `:data/trades.csv ``                                 | `support.class.handle.q`              |
-| `` `sym ``                                              | `constant.language.symbol.q`          |
-| `0N`, `0w`, dates, times, numbers                       | `constant.numeric.*.q`                |
-| `x`, `y`, `z` and `{[a;b]` parameters                   | `variable.parameter.q`, `…implicit.q` |
-| `/ \ ' ': /: \:` (iterators)                            | `keyword.operator.iterator.q`         |
-| `\l`, `\t`, … and `k)`                                  | `meta.preprocessor.*.q`               |
+Each scope below also covers the more specific scopes that start with it,
+such as `constant.numeric.date.q`, and `source.q` keeps a rule to q files.
+
+| Tokens                                                  | Scope                               |
+| ------------------------------------------------------- | ----------------------------------- |
+| `if`, `$[`, `do`, `while`, `exit`, `'` (signal)         | `source.q keyword.control`          |
+| `select`, `from`, `by`, `where`, …                      | `keyword.other.qsql.q`              |
+| `count`, `each`, `0:`, `-11!`, …                        | `source.q support.function.builtin` |
+| `` `int$ ``, `"j"$`, `` `$ `` (casts)                   | `support.type.cast.q`               |
+| `` `s# ``, `` `u# ``, `` `p# ``, `` `g# `` (attributes) | `storage.modifier.attribute.q`      |
+| `.Q.dd`, `.z.p`, `.h.ht`, `.j.j`                        | `source.q support.class.namespace`  |
+| `` `:data/trades.csv ``                                 | `support.class.handle.q`            |
+| `` `sym ``                                              | `constant.language.symbol.q`        |
+| `0N`, `0w`, dates, times, numbers                       | `source.q constant.numeric`         |
+| `x`, `y`, `z` and `{[a;b]` parameters                   | `source.q variable.parameter`       |
+| `/ \ ' ': /: \:` (iterators)                            | `keyword.operator.iterator.q`       |
+| `\l`, `\t`, … and `k)`                                  | `source.q meta.preprocessor`        |
 
 Run **Developer: Inspect Editor Tokens and Scopes** to see the scope of any
 token.
