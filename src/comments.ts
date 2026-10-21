@@ -6,20 +6,20 @@ export type BlockCommentToggle =
   | { kind: "remove"; lines: number[] }
   | { kind: "none" };
 
+// A block comment from its "/" line to its "\" line, or to the end when it
+// is left open
+export type BlockComment = { open: number; close?: number };
+
 const blockStart = /^\/\s*$/;
 const blockEnd = /^\\\s*$/;
 
-// Decide how to toggle a block comment over lines start to end (inclusive).
-// q only recognises markers alone on a line at column 0, which also works
-// inside a multi-line function, so markers are always added there.
-export function toggleBlockComment(
-  lines: string[],
-  start: number,
-  end: number,
-): BlockCommentToggle {
-  // Find block comments as q reads them: a lone "\" closes an open block,
-  // otherwise it comments out the rest of the script
-  const blocks: { open: number; close?: number }[] = [];
+// Find block comments as q reads them: a lone "\" closes an open block,
+// otherwise it comments out the rest of the script, from scriptEnd on
+export function findBlockComments(lines: string[]): {
+  blocks: BlockComment[];
+  scriptEnd: number;
+} {
+  const blocks: BlockComment[] = [];
   let open: number | undefined;
   let scriptEnd = lines.length;
   for (let i = 0; i < lines.length; i++) {
@@ -36,9 +36,20 @@ export function toggleBlockComment(
     }
   }
   if (open !== undefined) {
-    blocks.push({ open }); // Unterminated, so it runs to the end
+    blocks.push({ open });
   }
+  return { blocks, scriptEnd };
+}
 
+// Decide how to toggle a block comment over lines start to end (inclusive).
+// q only recognises markers alone on a line at column 0, which also works
+// inside a multi-line function, so markers are always added there.
+export function toggleBlockComment(
+  lines: string[],
+  start: number,
+  end: number,
+): BlockCommentToggle {
+  const { blocks, scriptEnd } = findBlockComments(lines);
   const touched = blocks.filter(
     (b) => b.open <= end && (b.close ?? lines.length - 1) >= start,
   );
