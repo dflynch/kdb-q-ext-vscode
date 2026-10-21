@@ -254,6 +254,30 @@ suite("q grammar", () => {
       ],
     ],
     [
+      "repeat counts",
+      "\\t:100 f[]\n\\ts:10 f x / y",
+      [
+        ["\\t:100", "meta.preprocessor.system.q"],
+        ["f", "source.q"],
+        ["[]", "source.q"],
+        ["\\ts:10", "meta.preprocessor.system.q"],
+        ["f", "source.q"],
+        ["x", "source.q"],
+        ["/", "keyword.operator.iterator.q"],
+        ["y", "source.q"],
+      ],
+    ],
+    [
+      "operating system commands",
+      "\\ls /tmp\n\\mkdir -p /tmp/a",
+      [
+        ["\\ls", "meta.preprocessor.system.q"],
+        ["/tmp", "source.q"],
+        ["\\mkdir", "meta.preprocessor.system.q"],
+        ["-p /tmp/a", "source.q"],
+      ],
+    ],
+    [
       "k line",
       "k)+/1 2",
       [
@@ -384,6 +408,16 @@ suite("q grammar", () => {
         ["[", "source.q"],
         ["z", "source.q"],
         ["]", "source.q"],
+      ],
+    ],
+    [
+      "each after assignment is not a signal",
+      "r:'x",
+      [
+        ["r", "source.q"],
+        [":", "keyword.operator.assignment.q"],
+        ["'", "keyword.operator.iterator.q"],
+        ["x", "source.q"],
       ],
     ],
     [
@@ -610,6 +644,18 @@ suite("q grammar", () => {
         ["2h", "constant.numeric.number.q"],
         ["2.5e", "constant.numeric.number.q"],
         ["1f", "constant.numeric.number.q"],
+      ],
+    ],
+    [
+      "temporal type suffixes",
+      "3n 12t 1p 12u 12v 1.5n",
+      [
+        ["3n", "constant.numeric.number.q"],
+        ["12t", "constant.numeric.number.q"],
+        ["1p", "constant.numeric.number.q"],
+        ["12u", "constant.numeric.number.q"],
+        ["12v", "constant.numeric.number.q"],
+        ["1.5n", "constant.numeric.number.q"],
       ],
     ],
     [

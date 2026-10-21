@@ -59,7 +59,7 @@
           }
         },
         {
-          "begin": "^(\\\\(?:ts|[abBcCdefgopPrsStTuvwWxz\\\\]))(?=\\s|$)",
+          "begin": "^(\\\\(?:ts|[abBcCdefgopPrsStTuvwWxz\\\\])(?::\\d+)?)(?=\\s|$)",
           "beginCaptures": {
             "1": {
               "name": "meta.preprocessor.system.q"
@@ -89,6 +89,14 @@
               "include": "#punctuation"
             }
           ]
+        },
+        {
+          "match": "^(\\\\[A-Za-z_][\\w.-]*)(?=\\s|$).*",
+          "captures": {
+            "1": {
+              "name": "meta.preprocessor.system.q"
+            }
+          }
         },
         {
           "match": "^(k\\)).*",
@@ -165,7 +173,7 @@
         },
         {
           "name": "keyword.control.flow.signal.q",
-          "match": "(?<![^\\s\\[(;:{])'(?!:)"
+          "match": "(?<![^\\s\\[(;{])'(?!:)"
         },
         {
           "name": "keyword.operator.iterator.q",
@@ -249,7 +257,7 @@
         },
         {
           "name": "constant.numeric.number.q",
-          "match": "-?(?:\\d+\\.\\d*|\\.\\d+|\\d+)(?:e[+-]?\\d+)?[jhife]?"
+          "match": "-?(?:\\d+\\.\\d*|\\.\\d+|\\d+)(?:e[+-]?\\d+)?[cefhijnptuv]?"
         }
       ]
     },

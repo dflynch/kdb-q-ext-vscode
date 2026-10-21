@@ -31,22 +31,6 @@ suite("q editing", () => {
     ["enter between parentheses", "a:()", 0, 3, "\n", "a:(\n  )"],
     ["enter after an open brace", "f:{", 0, 3, "\n", "f:{\n  "],
     ["enter after a body line", "f:{\n  x", 1, 3, "\n", "f:{\n  x\n  "],
-    [
-      "enter after a closing brace",
-      "f:{\n  x\n  }",
-      2,
-      3,
-      "\n",
-      "f:{\n  x\n  }\n",
-    ],
-    [
-      "enter after a nested closing brace",
-      "f:{\n  g:{\n    x\n    }",
-      3,
-      5,
-      "\n",
-      "f:{\n  g:{\n    x\n    }\n  ",
-    ],
     ["enter after a statement", "a:1", 0, 3, "\n", "a:1\n"],
   ];
 

@@ -22,7 +22,12 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - All string escapes q accepts are highlighted: `\n`, `\t`, `\r` and octal
 - Every name in a `{[a;b]}` parameter list is highlighted as a parameter
 - System command arguments, such as the path in `\cd /tmp`, are no longer
-  highlighted as comments
+  highlighted as comments. This includes `\t:n` and `\ts:n`, and commands
+  q passes to the operating system, such as `\ls /tmp`
+- Numbers with temporal type suffixes, such as `3n`, `12t` and `1p`, are
+  one literal
+- Double-clicking, or Ctrl/Cmd + D, selects a whole dotted name (`a.b.c`)
+  or file handle (`` `:data/trades.csv ``)
 - Pressing Enter between brackets no longer moves the closing bracket to
   column 0, where q would read it as a new statement
 - Toggle Block Comment no longer produces invalid q

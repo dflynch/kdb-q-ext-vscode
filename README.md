@@ -6,8 +6,9 @@ A lightweight extension for kdb+/q programming.
 
 - Syntax highlighting for q, including the q 5 (KDB-X) keywords and
   `.Q`/`.z`/`.h`/`.j` namespaces
-- Editing that keeps q's layout valid: pressing Enter keeps closing
-  brackets indented, and block comments fold
+- Editing that keeps q's layout valid: pressing Enter between brackets keeps
+  the closing bracket indented (with `editor.autoIndent` at its default,
+  `full`, or `advanced`), and block comments fold
 - Run the selected text, or the current line, from \*.q files in the active
   terminal (e.g. a q session)
 

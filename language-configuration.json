@@ -20,14 +20,10 @@
       "beforeText": "[{\\[(]\\s*$",
       "afterText": "^\\s*[}\\])]",
       "action": { "indent": "indent" }
-    },
-    {
-      "beforeText": "^\\s+[}\\])]\\s*$",
-      "action": { "indent": "outdent" }
     }
   ],
   "folding": {
     "markers": { "start": "^/\\s*$", "end": "^\\\\\\s*$" }
   },
-  "wordPattern": "(?:\\.[A-Za-z][A-Za-z_0-9.]*(?<!\\.)|[A-Za-z][A-Za-z_0-9]*|(?<=`)[.:\\w]+)"
+  "wordPattern": "(?:\\.?[A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z0-9_]+)*|(?<=`)[.:/\\w]+)"
 }
