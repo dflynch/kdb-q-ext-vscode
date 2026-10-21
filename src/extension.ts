@@ -31,7 +31,7 @@ export function activate(context: vscode.ExtensionContext) {
         // Send the selected text to the terminal
         vscode.window.activeTerminal?.sendText(text);
       }
-    })
+    }),
   );
 }
 
