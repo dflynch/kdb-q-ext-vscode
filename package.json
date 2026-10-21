@@ -50,7 +50,7 @@
         "command": "kdb-q-ext-vscode.runSelectedText",
         "key": "ctrl+enter",
         "mac": "cmd+enter",
-        "when": "editorLangId == q"
+        "when": "editorTextFocus && editorLangId == q"
       }
     ]
   },
