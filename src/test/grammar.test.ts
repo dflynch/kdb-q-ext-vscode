@@ -246,6 +246,14 @@ suite("q grammar", () => {
 
     // Keywords
     [
+      "use",
+      "use`kx.log",
+      [
+        ["use", "keyword.control.import.q"],
+        ["`kx.log", "support.type.symbol.q"],
+      ],
+    ],
+    [
       "control flow",
       "if do while",
       [
@@ -625,6 +633,24 @@ suite("q grammar", () => {
         [".z.ts", "support.function.namespace.dotz.q"],
         [".h.ht", "support.function.namespace.http.q"],
         [".j.j", "support.function.namespace.json.q"],
+      ],
+    ],
+    [
+      "q 5 namespace members",
+      ".Q.sx .Q.L1 .Q.trpd .h.ka",
+      [
+        [".Q.sx", "support.function.namespace.utilities.q"],
+        [".Q.L1", "support.function.namespace.utilities.q"],
+        [".Q.trpd", "support.function.namespace.utilities.q"],
+        [".h.ka", "support.function.namespace.http.q"],
+      ],
+    ],
+    [
+      "removed namespace members",
+      ".Q.Cf .Q.Xf",
+      [
+        [".Q.Cf", "variable.other.q"],
+        [".Q.Xf", "variable.other.q"],
       ],
     ],
 

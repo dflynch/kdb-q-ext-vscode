@@ -111,6 +111,10 @@
     "keywords": {
       "patterns": [
         {
+          "name": "keyword.control.import.q",
+          "match": "\\buse\\b"
+        },
+        {
           "name": "keyword.control.q",
           "match": "\\b(?:if|do|while|exit|each|peach|over|scan|prior)\\b"
         },
@@ -196,7 +200,7 @@
       "patterns": [
         {
           "name": "support.function.namespace.http.q",
-          "match": "\\.h\\.(?:HOME|br|c0|c1|cd|code|d|data|eb|ec|ed|edsn|es|ex|fram|ha|hb|hc|he|hn|hnz|hp|hr|ht|hta|htac|htc|html|http|hu|hug|hy|iso8601|jx|logo|nbr|pre|sa|sb|sc|td|text|tx|ty|uh|val|xd|xmp|xs|xt)\\b"
+          "match": "\\.h\\.(?:HOME|br|c0|c1|cd|code|d|data|eb|ec|ed|edsn|es|ex|fram|ha|hb|hc|he|hn|hnz|hp|hr|ht|hta|htac|htc|html|http|hu|hug|hy|iso8601|jx|ka|logo|nbr|pre|sa|sb|sc|td|text|tx|ty|uh|val|xd|xmp|xs|xt)\\b"
         },
         {
           "name": "support.function.namespace.json.q",
@@ -204,7 +208,7 @@
         },
         {
           "name": "support.function.namespace.utilities.q",
-          "match": "\\.Q\\.(?:A|Aa|BP|Cf|DL|IN|K|L|Ll|Lp|Ls|Lu|Lx|M|MAP|S|V|Xf|a|a0|a1|a2|addmonths|addr|ajf0|an|b6|bc|bd|bp|bs|bt|btoa|btx|bu|bv|chk|cn|d0|dbg|dd|def|dpft|dpfts|dpt|dpts|dr|dsftg|dt|dw|en|ens|enx|enxs|err|f|fc|ff|fk|fl|fmt|foo|fp|fpn|fps|fqk|fql|fs|fsn|ft|fu|gc|gz|hap|hdpf|hg|hmb|host|hp|id|ind|j10|j12|jl8|k|l|lu|n|nA|nct|nv|opt|ord|p|p1|p2|par|pcnt|pl|pl0|pm|prf0|prr|ps|pt|q0|qa|qb|qd|qe|qp|qt|res|s|s1|s2|sbt|sha1|srr|sw|t|t0|tab|trp|ts|tt|tx|ty|ua|unm|v|view|vt|w|x0|x1|x10|x12|x2|xy)\\b"
+          "match": "\\.Q\\.(?:A|Aa|BP|DL|IN|K|L|L1|Ll|Lp|Ls|Lu|Lx|M|MAP|S|V|a|a0|a1|a2|addmonths|addr|ajf0|an|atob|b6|bc|bd|bp|bs|bt|btoa|btx|bu|bv|bvfp|bvi|cN|cfg|chk|cn|d0|dbg|dd|def|dpft|dpfts|dpt|dpts|dr|dsftg|dt|dw|en|ens|enx|enxs|err|f|fc|ff|fk|fl|fln|fmt|fobj|foo|fp|fpn|fps|fqk|fql|fs|fsn|ft|fu|gc|gz|hap|hdpf|hg|hmb|host|hp|id|ind|ipc|j10|j12|jl8|jp|k|l|ld|li|lim|lo|lu|m|n|nA|nct|nv|o|objp|opt|ord|p|p1|p2|par|pcnt|pfc|pl|pl0|pm|prf0|prr|ps|pt|q0|qO|qa|qb|qd|qe|qk|qp|qt|res|rp|s|s1|s2|sbt|sha1|sp|srr|sw|sx|t|t0|tab|tel|trp|trpd|ts|tt|tx|ty|ua|unm|v|view|vt|w|x0|x1|x10|x12|x2|xy)\\b"
         },
         {
           "name": "support.function.namespace.dotz.q",
