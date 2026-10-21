@@ -6,12 +6,11 @@ A lightweight extension for kdb+/q programming.
 
 - Syntax highlighting for q, including the q 5 (KDB-X) keywords and
   `.Q`/`.z`/`.h`/`.j` namespaces
+- Run the selected text, or the current line, in the active terminal (e.g. a
+  q session)
 - Editing that keeps q's layout valid: pressing Enter between brackets keeps
-  the closing bracket indented (with `editor.autoIndent` at its default,
-  `full`, or `advanced`), block comments fold, and Toggle Block Comment puts
-  the `/` and `\` markers on lines of their own at column 0, as q requires
-- Run the selected text, or the current line, from \*.q files in the active
-  terminal (e.g. a q session)
+  the closing bracket indented, Toggle Block Comment puts the `/` and `\`
+  markers on lines of their own at column 0, and block comments fold
 
 ### Running selected text
 
@@ -59,21 +58,9 @@ token.
 
 ## Commands
 
-| Command                      | Keybinding       | When                                   |
-| ---------------------------- | ---------------- | -------------------------------------- |
-| kdb+/q: Run Selected Text    | Ctrl/Cmd + Enter | editorTextFocus && editorLangId == 'q' |
-| kdb+/q: Toggle Block Comment | Shift + Alt + A  | editorTextFocus && editorLangId == 'q' |
+Both keybindings apply in q files.
 
-## Release Notes
-
-### 1.0.0
-
-Initial release
-
-### 1.0.1
-
-Add icon
-
-### 1.0.2
-
-Add language configuration
+| Command                      | Keybinding       |
+| ---------------------------- | ---------------- |
+| kdb+/q: Run Selected Text    | Ctrl/Cmd + Enter |
+| kdb+/q: Toggle Block Comment | Shift + Alt + A  |
