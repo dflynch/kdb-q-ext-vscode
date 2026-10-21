@@ -22,6 +22,7 @@ statement at a time, following the same rules as a q script:
 - Comments are removed, including block comments and everything after a lone
   `\`
 - System commands, such as `\l`, are sent as is
+- A string that spans lines keeps its line breaks, as `\n`
 
 ### Customizing colors
 
