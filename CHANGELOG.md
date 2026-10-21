@@ -30,7 +30,10 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
   or file handle (`` `:data/trades.csv ``)
 - Pressing Enter between brackets no longer moves the closing bracket to
   column 0, where q would read it as a new statement
-- Toggle Block Comment no longer produces invalid q
+- Toggle Block Comment (Shift+Alt+A) comments out the selected lines with
+  `/` and `\` marker lines at column 0, which works inside functions too, and
+  removes the markers of a block it is run in. It used to wrap the selection
+  inline, which q can't parse
 
 ### Added
 
@@ -38,6 +41,9 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
   `.h.ka`
 - Highlighting for signal (`'`), `x`/`y`/`z` as implicit parameters, and
   `k)` lines
+- Highlighting for casts (`` `int$ ``, `"j"$`, `` `$ ``, `7h$`), attributes
+  (`` `s# ``) and internal functions (`-11!`)
+- `.z.A`, `.z.M`, `.z.m` and `.z.v`, which q 5 defines
 - Folding for `/` … `\` block comments
 - A README section on customizing colors, with the scope for each kind of
   token

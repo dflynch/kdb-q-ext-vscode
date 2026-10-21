@@ -8,7 +8,8 @@ A lightweight extension for kdb+/q programming.
   `.Q`/`.z`/`.h`/`.j` namespaces
 - Editing that keeps q's layout valid: pressing Enter between brackets keeps
   the closing bracket indented (with `editor.autoIndent` at its default,
-  `full`, or `advanced`), and block comments fold
+  `full`, or `advanced`), block comments fold, and Toggle Block Comment puts
+  the `/` and `\` markers on lines of their own at column 0, as q requires
 - Run the selected text, or the current line, from \*.q files in the active
   terminal (e.g. a q session)
 
@@ -37,27 +38,30 @@ its own scope, so you can give it a color of your own in `settings.json`:
 }
 ```
 
-| Tokens                                          | Scope                                 |
-| ----------------------------------------------- | ------------------------------------- |
-| `if`, `$[`, `do`, `while`, `exit`, `'` (signal) | `keyword.control.*.q`                 |
-| `select`, `from`, `by`, `where`, …              | `keyword.other.qsql.q`                |
-| `count`, `each`, `0:`, …                        | `support.function.builtin.q`, `…io.q` |
-| `.Q.dd`, `.z.p`, `.h.ht`, `.j.j`                | `support.class.namespace.*.q`         |
-| `` `:data/trades.csv ``                         | `support.class.handle.q`              |
-| `` `sym ``                                      | `constant.language.symbol.q`          |
-| `0N`, `0w`, dates, times, numbers               | `constant.numeric.*.q`                |
-| `x`, `y`, `z` and `{[a;b]` parameters           | `variable.parameter.q`, `…implicit.q` |
-| `/ \ ' ': /: \:` (iterators)                    | `keyword.operator.iterator.q`         |
-| `\l`, `\t`, … and `k)`                          | `meta.preprocessor.*.q`               |
+| Tokens                                                  | Scope                                 |
+| ------------------------------------------------------- | ------------------------------------- |
+| `if`, `$[`, `do`, `while`, `exit`, `'` (signal)         | `keyword.control.*.q`                 |
+| `select`, `from`, `by`, `where`, …                      | `keyword.other.qsql.q`                |
+| `count`, `each`, `0:`, `-11!`, …                        | `support.function.builtin.*.q`        |
+| `` `int$ ``, `"j"$`, `` `$ `` (casts)                   | `support.type.cast.q`                 |
+| `` `s# ``, `` `u# ``, `` `p# ``, `` `g# `` (attributes) | `storage.modifier.attribute.q`        |
+| `.Q.dd`, `.z.p`, `.h.ht`, `.j.j`                        | `support.class.namespace.*.q`         |
+| `` `:data/trades.csv ``                                 | `support.class.handle.q`              |
+| `` `sym ``                                              | `constant.language.symbol.q`          |
+| `0N`, `0w`, dates, times, numbers                       | `constant.numeric.*.q`                |
+| `x`, `y`, `z` and `{[a;b]` parameters                   | `variable.parameter.q`, `…implicit.q` |
+| `/ \ ' ': /: \:` (iterators)                            | `keyword.operator.iterator.q`         |
+| `\l`, `\t`, … and `k)`                                  | `meta.preprocessor.*.q`               |
 
 Run **Developer: Inspect Editor Tokens and Scopes** to see the scope of any
 token.
 
 ## Commands
 
-| Command                   | Keybinding       | When                                   |
-| ------------------------- | ---------------- | -------------------------------------- |
-| kdb+/q: Run Selected Text | Ctrl/Cmd + Enter | editorTextFocus && editorLangId == 'q' |
+| Command                      | Keybinding       | When                                   |
+| ---------------------------- | ---------------- | -------------------------------------- |
+| kdb+/q: Run Selected Text    | Ctrl/Cmd + Enter | editorTextFocus && editorLangId == 'q' |
+| kdb+/q: Toggle Block Comment | Shift + Alt + A  | editorTextFocus && editorLangId == 'q' |
 
 ## Release Notes
 

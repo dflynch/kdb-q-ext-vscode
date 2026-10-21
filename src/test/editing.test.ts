@@ -63,4 +63,72 @@ suite("q editing", () => {
     });
     assert.deepStrictEqual(visible, [0, 1, 5]);
   });
+
+  // [text, selection] before and after Toggle Block Comment
+  const blockComments: [string, string, number[], string, number[]][] = [
+    [
+      "comment out lines inside a function",
+      "f:{\n  a:1;\n  b:2;\n  a}",
+      [2, 0, 2, 6],
+      "f:{\n  a:1;\n/\n  b:2;\n\\\n  a}",
+      [3, 0, 3, 6],
+    ],
+    [
+      "comment out lines ending at column 0",
+      "a:1\nb:2\nc:3",
+      [0, 0, 2, 0],
+      "/\na:1\nb:2\n\\\nc:3",
+      [1, 0, 3, 0],
+    ],
+    [
+      "comment out lines up to a \\ ending the script",
+      "a\n\\\nb",
+      [0, 0, 2, 1],
+      "/\na\n\\\n\\\nb",
+      [1, 0, 4, 1],
+    ],
+    [
+      "uncomment a block",
+      "a:1\n/\nb:2\n\\\nc:3",
+      [2, 1, 2, 1],
+      "a:1\nb:2\nc:3",
+      [1, 1, 1, 1],
+    ],
+    [
+      "uncomment a block at the end of the file",
+      "a:1\n/\n\\",
+      [1, 0, 1, 0],
+      "a:1",
+      [0, 3, 0, 3],
+    ],
+  ];
+
+  for (const [name, before, from, after, to] of blockComments) {
+    test(name, async () => {
+      const editor = await open(before);
+      editor.selection = new vscode.Selection(
+        from[0],
+        from[1],
+        from[2],
+        from[3],
+      );
+      await vscode.commands.executeCommand(
+        "kdb-q-ext-vscode.toggleBlockComment",
+      );
+      assert.strictEqual(editor.document.getText(), after);
+      const { start, end } = editor.selection;
+      assert.deepStrictEqual(
+        [start.line, start.character, end.line, end.character],
+        to,
+      );
+    });
+  }
+
+  test("toggle block comment twice", async () => {
+    const editor = await open("a:1\nb:2");
+    editor.selection = new vscode.Selection(1, 0, 1, 0);
+    await vscode.commands.executeCommand("kdb-q-ext-vscode.toggleBlockComment");
+    await vscode.commands.executeCommand("kdb-q-ext-vscode.toggleBlockComment");
+    assert.strictEqual(editor.document.getText(), "a:1\nb:2");
+  });
 });

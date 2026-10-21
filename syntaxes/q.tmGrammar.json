@@ -12,6 +12,9 @@
       "include": "#lambdas"
     },
     {
+      "include": "#casts"
+    },
+    {
       "include": "#strings"
     },
     {
@@ -69,6 +72,9 @@
           "patterns": [
             {
               "include": "#lambdas"
+            },
+            {
+              "include": "#casts"
             },
             {
               "include": "#strings"
@@ -188,6 +194,10 @@
           "match": "(?<![\\w.])[012]:"
         },
         {
+          "name": "support.function.builtin.internal.q",
+          "match": "(?<![\\w)\\]}\"])-\\d+!"
+        },
+        {
           "name": "keyword.operator.arithmetic.q",
           "match": "(?<=[\\w)\\]}\"])-|-(?!\\.?\\d)|[+*%]"
         },
@@ -212,8 +222,12 @@
           "match": "`:[.:/\\w]*"
         },
         {
+          "name": "storage.modifier.attribute.q",
+          "match": "`[spgu]?(?=#)"
+        },
+        {
           "name": "constant.language.symbol.q",
-          "match": "`[.:\\w]*"
+          "match": "(?:`[.:\\w]*)+"
         },
         {
           "name": "constant.numeric.datetime.q",
@@ -277,7 +291,7 @@
         },
         {
           "name": "support.class.namespace.dotz.q",
-          "match": "\\.z\\.(?:D|H|K|N|P|T|W|X|Z|a|ac|b|bm|c|d|e|ex|exit|ey|f|h|i|k|l|n|o|p|pc|pd|pg|ph|pi|pm|po|pp|pq|ps|pw|q|r|s|t|ts|u|vs|w|wc|wo|ws|x|z|zd)\\b"
+          "match": "\\.z\\.(?:A|D|H|K|M|N|P|T|W|X|Z|a|ac|b|bm|c|d|e|ex|exit|ey|f|h|i|k|l|m|n|o|p|pc|pd|pg|ph|pi|pm|po|pp|pq|ps|pw|q|r|s|t|ts|u|v|vs|w|wc|wo|ws|x|z|zd)\\b"
         }
       ]
     },
@@ -310,6 +324,22 @@
         {
           "name": "punctuation.separator.q",
           "match": ";"
+        }
+      ]
+    },
+    "casts": {
+      "patterns": [
+        {
+          "name": "support.type.cast.q",
+          "match": "`(?:boolean|guid|byte|short|int|long|real|float|char|symbol|timestamp|month|date|datetime|timespan|minute|second|time|year|mm|dd|hh|uu|ss|week)?(?=\\$)"
+        },
+        {
+          "name": "support.type.cast.q",
+          "match": "\"[bcdefghijmnpstuvxzBCDEFGHIJMNPSTUVXZ*]\"(?=\\$)"
+        },
+        {
+          "name": "support.type.cast.q",
+          "match": "(?<![\\w.])\\d+h(?=\\$)"
         }
       ]
     }

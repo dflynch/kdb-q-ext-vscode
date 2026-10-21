@@ -43,6 +43,11 @@
         "command": "kdb-q-ext-vscode.runSelectedText",
         "category": "kdb+/q",
         "title": "Run Selected Text"
+      },
+      {
+        "command": "kdb-q-ext-vscode.toggleBlockComment",
+        "category": "kdb+/q",
+        "title": "Toggle Block Comment"
       }
     ],
     "keybindings": [
@@ -51,6 +56,11 @@
         "key": "ctrl+enter",
         "mac": "cmd+enter",
         "when": "editorTextFocus && editorLangId == q"
+      },
+      {
+        "command": "kdb-q-ext-vscode.toggleBlockComment",
+        "key": "shift+alt+a",
+        "when": "editorTextFocus && !editorReadonly && editorLangId == q"
       }
     ]
   },
