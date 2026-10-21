@@ -8,6 +8,11 @@ async function open(content: string) {
   });
   const editor = await vscode.window.showTextDocument(doc);
   editor.options = { insertSpaces: true, tabSize: 2 };
+  // Use the content's line endings, or LF, rather than the OS default
+  const eol = content.includes("\r\n")
+    ? vscode.EndOfLine.CRLF
+    : vscode.EndOfLine.LF;
+  await editor.edit((edit) => edit.setEndOfLine(eol));
   // VS Code skips language indent rules on lines it hasn't tokenized yet
   await vscode.commands.executeCommand("editor.action.forceRetokenize");
   return editor;
@@ -100,6 +105,20 @@ suite("q editing", () => {
       [1, 0, 1, 0],
       "a:1",
       [0, 3, 0, 3],
+    ],
+    [
+      "comment out lines with CRLF line endings",
+      "a:1\r\nb:2",
+      [0, 0, 0, 0],
+      "/\r\na:1\r\n\\\r\nb:2",
+      [1, 0, 1, 0],
+    ],
+    [
+      "uncomment a block with CRLF line endings",
+      "a:1\r\n/\r\nb:2\r\n\\\r\nc:3",
+      [2, 1, 2, 1],
+      "a:1\r\nb:2\r\nc:3",
+      [1, 1, 1, 1],
     ],
   ];
 
