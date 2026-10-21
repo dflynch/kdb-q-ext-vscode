@@ -597,13 +597,18 @@ suite("q grammar", () => {
     // Literals
     [
       "symbols",
-      "`abc`a.b`a_1 `",
+      "`abc `a.b `a_1 `",
       [
         ["`abc", "constant.language.symbol.q"],
         ["`a.b", "constant.language.symbol.q"],
         ["`a_1", "constant.language.symbol.q"],
         ["`", "constant.language.symbol.q"],
       ],
+    ],
+    [
+      "symbol list",
+      "`abc`a.b``a_1",
+      [["`abc`a.b``a_1", "constant.language.symbol.q"]],
     ],
     [
       "handles",
@@ -842,6 +847,38 @@ suite("q grammar", () => {
         ["`a", "constant.language.symbol.q"],
         ["#", "keyword.operator.q"],
         ["t", "source.q"],
+      ],
+    ],
+    [
+      "symbol lists before # and $ are not attributes or casts",
+      "`a`p#t;`a`int$x;`a`$y",
+      [
+        ["`a`p", "constant.language.symbol.q"],
+        ["#", "keyword.operator.q"],
+        ["t", "source.q"],
+        [";", "punctuation.separator.q"],
+        ["`a`int", "constant.language.symbol.q"],
+        ["$", "keyword.operator.q"],
+        ["x", "source.q"],
+        [";", "punctuation.separator.q"],
+        ["`a`", "constant.language.symbol.q"],
+        ["$", "keyword.operator.q"],
+        ["y", "source.q"],
+      ],
+    ],
+    [
+      "attribute and cast after a name or a spaced symbol",
+      "x`int$y;`a `s#z",
+      [
+        ["x", "source.q"],
+        ["`int", "support.type.cast.q"],
+        ["$", "keyword.operator.q"],
+        ["y", "source.q"],
+        [";", "punctuation.separator.q"],
+        ["`a", "constant.language.symbol.q"],
+        ["`s", "storage.modifier.attribute.q"],
+        ["#", "keyword.operator.q"],
+        ["z", "source.q"],
       ],
     ],
 
