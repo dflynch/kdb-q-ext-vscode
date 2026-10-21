@@ -8,7 +8,8 @@ A lightweight extension for kdb+/q programming.
   `.Q`/`.z`/`.h`/`.j` namespaces
 - Editing that keeps q's layout valid: pressing Enter between brackets keeps
   the closing bracket indented (with `editor.autoIndent` at its default,
-  `full`, or `advanced`), and block comments fold
+  `full`, or `advanced`), block comments fold, and Toggle Block Comment puts
+  the `/` and `\` markers on lines of their own at column 0, as q requires
 - Run the selected text, or the current line, from \*.q files in the active
   terminal (e.g. a q session)
 
@@ -57,9 +58,10 @@ token.
 
 ## Commands
 
-| Command                   | Keybinding       | When                                   |
-| ------------------------- | ---------------- | -------------------------------------- |
-| kdb+/q: Run Selected Text | Ctrl/Cmd + Enter | editorTextFocus && editorLangId == 'q' |
+| Command                      | Keybinding       | When                                   |
+| ---------------------------- | ---------------- | -------------------------------------- |
+| kdb+/q: Run Selected Text    | Ctrl/Cmd + Enter | editorTextFocus && editorLangId == 'q' |
+| kdb+/q: Toggle Block Comment | Shift + Alt + A  | editorTextFocus && editorLangId == 'q' |
 
 ## Release Notes
 
