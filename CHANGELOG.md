@@ -38,6 +38,9 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
   `.h.ka`
 - Highlighting for signal (`'`), `x`/`y`/`z` as implicit parameters, and
   `k)` lines
+- Highlighting for casts (`` `int$ ``, `"j"$`, `` `$ ``, `7h$`), attributes
+  (`` `s# ``) and internal functions (`-11!`)
+- `.z.A`, `.z.M`, `.z.m` and `.z.v`, which q 5 defines
 - Folding for `/` … `\` block comments
 - A README section on customizing colors, with the scope for each kind of
   token

@@ -12,6 +12,9 @@
       "include": "#lambdas"
     },
     {
+      "include": "#casts"
+    },
+    {
       "include": "#strings"
     },
     {
@@ -69,6 +72,9 @@
           "patterns": [
             {
               "include": "#lambdas"
+            },
+            {
+              "include": "#casts"
             },
             {
               "include": "#strings"
@@ -188,6 +194,10 @@
           "match": "(?<![\\w.])[012]:"
         },
         {
+          "name": "support.function.builtin.internal.q",
+          "match": "(?<![\\w)\\]}\"])-\\d+!"
+        },
+        {
           "name": "keyword.operator.arithmetic.q",
           "match": "(?<=[\\w)\\]}\"])-|-(?!\\.?\\d)|[+*%]"
         },
@@ -210,6 +220,10 @@
         {
           "name": "support.class.handle.q",
           "match": "`:[.:/\\w]*"
+        },
+        {
+          "name": "storage.modifier.attribute.q",
+          "match": "`[spgu]?(?=#)"
         },
         {
           "name": "constant.language.symbol.q",
@@ -310,6 +324,22 @@
         {
           "name": "punctuation.separator.q",
           "match": ";"
+        }
+      ]
+    },
+    "casts": {
+      "patterns": [
+        {
+          "name": "support.type.cast.q",
+          "match": "`(?:boolean|guid|byte|short|int|long|real|float|char|symbol|timestamp|month|date|datetime|timespan|minute|second|time|year|mm|dd|hh|uu|ss|week)?(?=\\$)"
+        },
+        {
+          "name": "support.type.cast.q",
+          "match": "\"[bcdefghijmnpstuvxzBCDEFGHIJMNPSTUVXZ*]\"(?=\\$)"
+        },
+        {
+          "name": "support.type.cast.q",
+          "match": "(?<![\\w.])\\d+h(?=\\$)"
         }
       ]
     }

@@ -37,18 +37,20 @@ its own scope, so you can give it a color of your own in `settings.json`:
 }
 ```
 
-| Tokens                                          | Scope                                 |
-| ----------------------------------------------- | ------------------------------------- |
-| `if`, `$[`, `do`, `while`, `exit`, `'` (signal) | `keyword.control.*.q`                 |
-| `select`, `from`, `by`, `where`, …              | `keyword.other.qsql.q`                |
-| `count`, `each`, `0:`, …                        | `support.function.builtin.q`, `…io.q` |
-| `.Q.dd`, `.z.p`, `.h.ht`, `.j.j`                | `support.class.namespace.*.q`         |
-| `` `:data/trades.csv ``                         | `support.class.handle.q`              |
-| `` `sym ``                                      | `constant.language.symbol.q`          |
-| `0N`, `0w`, dates, times, numbers               | `constant.numeric.*.q`                |
-| `x`, `y`, `z` and `{[a;b]` parameters           | `variable.parameter.q`, `…implicit.q` |
-| `/ \ ' ': /: \:` (iterators)                    | `keyword.operator.iterator.q`         |
-| `\l`, `\t`, … and `k)`                          | `meta.preprocessor.*.q`               |
+| Tokens                                                  | Scope                                 |
+| ------------------------------------------------------- | ------------------------------------- |
+| `if`, `$[`, `do`, `while`, `exit`, `'` (signal)         | `keyword.control.*.q`                 |
+| `select`, `from`, `by`, `where`, …                      | `keyword.other.qsql.q`                |
+| `count`, `each`, `0:`, `-11!`, …                        | `support.function.builtin.*.q`        |
+| `` `int$ ``, `"j"$`, `` `$ `` (casts)                   | `support.type.cast.q`                 |
+| `` `s# ``, `` `u# ``, `` `p# ``, `` `g# `` (attributes) | `storage.modifier.attribute.q`        |
+| `.Q.dd`, `.z.p`, `.h.ht`, `.j.j`                        | `support.class.namespace.*.q`         |
+| `` `:data/trades.csv ``                                 | `support.class.handle.q`              |
+| `` `sym ``                                              | `constant.language.symbol.q`          |
+| `0N`, `0w`, dates, times, numbers                       | `constant.numeric.*.q`                |
+| `x`, `y`, `z` and `{[a;b]` parameters                   | `variable.parameter.q`, `…implicit.q` |
+| `/ \ ' ': /: \:` (iterators)                            | `keyword.operator.iterator.q`         |
+| `\l`, `\t`, … and `k)`                                  | `meta.preprocessor.*.q`               |
 
 Run **Developer: Inspect Editor Tokens and Scopes** to see the scope of any
 token.
