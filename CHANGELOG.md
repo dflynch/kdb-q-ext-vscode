@@ -50,6 +50,8 @@ All notable changes to the extension are documented in this file.
   handle
 - Pressing Enter between brackets no longer moves the closing bracket to
   column 0, where q would read it as a new statement
+- Block comments nest, as in q, for highlighting, Run Selected Text and
+  Toggle Block Comment
 
 ## [1.0.2]
 

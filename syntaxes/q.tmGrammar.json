@@ -37,9 +37,7 @@
     "comments": {
       "patterns": [
         {
-          "name": "comment.block.q",
-          "begin": "^\\/\\s*$",
-          "end": "^\\\\\\s*$"
+          "include": "#blockComment"
         },
         {
           "name": "comment.block.eof.q",
@@ -48,6 +46,16 @@
         {
           "name": "comment.line.slash.q",
           "match": "(?:(?<=[ \\t])|(?<!.))\\/.*"
+        }
+      ]
+    },
+    "blockComment": {
+      "name": "comment.block.q",
+      "begin": "^\\/\\s*$",
+      "end": "^\\\\\\s*$",
+      "patterns": [
+        {
+          "include": "#blockComment"
         }
       ]
     },

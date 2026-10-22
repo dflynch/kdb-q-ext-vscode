@@ -41,6 +41,12 @@ suite("statements.flatten", () => {
       ["a:1", "b:2"],
     ],
     ["unterminated block comment", "a:1\n/\nnote\nb:2", ["a:1"]],
+    [
+      "nested block comments",
+      "a:1\n/\nb:2\n/\nc:3\n\\\nd:4\n\\\ne:5",
+      ["a:1", "e:5"],
+    ],
+    ["unterminated outer block comment", "a:1\n/\n/\nb:2\n\\\nc:3", ["a:1"]],
     ["end-of-file comment", "a:1\n\\\nb:2", ["a:1"]],
 
     // Multi-line strings
