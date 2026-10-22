@@ -30,23 +30,14 @@ export class OverLimit extends Error {
     compressed = false,
   ) {
     super(
-      `the result is ${bytes(size)}${compressed ? " compressed" : ""}, over the ${bytes(limit)} limit`,
+      `the result is ${bytes(size)} bytes${compressed ? " compressed" : ""}, over the ${bytes(limit)} byte limit`,
     );
   }
 }
 
-// A size in the largest unit that keeps it at 1 or more
-export function bytes(n: number): string {
-  for (const [unit, scale] of [
-    ["GB", 1e9],
-    ["MB", 1e6],
-    ["KB", 1e3],
-  ] as const) {
-    if (n >= scale) {
-      return `${Number((n / scale).toFixed(1))} ${unit}`;
-    }
-  }
-  return `${n} bytes`;
+// Exact, as rounding could show a size just over the limit as equal to it
+function bytes(n: number): string {
+  return n.toLocaleString("en-US");
 }
 
 const what = ["async message", "sync call", "response"];
@@ -212,7 +203,11 @@ export class Connection {
         // A compressed message's length uncompressed comes after its header:
         // checked before the rest arrives, and bounding what decompressing
         // it allocates
-        if (this.message[2] && this.received >= 12 && this.received - n < 12) {
+        if (
+          this.message[2] === 1 &&
+          this.received >= 12 &&
+          this.received - n < 12
+        ) {
           const length = this.message[0]
             ? this.message.readUInt32LE(8)
             : this.message.readUInt32BE(8);

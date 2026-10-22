@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import * as net from "node:net";
 import * as path from "node:path";
 import { encode } from "../codec/encode";
-import { bytes, Connection, OverLimit, QError } from "../connection";
+import { Connection, OverLimit, QError } from "../connection";
 
 const fixtures: { name: string; bytes: string; compressed?: string }[] =
   JSON.parse(
@@ -304,7 +304,7 @@ suite("connection", () => {
       connection.query("x"),
       (error) =>
         error instanceof OverLimit &&
-        error.message === "the result is 17 bytes, over the 16 bytes limit",
+        error.message === "the result is 17 bytes, over the 16 byte limit",
     );
     await server.closed;
   });
@@ -342,12 +342,11 @@ suite("connection", () => {
     connection.close();
   });
 
-  test("sizes in the largest unit that keeps them at 1 or more", () => {
-    assert.strictEqual(bytes(999), "999 bytes");
-    assert.strictEqual(bytes(1000), "1 KB");
-    assert.strictEqual(bytes(1_500_000), "1.5 MB");
-    assert.strictEqual(bytes(10e6), "10 MB");
-    assert.strictEqual(bytes(2_345_678_901), "2.3 GB");
+  test("sizes are exact, so one just over the limit doesn't read as equal to it", () => {
+    assert.strictEqual(
+      new OverLimit(10_000_001, 10e6, true).message,
+      "the result is 10,000,001 bytes compressed, over the 10,000,000 byte limit",
+    );
   });
 
   test("one query at a time", async () => {
