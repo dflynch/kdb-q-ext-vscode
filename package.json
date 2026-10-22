@@ -51,6 +51,18 @@
         "title": "Toggle Block Comment"
       }
     ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "kdb-q-ext-vscode.runSelectedText",
+          "when": "editorLangId == q"
+        },
+        {
+          "command": "kdb-q-ext-vscode.toggleBlockComment",
+          "when": "!editorReadonly && editorLangId == q"
+        }
+      ]
+    },
     "keybindings": [
       {
         "command": "kdb-q-ext-vscode.runSelectedText",
