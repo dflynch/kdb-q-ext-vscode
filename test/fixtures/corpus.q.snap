@@ -1102,7 +1102,7 @@
   62 "#" keyword.operator.q
   63 "`p`q`p" constant.language.symbol.q
   69 ")" -
-> table.stringColumn:([] s:("ab";"c"); n:1 2)
+> table.stringColumn:([] s:("ab";enlist "c";""); n:1 2 3)
   0 "table.stringColumn" -
   18 ":" keyword.operator.assignment.q
   19 "([] " -
@@ -1113,16 +1113,21 @@
   27 "ab" string.quoted.double.q
   29 "\"" string.quoted.double.q
   30 ";" punctuation.separator.q
-  31 "\"" string.quoted.double.q
-  32 "c" string.quoted.double.q
-  33 "\"" string.quoted.double.q
-  34 ")" -
-  35 ";" punctuation.separator.q
-  37 "n" -
-  38 ":" keyword.operator.assignment.q
-  39 "1" constant.numeric.number.q
-  41 "2" constant.numeric.number.q
-  42 ")" -
+  31 "enlist" support.function.builtin.q
+  38 "\"" string.quoted.double.q
+  39 "c" string.quoted.double.q
+  40 "\"" string.quoted.double.q
+  41 ";" punctuation.separator.q
+  42 "\"" string.quoted.double.q
+  43 "\"" string.quoted.double.q
+  44 ")" -
+  45 ";" punctuation.separator.q
+  47 "n" -
+  48 ":" keyword.operator.assignment.q
+  49 "1" constant.numeric.number.q
+  51 "2" constant.numeric.number.q
+  53 "3" constant.numeric.number.q
+  54 ")" -
 > table.nestedColumn:([] v:(1 2;3 4 5))
   0 "table.nestedColumn" -
   18 ":" keyword.operator.assignment.q
@@ -1137,6 +1142,22 @@
   32 "4" constant.numeric.number.q
   34 "5" constant.numeric.number.q
   35 "))" -
+> table.charColumns:([] a:"ab"; b:"cd")
+  0 "table.charColumns" -
+  17 ":" keyword.operator.assignment.q
+  18 "([] " -
+  22 "a" -
+  23 ":" keyword.operator.assignment.q
+  24 "\"" string.quoted.double.q
+  25 "ab" string.quoted.double.q
+  27 "\"" string.quoted.double.q
+  28 ";" punctuation.separator.q
+  30 "b" -
+  31 ":" keyword.operator.assignment.q
+  32 "\"" string.quoted.double.q
+  33 "cd" string.quoted.double.q
+  35 "\"" string.quoted.double.q
+  36 ")" -
 > / -8! sends an enumeration as plain symbols
   0 "/ -8! sends an enumeration as plain symbols" comment.line.slash.q
 > table.enumerated:([] sym:`.corpus.domain?`a`b`a)
@@ -1253,6 +1274,20 @@
   19 "[" -
   20 "1" constant.numeric.number.q
   21 "]" -
+> fn.elided:{x+y+z}[;1]
+  0 "fn.elided" -
+  9 ":" keyword.operator.assignment.q
+  10 "{" -
+  11 "x" variable.parameter.implicit.q
+  12 "+" keyword.operator.arithmetic.q
+  13 "y" variable.parameter.implicit.q
+  14 "+" keyword.operator.arithmetic.q
+  15 "z" variable.parameter.implicit.q
+  16 "}" -
+  17 "[" -
+  18 ";" punctuation.separator.q
+  19 "1" constant.numeric.number.q
+  20 "]" -
 > fn.composition:('[neg;abs])
   0 "fn.composition" -
   14 ":" keyword.operator.assignment.q

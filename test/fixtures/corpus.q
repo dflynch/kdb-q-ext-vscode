@@ -200,8 +200,9 @@ table.keyed:([sym:`a`b] price:1.5 2.5)
 table.multiKeyed:([sym:`a`b; ex:`n`l] price:1.5 2.5)
 table.sortedKeyed:`s#([sym:`a`b] price:1.5 2.5)
 table.attributes:([] p:`p#1 1 2; s:`s#1 2 3; u:`u#`x`y`z; g:`g#`p`q`p)
-table.stringColumn:([] s:("ab";"c"); n:1 2)
+table.stringColumn:([] s:("ab";enlist "c";""); n:1 2 3)
 table.nestedColumn:([] v:(1 2;3 4 5))
+table.charColumns:([] a:"ab"; b:"cd")
 / -8! sends an enumeration as plain symbols
 table.enumerated:([] sym:`.corpus.domain?`a`b`a)
 
@@ -217,6 +218,7 @@ fn.multiLine:{[t;n]
   r }
 fn.global:{[v] `.corpus.fn.seen set v; v}
 fn.projection:{x+y}[1]
+fn.elided:{x+y+z}[;1]
 fn.composition:('[neg;abs])
 fn.operator:(+)
 fn.iterator:(/)

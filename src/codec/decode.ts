@@ -1,10 +1,19 @@
-import type { Atom, Texts, Value, Vector } from "./types";
+import {
+  type Atom,
+  count,
+  type List,
+  type QFunction,
+  type Table,
+  type Texts,
+  type Value,
+  type Vector,
+} from "./types";
 
 // Keeping a leading byte-order mark, which q would show as part of the symbol
 const utf8 = new TextDecoder("utf-8", { ignoreBOM: true });
 
-// Decode a q IPC message, as a server sends it or -8! writes it. So far this
-// covers atoms and vectors; any other type throws.
+// Decode a q IPC message, as a server sends it or -8! writes it. Compressed
+// messages and foreign objects throw.
 export function decode(message: Uint8Array): Value {
   if (message.length < 8) {
     throw new Error("the message ends early");
@@ -58,7 +67,155 @@ class Reader {
     if (type > 0 && type <= 19 && type !== 3) {
       return this.vector(type);
     }
-    throw new Error(`type ${type} isn't supported yet`);
+    switch (type) {
+      case 0:
+        return this.list();
+      case 98:
+        return this.table();
+      case 99:
+      case 127:
+        return this.dictionary(type);
+      case 100:
+        return this.lambda();
+      case 101:
+      case 102:
+      case 103:
+        return { type, code: this.message[this.take(1)] };
+      case 104:
+      case 105:
+        return { type, parts: this.values(this.uint32(this.take(4))) };
+      case 106:
+      case 107:
+      case 108:
+      case 109:
+      case 110:
+      case 111:
+        return { type, value: this.value() };
+      case -128:
+        return { type, message: utf8.decode(this.symbol()) };
+    }
+    throw new Error(`type ${type} isn't supported`);
+  }
+
+  private values(count: number): Value[] {
+    const values: Value[] = [];
+    for (let i = 0; i < count; i++) {
+      values.push(this.value());
+    }
+    return values;
+  }
+
+  private list(): List {
+    const attribute = this.attribute();
+    const count = this.uint32(this.take(4));
+    const strings = this.strings(count);
+    if (strings) {
+      return { type: 0, attribute, strings };
+    }
+    return { type: 0, attribute, items: this.values(count) };
+  }
+
+  // The items of a list of strings end to end, or nothing if the list is
+  // empty or any item isn't a char vector without an attribute. Every item's
+  // header is checked before anything is copied, so a string column makes no
+  // object per string.
+  private strings(count: number): Texts | undefined {
+    const message = this.message;
+    let at = this.offset;
+    let total = 0;
+    for (let i = 0; i < count; i++) {
+      if (at + 6 > message.length || message[at] !== 10 || message[at + 1]) {
+        return undefined;
+      }
+      const length = this.uint32(at + 2);
+      total += length;
+      at += 6 + length;
+    }
+    if (count === 0 || at > message.length) {
+      return undefined;
+    }
+    const bytes = new Uint8Array(total);
+    const offsets = new Uint32Array(count + 1);
+    for (let i = 0; i < count; i++) {
+      const length = this.uint32(this.take(6) + 2);
+      const start = this.take(length);
+      // Byte by byte: subarray would make an object per string
+      for (let j = 0; j < length; j++) {
+        bytes[offsets[i] + j] = message[start + j];
+      }
+      offsets[i + 1] = offsets[i] + length;
+    }
+    return { bytes, offsets };
+  }
+
+  private dictionary(type: 99 | 127): Value {
+    const keys = this.value();
+    const values = this.value();
+    const length = count(keys);
+    if (length === undefined || length !== count(values)) {
+      throw new Error("a dictionary's keys and values don't match in length");
+    }
+    return { type, keys, values };
+  }
+
+  // A table is a flag, then a dictionary from its column names to a list of
+  // its columns, or to a symbol for a table on the server's disk
+  private table(): Table {
+    const attribute = this.attribute();
+    if (this.message[this.take(1)] !== 99) {
+      throw new Error("a table without its dictionary");
+    }
+    const names = this.value();
+    if (names.type !== 11) {
+      throw new Error("a table's column names aren't symbols");
+    }
+    const { bytes, offsets } = names.data;
+    const columns = [...offsets.subarray(1)].map((end, i) =>
+      utf8.decode(bytes.subarray(offsets[i], end)),
+    );
+    const kind = this.view.getInt8(this.take(1));
+    if (kind === -11) {
+      return {
+        type: 98,
+        attribute,
+        columns,
+        reference: utf8.decode(this.symbol()),
+      };
+    }
+    if (kind !== 0) {
+      throw new Error(`a table's columns are type ${kind}`);
+    }
+    this.attribute();
+    // Read item by item, so that columns which are all char vectors aren't
+    // taken for a list of strings
+    const length = this.uint32(this.take(4));
+    if (length !== columns.length) {
+      throw new Error(
+        `a table has ${columns.length} names but ${length} columns`,
+      );
+    }
+    const data: (Vector | List)[] = [];
+    for (const column of this.values(length)) {
+      if (column.type < 0 || column.type > 19) {
+        throw new Error(`a table column is type ${column.type}`);
+      }
+      data.push(column as Vector | List);
+    }
+    const rows = new Set(data.map((column) => count(column)));
+    if (rows.size > 1) {
+      throw new Error("a table's columns don't match in length");
+    }
+    return { type: 98, attribute, columns, data };
+  }
+
+  // A lambda is the namespace it was defined in, then its source
+  private lambda(): QFunction {
+    const context = utf8.decode(this.symbol());
+    const source = this.value();
+    if (source.type !== 10) {
+      throw new Error("a lambda's source isn't a string");
+    }
+    return { type: 100, context, source: utf8.decode(source.data) };
   }
 
   private atom(type: number): Atom {
@@ -94,10 +251,7 @@ class Reader {
   }
 
   private vector(type: number): Vector {
-    const attribute = this.message[this.take(1)];
-    if (attribute > 4) {
-      throw new Error(`attribute ${attribute} isn't one of q's`);
-    }
+    const attribute = this.attribute();
     const count = this.uint32(this.take(4));
     switch (type) {
       case 1:
@@ -169,6 +323,14 @@ class Reader {
       }
     }
     return { bytes, offsets };
+  }
+
+  private attribute(): number {
+    const attribute = this.message[this.take(1)];
+    if (attribute > 4) {
+      throw new Error(`attribute ${attribute} isn't one of q's`);
+    }
+    return attribute;
   }
 
   // A symbol's bytes, up to the 0 byte that ends it
