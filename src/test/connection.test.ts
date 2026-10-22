@@ -150,7 +150,7 @@ suite("connection", () => {
     const server = await fake();
     server.stop();
     await assert.rejects(open(server), {
-      message: "hop. OS reports: connection refused",
+      message: "hop. OS reports: Connection refused",
     });
   });
 

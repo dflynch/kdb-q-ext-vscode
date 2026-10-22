@@ -57,32 +57,52 @@ export class Connection {
     return new Promise((resolve, reject) => {
       const socket = net.connect(server.port, server.host);
       socket.setNoDelay(true);
-      socket.setTimeout(server.timeout ?? 5000);
-      const fail = (error: Error) => {
-        socket.destroy();
-        reject(error);
-      };
-      socket.once("connect", () => {
+      // A deadline for connecting and logging in together; the socket's own
+      // timeout would restart with every write and read
+      const timer = setTimeout(
+        () => fail(new Error("timeout")),
+        server.timeout ?? 5000,
+      );
+      const login = () => {
         // Version 3: compression, timestamps, timespans and GUIDs
-        const login = `${server.user ?? ""}:${server.password ?? ""}\x03\x00`;
-        socket.write(login, "utf8");
-      });
-      socket.once("timeout", () => fail(new Error("timeout")));
+        socket.write(
+          `${server.user ?? ""}:${server.password ?? ""}\x03\x00`,
+          "utf8",
+        );
+      };
       // q names the host when it can't be found, and says hop otherwise
-      socket.once("error", (cause: NodeJS.ErrnoException) => {
-        const word = cause.code === "ENOTFOUND" ? server.host : "hop";
+      const error = (cause: NodeJS.ErrnoException) => {
+        const word = cause.syscall === "getaddrinfo" ? server.host : "hop";
         const reason =
           cause.errno === undefined
             ? cause.message
             : getSystemErrorMessage(cause.errno);
-        fail(new Error(`${word}. OS reports: ${reason}`, { cause }));
-      });
-      socket.once("close", () => fail(new Error("access")));
-      socket.once("data", (chunk) => {
-        socket.removeAllListeners();
-        socket.setTimeout(0);
+        // Capitalised, as the OS's own messages that q quotes are
+        const os = reason.charAt(0).toUpperCase() + reason.slice(1);
+        fail(new Error(`${word}. OS reports: ${os}`, { cause }));
+      };
+      const refused = () => fail(new Error("access"));
+      const accepted = (chunk: Buffer) => {
+        done();
         resolve(new Connection(socket, chunk.subarray(1)));
-      });
+      };
+      // Only the listeners added here: the socket has Node's own too
+      const done = () => {
+        clearTimeout(timer);
+        socket.off("connect", login);
+        socket.off("error", error);
+        socket.off("close", refused);
+        socket.off("data", accepted);
+      };
+      const fail = (reason: Error) => {
+        done();
+        socket.destroy();
+        reject(reason);
+      };
+      socket.once("connect", login);
+      socket.once("error", error);
+      socket.once("close", refused);
+      socket.once("data", accepted);
     });
   }
 
