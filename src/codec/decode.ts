@@ -1,5 +1,5 @@
 import { decompress } from "./decompress";
-import { badmsg, OverBudget } from "./errors";
+import { badmsg } from "./errors";
 import {
   type Atom,
   count,
@@ -14,22 +14,10 @@ import {
 // Keeping a leading byte-order mark, which q would show as part of the symbol
 const utf8 = new TextDecoder("utf-8", { ignoreBOM: true });
 
-// What a decoded value costs, roughly, in bytes, measured on Node 26: a
-// million char atoms in a general list take 50 MB of heap, a million
-// projections 338 MB, and a million short strings with a char atom among
-// them 282 MB, though each is a few MB on the wire. The decoder counts every
-// value as it makes it, against the budget: an object, a slot per item for
-// a list or a function's parts, and a buffer's overhead and its data.
-const valueCost = 64;
-const itemCost = 8;
-const bufferCost = 216;
-
 // Decode a q IPC message, as a server sends it or -8! or -18! writes it.
 // A message it can't read throws badmsg, as q does; big-endian messages and
-// foreign objects, which q can read, throw errors of their own. A result
-// that would cost more than the budget to decompress or decode throws
-// OverBudget.
-export function decode(message: Uint8Array, budget = Infinity): Value {
+// foreign objects, which q can read, throw errors of their own.
+export function decode(message: Uint8Array): Value {
   if (message.length < 8) {
     throw badmsg("the message ends early");
   }
@@ -54,18 +42,8 @@ export function decode(message: Uint8Array, budget = Infinity): Value {
   if (message[2] > 1) {
     throw badmsg(`compression flag ${message[2]} isn't one of q's`);
   }
-  if (message[2] && message.length >= 12) {
-    const uncompressed = new DataView(
-      message.buffer,
-      message.byteOffset,
-      message.byteLength,
-    ).getUint32(8, true);
-    if (uncompressed > budget) {
-      throw new OverBudget(uncompressed, budget, "uncompressed");
-    }
-  }
   const data = message[2] ? decompress(message) : message;
-  const reader = new Reader(data, budget);
+  const reader = new Reader(data);
   const value = reader.value();
   if (reader.offset !== data.length) {
     throw badmsg(`${data.length - reader.offset} bytes left after the value`);
@@ -73,22 +51,12 @@ export function decode(message: Uint8Array, budget = Infinity): Value {
   return value;
 }
 
-function size(data: Vector["data"] | Texts): number {
-  return "offsets" in data
-    ? data.bytes.byteLength + data.offsets.byteLength
-    : data.byteLength;
-}
-
 class Reader {
   // Past the header
   offset = 8;
   private view: DataView;
-  private spent = 0;
 
-  constructor(
-    private message: Uint8Array,
-    private budget: number,
-  ) {
+  constructor(private message: Uint8Array) {
     this.view = new DataView(
       message.buffer,
       message.byteOffset,
@@ -97,16 +65,13 @@ class Reader {
   }
 
   value(): Value {
-    this.spend(valueCost);
     const type = this.view.getInt8(this.take(1));
     if (type < 0 && type >= -19) {
       return this.atom(type);
     }
     // There's no type 3
     if (type > 0 && type <= 19 && type !== 3) {
-      const vector = this.vector(type);
-      this.spend(bufferCost + size(vector.data));
-      return vector;
+      return this.vector(type);
     }
     switch (type) {
       case 0:
@@ -123,11 +88,8 @@ class Reader {
       case 103:
         return { type, code: this.message[this.take(1)] };
       case 104:
-      case 105: {
-        const parts = this.values(this.uint32(this.take(4)));
-        this.spend(itemCost * parts.length);
-        return { type, parts };
-      }
+      case 105:
+        return { type, parts: this.values(this.uint32(this.take(4))) };
       case 106:
       case 107:
       case 108:
@@ -157,12 +119,9 @@ class Reader {
     const count = this.uint32(this.take(4));
     const strings = this.strings(count);
     if (strings) {
-      this.spend(size(strings));
       return { type: 0, attribute, strings };
     }
-    const items = this.values(count);
-    this.spend(itemCost * count);
-    return { type: 0, attribute, items };
+    return { type: 0, attribute, items: this.values(count) };
   }
 
   // The items of a list of strings end to end, or nothing if the list is
@@ -219,12 +178,16 @@ class Reader {
     if (names.type !== 11) {
       throw badmsg("a table's column names aren't symbols");
     }
+    const { bytes, offsets } = names.data;
+    const columns = [...offsets.subarray(1)].map((end, i) =>
+      utf8.decode(bytes.subarray(offsets[i], end)),
+    );
     const kind = this.view.getInt8(this.take(1));
     if (kind === -11) {
       return {
         type: 98,
         attribute,
-        columns: this.names(names.data),
+        columns,
         reference: utf8.decode(this.symbol()),
       };
     }
@@ -235,11 +198,9 @@ class Reader {
     // Read item by item, so that columns which are all char vectors aren't
     // taken for a list of strings
     const length = this.uint32(this.take(4));
-    const named = names.data.offsets.length - 1;
-    if (length !== named) {
-      throw badmsg(`a table has ${named} names but ${length} columns`);
+    if (length !== columns.length) {
+      throw badmsg(`a table has ${columns.length} names but ${length} columns`);
     }
-    const columns = this.names(names.data);
     const data: (Vector | List)[] = [];
     for (const column of this.values(length)) {
       if (column.type < 0 || column.type > 19) {
@@ -252,16 +213,6 @@ class Reader {
       throw badmsg("a table's columns don't match in length");
     }
     return { type: 98, attribute, columns, data };
-  }
-
-  // A table's column names as strings, each counted as a value
-  private names({ bytes, offsets }: Texts): string[] {
-    const names: string[] = [];
-    this.spend(valueCost * (offsets.length - 1));
-    for (let i = 1; i < offsets.length; i++) {
-      names.push(utf8.decode(bytes.subarray(offsets[i - 1], offsets[i])));
-    }
-    return names;
   }
 
   // A lambda is the namespace it was defined in, then its source
@@ -281,7 +232,6 @@ class Reader {
       case -10:
         return { type, value: this.message[this.take(1)] };
       case -2:
-        this.spend(bufferCost + 16);
         return { type, value: this.bytes(16) };
       case -5:
         return { type, value: this.view.getInt16(this.take(2), true) };
@@ -359,17 +309,6 @@ class Reader {
         return { type, attribute, data: this.symbols(count) };
     }
     throw new Error(`type ${type} isn't a vector`);
-  }
-
-  // Count what a value costs, once it's made, refusing it when the total is
-  // over budget. Making it first is safe: one value's buffers are at most a
-  // few times the message, which is within budget itself, and a buffer that
-  // can't be had is an error that can be caught.
-  private spend(cost: number): void {
-    this.spent += cost;
-    if (this.spent > this.budget) {
-      throw new OverBudget(undefined, this.budget, "once decoded");
-    }
   }
 
   // Symbols end to end without their 0 bytes, and n + 1 offsets

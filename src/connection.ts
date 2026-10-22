@@ -2,7 +2,7 @@ import * as net from "node:net";
 import { getSystemErrorMessage } from "node:util";
 import { decode } from "./codec/decode";
 import { encode } from "./codec/encode";
-import { badmsg, OverBudget } from "./codec/errors";
+import { badmsg } from "./codec/errors";
 import type { Value } from "./codec/types";
 
 export type Server = {
@@ -12,13 +12,42 @@ export type Server = {
   password?: string;
   // How long to wait for the server to connect and log in, in milliseconds
   timeout?: number;
-  // The most a result may cost, in bytes: on the wire, uncompressed and
-  // decoded. Well below what the extension host's heap can take.
-  budget?: number;
+  // The largest result to take, in bytes, uncompressed
+  limit?: number;
 };
 
 // An error the server signalled, with q's text as the message
 export class QError extends Error {}
+
+// A result over the limit. The extension host's heap is capped, and going
+// over it kills the host, so results are refused well before: a general
+// list decodes to up to about 60 times its size. Refusing closes the
+// connection, which stops the server sending the rest.
+export class OverLimit extends Error {
+  constructor(
+    readonly size: number,
+    readonly limit: number,
+    compressed = false,
+  ) {
+    super(
+      `the result is ${bytes(size)}${compressed ? " compressed" : ""}, over the ${bytes(limit)} limit`,
+    );
+  }
+}
+
+// A size in the largest unit that keeps it at 1 or more
+export function bytes(n: number): string {
+  for (const [unit, scale] of [
+    ["GB", 1e9],
+    ["MB", 1e6],
+    ["KB", 1e3],
+  ] as const) {
+    if (n >= scale) {
+      return `${Number((n / scale).toFixed(1))} ${unit}`;
+    }
+  }
+  return `${n} bytes`;
+}
 
 const what = ["async message", "sync call", "response"];
 
@@ -43,7 +72,7 @@ export class Connection {
 
   private constructor(
     private socket: net.Socket,
-    private budget: number,
+    private limit: number,
     rest: Buffer,
   ) {
     socket.on("data", (chunk) => this.receive(chunk));
@@ -89,7 +118,7 @@ export class Connection {
       const accepted = (chunk: Buffer) => {
         done();
         resolve(
-          new Connection(socket, server.budget ?? 1e9, chunk.subarray(1)),
+          new Connection(socket, server.limit ?? 10e6, chunk.subarray(1)),
         );
       };
       // Only the listeners added here: the socket has Node's own too
@@ -169,13 +198,8 @@ export class Connection {
               `unexpected ${what[this.header[1]]} from the server`,
             );
           }
-          // Closing the connection stops the server sending the rest
-          if (length > this.budget) {
-            throw new OverBudget(
-              length,
-              this.budget,
-              this.header[2] ? "compressed" : "on the wire",
-            );
+          if (length > this.limit) {
+            throw new OverLimit(length, this.limit, this.header[2] === 1);
           }
           this.message = Buffer.allocUnsafe(length);
           this.header.copy(this.message);
@@ -185,6 +209,17 @@ export class Connection {
         chunk.copy(this.message, this.received, 0, n);
         this.received += n;
         chunk = chunk.subarray(n);
+        // A compressed message's length uncompressed comes after its header:
+        // checked before the rest arrives, and bounding what decompressing
+        // it allocates
+        if (this.message[2] && this.received >= 12 && this.received - n < 12) {
+          const length = this.message[0]
+            ? this.message.readUInt32LE(8)
+            : this.message.readUInt32BE(8);
+          if (length > this.limit) {
+            throw new OverLimit(length, this.limit);
+          }
+        }
         if (this.received === this.message.length) {
           const message = this.message;
           this.message = undefined;
@@ -207,7 +242,7 @@ export class Connection {
     this.pending = undefined;
     let value: Value;
     try {
-      value = decode(message, this.budget);
+      value = decode(message);
     } catch (error) {
       pending.reject(error instanceof Error ? error : new Error(String(error)));
       return;

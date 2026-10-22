@@ -4,8 +4,7 @@ import { readFileSync } from "node:fs";
 import * as net from "node:net";
 import * as path from "node:path";
 import { encode } from "../codec/encode";
-import { OverBudget } from "../codec/errors";
-import { Connection, QError } from "../connection";
+import { bytes, Connection, OverLimit, QError } from "../connection";
 
 const fixtures: { name: string; bytes: string; compressed?: string }[] =
   JSON.parse(
@@ -294,57 +293,61 @@ suite("connection", () => {
     await assert.rejects(connection.query("x"), /the connection is closed/);
   });
 
-  test("a result over budget on the wire closes the connection", async () => {
+  function limited(server: Fake, limit: number): Promise<Connection> {
+    return Connection.open({ host: "127.0.0.1", port: server.port, limit });
+  }
+
+  test("a result over the limit closes the connection", async () => {
     const server = await fake((socket) => socket.write(response("atom.long")));
-    const connection = await Connection.open({
-      host: "127.0.0.1",
-      port: server.port,
-      budget: 16,
-    });
+    const connection = await limited(server, 16);
     await assert.rejects(
       connection.query("x"),
       (error) =>
-        error instanceof OverBudget &&
-        error.message ===
-          "the result is 17 bytes on the wire, over the 16 bytes limit",
+        error instanceof OverLimit &&
+        error.message === "the result is 17 bytes, over the 16 bytes limit",
     );
     await server.closed;
   });
 
-  test("a result exactly at the budget is accepted", async () => {
-    // A long atom is 17 bytes on the wire, and costs a value, 64, decoded
+  test("a result exactly at the limit is accepted", async () => {
     const server = await fake((socket) => socket.write(response("atom.long")));
-    const connection = await Connection.open({
-      host: "127.0.0.1",
-      port: server.port,
-      budget: 64,
-    });
+    const connection = await limited(server, 17);
     assert.strictEqual((await connection.query("x")).type, -7);
     connection.close();
   });
 
-  test("a result over budget once decoded leaves the connection open", async () => {
-    // A general list of 1,000 char atoms, then a long
-    const list = Buffer.alloc(14 + 2000);
-    list.set([1, 2, 0, 0, 0, 0, 0, 0, 0, 0]);
-    list.writeUInt32LE(list.length, 4);
-    list.writeUInt32LE(1000, 10);
-    for (let i = 0; i < 1000; i++) {
-      list.set([0xf6, 97], 14 + 2 * i);
-    }
-    let first = true;
-    const server = await fake((socket) => {
-      socket.write(first ? list : response("atom.long"));
-      first = false;
-    });
-    const connection = await Connection.open({
-      host: "127.0.0.1",
-      port: server.port,
-      budget: 20_000,
-    });
-    await assert.rejects(connection.query("x"), /once decoded/);
-    assert.strictEqual((await connection.query("x")).type, -7);
+  test("a compressed result is refused by its size uncompressed, before the rest arrives", async () => {
+    const message = response("large.longs", true);
+    const uncompressed = message.readUInt32LE(8);
+    // Only the header and the length uncompressed are ever sent
+    const server = await fake((socket) =>
+      socket.write(message.subarray(0, 12)),
+    );
+    const connection = await limited(server, uncompressed - 1);
+    await assert.rejects(
+      connection.query("x"),
+      (error) =>
+        error instanceof OverLimit &&
+        error.size === uncompressed &&
+        !/compressed/.test(error.message),
+    );
+    await server.closed;
+  });
+
+  test("a compressed result exactly at the limit uncompressed is accepted", async () => {
+    const message = response("large.longs", true);
+    const server = await fake((socket) => socket.write(message));
+    const connection = await limited(server, message.readUInt32LE(8));
+    assert.strictEqual((await connection.query("x")).type, 7);
     connection.close();
+  });
+
+  test("sizes in the largest unit that keeps them at 1 or more", () => {
+    assert.strictEqual(bytes(999), "999 bytes");
+    assert.strictEqual(bytes(1000), "1 KB");
+    assert.strictEqual(bytes(1_500_000), "1.5 MB");
+    assert.strictEqual(bytes(10e6), "10 MB");
+    assert.strictEqual(bytes(2_345_678_901), "2.3 GB");
   });
 
   test("one query at a time", async () => {
