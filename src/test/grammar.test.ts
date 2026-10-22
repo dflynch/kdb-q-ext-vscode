@@ -404,6 +404,19 @@ suite("q grammar", () => {
       ],
     ],
     [
+      "compose is not a signal",
+      "('[neg;abs])",
+      [
+        ["(", "source.q"],
+        ["'", "keyword.operator.iterator.q"],
+        ["[", "source.q"],
+        ["neg", "support.function.builtin.q"],
+        [";", "punctuation.separator.q"],
+        ["abs", "support.function.builtin.q"],
+        ["])", "source.q"],
+      ],
+    ],
+    [
       "each after a value is not a signal",
       "x,'y;count'[z]",
       [

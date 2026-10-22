@@ -176,7 +176,7 @@
         },
         {
           "name": "keyword.control.flow.signal.q",
-          "match": "(?<![^\\s\\[(;{])'(?!:)"
+          "match": "(?<![^\\s\\[(;{])'(?![:\\[])"
         },
         {
           "name": "keyword.operator.iterator.q",

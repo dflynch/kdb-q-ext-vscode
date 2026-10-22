@@ -796,7 +796,7 @@
   0 "fn.composition" -
   14 ":" keyword.operator.assignment.q
   15 "(" -
-  16 "'" keyword.control.flow.signal.q
+  16 "'" keyword.operator.iterator.q
   17 "[" -
   18 "neg" support.function.builtin.q
   21 ";" punctuation.separator.q
