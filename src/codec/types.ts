@@ -72,21 +72,22 @@ export type Vector = { attribute: Attribute } & (
   | { type: 19; data: Int32Array } // time
 );
 
-// A general list: a value per element, so only for mixed or nested data.
-// A list of strings, such as a string column, is stored like symbols when
-// every item is a char vector without an attribute.
+// A general list: a value per item, for mixed or nested data. A list of
+// strings, such as a string column, is stored like symbols when it isn't
+// empty and every item is a char vector without an attribute.
 export type List = { type: 0; attribute: Attribute } & (
   | { items: Value[] }
   | { strings: Texts }
 );
 
-// A table's columns in order, each a vector or a general list of equal length
-export interface Table {
-  type: 98;
-  attribute: Attribute;
-  columns: string[];
-  data: (Vector | List)[];
-}
+// A table's column names, and its columns in order, each a vector or a
+// general list of equal length. Returning a splayed or partitioned table
+// itself, rather than querying it, sends a reference instead: a symbol
+// holding its path or its name, since only the server can read its files.
+export type Table = { type: 98; attribute: Attribute; columns: string[] } & (
+  | { data: (Vector | List)[] }
+  | { reference: string }
+);
 
 // A dictionary, or a sorted one (127 on the wire). A keyed table is a
 // dictionary from a table of keys to a table of values.
@@ -96,14 +97,18 @@ export interface Dictionary {
   values: Value;
 }
 
-// The function types. A lambda keeps its source text and the namespace it
-// was defined in. Primitives are q's internal codes, and :: is the unary
-// primitive 0. Projections and compositions keep their parts, and an
-// iterator keeps the value it applies to, so each can be shown as q shows
-// it. A foreign object holds a C pointer, so there's nothing to keep.
+// The function types. A lambda keeps its source as written, with a leading
+// k) for a k lambda, and the namespace it was defined in, without the leading
+// dot: "" at the root, "a.b" for .a.b. Primitives, operators and iterators
+// are q's internal codes: :: is unary 0, + is operator 1, / is iterator 1.
+// Projections and compositions keep their parts, where a projection's
+// missing argument, as in +[;1], is unary 255. Each iterated function keeps
+// the value it applies to. All of this is so each can be shown as q shows
+// it. A foreign object holds a C pointer; q has no built-in one, so its wire
+// form is unchecked.
 export type QFunction =
   | { type: 100; context: string; source: string } // lambda
-  | { type: 101 | 102 | 103; code: number } // unary, binary, ternary primitive
+  | { type: 101 | 102 | 103; code: number } // unary, operator, iterator
   | { type: 104 | 105; parts: Value[] } // projection, composition
   | { type: 106 | 107 | 108 | 109 | 110 | 111; value: Value } // ' / \ ': /: \:
   | { type: 112 }; // foreign
