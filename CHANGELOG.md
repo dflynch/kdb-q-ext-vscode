@@ -15,6 +15,7 @@ All notable changes to the extension are documented in this file.
   markers on lines of their own at column 0. VS Code's built-in command
   wrapped the selection inline, which q can't parse
 - Folding for `/` … `\` block comments
+- Run Selected Text and Toggle Block Comment work with several selections
 
 ### Changed
 
@@ -25,6 +26,7 @@ All notable changes to the extension are documented in this file.
   the README to customize them
 - Run Selected Text warns when there is no active terminal
 - The Ctrl/Cmd + Enter keybinding only applies when the editor has focus
+- The commands only appear in the Command Palette for q files
 - `.Q.Cf` and `.Q.Xf`, removed in q 5, are no longer highlighted
 
 ### Fixed
@@ -46,6 +48,7 @@ All notable changes to the extension are documented in this file.
 - Every name in a `{[a;b]}` parameter list is highlighted as a parameter
 - System command arguments, such as the path in `\cd /tmp`, are no longer
   highlighted as comments
+- A comment after `\t` or `\ts` is highlighted as a comment, not code
 - Double-clicking, or Ctrl/Cmd + D, selects a whole dotted name or file
   handle
 - Pressing Enter between brackets no longer moves the closing bracket to
