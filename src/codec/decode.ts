@@ -9,9 +9,6 @@ import {
   type Vector,
 } from "./types";
 
-// Far deeper than any real result, and well inside the call stack
-const maxDepth = 1000;
-
 // Keeping a leading byte-order mark, which q would show as part of the symbol
 const utf8 = new TextDecoder("utf-8", { ignoreBOM: true });
 
@@ -45,7 +42,6 @@ export function decode(message: Uint8Array): Value {
 class Reader {
   // Past the header, once its length is checked
   offset = 8;
-  private depth = 0;
   private view: DataView;
 
   constructor(private message: Uint8Array) {
@@ -63,15 +59,6 @@ class Reader {
   }
 
   value(): Value {
-    if (++this.depth > maxDepth) {
-      throw new Error(`the value is nested more than ${maxDepth} deep`);
-    }
-    const value = this.read();
-    this.depth--;
-    return value;
-  }
-
-  private read(): Value {
     const type = this.view.getInt8(this.take(1));
     if (type < 0 && type >= -19) {
       return this.atom(type);

@@ -446,10 +446,6 @@ suite("decode", () => {
       const strings = "0000020000000a000200000061620a000200";
       assert.throws(() => decode(message(strings)), /ends early/);
     });
-    test("a value nested too deep", () => {
-      const nested = `${"000001000000".repeat(1001)}f90100000000000000`;
-      assert.throws(() => decode(message(nested)), /nested more than 1000/);
-    });
     test("types it can't decode", () => {
       assert.throws(() => decode(message("70")), /type 112 isn't supported/);
       assert.throws(() => decode(message("1400")), /type 20 isn't supported/);
