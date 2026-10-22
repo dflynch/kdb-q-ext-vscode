@@ -69,6 +69,23 @@
     "commands": {
       "patterns": [
         {
+          "begin": "^(\\\\d)(?=\\s|$)",
+          "beginCaptures": {
+            "1": {
+              "name": "meta.preprocessor.system.q"
+            }
+          },
+          "end": "$",
+          "patterns": [
+            {
+              "include": "#comments"
+            },
+            {
+              "match": "\\.\\w*(?:\\.\\w+)*"
+            }
+          ]
+        },
+        {
           "match": "^(\\\\(?:l|cd|[12_]))(?=\\s|$).*",
           "captures": {
             "1": {
@@ -77,7 +94,7 @@
           }
         },
         {
-          "begin": "^(\\\\(?:ts|[abBcCdefgopPrsStTuvwWxz\\\\])(?::\\d+)?)(?=\\s|$)",
+          "begin": "^(\\\\(?:ts|[abBcCefgopPrsStTuvwWxz\\\\])(?::\\d+)?)(?=\\s|$)",
           "beginCaptures": {
             "1": {
               "name": "meta.preprocessor.system.q"

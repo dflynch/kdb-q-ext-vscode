@@ -202,6 +202,17 @@ suite("q grammar", () => {
 
     // System commands
     [
+      "namespace command",
+      "\\d .a.b / note\n\\d .",
+      [
+        ["\\d", "meta.preprocessor.system.q"],
+        [".a.b", "source.q"],
+        ["/ note", "comment.line.slash.q"],
+        ["\\d", "meta.preprocessor.system.q"],
+        [".", "source.q"],
+      ],
+    ],
+    [
       "load command",
       "\\l foo.q",
       [
