@@ -16,10 +16,12 @@ export enum Attribute {
   Grouped = 4,
 }
 
-// Symbols as their UTF-8 bytes, each ending in a 0 byte as on the wire, and
-// the offset where each one starts. Symbol columns are where results get big,
-// so they're never a string per value.
-export interface Symbols {
+// Symbols, or strings, laid end to end, with the offset where each starts
+// and one more for where the last ends: element i is the bytes from
+// offsets[i] up to offsets[i + 1]. Symbol and string columns are where
+// results get big, so they're never a JavaScript string per value. Symbols
+// lose the 0 byte that ends each one on the wire.
+export interface Texts {
   bytes: Uint8Array;
   offsets: Uint32Array;
 }
@@ -59,7 +61,7 @@ export type Vector = { attribute: Attribute } & (
   | { type: 8; data: Float32Array } // real
   | { type: 9; data: Float64Array } // float
   | { type: 10; data: Uint8Array } // char
-  | { type: 11; data: Symbols } // symbol
+  | { type: 11; data: Texts } // symbol
   | { type: 12; data: BigInt64Array } // timestamp
   | { type: 13; data: Int32Array } // month
   | { type: 14; data: Int32Array } // date
@@ -70,12 +72,13 @@ export type Vector = { attribute: Attribute } & (
   | { type: 19; data: Int32Array } // time
 );
 
-// A general list: a value per element, so only for mixed or nested data
-export interface List {
-  type: 0;
-  attribute: Attribute;
-  items: Value[];
-}
+// A general list: a value per element, so only for mixed or nested data.
+// A list of strings, such as a string column, is stored like symbols when
+// every item is a char vector without an attribute.
+export type List = { type: 0; attribute: Attribute } & (
+  | { items: Value[] }
+  | { strings: Texts }
+);
 
 // A table's columns in order, each a vector or a general list of equal length
 export interface Table {
