@@ -1,3 +1,4 @@
+import { decompress } from "./decompress";
 import {
   type Atom,
   count,
@@ -12,8 +13,8 @@ import {
 // Keeping a leading byte-order mark, which q would show as part of the symbol
 const utf8 = new TextDecoder("utf-8", { ignoreBOM: true });
 
-// Decode a q IPC message, as a server sends it or -8! writes it. Compressed
-// messages and foreign objects throw.
+// Decode a q IPC message, as a server sends it or -8! or -18! writes it.
+// Foreign objects throw.
 export function decode(message: Uint8Array): Value {
   if (message.length < 8) {
     throw new Error("the message ends early");
@@ -26,21 +27,32 @@ export function decode(message: Uint8Array): Value {
   if (message[0] !== 1) {
     throw new Error("this isn't a q message");
   }
-  if (message[2] !== 0) {
-    throw new Error("compressed messages aren't supported yet");
-  }
-  const reader = new Reader(message);
-  const value = reader.value();
-  if (reader.offset !== message.length) {
+  const length = new DataView(
+    message.buffer,
+    message.byteOffset,
+    message.byteLength,
+  ).getUint32(4, true);
+  if (length !== message.length) {
     throw new Error(
-      `${message.length - reader.offset} bytes left after the value`,
+      `the header says ${length} bytes, but there are ${message.length}`,
+    );
+  }
+  if (message[2] > 1) {
+    throw new Error(`compression flag ${message[2]} isn't supported`);
+  }
+  const data = message[2] ? decompress(message) : message;
+  const reader = new Reader(data);
+  const value = reader.value();
+  if (reader.offset !== data.length) {
+    throw new Error(
+      `${data.length - reader.offset} bytes left after the value`,
     );
   }
   return value;
 }
 
 class Reader {
-  // Past the header, once its length is checked
+  // Past the header
   offset = 8;
   private view: DataView;
 
@@ -50,12 +62,6 @@ class Reader {
       message.byteOffset,
       message.byteLength,
     );
-    const length = this.uint32(4);
-    if (length !== message.length) {
-      throw new Error(
-        `the header says ${length} bytes, but there are ${message.length}`,
-      );
-    }
   }
 
   value(): Value {

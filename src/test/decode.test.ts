@@ -394,14 +394,15 @@ suite("decode", () => {
       message.writeUInt32LE(12, 4);
       assert.throws(() => decode(message), /inside a symbol/);
     });
-    test("big-endian and compressed messages", () => {
+    test("a big-endian message", () => {
       const message = long();
       message[0] = 0;
       assert.throws(() => decode(message), /big-endian/);
-      assert.throws(
-        () => decode(bytes("large.longs").fill(1, 2, 3)),
-        /compressed/,
-      );
+    });
+    test("an unknown compression flag", () => {
+      const message = long();
+      message[2] = 2;
+      assert.throws(() => decode(message), /compression flag 2/);
     });
     // ([] a:1 2), with the column swapped for other values
     const table = (column: string) =>
