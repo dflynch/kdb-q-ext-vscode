@@ -203,37 +203,49 @@ suite("q Run Selected Text", () => {
   teardown(close);
 
   // The statements sent after running with the given selections
-  async function run(content: string, selections: vscode.Selection[]) {
+  async function run(
+    content: string,
+    selections: vscode.Selection[],
+    expected: string[],
+  ) {
     const editor = await open(content);
     editor.selections = selections;
     received = "";
     await vscode.commands.executeCommand("kdb-q-ext-vscode.runSelectedText");
-    // Statements end in a carriage return, and nothing marks the last one
+    // Statements end in a carriage return, and nothing marks the last one,
+    // so wait for the expected count, then for any extra statements
+    const sent = () => received.match(/\r\n?|\n/g)?.length ?? 0;
+    for (let i = 0; i < 50 && sent() < expected.length; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
     await new Promise((resolve) => setTimeout(resolve, 200));
+    assert.deepStrictEqual(statements(), expected);
+  }
+
+  function statements() {
     return received.split(/\r\n?|\n/).filter((s) => s);
   }
 
   test("run the current line", async () => {
-    assert.deepStrictEqual(
-      await run("a:1\nb:2", [new vscode.Selection(1, 1, 1, 1)]),
-      ["b:2"],
-    );
+    await run("a:1\nb:2", [new vscode.Selection(1, 1, 1, 1)], ["b:2"]);
   });
 
   test("run a selection", async () => {
-    assert.deepStrictEqual(
-      await run("f:{\n  x}\nb:2", [new vscode.Selection(0, 0, 2, 3)]),
+    await run(
+      "f:{\n  x}\nb:2",
+      [new vscode.Selection(0, 0, 2, 3)],
       ["f:{ x}", "b:2"],
     );
   });
 
   test("run several selections", async () => {
-    assert.deepStrictEqual(
-      await run("a:1\nb:2\nc:3", [
+    await run(
+      "a:1\nb:2\nc:3",
+      [
         new vscode.Selection(2, 0, 2, 0),
         new vscode.Selection(0, 0, 0, 0),
         new vscode.Selection(0, 2, 0, 2),
-      ]),
+      ],
       ["a:1", "c:3"],
     );
   });
