@@ -15,19 +15,19 @@ export type Size = { lines: number; width: number };
 export const defaultSize: Size = { lines: 5000, width: 5000 };
 
 // A value as the q console shows it, for any result but a table or a
-// dictionary, which go to the grid. A lambda's source is never cut: it's
-// what someone inspecting a remote function wants to read in full.
+// dictionary, which go to the grid
 export function show(value: Value, size: Size = defaultSize): string {
-  if (value.type === 100) {
-    return value.source;
-  }
   // The generic null
   if (value.type === 101 && value.code === 0) {
     return "";
   }
-  const lines =
-    value.type === 0 ? column(value, size) : [qText(value, size.width)];
-  return cut(lines, size).join("\n");
+  // Only a function's text can run over lines, a lambda's source as written
+  const limit = value.type >= 100 ? size.width * size.lines : size.width;
+  const lines = value.type === 0 ? column(value, size) : [qText(value, limit)];
+  return cut(
+    lines.flatMap((line) => line.split("\n")),
+    size,
+  ).join("\n");
 }
 
 function cut(lines: string[], size: Size): string[] {

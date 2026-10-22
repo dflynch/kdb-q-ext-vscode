@@ -79,23 +79,29 @@ suite("console text", () => {
     ]);
   });
 
-  test("a lambda's source is never cut", () => {
+  test("a lambda is cut like any other value", () => {
     const source = `{[x] ${"x+".repeat(5000)}1}`;
     assert.strictEqual(
-      show({ type: 100, context: "", source }, { lines: 1, width: 10 }),
-      source,
+      show({ type: 100, context: "", source }, { lines: 10, width: 10 }),
+      "{[x] x+x..",
     );
   });
 
-  test("a multi-line lambda keeps its lines", () => {
+  test("a projection is cut like any other value", () => {
+    const projection: Value = {
+      type: 104,
+      parts: [{ type: 100, context: "", source: "{x+y}" }, longs(1000)],
+    };
     assert.strictEqual(
-      show(value("fn.multiLine"), { lines: 2, width: 10 }),
-      [
-        "{[t;n]",
-        "  r:select from t where size>n;",
-        "  / a comment inside a function",
-        "  r }",
-      ].join("\n"),
+      show(projection, { lines: 10, width: 12 }),
+      "{x+y}[0 1 ..",
+    );
+  });
+
+  test("a multi-line lambda's lines count against the limit", () => {
+    assert.strictEqual(
+      show(value("fn.multiLine"), { lines: 3, width: 10 }),
+      ["{[t;n]", "  r:sele..", ".."].join("\n"),
     );
   });
 
