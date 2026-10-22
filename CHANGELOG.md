@@ -2,7 +2,7 @@
 
 All notable changes to the extension are documented in this file.
 
-## [Unreleased]
+## [1.1.0]
 
 ### Added
 
@@ -19,6 +19,7 @@ All notable changes to the extension are documented in this file.
 
 ### Changed
 
+- Requires VS Code 1.140 or later
 - The extension is now named kdb+/q in the Marketplace and Extensions view
 - Highlighting colors: control flow, qSQL, built-in functions, `.Q`/`.z`,
   symbols, file handles and strings are now distinct in VS Code's default
