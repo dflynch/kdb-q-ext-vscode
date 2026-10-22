@@ -16,6 +16,10 @@ All notable changes to the extension are documented in this file.
 - Negative times, such as `-12:34:56.789`, are highlighted as one literal
 - `'[f;g]` (compose) is no longer highlighted as a signal
 - The `.` in `\d .` is no longer highlighted as an operator
+- Lowercase typed nulls and infinities, such as `0nz` and `-0wz` (how q
+  prints a datetime infinity), are highlighted as one literal
+- Names under a namespace member, such as `.z.ts.x`, are highlighted as one
+  name
 
 ## [1.1.0]
 

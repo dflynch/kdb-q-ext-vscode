@@ -9,7 +9,7 @@
 > 
 > \d .corpus
   0 "\\d" meta.preprocessor.system.q
-  3 ".corpus" -
+  2 " .corpus" -
 > 
 > / Atoms, one per type
   0 "/ Atoms, one per type" comment.line.slash.q
@@ -1437,14 +1437,14 @@
 > 
 > \d .corpus.nested.deeper
   0 "\\d" meta.preprocessor.system.q
-  3 ".corpus.nested.deeper" -
+  2 " .corpus.nested.deeper" -
 > answer:42
   0 "answer" -
   6 ":" keyword.operator.assignment.q
   7 "42" constant.numeric.number.q
 > \d .
   0 "\\d" meta.preprocessor.system.q
-  3 "." -
+  2 " ." -
 > .corpus.nested.direct:{.corpus.nested.deeper.answer}[]
   0 ".corpus.nested.direct" -
   21 ":" keyword.operator.assignment.q
