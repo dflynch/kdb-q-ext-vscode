@@ -24,6 +24,14 @@ function hex(data: Uint8Array): string {
 const nullLong = -(2n ** 63n);
 const infinityLong = 2n ** 63n - 1n;
 
+// Checks for the badmsg error, with the detail in its cause
+function badmsg(detail: RegExp) {
+  return (error: unknown) =>
+    error instanceof Error &&
+    error.message === "badmsg" &&
+    detail.test(String(error.cause));
+}
+
 suite("decode", () => {
   test("every value in the corpus", () => {
     for (const fixture of fixtures) {
@@ -359,96 +367,121 @@ suite("decode", () => {
   suite("rejects", () => {
     const long = () => Buffer.from(bytes("atom.long"));
     test("a count larger than the message", () => {
-      assert.throws(() => decode(message("0700ffffffff")), /ends early/);
+      assert.throws(
+        () => decode(message("0700ffffffff")),
+        badmsg(/ends early/),
+      );
       assert.throws(
         () => decode(message("0b00ffffffff6100")),
-        /inside a symbol/,
+        badmsg(/inside a symbol/),
       );
     });
     test("an attribute q doesn't have", () => {
-      assert.throws(() => decode(message("070901000000")), /attribute 9/);
+      assert.throws(
+        () => decode(message("070901000000")),
+        badmsg(/attribute 9/),
+      );
     });
     test("something that isn't a q message", () => {
       const notQ = long();
       notQ[0] = 2;
-      assert.throws(() => decode(notQ), /isn't a q message/);
+      assert.throws(() => decode(notQ), badmsg(/first byte 2 isn't 0 or 1/));
     });
     test("a message shorter than its header", () => {
-      assert.throws(() => decode(Uint8Array.of(1, 0, 0)), /ends early/);
+      assert.throws(() => decode(Uint8Array.of(1, 0, 0)), badmsg(/ends early/));
     });
     test("a message that ends early", () => {
       const message = long().subarray(0, 12);
       message.writeUInt32LE(12, 4);
-      assert.throws(() => decode(message), /ends early/);
+      assert.throws(() => decode(message), badmsg(/ends early/));
     });
     test("a header that disagrees with the length", () => {
-      assert.throws(() => decode(long().subarray(0, 12)), /header says 17/);
+      assert.throws(
+        () => decode(long().subarray(0, 12)),
+        badmsg(/header says 17/),
+      );
     });
     test("bytes left after the value", () => {
       const message = Buffer.concat([long(), Buffer.of(0)]);
       message.writeUInt32LE(18, 4);
-      assert.throws(() => decode(message), /1 bytes left/);
+      assert.throws(() => decode(message), badmsg(/1 bytes left/));
     });
     test("a symbol without its 0 byte", () => {
       const message = Buffer.from(bytes("atom.symbol")).subarray(0, 12);
       message.writeUInt32LE(12, 4);
-      assert.throws(() => decode(message), /inside a symbol/);
+      assert.throws(() => decode(message), badmsg(/inside a symbol/));
     });
-    test("big-endian and compressed messages", () => {
+    test("a big-endian message", () => {
       const message = long();
       message[0] = 0;
       assert.throws(() => decode(message), /big-endian/);
-      assert.throws(
-        () => decode(bytes("large.longs").fill(1, 2, 3)),
-        /compressed/,
-      );
+    });
+    test("an unknown compression flag", () => {
+      const message = long();
+      message[2] = 2;
+      assert.throws(() => decode(message), badmsg(/compression flag 2/));
     });
     // ([] a:1 2), with the column swapped for other values
     const table = (column: string) =>
       message(`6200630b00010000006100000001000000${column}`);
     test("a malformed table", () => {
-      assert.throws(() => decode(message("620001")), /without its dictionary/);
+      assert.throws(
+        () => decode(message("620001")),
+        badmsg(/without its dictionary/),
+      );
       assert.throws(
         () => decode(message("620063070001000000010000000000000007")),
-        /names aren't symbols/,
+        badmsg(/names aren't symbols/),
       );
       assert.throws(
         () => decode(message("6200630b00010000006100070000000000")),
-        /columns are type 7/,
+        badmsg(/columns are type 7/),
       );
       assert.throws(
         () =>
           decode(message("6200630b0001000000610000000200000007000000000000")),
-        /1 names but 2 columns/,
+        badmsg(/1 names but 2 columns/),
       );
       assert.throws(
         () => decode(table("f90100000000000000")),
-        /column is type -7/,
+        badmsg(/column is type -7/),
       );
     });
     test("lengths that don't match", () => {
       const ragged =
         "6200630b0002000000610062000000020000000700020000000100000000000000" +
         "02000000000000000700010000000300000000000000";
-      assert.throws(() => decode(message(ragged)), /columns don't match/);
+      assert.throws(
+        () => decode(message(ragged)),
+        badmsg(/columns don't match/),
+      );
       const dictionary = "630b0002000000610062000700010000000100000000000000";
-      assert.throws(() => decode(message(dictionary)), /don't match in length/);
+      assert.throws(
+        () => decode(message(dictionary)),
+        badmsg(/don't match in length/),
+      );
       const atoms = "63f90100000000000000f90200000000000000";
-      assert.throws(() => decode(message(atoms)), /don't match in length/);
+      assert.throws(
+        () => decode(message(atoms)),
+        badmsg(/don't match in length/),
+      );
     });
     test("a lambda without its source", () => {
       assert.throws(
         () => decode(message("6400f90100000000000000")),
-        /source isn't a string/,
+        badmsg(/source isn't a string/),
       );
     });
     test("a list of strings that ends early", () => {
       const strings = "0000020000000a000200000061620a000200";
-      assert.throws(() => decode(message(strings)), /ends early/);
+      assert.throws(() => decode(message(strings)), badmsg(/ends early/));
     });
     test("types it can't decode", () => {
-      assert.throws(() => decode(message("70")), /type 112 isn't supported/);
-      assert.throws(() => decode(message("1400")), /type 20 isn't supported/);
+      assert.throws(
+        () => decode(message("70")),
+        /foreign objects aren't supported/,
+      );
+      assert.throws(() => decode(message("1400")), badmsg(/unknown type 20/));
     });
   });
 });

@@ -1,3 +1,5 @@
+import { decompress } from "./decompress";
+import { badmsg } from "./errors";
 import {
   type Atom,
   count,
@@ -12,11 +14,12 @@ import {
 // Keeping a leading byte-order mark, which q would show as part of the symbol
 const utf8 = new TextDecoder("utf-8", { ignoreBOM: true });
 
-// Decode a q IPC message, as a server sends it or -8! writes it. Compressed
-// messages and foreign objects throw.
+// Decode a q IPC message, as a server sends it or -8! or -18! writes it.
+// A message it can't read throws badmsg, as q does; big-endian messages and
+// foreign objects, which q can read, throw errors of their own.
 export function decode(message: Uint8Array): Value {
   if (message.length < 8) {
-    throw new Error("the message ends early");
+    throw badmsg("the message ends early");
   }
   // Every machine VS Code runs on is little-endian, and q writes in its own
   // byte order, so a big-endian message would come from a rare server
@@ -24,23 +27,32 @@ export function decode(message: Uint8Array): Value {
     throw new Error("big-endian messages aren't supported");
   }
   if (message[0] !== 1) {
-    throw new Error("this isn't a q message");
+    throw badmsg(`first byte ${message[0]} isn't 0 or 1`);
   }
-  if (message[2] !== 0) {
-    throw new Error("compressed messages aren't supported yet");
-  }
-  const reader = new Reader(message);
-  const value = reader.value();
-  if (reader.offset !== message.length) {
-    throw new Error(
-      `${message.length - reader.offset} bytes left after the value`,
+  const length = new DataView(
+    message.buffer,
+    message.byteOffset,
+    message.byteLength,
+  ).getUint32(4, true);
+  if (length !== message.length) {
+    throw badmsg(
+      `the header says ${length} bytes, but there are ${message.length}`,
     );
+  }
+  if (message[2] > 1) {
+    throw badmsg(`compression flag ${message[2]} isn't one of q's`);
+  }
+  const data = message[2] ? decompress(message) : message;
+  const reader = new Reader(data);
+  const value = reader.value();
+  if (reader.offset !== data.length) {
+    throw badmsg(`${data.length - reader.offset} bytes left after the value`);
   }
   return value;
 }
 
 class Reader {
-  // Past the header, once its length is checked
+  // Past the header
   offset = 8;
   private view: DataView;
 
@@ -50,12 +62,6 @@ class Reader {
       message.byteOffset,
       message.byteLength,
     );
-    const length = this.uint32(4);
-    if (length !== message.length) {
-      throw new Error(
-        `the header says ${length} bytes, but there are ${message.length}`,
-      );
-    }
   }
 
   value(): Value {
@@ -94,7 +100,10 @@ class Reader {
       case -128:
         return { type, message: utf8.decode(this.symbol()) };
     }
-    throw new Error(`type ${type} isn't supported`);
+    if (type === 112) {
+      throw new Error("foreign objects aren't supported");
+    }
+    throw badmsg(`unknown type ${type}`);
   }
 
   private values(count: number): Value[] {
@@ -153,7 +162,7 @@ class Reader {
     const values = this.value();
     const length = count(keys);
     if (length === undefined || length !== count(values)) {
-      throw new Error("a dictionary's keys and values don't match in length");
+      throw badmsg("a dictionary's keys and values don't match in length");
     }
     return { type, keys, values };
   }
@@ -163,11 +172,11 @@ class Reader {
   private table(): Table {
     const attribute = this.attribute();
     if (this.message[this.take(1)] !== 99) {
-      throw new Error("a table without its dictionary");
+      throw badmsg("a table without its dictionary");
     }
     const names = this.value();
     if (names.type !== 11) {
-      throw new Error("a table's column names aren't symbols");
+      throw badmsg("a table's column names aren't symbols");
     }
     const { bytes, offsets } = names.data;
     const columns = [...offsets.subarray(1)].map((end, i) =>
@@ -183,27 +192,25 @@ class Reader {
       };
     }
     if (kind !== 0) {
-      throw new Error(`a table's columns are type ${kind}`);
+      throw badmsg(`a table's columns are type ${kind}`);
     }
     this.attribute();
     // Read item by item, so that columns which are all char vectors aren't
     // taken for a list of strings
     const length = this.uint32(this.take(4));
     if (length !== columns.length) {
-      throw new Error(
-        `a table has ${columns.length} names but ${length} columns`,
-      );
+      throw badmsg(`a table has ${columns.length} names but ${length} columns`);
     }
     const data: (Vector | List)[] = [];
     for (const column of this.values(length)) {
       if (column.type < 0 || column.type > 19) {
-        throw new Error(`a table column is type ${column.type}`);
+        throw badmsg(`a table column is type ${column.type}`);
       }
       data.push(column as Vector | List);
     }
     const rows = new Set(data.map((column) => count(column)));
     if (rows.size > 1) {
-      throw new Error("a table's columns don't match in length");
+      throw badmsg("a table's columns don't match in length");
     }
     return { type: 98, attribute, columns, data };
   }
@@ -213,7 +220,7 @@ class Reader {
     const context = utf8.decode(this.symbol());
     const source = this.value();
     if (source.type !== 10) {
-      throw new Error("a lambda's source isn't a string");
+      throw badmsg("a lambda's source isn't a string");
     }
     return { type: 100, context, source: utf8.decode(source.data) };
   }
@@ -328,7 +335,7 @@ class Reader {
   private attribute(): number {
     const attribute = this.message[this.take(1)];
     if (attribute > 4) {
-      throw new Error(`attribute ${attribute} isn't one of q's`);
+      throw badmsg(`attribute ${attribute} isn't one of q's`);
     }
     return attribute;
   }
@@ -343,7 +350,7 @@ class Reader {
   private symbolEnd(): number {
     const end = this.message.indexOf(0, this.offset);
     if (end < 0) {
-      throw new Error("the message ends inside a symbol");
+      throw badmsg("the message ends inside a symbol");
     }
     this.offset = end + 1;
     return end;
@@ -371,7 +378,7 @@ class Reader {
   private take(n: number): number {
     const start = this.offset;
     if (start + n > this.message.length) {
-      throw new Error("the message ends early");
+      throw badmsg("the message ends early");
     }
     this.offset += n;
     return start;
