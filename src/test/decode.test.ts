@@ -385,7 +385,7 @@ suite("decode", () => {
     test("something that isn't a q message", () => {
       const notQ = long();
       notQ[0] = 2;
-      assert.throws(() => decode(notQ), badmsg(/isn't a q message/));
+      assert.throws(() => decode(notQ), badmsg(/first byte 2 isn't 0 or 1/));
     });
     test("a message shorter than its header", () => {
       assert.throws(() => decode(Uint8Array.of(1, 0, 0)), badmsg(/ends early/));

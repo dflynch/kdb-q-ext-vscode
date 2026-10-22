@@ -61,28 +61,40 @@ suite("decompress", () => {
     test("a length too short for the header", () => {
       assert.throws(
         () => decompress(Uint8Array.of(1, 0, 1, 0, 12, 0, 0, 0, 7, 0, 0, 0)),
-        badmsg(/malformed/),
+        badmsg(/length 7 is too short/),
       );
     });
     test("data that ends early", () => {
       const message = sized(compressed("large.longs").subarray(0, -1));
-      assert.throws(() => decode(message), badmsg(/malformed/));
+      assert.throws(
+        () => decode(message),
+        badmsg(/doesn't end where the message does/),
+      );
     });
     test("data left over", () => {
       const message = sized(
         Buffer.concat([compressed("large.longs"), Buffer.of(0)]),
       );
-      assert.throws(() => decode(message), badmsg(/malformed/));
+      assert.throws(
+        () => decode(message),
+        badmsg(/doesn't end where the message does/),
+      );
     });
     test("a length the data doesn't fill", () => {
       const message = compressed("large.longs");
       message.writeUInt32LE(message.readUInt32LE(8) + 1, 8);
-      assert.throws(() => decode(message), badmsg(/malformed/));
+      assert.throws(
+        () => decode(message),
+        badmsg(/doesn't end where the message does/),
+      );
     });
     test("a length the data overruns", () => {
       const message = compressed("large.longs");
       message.writeUInt32LE(message.readUInt32LE(8) - 1, 8);
-      assert.throws(() => decode(message), badmsg(/malformed/));
+      assert.throws(
+        () => decode(message),
+        badmsg(/doesn't end where the message does/),
+      );
     });
   });
 });

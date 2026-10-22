@@ -21,9 +21,8 @@ export function decompress(message: Uint8Array): Uint8Array {
     message.byteOffset,
     message.byteLength,
   ).getUint32(8, true);
-  // Too short to hold even the header
   if (length < 8) {
-    throw badmsg("the compressed message is malformed");
+    throw badmsg(`the compressed length ${length} is too short for a header`);
   }
   const out = new Uint8Array(length);
   out.set(message.subarray(0, 4));
@@ -62,9 +61,9 @@ export function decompress(message: Uint8Array): Uint8Array {
     }
     bit = bit === 128 ? 0 : bit * 2;
   }
-  // Data that runs out early, or runs past the length, isn't q's
+  // Data that runs out early, or runs past the length
   if (to !== length || from !== message.length) {
-    throw badmsg("the compressed message is malformed");
+    throw badmsg("the compressed data doesn't end where the message does");
   }
   return out;
 }

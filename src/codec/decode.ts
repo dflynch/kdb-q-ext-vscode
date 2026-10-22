@@ -27,7 +27,7 @@ export function decode(message: Uint8Array): Value {
     throw new Error("big-endian messages aren't supported");
   }
   if (message[0] !== 1) {
-    throw badmsg("this isn't a q message");
+    throw badmsg(`first byte ${message[0]} isn't 0 or 1`);
   }
   const length = new DataView(
     message.buffer,
