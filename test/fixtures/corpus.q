@@ -1,6 +1,7 @@
-/ Corpus of q for the grammar snapshot and, later, the codec fixtures.
-/ Every value lives under .corpus, so a script can walk it with key.
+/ Corpus of q for the grammar snapshot and the codec fixtures.
+/ Every value lives under .corpus, where fixtures.q walks it with key.
 / It must load cleanly: q -q test/fixtures/corpus.q
+/ After a change, run npm run fixtures and UPDATE_SNAPSHOT=1 npm test
 
 \d .corpus
 
@@ -40,7 +41,7 @@ temporal.preEpochTimestamp:1970.01.01D00:00:00.000000000
 
 / Vectors, one per type
 vector.boolean:101b
-vector.guid:2?0Ng
+vector.guid:"G"$("0a369037-75d3-b24d-6721-5a1d44d4bed5";"00000000-0000-0000-0000-000000000001")
 vector.byte:0x00ff2a
 vector.short:1 2 3h
 vector.int:1 2 3i
@@ -155,7 +156,14 @@ fn.multiLine:{[t;n]
 fn.global:{[v] `.corpus.fn.seen set v; v}
 fn.projection:{x+y}[1]
 fn.composition:('[neg;abs])
+fn.operator:(+)
+fn.iterator:(/)
 fn.iterated:+/
+fn.each:count'
+fn.scan:+\
+fn.prior:-':
+fn.eachRight:,/:
+fn.eachLeft:,\:
 fn.builtin:count
 fn.dotted:.corpus.fn.implicit
 
@@ -204,6 +212,11 @@ qsql.exec:exec sum size from table.trades
 qsql.update:update price*2 from table.trades
 qsql.delete:delete from table.trades where sym=`b
 qsql.functional:?[table.trades;();0b;()]
+
+/ Large values, which -18! compresses
+large.longs:til 2000
+large.symbols:1000#`a`b`c
+large.table:([] sym:300#`a`b`c; price:300#1.5 2.5; size:til 300)
 
 / System namespaces
 system.zK:.z.K

@@ -1,9 +1,11 @@
-> / Corpus of q for the grammar snapshot and, later, the codec fixtures.
-  0 "/ Corpus of q for the grammar snapshot and, later, the codec fixtures." comment.line.slash.q
-> / Every value lives under .corpus, so a script can walk it with key.
-  0 "/ Every value lives under .corpus, so a script can walk it with key." comment.line.slash.q
+> / Corpus of q for the grammar snapshot and the codec fixtures.
+  0 "/ Corpus of q for the grammar snapshot and the codec fixtures." comment.line.slash.q
+> / Every value lives under .corpus, where fixtures.q walks it with key.
+  0 "/ Every value lives under .corpus, where fixtures.q walks it with key." comment.line.slash.q
 > / It must load cleanly: q -q test/fixtures/corpus.q
   0 "/ It must load cleanly: q -q test/fixtures/corpus.q" comment.line.slash.q
+> / After a change, run npm run fixtures and UPDATE_SNAPSHOT=1 npm test
+  0 "/ After a change, run npm run fixtures and UPDATE_SNAPSHOT=1 npm test" comment.line.slash.q
 > 
 > \d .corpus
   0 "\\d" meta.preprocessor.system.q
@@ -147,12 +149,20 @@
   0 "vector.boolean" -
   14 ":" keyword.operator.assignment.q
   15 "101b" constant.numeric.boolean.q
-> vector.guid:2?0Ng
+> vector.guid:"G"$("0a369037-75d3-b24d-6721-5a1d44d4bed5";"00000000-0000-0000-0000-000000000001")
   0 "vector.guid" -
   11 ":" keyword.operator.assignment.q
-  12 "2" constant.numeric.number.q
-  13 "?" keyword.operator.q
-  14 "0Ng" constant.numeric.null.q
+  12 "\"G\"" support.type.cast.q
+  15 "$" keyword.operator.q
+  16 "(" -
+  17 "\"" string.quoted.double.q
+  18 "0a369037-75d3-b24d-6721-5a1d44d4bed5" string.quoted.double.q
+  54 "\"" string.quoted.double.q
+  55 ";" punctuation.separator.q
+  56 "\"" string.quoted.double.q
+  57 "00000000-0000-0000-0000-000000000001" string.quoted.double.q
+  93 "\"" string.quoted.double.q
+  94 ")" -
 > vector.byte:0x00ff2a
   0 "vector.byte" -
   11 ":" keyword.operator.assignment.q
@@ -802,11 +812,48 @@
   21 ";" punctuation.separator.q
   22 "abs" support.function.builtin.q
   25 "])" -
+> fn.operator:(+)
+  0 "fn.operator" -
+  11 ":" keyword.operator.assignment.q
+  12 "(" -
+  13 "+" keyword.operator.arithmetic.q
+  14 ")" -
+> fn.iterator:(/)
+  0 "fn.iterator" -
+  11 ":" keyword.operator.assignment.q
+  12 "(" -
+  13 "/" keyword.operator.iterator.q
+  14 ")" -
 > fn.iterated:+/
   0 "fn.iterated" -
   11 ":" keyword.operator.assignment.q
   12 "+" keyword.operator.arithmetic.q
   13 "/" keyword.operator.iterator.q
+> fn.each:count'
+  0 "fn.each" -
+  7 ":" keyword.operator.assignment.q
+  8 "count" support.function.builtin.q
+  13 "'" keyword.operator.iterator.q
+> fn.scan:+\
+  0 "fn.scan" -
+  7 ":" keyword.operator.assignment.q
+  8 "+" keyword.operator.arithmetic.q
+  9 "\\" keyword.operator.iterator.q
+> fn.prior:-':
+  0 "fn.prior" -
+  8 ":" keyword.operator.assignment.q
+  9 "-" keyword.operator.arithmetic.q
+  10 "':" keyword.operator.iterator.q
+> fn.eachRight:,/:
+  0 "fn.eachRight" -
+  12 ":" keyword.operator.assignment.q
+  13 "," keyword.operator.q
+  14 "/:" keyword.operator.iterator.q
+> fn.eachLeft:,\:
+  0 "fn.eachLeft" -
+  11 ":" keyword.operator.assignment.q
+  12 "," keyword.operator.q
+  13 "\\:" keyword.operator.iterator.q
 > fn.builtin:count
   0 "fn.builtin" -
   10 ":" keyword.operator.assignment.q
@@ -1281,6 +1328,42 @@
   34 "0b" constant.numeric.boolean.q
   36 ";" punctuation.separator.q
   37 "()]" -
+> 
+> / Large values, which -18! compresses
+  0 "/ Large values, which -18! compresses" comment.line.slash.q
+> large.longs:til 2000
+  0 "large.longs" -
+  11 ":" keyword.operator.assignment.q
+  12 "til" support.function.builtin.q
+  16 "2000" constant.numeric.number.q
+> large.symbols:1000#`a`b`c
+  0 "large.symbols" -
+  13 ":" keyword.operator.assignment.q
+  14 "1000" constant.numeric.number.q
+  18 "#" keyword.operator.q
+  19 "`a`b`c" constant.language.symbol.q
+> large.table:([] sym:300#`a`b`c; price:300#1.5 2.5; size:til 300)
+  0 "large.table" -
+  11 ":" keyword.operator.assignment.q
+  12 "([] " -
+  16 "sym" -
+  19 ":" keyword.operator.assignment.q
+  20 "300" constant.numeric.number.q
+  23 "#" keyword.operator.q
+  24 "`a`b`c" constant.language.symbol.q
+  30 ";" punctuation.separator.q
+  32 "price" -
+  37 ":" keyword.operator.assignment.q
+  38 "300" constant.numeric.number.q
+  41 "#" keyword.operator.q
+  42 "1.5" constant.numeric.number.q
+  46 "2.5" constant.numeric.number.q
+  49 ";" punctuation.separator.q
+  51 "size" -
+  55 ":" keyword.operator.assignment.q
+  56 "til" support.function.builtin.q
+  60 "300" constant.numeric.number.q
+  63 ")" -
 > 
 > / System namespaces
   0 "/ System namespaces" comment.line.slash.q
