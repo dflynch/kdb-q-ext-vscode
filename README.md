@@ -2,6 +2,39 @@
 
 A lightweight extension for kdb+/q programming.
 
+## Scope
+
+Quirk is for writing q, and in time for querying kdb+ and reading what comes
+back, without leaving VS Code. It's one extension with nothing to install
+alongside it. Today it highlights q, edits it and runs it in a terminal (see
+[Features](#features)).
+
+### Planned
+
+- Connecting to a kdb+ process and running a query against it
+- Results in a grid, shown as the q console shows them, using q's default
+  display settings: a long keeps every digit, a timestamp keeps its
+  nanoseconds, and a null shows which type of null it is. Copying a selection
+  copies the text you see. The aim is a faithful view of the result, not
+  text that's promised to read back into q
+- Go to definition, references, outline and workspace symbol search that
+  follow q's namespaces and know which names are local to a lambda
+
+### The query you send is the query you wrote
+
+Quirk won't wrap a query to fetch extra metadata, or add a row limit to it.
+Gateways that only allow listed calls see exactly what you typed. Row limits
+only change what the grid shows. A result over the size limit is refused,
+with a message saying how big it was and how to raise the limit.
+
+### Out of scope
+
+- Rename, formatting, diagnostics and `.k` files
+- Names built from strings at runtime, such as `value "f",string x`: q can't
+  resolve them until the code runs, so navigation won't either
+- Starting or bundling q: Run Selected Text sends your code to a q session
+  you started, which remains the right tool for anything stateful
+
 ## Features
 
 - Syntax highlighting for q, including the q 5 (KDB-X) keywords and
