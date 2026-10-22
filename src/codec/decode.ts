@@ -1,6 +1,7 @@
-import type { Atom, Attribute, Texts, Value, Vector } from "./types";
+import type { Atom, Texts, Value, Vector } from "./types";
 
-const utf8 = new TextDecoder();
+// Keeping a leading byte-order mark, which q would show as part of the symbol
+const utf8 = new TextDecoder("utf-8", { ignoreBOM: true });
 
 // Decode a q IPC message, as a server sends it or -8! writes it. So far this
 // covers atoms and vectors; any other type throws.
@@ -10,29 +11,28 @@ export function decode(message: Uint8Array): Value {
   }
   // Every machine VS Code runs on is little-endian, and q writes in its own
   // byte order, so a big-endian message would come from a rare server
-  if (message[0] !== 1) {
+  if (message[0] === 0) {
     throw new Error("big-endian messages aren't supported");
+  }
+  if (message[0] !== 1) {
+    throw new Error("this isn't a q message");
   }
   if (message[2] !== 0) {
     throw new Error("compressed messages aren't supported yet");
   }
   const reader = new Reader(message);
-  const length = reader.uint32(4);
-  if (length !== message.length) {
-    throw new Error(
-      `the header says ${length} bytes, but there are ${message.length}`,
-    );
-  }
-  reader.offset = 8;
   const value = reader.value();
-  if (reader.offset !== length) {
-    throw new Error(`${length - reader.offset} bytes left after the value`);
+  if (reader.offset !== message.length) {
+    throw new Error(
+      `${message.length - reader.offset} bytes left after the value`,
+    );
   }
   return value;
 }
 
 class Reader {
-  offset = 0;
+  // Past the header, once its length is checked
+  offset = 8;
   private view: DataView;
 
   constructor(private message: Uint8Array) {
@@ -41,6 +41,12 @@ class Reader {
       message.byteOffset,
       message.byteLength,
     );
+    const length = this.uint32(4);
+    if (length !== message.length) {
+      throw new Error(
+        `the header says ${length} bytes, but there are ${message.length}`,
+      );
+    }
   }
 
   value(): Value {
@@ -48,7 +54,8 @@ class Reader {
     if (type < 0 && type >= -19) {
       return this.atom(type);
     }
-    if (type > 0 && type <= 19) {
+    // There's no type 3
+    if (type > 0 && type <= 19 && type !== 3) {
       return this.vector(type);
     }
     throw new Error(`type ${type} isn't supported yet`);
@@ -58,6 +65,7 @@ class Reader {
     switch (type) {
       case -1:
       case -4:
+      case -10:
         return { type, value: this.message[this.take(1)] };
       case -2:
         return { type, value: this.bytes(16) };
@@ -79,8 +87,6 @@ class Reader {
       case -9:
       case -15:
         return { type, value: this.view.getFloat64(this.take(8), true) };
-      case -10:
-        return { type, value: this.message[this.take(1)] };
       case -11:
         return { type, value: utf8.decode(this.symbol()) };
     }
@@ -88,7 +94,10 @@ class Reader {
   }
 
   private vector(type: number): Vector {
-    const attribute = this.message[this.take(1)] as Attribute;
+    const attribute = this.message[this.take(1)];
+    if (attribute > 4) {
+      throw new Error(`attribute ${attribute} isn't one of q's`);
+    }
     const count = this.uint32(this.take(4));
     switch (type) {
       case 1:
@@ -141,23 +150,22 @@ class Reader {
     throw new Error(`type ${type} isn't a vector`);
   }
 
-  // Symbols end to end without their 0 bytes, and n + 1 offsets. Copied a
-  // byte at a time, so a column makes no object per symbol.
+  // Symbols end to end without their 0 bytes, and n + 1 offsets
   private symbols(count: number): Texts {
     const start = this.offset;
     for (let i = 0; i < count; i++) {
       this.symbolEnd();
     }
-    const wire = this.message.subarray(start, this.offset);
-    const bytes = new Uint8Array(wire.length - count);
+    const message = this.message;
+    const bytes = new Uint8Array(this.offset - start - count);
     const offsets = new Uint32Array(count + 1);
     let symbol = 0;
     let length = 0;
-    for (const byte of wire) {
-      if (byte === 0) {
+    for (let i = start; i < this.offset; i++) {
+      if (message[i] === 0) {
         offsets[++symbol] = length;
       } else {
-        bytes[length++] = byte;
+        bytes[length++] = message[i];
       }
     }
     return { bytes, offsets };
@@ -193,7 +201,7 @@ class Reader {
     return this.bytes(n).buffer;
   }
 
-  uint32(offset: number): number {
+  private uint32(offset: number): number {
     return this.view.getUint32(offset, true);
   }
 

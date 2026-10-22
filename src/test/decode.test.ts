@@ -169,8 +169,35 @@ suite("decode", () => {
     assert.strictEqual(value.data.buffer.byteLength, 12);
   });
 
+  // A message around the bytes of one value, for shapes q won't write
+  function message(hex: string): Buffer {
+    const bytes = Buffer.from(`0100000000000000${hex}`, "hex");
+    bytes.writeUInt32LE(bytes.length, 4);
+    return bytes;
+  }
+
+  test("symbol atoms keep a leading byte-order mark", () => {
+    const value = decode(message("f5efbbbf61626300"));
+    assert.deepStrictEqual(value, { type: -11, value: "\ufeffabc" });
+  });
+
   suite("rejects", () => {
     const long = () => Buffer.from(bytes("atom.long"));
+    test("a count larger than the message", () => {
+      assert.throws(() => decode(message("0700ffffffff")), /ends early/);
+      assert.throws(
+        () => decode(message("0b00ffffffff6100")),
+        /inside a symbol/,
+      );
+    });
+    test("an attribute q doesn't have", () => {
+      assert.throws(() => decode(message("070901000000")), /attribute 9/);
+    });
+    test("something that isn't a q message", () => {
+      const notQ = long();
+      notQ[0] = 2;
+      assert.throws(() => decode(notQ), /isn't a q message/);
+    });
     test("a message shorter than its header", () => {
       assert.throws(() => decode(Uint8Array.of(1, 0, 0)), /ends early/);
     });
