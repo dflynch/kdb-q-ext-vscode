@@ -9,6 +9,14 @@ All notable changes to the extension are documented in this file.
 - New icons: a rounded q tile in the Marketplace, and a file icon with
   separate light and dark versions, so it stays clear in dark themes
 
+### Fixed
+
+- Dotted names that start with a reserved word, such as `null.x` or
+  `select.y`, are highlighted as one name
+- Negative times, such as `-12:34:56.789`, are highlighted as one literal
+- `'[f;g]` (compose) is no longer highlighted as a signal
+- The `.` in `\d .` is no longer highlighted as an operator
+
 ## [1.1.0]
 
 ### Added
