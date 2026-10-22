@@ -4,6 +4,8 @@
 // Uint8Array, a copy of the header in the result, and checks that the
 // compressed data ends where the message does.
 
+import { badmsg } from "./errors";
+
 // Expand a compressed q message into the message it stands for, header
 // included. After the header comes the uncompressed length, then the data:
 // a flag byte for every eight items, where a clear bit is a literal byte and
@@ -12,7 +14,7 @@
 // and how many bytes past two to copy.
 export function decompress(message: Uint8Array): Uint8Array {
   if (message.length < 12) {
-    throw new Error("the message ends early");
+    throw badmsg("the message ends early");
   }
   const length = new DataView(
     message.buffer,
@@ -21,7 +23,7 @@ export function decompress(message: Uint8Array): Uint8Array {
   ).getUint32(8, true);
   // Too short to hold even the header
   if (length < 8) {
-    throw new Error("the compressed message is malformed");
+    throw badmsg("the compressed message is malformed");
   }
   const out = new Uint8Array(length);
   out.set(message.subarray(0, 4));
@@ -62,7 +64,7 @@ export function decompress(message: Uint8Array): Uint8Array {
   }
   // Data that runs out early, or runs past the length, isn't q's
   if (to !== length || from !== message.length) {
-    throw new Error("the compressed message is malformed");
+    throw badmsg("the compressed message is malformed");
   }
   return out;
 }

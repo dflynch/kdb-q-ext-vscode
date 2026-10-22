@@ -25,6 +25,14 @@ function sized(message: Buffer): Buffer {
   return message;
 }
 
+// Checks for the badmsg error, with the detail in its cause
+function badmsg(detail: RegExp) {
+  return (error: unknown) =>
+    error instanceof Error &&
+    error.message === "badmsg" &&
+    detail.test(String(error.cause));
+}
+
 suite("decompress", () => {
   test("every compressed value in the corpus", () => {
     assert.ok(fixtures.length > 0);
@@ -47,34 +55,34 @@ suite("decompress", () => {
     test("a message too short for its length", () => {
       assert.throws(
         () => decompress(Uint8Array.of(1, 0, 1, 0, 11, 0, 0, 0, 0, 0, 0)),
-        /ends early/,
+        badmsg(/ends early/),
       );
     });
     test("a length too short for the header", () => {
       assert.throws(
         () => decompress(Uint8Array.of(1, 0, 1, 0, 12, 0, 0, 0, 7, 0, 0, 0)),
-        /malformed/,
+        badmsg(/malformed/),
       );
     });
     test("data that ends early", () => {
       const message = sized(compressed("large.longs").subarray(0, -1));
-      assert.throws(() => decode(message), /malformed/);
+      assert.throws(() => decode(message), badmsg(/malformed/));
     });
     test("data left over", () => {
       const message = sized(
         Buffer.concat([compressed("large.longs"), Buffer.of(0)]),
       );
-      assert.throws(() => decode(message), /malformed/);
+      assert.throws(() => decode(message), badmsg(/malformed/));
     });
     test("a length the data doesn't fill", () => {
       const message = compressed("large.longs");
       message.writeUInt32LE(message.readUInt32LE(8) + 1, 8);
-      assert.throws(() => decode(message), /malformed/);
+      assert.throws(() => decode(message), badmsg(/malformed/));
     });
     test("a length the data overruns", () => {
       const message = compressed("large.longs");
       message.writeUInt32LE(message.readUInt32LE(8) - 1, 8);
-      assert.throws(() => decode(message), /malformed/);
+      assert.throws(() => decode(message), badmsg(/malformed/));
     });
   });
 });
