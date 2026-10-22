@@ -40,7 +40,7 @@ export type Atom =
   | { type: -8; value: number } // real
   | { type: -9; value: number } // float
   | { type: -10; value: number } // char, a byte: q strings needn't be UTF-8
-  | { type: -11; value: string } // symbol
+  | { type: -11; value: string } // symbol, as UTF-8: other bytes become U+FFFD
   | { type: -12; value: bigint } // timestamp, nanoseconds since 2000.01.01
   | { type: -13; value: number } // month, months since 2000.01
   | { type: -14; value: number } // date, days since 2000.01.01
