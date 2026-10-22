@@ -1,31 +1,6 @@
 import * as assert from "node:assert";
-import { readFile } from "node:fs/promises";
-import * as path from "node:path";
-import * as oniguruma from "vscode-oniguruma";
 import * as textmate from "vscode-textmate";
-
-const grammarPath = path.join(__dirname, "../../syntaxes/q.tmGrammar.json");
-
-async function loadGrammar(): Promise<textmate.IGrammar> {
-  const wasm = await readFile(
-    require.resolve("vscode-oniguruma/release/onig.wasm"),
-  );
-  await oniguruma.loadWASM(wasm.buffer as ArrayBuffer);
-  const registry = new textmate.Registry({
-    onigLib: Promise.resolve({
-      createOnigScanner: (patterns) => new oniguruma.OnigScanner(patterns),
-      createOnigString: (s) => new oniguruma.OnigString(s),
-    }),
-    loadGrammar: async () =>
-      textmate.parseRawGrammar(
-        await readFile(grammarPath, "utf8"),
-        grammarPath,
-      ),
-  });
-  const grammar = await registry.loadGrammar("source.q");
-  assert.ok(grammar, "grammar did not load");
-  return grammar;
-}
+import { loadGrammar } from "./grammar";
 
 // Every non-whitespace token across all lines, as [text, innermost scope]
 function tokenize(grammar: textmate.IGrammar, source: string) {
