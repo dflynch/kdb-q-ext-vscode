@@ -2,7 +2,7 @@ import * as assert from "node:assert";
 import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import { decode } from "../codec/decode";
-import type { Value } from "../codec/types";
+import type { Value, Vector } from "../codec/types";
 
 const fixtures: { name: string; type: number; bytes: string }[] = JSON.parse(
   readFileSync(
@@ -25,14 +25,12 @@ const nullLong = -(2n ** 63n);
 const infinityLong = 2n ** 63n - 1n;
 
 suite("decode", () => {
-  test("every atom and vector in the corpus", () => {
-    const simple = fixtures.filter(
-      (f) => f.type !== 0 && f.type >= -19 && f.type <= 19,
-    );
-    assert.ok(simple.length > 100);
-    for (const fixture of simple) {
+  test("every value in the corpus", () => {
+    for (const fixture of fixtures) {
       const value = decode(Buffer.from(fixture.bytes, "hex"));
-      assert.strictEqual(value.type, fixture.type, fixture.name);
+      // q's type says 99 for a sorted dictionary, which is 127 on the wire
+      const type = value.type === 127 ? 99 : value.type;
+      assert.strictEqual(type, fixture.type, fixture.name);
     }
   });
 
@@ -181,6 +179,171 @@ suite("decode", () => {
     assert.deepStrictEqual(value, { type: -11, value: "\ufeffabc" });
   });
 
+  // Shorthands for expected values
+  const long = (value: bigint): Value => ({ type: -7, value });
+  const longs = (...values: bigint[]): Vector => ({
+    type: 7,
+    attribute: 0,
+    data: BigInt64Array.of(...values),
+  });
+  const texts = (...values: string[]) => {
+    const offsets = [0];
+    for (const value of values) {
+      offsets.push(offsets[offsets.length - 1] + Buffer.byteLength(value));
+    }
+    return {
+      bytes: new Uint8Array(Buffer.from(values.join(""))),
+      offsets: Uint32Array.from(offsets),
+    };
+  };
+  const symbols = (...values: string[]): Vector => ({
+    type: 11,
+    attribute: 0,
+    data: texts(...values),
+  });
+  const chars = (value: string): Vector => ({
+    type: 10,
+    attribute: 0,
+    data: new Uint8Array(Buffer.from(value)),
+  });
+  const lambda = (source: string): Value => ({
+    type: 100,
+    context: "corpus",
+    source,
+  });
+
+  const structures: [string, Value][] = [
+    [
+      "list.mixed",
+      {
+        type: 0,
+        attribute: 0,
+        items: [
+          long(1n),
+          { type: -11, value: "a" },
+          { type: -10, value: 98 },
+          { type: -9, value: 2.5 },
+        ],
+      },
+    ],
+    ["list.empty", { type: 0, attribute: 0, items: [] }],
+    [
+      "dict.simple",
+      { type: 99, keys: symbols("a", "b", "c"), values: longs(1n, 2n, 3n) },
+    ],
+    [
+      "dict.sorted",
+      {
+        type: 127,
+        keys: { type: 11, attribute: 1, data: texts("a", "b") },
+        values: longs(1n, 2n),
+      },
+    ],
+    [
+      "table.stringColumn",
+      {
+        type: 98,
+        attribute: 0,
+        columns: ["s", "n"],
+        data: [
+          { type: 0, attribute: 0, strings: texts("ab", "c", "") },
+          longs(1n, 2n, 3n),
+        ],
+      },
+    ],
+    [
+      "table.charColumns",
+      {
+        type: 98,
+        attribute: 0,
+        columns: ["a", "b"],
+        data: [chars("ab"), chars("cd")],
+      },
+    ],
+    [
+      "table.keyed",
+      {
+        type: 99,
+        keys: {
+          type: 98,
+          attribute: 0,
+          columns: ["sym"],
+          data: [symbols("a", "b")],
+        },
+        values: {
+          type: 98,
+          attribute: 0,
+          columns: ["price"],
+          data: [{ type: 9, attribute: 0, data: Float64Array.of(1.5, 2.5) }],
+        },
+      },
+    ],
+    ["null.generic", { type: 101, code: 0 }],
+    ["fn.implicit", lambda("{x+y}")],
+    ["fn.builtin", { type: 101, code: 13 }],
+    ["fn.operator", { type: 102, code: 1 }],
+    ["fn.iterator", { type: 103, code: 1 }],
+    ["fn.projection", { type: 104, parts: [lambda("{x+y}"), long(1n)] }],
+    [
+      "fn.elided",
+      {
+        type: 104,
+        parts: [lambda("{x+y+z}"), { type: 101, code: 255 }, long(1n)],
+      },
+    ],
+    [
+      "fn.composition",
+      {
+        type: 105,
+        parts: [
+          { type: 101, code: 2 },
+          { type: 101, code: 31 },
+        ],
+      },
+    ],
+    ["fn.each", { type: 106, value: { type: 101, code: 13 } }],
+    ["fn.iterated", { type: 107, value: { type: 102, code: 1 } }],
+  ];
+  for (const [name, expected] of structures) {
+    test(name, () => {
+      assert.deepStrictEqual(decode(bytes(name)), expected);
+    });
+  }
+
+  test("table attributes and column attributes", () => {
+    const value = decode(bytes("table.attributes"));
+    assert.ok(value.type === 98 && "data" in value);
+    assert.deepStrictEqual(
+      value.data.map((column) => column.attribute),
+      [3, 1, 2, 4],
+    );
+  });
+
+  // From q 5: a splayed table returned as itself, ([] s:`a`b; v:1 2) at
+  // `:db/t/, and responses captured from a server over a socket
+  test("a reference to a table on the server's disk", () => {
+    assert.deepStrictEqual(
+      decode(message("6200630b000200000073007600f53a64622f742f00")),
+      { type: 98, attribute: 0, columns: ["s", "v"], reference: ":db/t/" },
+    );
+  });
+
+  test("an error from a server", () => {
+    const response = Buffer.from("010200000e000000807479706500", "hex");
+    assert.deepStrictEqual(decode(response), { type: -128, message: "type" });
+  });
+
+  test("a result from a server", () => {
+    const response = Buffer.from(
+      "0102000023000000680200000064000a00050000007b782b797df90100000000000000",
+      "hex",
+    );
+    assert.deepStrictEqual(decode(response), {
+      type: 104,
+      parts: [{ type: 100, context: "", source: "{x+y}" }, long(1n)],
+    });
+  });
+
   suite("rejects", () => {
     const long = () => Buffer.from(bytes("atom.long"));
     test("a count larger than the message", () => {
@@ -228,11 +391,9 @@ suite("decode", () => {
         /compressed/,
       );
     });
-    test("types it can't decode yet", () => {
-      assert.throws(
-        () => decode(bytes("list.mixed")),
-        /type 0 isn't supported/,
-      );
+    test("types it can't decode", () => {
+      assert.throws(() => decode(message("70")), /type 112 isn't supported/);
+      assert.throws(() => decode(message("1400")), /type 20 isn't supported/);
     });
   });
 });
