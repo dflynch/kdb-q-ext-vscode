@@ -1039,6 +1039,19 @@ suite("q grammar", () => {
       ],
     ],
     [
+      "dotted names that start with a reserved word",
+      "null.a;do.b;select.c;count",
+      [
+        ["null.a", "source.q"],
+        [";", "punctuation.separator.q"],
+        ["do.b", "source.q"],
+        [";", "punctuation.separator.q"],
+        ["select.c", "source.q"],
+        [";", "punctuation.separator.q"],
+        ["count", "support.function.builtin.q"],
+      ],
+    ],
+    [
       "parameter",
       "{[a] a}",
       [

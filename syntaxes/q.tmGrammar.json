@@ -156,11 +156,11 @@
       "patterns": [
         {
           "name": "keyword.control.import.q",
-          "match": "\\buse\\b"
+          "match": "\\buse(?![\\w.])"
         },
         {
           "name": "keyword.control.conditional.q",
-          "match": "\\bif\\b"
+          "match": "\\bif(?![\\w.])"
         },
         {
           "name": "keyword.control.conditional.q",
@@ -168,11 +168,11 @@
         },
         {
           "name": "keyword.control.loop.q",
-          "match": "\\b(?:do|while)\\b"
+          "match": "\\b(?:do|while)(?![\\w.])"
         },
         {
           "name": "keyword.control.flow.q",
-          "match": "\\bexit\\b"
+          "match": "\\bexit(?![\\w.])"
         },
         {
           "name": "keyword.control.flow.signal.q",
@@ -184,7 +184,7 @@
         },
         {
           "name": "keyword.other.qsql.q",
-          "match": "\\b(?:select|exec|update|delete|by|from|where)\\b"
+          "match": "\\b(?:select|exec|update|delete|by|from|where)(?![\\w.])"
         },
         {
           "name": "support.function.builtin.io.q",
@@ -208,7 +208,7 @@
         },
         {
           "name": "support.function.builtin.q",
-          "match": "\\b(?:each|over|scan|prior|peach|abs|acos|aj|aj0|ajf|ajf0|all|and|any|asc|asin|asof|atan|attr|avg|avgs|bin|binr|ceiling|cols|cor|cos|count|cov|cross|csv|cut|deltas|desc|dev|differ|distinct|div|dsave|ej|ema|enlist|eval|except|exp|fby|fills|first|fkeys|flip|floor|get|getenv|group|gtime|hclose|hcount|hdel|hopen|hsym|iasc|idesc|ij|ijf|in|insert|inter|inv|key|keys|last|like|lj|ljf|load|log|lower|lsq|ltime|ltrim|mavg|max|maxs|mcount|md5|mdev|med|meta|min|mins|mmax|mmin|mmu|mod|msum|neg|next|not|null|or|parse|pj|prd|prds|prev|rand|rank|ratios|raze|read0|read1|reciprocal|reval|reverse|rload|rotate|rsave|rtrim|save|scov|sdev|set|setenv|show|signum|sin|sqrt|ss|ssr|string|sublist|sum|sums|sv|svar|system|tables|tan|til|trim|type|uj|ujf|ungroup|union|upper|upsert|value|var|view|views|vs|wavg|within|wj|wj1|wsum|ww|xasc|xbar|xcol|xcols|xdesc|xexp|xgroup|xkey|xlog|xprev|xrank)\\b"
+          "match": "\\b(?:each|over|scan|prior|peach|abs|acos|aj|aj0|ajf|ajf0|all|and|any|asc|asin|asof|atan|attr|avg|avgs|bin|binr|ceiling|cols|cor|cos|count|cov|cross|csv|cut|deltas|desc|dev|differ|distinct|div|dsave|ej|ema|enlist|eval|except|exp|fby|fills|first|fkeys|flip|floor|get|getenv|group|gtime|hclose|hcount|hdel|hopen|hsym|iasc|idesc|ij|ijf|in|insert|inter|inv|key|keys|last|like|lj|ljf|load|log|lower|lsq|ltime|ltrim|mavg|max|maxs|mcount|md5|mdev|med|meta|min|mins|mmax|mmin|mmu|mod|msum|neg|next|not|null|or|parse|pj|prd|prds|prev|rand|rank|ratios|raze|read0|read1|reciprocal|reval|reverse|rload|rotate|rsave|rtrim|save|scov|sdev|set|setenv|show|signum|sin|sqrt|ss|ssr|string|sublist|sum|sums|sv|svar|system|tables|tan|til|trim|type|uj|ujf|ungroup|union|upper|upsert|value|var|view|views|vs|wavg|within|wj|wj1|wsum|ww|xasc|xbar|xcol|xcols|xdesc|xexp|xgroup|xkey|xlog|xprev|xrank)(?![\\w.])"
         }
       ]
     },
