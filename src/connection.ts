@@ -23,13 +23,10 @@ export class QError extends Error {}
 // over it kills the host, so results are refused well before: a general
 // list decodes to up to about 60 times its size. Refusing closes the
 // connection, which stops the server sending the rest.
-export class OverLimit extends Error {
-  constructor(
-    readonly size: number,
-    readonly limit: number,
-  ) {
-    super("the result is too big");
-  }
+function tooBig(size: number, limit: number): Error {
+  return new Error("the result is too big", {
+    cause: `${size} bytes, over the limit of ${limit}`,
+  });
 }
 
 const what = ["async message", "sync call", "response"];
@@ -182,7 +179,7 @@ export class Connection {
             );
           }
           if (length > this.limit) {
-            throw new OverLimit(length, this.limit);
+            throw tooBig(length, this.limit);
           }
           this.message = Buffer.allocUnsafe(length);
           this.header.copy(this.message);
@@ -204,7 +201,7 @@ export class Connection {
             ? this.message.readUInt32LE(8)
             : this.message.readUInt32BE(8);
           if (length > this.limit) {
-            throw new OverLimit(length, this.limit);
+            throw tooBig(length, this.limit);
           }
         }
         if (this.received === this.message.length) {

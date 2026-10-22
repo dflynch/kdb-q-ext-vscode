@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import * as net from "node:net";
 import * as path from "node:path";
 import { encode } from "../codec/encode";
-import { Connection, OverLimit, QError } from "../connection";
+import { Connection, QError } from "../connection";
 
 const fixtures: { name: string; bytes: string; compressed?: string }[] =
   JSON.parse(
@@ -303,10 +303,9 @@ suite("connection", () => {
     await assert.rejects(
       connection.query("x"),
       (error) =>
-        error instanceof OverLimit &&
+        error instanceof Error &&
         error.message === "the result is too big" &&
-        error.size === 17 &&
-        error.limit === 16,
+        error.cause === "17 bytes, over the limit of 16",
     );
     await server.closed;
   });
@@ -328,7 +327,11 @@ suite("connection", () => {
     const connection = await limited(server, uncompressed - 1);
     await assert.rejects(
       connection.query("x"),
-      (error) => error instanceof OverLimit && error.size === uncompressed,
+      (error) =>
+        error instanceof Error &&
+        error.message === "the result is too big" &&
+        error.cause ===
+          `${uncompressed} bytes, over the limit of ${uncompressed - 1}`,
     );
     await server.closed;
   });
