@@ -35,7 +35,9 @@ function qError(text: string): Buffer {
 }
 
 // A stand-in for q: it takes the login, then hands each message it's sent to
-// answer, which writes back whatever the test needs
+// answer, which writes back whatever the test needs. It accepts the login,
+// refuses it by closing the connection, or never answers it.
+type Login = "accept" | "refuse" | "ignore";
 type Fake = {
   port: number;
   login: Promise<Buffer>;
@@ -46,7 +48,7 @@ type Fake = {
 
 async function serve(
   answer: (socket: net.Socket, message: Buffer) => void,
-  accept = true,
+  login: Login,
 ): Promise<Fake> {
   let loggedIn: (login: Buffer) => void = () => {};
   let closed: () => void = () => {};
@@ -61,20 +63,22 @@ async function serve(
   };
   const server = net.createServer((socket) => {
     let buffered = Buffer.alloc(0);
-    let login = true;
+    let loggingIn = true;
     socket.on("close", closed);
     socket.on("data", (chunk) => {
       buffered = Buffer.concat([buffered, chunk]);
-      if (login) {
+      if (loggingIn) {
         const end = buffered.indexOf(0);
         if (end < 0) {
           return;
         }
         loggedIn(buffered.subarray(0, end + 1));
         buffered = buffered.subarray(end + 1);
-        login = false;
-        if (!accept) {
+        loggingIn = false;
+        if (login === "refuse") {
           socket.destroy();
+        }
+        if (login !== "accept") {
           return;
         }
         socket.write(Buffer.of(3));
@@ -113,9 +117,9 @@ suite("connection", () => {
   const fakes: Fake[] = [];
   async function fake(
     answer: (socket: net.Socket, message: Buffer) => void = () => {},
-    accept = true,
+    login: Login = "accept",
   ): Promise<Fake> {
-    const f = await serve(answer, accept);
+    const f = await serve(answer, login);
     fakes.push(f);
     return f;
   }
@@ -138,14 +142,44 @@ suite("connection", () => {
   });
 
   test("a refused login is q's access error", async () => {
-    const server = await fake(() => {}, false);
+    const server = await fake(() => {}, "refuse");
     await assert.rejects(open(server), { message: "access" });
   });
 
-  test("a server that isn't there", async () => {
+  test("a server that isn't there is q's hop error", async () => {
     const server = await fake();
     server.stop();
-    await assert.rejects(open(server), /couldn't connect to 127.0.0.1/);
+    await assert.rejects(open(server), {
+      message: "hop. OS reports: connection refused",
+    });
+  });
+
+  test("a host that can't be found is named, as q does", async () => {
+    await assert.rejects(
+      Connection.open({ host: "nosuchhost.invalid", port: 5000 }),
+      /^Error: nosuchhost\.invalid\. OS reports: /,
+    );
+  });
+
+  test("a login that isn't answered times out", async () => {
+    const server = await fake(() => {}, "ignore");
+    await assert.rejects(
+      Connection.open({ host: "127.0.0.1", port: server.port, timeout: 50 }),
+      { message: "timeout" },
+    );
+  });
+
+  test("a connection outlasts the login's timeout", async () => {
+    const server = await fake((socket) => {
+      setTimeout(() => socket.write(response("atom.long")), 100);
+    });
+    const connection = await Connection.open({
+      host: "127.0.0.1",
+      port: server.port,
+      timeout: 50,
+    });
+    assert.strictEqual((await connection.query("x")).type, -7);
+    connection.close();
   });
 
   test("sends the query and resolves with the result", async () => {
@@ -177,15 +211,52 @@ suite("connection", () => {
     connection.close();
   });
 
-  test("drops messages that aren't responses", async () => {
+  test("an async message closes the connection", async () => {
     const server = await fake((socket) => {
       const async = response("atom.symbol");
       async[1] = 0;
       socket.write(Buffer.concat([async, response("atom.long")]));
     });
     const connection = await open(server);
+    await assert.rejects(
+      connection.query("x"),
+      /the server sent an async message without being asked/,
+    );
+    await server.closed;
+  });
+
+  test("a sync call closes the connection", async () => {
+    const server = await fake((socket) => {
+      const sync = response("atom.symbol");
+      sync[1] = 1;
+      socket.write(sync);
+    });
+    const connection = await open(server);
+    await assert.rejects(
+      connection.query("x"),
+      /the server sent a sync call without being asked/,
+    );
+    await server.closed;
+  });
+
+  test("a message between queries closes the connection, with the reason kept for the next query", async () => {
+    // The response, then a tickerplant's update
+    const server = await fake((socket) => {
+      const update = response("atom.symbol");
+      update[1] = 0;
+      socket.write(response("atom.long"));
+      setTimeout(() => socket.write(update), 10);
+    });
+    const connection = await open(server);
     assert.strictEqual((await connection.query("x")).type, -7);
-    connection.close();
+    await server.closed;
+    await assert.rejects(
+      connection.query("x"),
+      (error) =>
+        error instanceof Error &&
+        error.message === "the connection is closed" &&
+        /async message without being asked/.test(String(error.cause)),
+    );
   });
 
   test("a q error rejects with q's text", async () => {
