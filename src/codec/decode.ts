@@ -1,5 +1,5 @@
 import { decompress } from "./decompress";
-import { badmsg } from "./errors";
+import { badmsg, OverBudget } from "./errors";
 import {
   type Atom,
   count,
@@ -14,10 +14,21 @@ import {
 // Keeping a leading byte-order mark, which q would show as part of the symbol
 const utf8 = new TextDecoder("utf-8", { ignoreBOM: true });
 
+// What a decoded value costs, roughly, in bytes, measured on Node 26: a
+// million char atoms in a general list take 50 MB of heap, and a million
+// short strings with a char atom among them 282 MB, though both are a few MB
+// on the wire. The decoder counts these as it goes against the budget.
+const atomCost = 64;
+const listCost = 64;
+const itemCost = 8;
+const vectorCost = 280;
+
 // Decode a q IPC message, as a server sends it or -8! or -18! writes it.
 // A message it can't read throws badmsg, as q does; big-endian messages and
-// foreign objects, which q can read, throw errors of their own.
-export function decode(message: Uint8Array): Value {
+// foreign objects, which q can read, throw errors of their own. A result
+// that would cost more than the budget to decompress or decode throws
+// OverBudget.
+export function decode(message: Uint8Array, budget = Infinity): Value {
   if (message.length < 8) {
     throw badmsg("the message ends early");
   }
@@ -42,8 +53,18 @@ export function decode(message: Uint8Array): Value {
   if (message[2] > 1) {
     throw badmsg(`compression flag ${message[2]} isn't one of q's`);
   }
+  if (message[2] && message.length >= 12) {
+    const uncompressed = new DataView(
+      message.buffer,
+      message.byteOffset,
+      message.byteLength,
+    ).getUint32(8, true);
+    if (uncompressed > budget) {
+      throw new OverBudget(uncompressed, budget, "uncompressed");
+    }
+  }
   const data = message[2] ? decompress(message) : message;
-  const reader = new Reader(data);
+  const reader = new Reader(data, budget);
   const value = reader.value();
   if (reader.offset !== data.length) {
     throw badmsg(`${data.length - reader.offset} bytes left after the value`);
@@ -51,12 +72,22 @@ export function decode(message: Uint8Array): Value {
   return value;
 }
 
+function size(data: Vector["data"] | Texts): number {
+  return "offsets" in data
+    ? data.bytes.byteLength + data.offsets.byteLength
+    : data.byteLength;
+}
+
 class Reader {
   // Past the header
   offset = 8;
   private view: DataView;
+  private spent = 0;
 
-  constructor(private message: Uint8Array) {
+  constructor(
+    private message: Uint8Array,
+    private budget: number,
+  ) {
     this.view = new DataView(
       message.buffer,
       message.byteOffset,
@@ -71,7 +102,9 @@ class Reader {
     }
     // There's no type 3
     if (type > 0 && type <= 19 && type !== 3) {
-      return this.vector(type);
+      const vector = this.vector(type);
+      this.spend(vectorCost + size(vector.data));
+      return vector;
     }
     switch (type) {
       case 0:
@@ -119,9 +152,12 @@ class Reader {
     const count = this.uint32(this.take(4));
     const strings = this.strings(count);
     if (strings) {
+      this.spend(listCost + size(strings));
       return { type: 0, attribute, strings };
     }
-    return { type: 0, attribute, items: this.values(count) };
+    const items = this.values(count);
+    this.spend(listCost + itemCost * count);
+    return { type: 0, attribute, items };
   }
 
   // The items of a list of strings end to end, or nothing if the list is
@@ -226,6 +262,7 @@ class Reader {
   }
 
   private atom(type: number): Atom {
+    this.spend(atomCost);
     switch (type) {
       case -1:
       case -4:
@@ -309,6 +346,17 @@ class Reader {
         return { type, attribute, data: this.symbols(count) };
     }
     throw new Error(`type ${type} isn't a vector`);
+  }
+
+  // Count what a value costs, once it's made, refusing it when the total is
+  // over budget. Making it first is safe: one value's buffers are at most a
+  // few times the message, which is within budget itself, and a buffer that
+  // can't be had is an error that can be caught.
+  private spend(cost: number): void {
+    this.spent += cost;
+    if (this.spent > this.budget) {
+      throw new OverBudget(undefined, this.budget, "once decoded");
+    }
   }
 
   // Symbols end to end without their 0 bytes, and n + 1 offsets

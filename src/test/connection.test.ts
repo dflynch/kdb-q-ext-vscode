@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import * as net from "node:net";
 import * as path from "node:path";
 import { encode } from "../codec/encode";
+import { OverBudget } from "../codec/errors";
 import { Connection, QError } from "../connection";
 
 const fixtures: { name: string; bytes: string; compressed?: string }[] =
@@ -291,6 +292,47 @@ suite("connection", () => {
     const connection = await open(server);
     await assert.rejects(connection.query("x"), { message: "badmsg" });
     await assert.rejects(connection.query("x"), /the connection is closed/);
+  });
+
+  test("a result over budget on the wire closes the connection", async () => {
+    const server = await fake((socket) => socket.write(response("atom.long")));
+    const connection = await Connection.open({
+      host: "127.0.0.1",
+      port: server.port,
+      budget: 16,
+    });
+    await assert.rejects(
+      connection.query("x"),
+      (error) =>
+        error instanceof OverBudget &&
+        error.message ===
+          "the result is 17 bytes on the wire, over the 16 bytes limit",
+    );
+    await server.closed;
+  });
+
+  test("a result over budget once decoded leaves the connection open", async () => {
+    // A general list of 1,000 char atoms, then a long
+    const list = Buffer.alloc(14 + 2000);
+    list.set([1, 2, 0, 0, 0, 0, 0, 0, 0, 0]);
+    list.writeUInt32LE(list.length, 4);
+    list.writeUInt32LE(1000, 10);
+    for (let i = 0; i < 1000; i++) {
+      list.set([0xf6, 97], 14 + 2 * i);
+    }
+    let first = true;
+    const server = await fake((socket) => {
+      socket.write(first ? list : response("atom.long"));
+      first = false;
+    });
+    const connection = await Connection.open({
+      host: "127.0.0.1",
+      port: server.port,
+      budget: 20_000,
+    });
+    await assert.rejects(connection.query("x"), /once decoded/);
+    assert.strictEqual((await connection.query("x")).type, -7);
+    connection.close();
   });
 
   test("one query at a time", async () => {

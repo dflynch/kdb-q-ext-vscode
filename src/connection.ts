@@ -2,7 +2,7 @@ import * as net from "node:net";
 import { getSystemErrorMessage } from "node:util";
 import { decode } from "./codec/decode";
 import { encode } from "./codec/encode";
-import { badmsg } from "./codec/errors";
+import { badmsg, OverBudget } from "./codec/errors";
 import type { Value } from "./codec/types";
 
 export type Server = {
@@ -12,6 +12,9 @@ export type Server = {
   password?: string;
   // How long to wait for the server to connect and log in, in milliseconds
   timeout?: number;
+  // The most a result may cost, in bytes: on the wire, uncompressed and
+  // decoded. Well below what the extension host's heap can take.
+  budget?: number;
 };
 
 // An error the server signalled, with q's text as the message
@@ -40,6 +43,7 @@ export class Connection {
 
   private constructor(
     private socket: net.Socket,
+    private budget: number,
     rest: Buffer,
   ) {
     socket.on("data", (chunk) => this.receive(chunk));
@@ -84,7 +88,9 @@ export class Connection {
       const refused = () => fail(new Error("access"));
       const accepted = (chunk: Buffer) => {
         done();
-        resolve(new Connection(socket, chunk.subarray(1)));
+        resolve(
+          new Connection(socket, server.budget ?? 1e9, chunk.subarray(1)),
+        );
       };
       // Only the listeners added here: the socket has Node's own too
       const done = () => {
@@ -163,6 +169,14 @@ export class Connection {
               `unexpected ${what[this.header[1]]} from the server`,
             );
           }
+          // Closing the connection stops the server sending the rest
+          if (length > this.budget) {
+            throw new OverBudget(
+              length,
+              this.budget,
+              this.header[2] ? "compressed" : "on the wire",
+            );
+          }
           this.message = Buffer.allocUnsafe(length);
           this.header.copy(this.message);
           this.received = 8;
@@ -193,7 +207,7 @@ export class Connection {
     this.pending = undefined;
     let value: Value;
     try {
-      value = decode(message);
+      value = decode(message, this.budget);
     } catch (error) {
       pending.reject(error instanceof Error ? error : new Error(String(error)));
       return;
