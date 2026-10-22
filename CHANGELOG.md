@@ -2,6 +2,13 @@
 
 All notable changes to the extension are documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- New icons: a rounded q tile in the Marketplace, and a file icon with
+  separate light and dark versions, so it stays clear in dark themes
+
 ## [1.1.0]
 
 ### Added
