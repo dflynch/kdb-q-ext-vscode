@@ -2,7 +2,7 @@ import * as assert from "node:assert";
 import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import { decode } from "../codec/decode";
-import type { Value, Vector } from "../codec/types";
+import { count, type Value, type Vector } from "../codec/types";
 
 const fixtures: { name: string; type: number; bytes: string }[] = JSON.parse(
   readFileSync(
@@ -310,6 +310,18 @@ suite("decode", () => {
     });
   }
 
+  test("counts rows, entries and elements", () => {
+    const counted = (name: string) => count(decode(bytes(name)));
+    assert.strictEqual(counted("table.trades"), 3);
+    assert.strictEqual(counted("table.empty"), 0);
+    assert.strictEqual(counted("table.multiKeyed"), 2);
+    assert.strictEqual(counted("dict.simple"), 3);
+    assert.strictEqual(counted("vector.guid"), 2);
+    assert.strictEqual(counted("vector.symbol"), 3);
+    assert.strictEqual(counted("table.stringColumn"), 3);
+    assert.strictEqual(counted("atom.long"), undefined);
+  });
+
   test("table attributes and column attributes", () => {
     const value = decode(bytes("table.attributes"));
     assert.ok(value.type === 98 && "data" in value);
@@ -390,6 +402,53 @@ suite("decode", () => {
         () => decode(bytes("large.longs").fill(1, 2, 3)),
         /compressed/,
       );
+    });
+    // ([] a:1 2), with the column swapped for other values
+    const table = (column: string) =>
+      message(`6200630b00010000006100000001000000${column}`);
+    test("a malformed table", () => {
+      assert.throws(() => decode(message("620001")), /without its dictionary/);
+      assert.throws(
+        () => decode(message("620063070001000000010000000000000007")),
+        /names aren't symbols/,
+      );
+      assert.throws(
+        () => decode(message("6200630b00010000006100070000000000")),
+        /columns are type 7/,
+      );
+      assert.throws(
+        () =>
+          decode(message("6200630b0001000000610000000200000007000000000000")),
+        /1 names but 2 columns/,
+      );
+      assert.throws(
+        () => decode(table("f90100000000000000")),
+        /column is type -7/,
+      );
+    });
+    test("lengths that don't match", () => {
+      const ragged =
+        "6200630b0002000000610062000000020000000700020000000100000000000000" +
+        "02000000000000000700010000000300000000000000";
+      assert.throws(() => decode(message(ragged)), /columns don't match/);
+      const dictionary = "630b0002000000610062000700010000000100000000000000";
+      assert.throws(() => decode(message(dictionary)), /don't match in length/);
+      const atoms = "63f90100000000000000f90200000000000000";
+      assert.throws(() => decode(message(atoms)), /don't match in length/);
+    });
+    test("a lambda without its source", () => {
+      assert.throws(
+        () => decode(message("6400f90100000000000000")),
+        /source isn't a string/,
+      );
+    });
+    test("a list of strings that ends early", () => {
+      const strings = "0000020000000a000200000061620a000200";
+      assert.throws(() => decode(message(strings)), /ends early/);
+    });
+    test("a value nested too deep", () => {
+      const nested = `${"000001000000".repeat(1001)}f90100000000000000`;
+      assert.throws(() => decode(message(nested)), /nested more than 1000/);
     });
     test("types it can't decode", () => {
       assert.throws(() => decode(message("70")), /type 112 isn't supported/);

@@ -127,3 +127,28 @@ export type Value =
   | Dictionary
   | QFunction
   | QError;
+
+// How many elements a vector or list has, how many rows a table or keyed
+// table has, and how many entries a dictionary has. Atoms, functions, errors
+// and on-disk tables have no count.
+export function count(value: Value): number | undefined {
+  switch (value.type) {
+    case 0:
+      return "items" in value
+        ? value.items.length
+        : value.strings.offsets.length - 1;
+    case 2:
+      return value.data.length / 16;
+    case 11:
+      return value.data.offsets.length - 1;
+    case 98:
+      return "data" in value
+        ? value.data.length && count(value.data[0])
+        : undefined;
+    case 99:
+    case 127:
+      return count(value.keys);
+  }
+  // Every other value with data is a vector
+  return "data" in value ? value.data.length : undefined;
+}

@@ -1,4 +1,16 @@
-import type { Atom, List, Table, Texts, Value, Vector } from "./types";
+import {
+  type Atom,
+  count,
+  type List,
+  type QFunction,
+  type Table,
+  type Texts,
+  type Value,
+  type Vector,
+} from "./types";
+
+// Far deeper than any real result, and well inside the call stack
+const maxDepth = 1000;
 
 // Keeping a leading byte-order mark, which q would show as part of the symbol
 const utf8 = new TextDecoder("utf-8", { ignoreBOM: true });
@@ -33,6 +45,7 @@ export function decode(message: Uint8Array): Value {
 class Reader {
   // Past the header, once its length is checked
   offset = 8;
+  private depth = 0;
   private view: DataView;
 
   constructor(private message: Uint8Array) {
@@ -50,6 +63,15 @@ class Reader {
   }
 
   value(): Value {
+    if (++this.depth > maxDepth) {
+      throw new Error(`the value is nested more than ${maxDepth} deep`);
+    }
+    const value = this.read();
+    this.depth--;
+    return value;
+  }
+
+  private read(): Value {
     const type = this.view.getInt8(this.take(1));
     if (type < 0 && type >= -19) {
       return this.atom(type);
@@ -65,7 +87,7 @@ class Reader {
         return this.table();
       case 99:
       case 127:
-        return { type, keys: this.value(), values: this.value() };
+        return this.dictionary(type);
       case 100:
         return this.lambda();
       case 101:
@@ -130,12 +152,23 @@ class Reader {
     for (let i = 0; i < count; i++) {
       const length = this.uint32(this.take(6) + 2);
       const start = this.take(length);
+      // Byte by byte: subarray would make an object per string
       for (let j = 0; j < length; j++) {
         bytes[offsets[i] + j] = message[start + j];
       }
       offsets[i + 1] = offsets[i] + length;
     }
     return { bytes, offsets };
+  }
+
+  private dictionary(type: 99 | 127): Value {
+    const keys = this.value();
+    const values = this.value();
+    const length = count(keys);
+    if (length === undefined || length !== count(values)) {
+      throw new Error("a dictionary's keys and values don't match in length");
+    }
+    return { type, keys, values };
   }
 
   // A table is a flag, then a dictionary from its column names to a list of
@@ -168,24 +201,28 @@ class Reader {
     this.attribute();
     // Read item by item, so that columns which are all char vectors aren't
     // taken for a list of strings
-    const count = this.uint32(this.take(4));
-    if (count !== columns.length) {
+    const length = this.uint32(this.take(4));
+    if (length !== columns.length) {
       throw new Error(
-        `a table has ${columns.length} names but ${count} columns`,
+        `a table has ${columns.length} names but ${length} columns`,
       );
     }
     const data: (Vector | List)[] = [];
-    for (const column of this.values(count)) {
+    for (const column of this.values(length)) {
       if (column.type < 0 || column.type > 19) {
         throw new Error(`a table column is type ${column.type}`);
       }
       data.push(column as Vector | List);
     }
+    const rows = new Set(data.map((column) => count(column)));
+    if (rows.size > 1) {
+      throw new Error("a table's columns don't match in length");
+    }
     return { type: 98, attribute, columns, data };
   }
 
   // A lambda is the namespace it was defined in, then its source
-  private lambda(): Value {
+  private lambda(): QFunction {
     const context = utf8.decode(this.symbol());
     const source = this.value();
     if (source.type !== 10) {
