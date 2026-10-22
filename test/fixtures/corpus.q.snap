@@ -798,12 +798,16 @@
 >  second"
   0 " second" string.quoted.double.q
   7 "\"" string.quoted.double.q
-> string.utf8:"Ã©tÃ©"
+> string.utf8:"\303\251t\303\251"
   0 "string.utf8" -
   11 ":" keyword.operator.assignment.q
   12 "\"" string.quoted.double.q
-  13 "Ã©tÃ©" string.quoted.double.q
-  18 "\"" string.quoted.double.q
+  13 "\\303" string.quoted.double.q constant.character.escape.q
+  17 "\\251" string.quoted.double.q constant.character.escape.q
+  21 "t" string.quoted.double.q
+  22 "\\303" string.quoted.double.q constant.character.escape.q
+  26 "\\251" string.quoted.double.q constant.character.escape.q
+  30 "\"" string.quoted.double.q
 > 
 > / Symbols and file handles
   0 "/ Symbols and file handles" comment.line.slash.q
@@ -835,14 +839,18 @@
   14 "\"" string.quoted.double.q
   15 "with space" string.quoted.double.q
   25 "\"" string.quoted.double.q
-> symbol.utf8:`$"Ã©tÃ©"
+> symbol.utf8:`$"\303\251t\303\251"
   0 "symbol.utf8" -
   11 ":" keyword.operator.assignment.q
   12 "`" support.type.cast.q
   13 "$" keyword.operator.q
   14 "\"" string.quoted.double.q
-  15 "Ã©tÃ©" string.quoted.double.q
-  20 "\"" string.quoted.double.q
+  15 "\\303" string.quoted.double.q constant.character.escape.q
+  19 "\\251" string.quoted.double.q constant.character.escape.q
+  23 "t" string.quoted.double.q
+  24 "\\303" string.quoted.double.q constant.character.escape.q
+  28 "\\251" string.quoted.double.q constant.character.escape.q
+  32 "\"" string.quoted.double.q
 > 
 > / Attributes
   0 "/ Attributes" comment.line.slash.q
