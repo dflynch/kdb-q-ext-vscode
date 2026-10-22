@@ -248,7 +248,7 @@
         },
         {
           "name": "constant.numeric.time.q",
-          "match": "(?:\\d{2}:){1,2}\\d{2}(?:\\.\\d*)?"
+          "match": "-?(?:\\d{2}:){1,2}\\d{2}(?:\\.\\d*)?"
         },
         {
           "name": "constant.numeric.null.q",

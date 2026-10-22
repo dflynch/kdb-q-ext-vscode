@@ -736,6 +736,17 @@ suite("q grammar", () => {
       ],
     ],
     [
+      "negative times and minus",
+      "-12:34 -00:00:01.5 a-12:34",
+      [
+        ["-12:34", "constant.numeric.time.q"],
+        ["-00:00:01.5", "constant.numeric.time.q"],
+        ["a", "source.q"],
+        ["-", "keyword.operator.arithmetic.q"],
+        ["12:34", "constant.numeric.time.q"],
+      ],
+    ],
+    [
       "timestamp",
       "2026.10.21D09:30:00.000000000",
       [["2026.10.21D09:30:00.000000000", "constant.numeric.timestamp.q"]],

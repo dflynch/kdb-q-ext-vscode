@@ -123,9 +123,7 @@
 35: temporal.negativeSecond:-00:00:01
   0 "temporal.negativeSecond" -
   23 ":" keyword.operator.assignment.q
-  24 "-00" constant.numeric.number.q
-  27 ":" keyword.operator.assignment.q
-  28 "00:01" constant.numeric.time.q
+  24 "-00:00:01" constant.numeric.time.q
 36: temporal.longTime:25:00:00.000
   0 "temporal.longTime" -
   17 ":" keyword.operator.assignment.q
@@ -133,9 +131,7 @@
 37: temporal.negativeTime:-12:34:56.789
   0 "temporal.negativeTime" -
   21 ":" keyword.operator.assignment.q
-  22 "-12" constant.numeric.number.q
-  25 ":" keyword.operator.assignment.q
-  26 "34:56.789" constant.numeric.time.q
+  22 "-12:34:56.789" constant.numeric.time.q
 38: temporal.preEpochDate:1999.12.31
   0 "temporal.preEpochDate" -
   21 ":" keyword.operator.assignment.q
