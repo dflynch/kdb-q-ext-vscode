@@ -8,13 +8,14 @@ const fixtures = path.join(__dirname, "../../test/fixtures");
 const corpusPath = path.join(fixtures, "corpus.q");
 const snapshotPath = path.join(fixtures, "corpus.q.snap");
 
-// Each source line, then each of its non-blank tokens as
-// column, quoted text and every scope below source.q
+// Each source line after "> ", then each of its non-blank tokens as column,
+// quoted text and every scope below source.q. No line numbers, so adding
+// to the corpus doesn't renumber the rest of the snapshot
 function highlight(grammar: textmate.IGrammar, source: string) {
   const out: string[] = [];
   let state = textmate.INITIAL;
-  source.split("\n").forEach((line, i) => {
-    out.push(`${i + 1}: ${line}`);
+  for (const line of source.split("\n")) {
+    out.push(`> ${line}`);
     const result = grammar.tokenizeLine(line, state);
     for (const token of result.tokens) {
       const text = line.slice(token.startIndex, token.endIndex);
@@ -24,7 +25,7 @@ function highlight(grammar: textmate.IGrammar, source: string) {
       }
     }
     state = result.ruleStack;
-  });
+  }
   return `${out.join("\n")}\n`;
 }
 
