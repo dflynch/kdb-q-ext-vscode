@@ -35,6 +35,17 @@ function atoms(n: number): Buffer {
   return sized(message);
 }
 
+// A general list of n copies of one item's bytes
+function list(n: number, item: number[]): Buffer {
+  const message = Buffer.alloc(14 + n * item.length);
+  message.set([1, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  message.writeUInt32LE(n, 10);
+  for (let i = 0; i < n; i++) {
+    message.set(item, 14 + i * item.length);
+  }
+  return sized(message);
+}
+
 function over(pattern: RegExp) {
   return (error: unknown) =>
     error instanceof OverBudget && pattern.test(error.message);
@@ -52,6 +63,50 @@ suite("budget", () => {
       () => decode(atoms(1000), 20_000),
       over(/^the result is over the 20 KB limit once decoded$/),
     );
+  });
+
+  test("every value counts, whatever its type", () => {
+    // What {x;} each til n returns: n of ::, two bytes each on the wire
+    assert.throws(() => decode(list(1000, [0x65, 0]), 20_000), over(/decoded/));
+  });
+
+  test("a GUID atom counts its buffer", () => {
+    const guid = [0xfe, ...new Array(16).fill(0)];
+    assert.strictEqual(decode(list(50, guid), 20_000).type, 0);
+    assert.throws(() => decode(list(100, guid), 20_000), over(/decoded/));
+  });
+
+  test("a table's column names count before they're made", () => {
+    // A table on the server's disk, with 1,000 one-letter names
+    const names = Buffer.alloc(1000 * 2);
+    for (let i = 0; i < 1000; i++) {
+      names.set([97, 0], 2 * i);
+    }
+    const head = Buffer.of(
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      98,
+      0,
+      99,
+      11,
+      0,
+      0,
+      0,
+      0,
+      0,
+    );
+    head.writeUInt32LE(1000, 13);
+    const message = sized(
+      Buffer.concat([head, names, Buffer.from([0xf5, ...Buffer.from("t"), 0])]),
+    );
+    assert.strictEqual(decode(message).type, 98);
+    assert.throws(() => decode(message, 20_000), over(/decoded/));
   });
 
   test("a compressed result is refused before it's uncompressed", () => {

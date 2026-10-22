@@ -311,6 +311,18 @@ suite("connection", () => {
     await server.closed;
   });
 
+  test("a result exactly at the budget is accepted", async () => {
+    // A long atom is 17 bytes on the wire, and costs a value, 64, decoded
+    const server = await fake((socket) => socket.write(response("atom.long")));
+    const connection = await Connection.open({
+      host: "127.0.0.1",
+      port: server.port,
+      budget: 64,
+    });
+    assert.strictEqual((await connection.query("x")).type, -7);
+    connection.close();
+  });
+
   test("a result over budget once decoded leaves the connection open", async () => {
     // A general list of 1,000 char atoms, then a long
     const list = Buffer.alloc(14 + 2000);
