@@ -293,6 +293,57 @@ suite("connection", () => {
     await assert.rejects(connection.query("x"), /the connection is closed/);
   });
 
+  function limited(server: Fake, limit: number): Promise<Connection> {
+    return Connection.open({ host: "127.0.0.1", port: server.port, limit });
+  }
+
+  test("a result over the limit closes the connection", async () => {
+    const server = await fake((socket) => socket.write(response("atom.long")));
+    const connection = await limited(server, 16);
+    await assert.rejects(
+      connection.query("x"),
+      (error) =>
+        error instanceof Error &&
+        error.message === "the result is too big" &&
+        error.cause === "17 bytes, over the limit of 16",
+    );
+    await server.closed;
+  });
+
+  test("a result exactly at the limit is accepted", async () => {
+    const server = await fake((socket) => socket.write(response("atom.long")));
+    const connection = await limited(server, 17);
+    assert.strictEqual((await connection.query("x")).type, -7);
+    connection.close();
+  });
+
+  test("a compressed result is refused by its size uncompressed, before the rest arrives", async () => {
+    const message = response("large.longs", true);
+    const uncompressed = message.readUInt32LE(8);
+    // Only the header and the length uncompressed are ever sent
+    const server = await fake((socket) =>
+      socket.write(message.subarray(0, 12)),
+    );
+    const connection = await limited(server, uncompressed - 1);
+    await assert.rejects(
+      connection.query("x"),
+      (error) =>
+        error instanceof Error &&
+        error.message === "the result is too big" &&
+        error.cause ===
+          `${uncompressed} bytes, over the limit of ${uncompressed - 1}`,
+    );
+    await server.closed;
+  });
+
+  test("a compressed result exactly at the limit uncompressed is accepted", async () => {
+    const message = response("large.longs", true);
+    const server = await fake((socket) => socket.write(message));
+    const connection = await limited(server, message.readUInt32LE(8));
+    assert.strictEqual((await connection.query("x")).type, 7);
+    connection.close();
+  });
+
   test("one query at a time", async () => {
     const server = await fake();
     const connection = await open(server);

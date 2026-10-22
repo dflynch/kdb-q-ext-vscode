@@ -12,10 +12,22 @@ export type Server = {
   password?: string;
   // How long to wait for the server to connect and log in, in milliseconds
   timeout?: number;
+  // The largest result to take, in bytes, uncompressed
+  limit?: number;
 };
 
 // An error the server signalled, with q's text as the message
 export class QError extends Error {}
+
+// A result over the limit. The extension host's heap is capped, and going
+// over it kills the host, so results are refused well before: a general
+// list decodes to up to about 60 times its size. Refusing closes the
+// connection, which stops the server sending the rest.
+function tooBig(size: number, limit: number): Error {
+  return new Error("the result is too big", {
+    cause: `${size} bytes, over the limit of ${limit}`,
+  });
+}
 
 const what = ["async message", "sync call", "response"];
 
@@ -40,6 +52,7 @@ export class Connection {
 
   private constructor(
     private socket: net.Socket,
+    private limit: number,
     rest: Buffer,
   ) {
     socket.on("data", (chunk) => this.receive(chunk));
@@ -84,7 +97,9 @@ export class Connection {
       const refused = () => fail(new Error("access"));
       const accepted = (chunk: Buffer) => {
         done();
-        resolve(new Connection(socket, chunk.subarray(1)));
+        resolve(
+          new Connection(socket, server.limit ?? 10e6, chunk.subarray(1)),
+        );
       };
       // Only the listeners added here: the socket has Node's own too
       const done = () => {
@@ -163,6 +178,9 @@ export class Connection {
               `unexpected ${what[this.header[1]]} from the server`,
             );
           }
+          if (length > this.limit) {
+            throw tooBig(length, this.limit);
+          }
           this.message = Buffer.allocUnsafe(length);
           this.header.copy(this.message);
           this.received = 8;
@@ -171,6 +189,21 @@ export class Connection {
         chunk.copy(this.message, this.received, 0, n);
         this.received += n;
         chunk = chunk.subarray(n);
+        // A compressed message's length uncompressed comes after its header:
+        // checked before the rest arrives, and bounding what decompressing
+        // it allocates
+        if (
+          this.message[2] === 1 &&
+          this.received >= 12 &&
+          this.received - n < 12
+        ) {
+          const length = this.message[0]
+            ? this.message.readUInt32LE(8)
+            : this.message.readUInt32BE(8);
+          if (length > this.limit) {
+            throw tooBig(length, this.limit);
+          }
+        }
         if (this.received === this.message.length) {
           const message = this.message;
           this.message = undefined;
