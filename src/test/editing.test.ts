@@ -143,6 +143,30 @@ suite("q editing", () => {
     });
   }
 
+  test("toggle block comment with several selections", async () => {
+    const editor = await open("a:1\n/\nb:2\n\\\nc:3\nd:4");
+    editor.selections = [
+      new vscode.Selection(0, 0, 0, 0),
+      new vscode.Selection(2, 0, 2, 0),
+      new vscode.Selection(4, 1, 4, 1),
+    ];
+    await vscode.commands.executeCommand("kdb-q-ext-vscode.toggleBlockComment");
+    assert.strictEqual(
+      editor.document.getText(),
+      "/\na:1\n\\\nb:2\n/\nc:3\n\\\nd:4",
+    );
+    assert.deepStrictEqual(
+      editor.selections.map((s) => [s.active.line, s.active.character]),
+      [
+        [1, 0],
+        [3, 0],
+        [5, 1],
+      ],
+    );
+    await vscode.commands.executeCommand("undo");
+    assert.strictEqual(editor.document.getText(), "a:1\n/\nb:2\n\\\nc:3\nd:4");
+  });
+
   test("toggle block comment twice", async () => {
     const editor = await open("a:1\nb:2");
     editor.selection = new vscode.Selection(1, 0, 1, 0);
@@ -151,3 +175,73 @@ suite("q editing", () => {
     assert.strictEqual(editor.document.getText(), "a:1\nb:2");
   });
 });
+
+suite("q Run Selected Text", () => {
+  // What the terminal receives, one statement per line
+  let received = "";
+  let terminal: vscode.Terminal;
+
+  suiteSetup(async () => {
+    const write = new vscode.EventEmitter<string>();
+    terminal = vscode.window.createTerminal({
+      name: "q",
+      pty: {
+        onDidWrite: write.event,
+        open: () => {},
+        close: () => {},
+        handleInput: (data: string) => {
+          received += data;
+        },
+      },
+    });
+    terminal.show();
+    await waitFor(() => vscode.window.activeTerminal === terminal);
+  });
+
+  suiteTeardown(() => terminal.dispose());
+
+  teardown(close);
+
+  // The statements sent after running with the given selections
+  async function run(content: string, selections: vscode.Selection[]) {
+    const editor = await open(content);
+    editor.selections = selections;
+    received = "";
+    await vscode.commands.executeCommand("kdb-q-ext-vscode.runSelectedText");
+    // Statements end in a carriage return, and nothing marks the last one
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    return received.split(/\r\n?|\n/).filter((s) => s);
+  }
+
+  test("run the current line", async () => {
+    assert.deepStrictEqual(
+      await run("a:1\nb:2", [new vscode.Selection(1, 1, 1, 1)]),
+      ["b:2"],
+    );
+  });
+
+  test("run a selection", async () => {
+    assert.deepStrictEqual(
+      await run("f:{\n  x}\nb:2", [new vscode.Selection(0, 0, 2, 3)]),
+      ["f:{ x}", "b:2"],
+    );
+  });
+
+  test("run several selections", async () => {
+    assert.deepStrictEqual(
+      await run("a:1\nb:2\nc:3", [
+        new vscode.Selection(2, 0, 2, 0),
+        new vscode.Selection(0, 0, 0, 0),
+        new vscode.Selection(0, 2, 0, 2),
+      ]),
+      ["a:1", "c:3"],
+    );
+  });
+});
+
+async function waitFor(condition: () => boolean) {
+  for (let i = 0; i < 50 && !condition(); i++) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.ok(condition(), "timed out");
+}

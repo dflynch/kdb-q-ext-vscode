@@ -7,7 +7,7 @@ A lightweight extension for kdb+/q programming.
 - Syntax highlighting for q, including the q 5 (KDB-X) keywords and
   `.Q`/`.z`/`.h`/`.j` namespaces
 - Run the selected text, or the current line, in the active terminal (e.g. a
-  q session)
+  q session). With several selections, each runs in turn
 - Editing that keeps q's layout valid: pressing Enter between brackets keeps
   the closing bracket indented, Toggle Block Comment puts the `/` and `\`
   markers on lines of their own at column 0, and block comments fold
@@ -61,7 +61,7 @@ token.
 
 ## Commands
 
-Both keybindings apply in q files.
+Both commands, and their keybindings, apply in q files.
 
 | Command                      | Keybinding       |
 | ---------------------------- | ---------------- |
