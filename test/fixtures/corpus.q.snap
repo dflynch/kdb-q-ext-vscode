@@ -1,0 +1,1436 @@
+1: / Corpus of q for the grammar snapshot and, later, the codec fixtures.
+  0 "/ Corpus of q for the grammar snapshot and, later, the codec fixtures." comment.line.slash.q
+2: / Every value lives under .corpus, so a script can walk it with key.
+  0 "/ Every value lives under .corpus, so a script can walk it with key." comment.line.slash.q
+3: / It must load cleanly: q -q test/fixtures/corpus.q
+  0 "/ It must load cleanly: q -q test/fixtures/corpus.q" comment.line.slash.q
+4: 
+5: \d .corpus
+  0 "\\d" meta.preprocessor.system.q
+  3 ".corpus" -
+6: 
+7: / Atoms, one per type
+  0 "/ Atoms, one per type" comment.line.slash.q
+8: atom.boolean:1b
+  0 "atom.boolean" -
+  12 ":" keyword.operator.assignment.q
+  13 "1b" constant.numeric.boolean.q
+9: atom.guid:"G"$"0a369037-75d3-b24d-6721-5a1d44d4bed5"
+  0 "atom.guid" -
+  9 ":" keyword.operator.assignment.q
+  10 "\"G\"" support.type.cast.q
+  13 "$" keyword.operator.q
+  14 "\"" string.quoted.double.q
+  15 "0a369037-75d3-b24d-6721-5a1d44d4bed5" string.quoted.double.q
+  51 "\"" string.quoted.double.q
+10: atom.byte:0x2a
+  0 "atom.byte" -
+  9 ":" keyword.operator.assignment.q
+  10 "0x2a" constant.numeric.byte.q
+11: atom.short:42h
+  0 "atom.short" -
+  10 ":" keyword.operator.assignment.q
+  11 "42h" constant.numeric.number.q
+12: atom.int:42i
+  0 "atom.int" -
+  8 ":" keyword.operator.assignment.q
+  9 "42i" constant.numeric.number.q
+13: atom.long:42
+  0 "atom.long" -
+  9 ":" keyword.operator.assignment.q
+  10 "42" constant.numeric.number.q
+14: atom.longSuffixed:42j
+  0 "atom.longSuffixed" -
+  17 ":" keyword.operator.assignment.q
+  18 "42j" constant.numeric.number.q
+15: atom.real:4.2e
+  0 "atom.real" -
+  9 ":" keyword.operator.assignment.q
+  10 "4.2e" constant.numeric.number.q
+16: atom.float:4.2
+  0 "atom.float" -
+  10 ":" keyword.operator.assignment.q
+  11 "4.2" constant.numeric.number.q
+17: atom.floatSuffixed:42f
+  0 "atom.floatSuffixed" -
+  18 ":" keyword.operator.assignment.q
+  19 "42f" constant.numeric.number.q
+18: atom.floatExponent:4.2e10
+  0 "atom.floatExponent" -
+  18 ":" keyword.operator.assignment.q
+  19 "4.2e10" constant.numeric.number.q
+19: atom.char:"q"
+  0 "atom.char" -
+  9 ":" keyword.operator.assignment.q
+  10 "\"" string.quoted.double.q
+  11 "q" string.quoted.double.q
+  12 "\"" string.quoted.double.q
+20: atom.symbol:`kdb
+  0 "atom.symbol" -
+  11 ":" keyword.operator.assignment.q
+  12 "`kdb" constant.language.symbol.q
+21: atom.timestamp:2026.10.22D12:34:56.123456789
+  0 "atom.timestamp" -
+  14 ":" keyword.operator.assignment.q
+  15 "2026.10.22D12:34:56.123456789" constant.numeric.timestamp.q
+22: atom.month:2026.10m
+  0 "atom.month" -
+  10 ":" keyword.operator.assignment.q
+  11 "2026.10m" constant.numeric.month.q
+23: atom.date:2026.10.22
+  0 "atom.date" -
+  9 ":" keyword.operator.assignment.q
+  10 "2026.10.22" constant.numeric.date.q
+24: atom.datetime:2026.10.22T12:34:56.123
+  0 "atom.datetime" -
+  13 ":" keyword.operator.assignment.q
+  14 "2026.10.22T12:34:56.123" constant.numeric.datetime.q
+25: atom.timespan:0D12:34:56.123456789
+  0 "atom.timespan" -
+  13 ":" keyword.operator.assignment.q
+  14 "0D12:34:56.123456789" constant.numeric.timespan.q
+26: atom.timespanDays:1D02:00:00
+  0 "atom.timespanDays" -
+  17 ":" keyword.operator.assignment.q
+  18 "1D02:00:00" constant.numeric.timespan.q
+27: atom.minute:12:34
+  0 "atom.minute" -
+  11 ":" keyword.operator.assignment.q
+  12 "12:34" constant.numeric.time.q
+28: atom.second:12:34:56
+  0 "atom.second" -
+  11 ":" keyword.operator.assignment.q
+  12 "12:34:56" constant.numeric.time.q
+29: atom.time:12:34:56.123
+  0 "atom.time" -
+  9 ":" keyword.operator.assignment.q
+  10 "12:34:56.123" constant.numeric.time.q
+30: 
+31: / Times beyond 24 hours and negative times
+  0 "/ Times beyond 24 hours and negative times" comment.line.slash.q
+32: temporal.longTimespan:12D23:59:59.999999999
+  0 "temporal.longTimespan" -
+  21 ":" keyword.operator.assignment.q
+  22 "12D23:59:59.999999999" constant.numeric.timespan.q
+33: temporal.negativeTimespan:-0D00:00:01
+  0 "temporal.negativeTimespan" -
+  25 ":" keyword.operator.assignment.q
+  26 "-0D00:00:01" constant.numeric.timespan.q
+34: temporal.longMinute:99:59
+  0 "temporal.longMinute" -
+  19 ":" keyword.operator.assignment.q
+  20 "99:59" constant.numeric.time.q
+35: temporal.negativeSecond:-00:00:01
+  0 "temporal.negativeSecond" -
+  23 ":" keyword.operator.assignment.q
+  24 "-00" constant.numeric.number.q
+  27 ":" keyword.operator.assignment.q
+  28 "00:01" constant.numeric.time.q
+36: temporal.longTime:25:00:00.000
+  0 "temporal.longTime" -
+  17 ":" keyword.operator.assignment.q
+  18 "25:00:00.000" constant.numeric.time.q
+37: temporal.negativeTime:-12:34:56.789
+  0 "temporal.negativeTime" -
+  21 ":" keyword.operator.assignment.q
+  22 "-12" constant.numeric.number.q
+  25 ":" keyword.operator.assignment.q
+  26 "34:56.789" constant.numeric.time.q
+38: temporal.preEpochDate:1999.12.31
+  0 "temporal.preEpochDate" -
+  21 ":" keyword.operator.assignment.q
+  22 "1999.12.31" constant.numeric.date.q
+39: temporal.preEpochTimestamp:1970.01.01D00:00:00.000000000
+  0 "temporal.preEpochTimestamp" -
+  26 ":" keyword.operator.assignment.q
+  27 "1970.01.01D00:00:00.000000000" constant.numeric.timestamp.q
+40: 
+41: / Vectors, one per type
+  0 "/ Vectors, one per type" comment.line.slash.q
+42: vector.boolean:101b
+  0 "vector.boolean" -
+  14 ":" keyword.operator.assignment.q
+  15 "101b" constant.numeric.boolean.q
+43: vector.guid:2?0Ng
+  0 "vector.guid" -
+  11 ":" keyword.operator.assignment.q
+  12 "2" constant.numeric.number.q
+  13 "?" keyword.operator.q
+  14 "0Ng" constant.numeric.null.q
+44: vector.byte:0x00ff2a
+  0 "vector.byte" -
+  11 ":" keyword.operator.assignment.q
+  12 "0x00ff2a" constant.numeric.byte.q
+45: vector.short:1 2 3h
+  0 "vector.short" -
+  12 ":" keyword.operator.assignment.q
+  13 "1" constant.numeric.number.q
+  15 "2" constant.numeric.number.q
+  17 "3h" constant.numeric.number.q
+46: vector.int:1 2 3i
+  0 "vector.int" -
+  10 ":" keyword.operator.assignment.q
+  11 "1" constant.numeric.number.q
+  13 "2" constant.numeric.number.q
+  15 "3i" constant.numeric.number.q
+47: vector.long:1 2 3
+  0 "vector.long" -
+  11 ":" keyword.operator.assignment.q
+  12 "1" constant.numeric.number.q
+  14 "2" constant.numeric.number.q
+  16 "3" constant.numeric.number.q
+48: vector.real:1 2.5 3e
+  0 "vector.real" -
+  11 ":" keyword.operator.assignment.q
+  12 "1" constant.numeric.number.q
+  14 "2.5" constant.numeric.number.q
+  18 "3e" constant.numeric.number.q
+49: vector.float:1 2.5 3
+  0 "vector.float" -
+  12 ":" keyword.operator.assignment.q
+  13 "1" constant.numeric.number.q
+  15 "2.5" constant.numeric.number.q
+  19 "3" constant.numeric.number.q
+50: vector.char:"kdb+"
+  0 "vector.char" -
+  11 ":" keyword.operator.assignment.q
+  12 "\"" string.quoted.double.q
+  13 "kdb+" string.quoted.double.q
+  17 "\"" string.quoted.double.q
+51: vector.symbol:`a`b`c
+  0 "vector.symbol" -
+  13 ":" keyword.operator.assignment.q
+  14 "`a`b`c" constant.language.symbol.q
+52: vector.timestamp:2026.10.22D00:00:00 2026.10.23D00:00:00
+  0 "vector.timestamp" -
+  16 ":" keyword.operator.assignment.q
+  17 "2026.10.22D00:00:00" constant.numeric.timestamp.q
+  37 "2026.10.23D00:00:00" constant.numeric.timestamp.q
+53: vector.month:2026.10 2026.11m
+  0 "vector.month" -
+  12 ":" keyword.operator.assignment.q
+  13 "2026.10" constant.numeric.number.q
+  21 "2026.11m" constant.numeric.month.q
+54: vector.date:2026.10.22 2026.10.23
+  0 "vector.date" -
+  11 ":" keyword.operator.assignment.q
+  12 "2026.10.22" constant.numeric.date.q
+  23 "2026.10.23" constant.numeric.date.q
+55: vector.datetime:2026.10.22T00:00:00.000 2026.10.23T00:00:00.000
+  0 "vector.datetime" -
+  15 ":" keyword.operator.assignment.q
+  16 "2026.10.22T00:00:00.000" constant.numeric.datetime.q
+  40 "2026.10.23T00:00:00.000" constant.numeric.datetime.q
+56: vector.timespan:0D00:00:01 0D00:00:02
+  0 "vector.timespan" -
+  15 ":" keyword.operator.assignment.q
+  16 "0D00:00:01" constant.numeric.timespan.q
+  27 "0D00:00:02" constant.numeric.timespan.q
+57: vector.minute:12:00 12:01
+  0 "vector.minute" -
+  13 ":" keyword.operator.assignment.q
+  14 "12:00" constant.numeric.time.q
+  20 "12:01" constant.numeric.time.q
+58: vector.second:12:00:00 12:00:01
+  0 "vector.second" -
+  13 ":" keyword.operator.assignment.q
+  14 "12:00:00" constant.numeric.time.q
+  23 "12:00:01" constant.numeric.time.q
+59: vector.time:12:00:00.000 12:00:00.001
+  0 "vector.time" -
+  11 ":" keyword.operator.assignment.q
+  12 "12:00:00.000" constant.numeric.time.q
+  25 "12:00:00.001" constant.numeric.time.q
+60: vector.emptyLong:`long$()
+  0 "vector.emptyLong" -
+  16 ":" keyword.operator.assignment.q
+  17 "`long" support.type.cast.q
+  22 "$" keyword.operator.q
+  23 "()" -
+61: vector.emptySymbol:`$()
+  0 "vector.emptySymbol" -
+  18 ":" keyword.operator.assignment.q
+  19 "`" support.type.cast.q
+  20 "$" keyword.operator.q
+  21 "()" -
+62: vector.singleton:enlist 42
+  0 "vector.singleton" -
+  16 ":" keyword.operator.assignment.q
+  17 "enlist" support.function.builtin.q
+  24 "42" constant.numeric.number.q
+63: 
+64: / Typed nulls
+  0 "/ Typed nulls" comment.line.slash.q
+65: null.guid:0Ng
+  0 "null" support.function.builtin.q
+  4 ".guid" -
+  9 ":" keyword.operator.assignment.q
+  10 "0Ng" constant.numeric.null.q
+66: null.short:0Nh
+  0 "null" support.function.builtin.q
+  4 ".short" -
+  10 ":" keyword.operator.assignment.q
+  11 "0Nh" constant.numeric.null.q
+67: null.int:0Ni
+  0 "null" support.function.builtin.q
+  4 ".int" -
+  8 ":" keyword.operator.assignment.q
+  9 "0Ni" constant.numeric.null.q
+68: null.long:0N
+  0 "null" support.function.builtin.q
+  4 ".long" -
+  9 ":" keyword.operator.assignment.q
+  10 "0N" constant.numeric.null.q
+69: null.longSuffixed:0Nj
+  0 "null" support.function.builtin.q
+  4 ".longSuffixed" -
+  17 ":" keyword.operator.assignment.q
+  18 "0Nj" constant.numeric.null.q
+70: null.real:0Ne
+  0 "null" support.function.builtin.q
+  4 ".real" -
+  9 ":" keyword.operator.assignment.q
+  10 "0Ne" constant.numeric.null.q
+71: null.float:0n
+  0 "null" support.function.builtin.q
+  4 ".float" -
+  10 ":" keyword.operator.assignment.q
+  11 "0n" constant.numeric.null.q
+72: null.floatSuffixed:0Nf
+  0 "null" support.function.builtin.q
+  4 ".floatSuffixed" -
+  18 ":" keyword.operator.assignment.q
+  19 "0Nf" constant.numeric.null.q
+73: null.char:" "
+  0 "null" support.function.builtin.q
+  4 ".char" -
+  9 ":" keyword.operator.assignment.q
+  10 "\"" string.quoted.double.q
+  12 "\"" string.quoted.double.q
+74: null.symbol:`
+  0 "null" support.function.builtin.q
+  4 ".symbol" -
+  11 ":" keyword.operator.assignment.q
+  12 "`" constant.language.symbol.q
+75: null.timestamp:0Np
+  0 "null" support.function.builtin.q
+  4 ".timestamp" -
+  14 ":" keyword.operator.assignment.q
+  15 "0Np" constant.numeric.null.q
+76: null.month:0Nm
+  0 "null" support.function.builtin.q
+  4 ".month" -
+  10 ":" keyword.operator.assignment.q
+  11 "0Nm" constant.numeric.null.q
+77: null.date:0Nd
+  0 "null" support.function.builtin.q
+  4 ".date" -
+  9 ":" keyword.operator.assignment.q
+  10 "0Nd" constant.numeric.null.q
+78: null.datetime:0Nz
+  0 "null" support.function.builtin.q
+  4 ".datetime" -
+  13 ":" keyword.operator.assignment.q
+  14 "0Nz" constant.numeric.null.q
+79: null.timespan:0Nn
+  0 "null" support.function.builtin.q
+  4 ".timespan" -
+  13 ":" keyword.operator.assignment.q
+  14 "0Nn" constant.numeric.null.q
+80: null.minute:0Nu
+  0 "null" support.function.builtin.q
+  4 ".minute" -
+  11 ":" keyword.operator.assignment.q
+  12 "0Nu" constant.numeric.null.q
+81: null.second:0Nv
+  0 "null" support.function.builtin.q
+  4 ".second" -
+  11 ":" keyword.operator.assignment.q
+  12 "0Nv" constant.numeric.null.q
+82: null.time:0Nt
+  0 "null" support.function.builtin.q
+  4 ".time" -
+  9 ":" keyword.operator.assignment.q
+  10 "0Nt" constant.numeric.null.q
+83: null.vector:1 0N 3
+  0 "null" support.function.builtin.q
+  4 ".vector" -
+  11 ":" keyword.operator.assignment.q
+  12 "1" constant.numeric.number.q
+  14 "0N" constant.numeric.null.q
+  17 "3" constant.numeric.number.q
+84: 
+85: / Infinities, positive and negative
+  0 "/ Infinities, positive and negative" comment.line.slash.q
+86: infinity.short:0Wh
+  0 "infinity.short" -
+  14 ":" keyword.operator.assignment.q
+  15 "0Wh" constant.numeric.infinity.q
+87: infinity.negativeShort:-0Wh
+  0 "infinity.negativeShort" -
+  22 ":" keyword.operator.assignment.q
+  23 "-0Wh" constant.numeric.infinity.q
+88: infinity.int:0Wi
+  0 "infinity.int" -
+  12 ":" keyword.operator.assignment.q
+  13 "0Wi" constant.numeric.infinity.q
+89: infinity.negativeInt:-0Wi
+  0 "infinity.negativeInt" -
+  20 ":" keyword.operator.assignment.q
+  21 "-0Wi" constant.numeric.infinity.q
+90: infinity.long:0W
+  0 "infinity.long" -
+  13 ":" keyword.operator.assignment.q
+  14 "0W" constant.numeric.infinity.q
+91: infinity.negativeLong:-0W
+  0 "infinity.negativeLong" -
+  21 ":" keyword.operator.assignment.q
+  22 "-0W" constant.numeric.infinity.q
+92: infinity.longSuffixed:0Wj
+  0 "infinity.longSuffixed" -
+  21 ":" keyword.operator.assignment.q
+  22 "0Wj" constant.numeric.infinity.q
+93: infinity.real:0We
+  0 "infinity.real" -
+  13 ":" keyword.operator.assignment.q
+  14 "0We" constant.numeric.infinity.q
+94: infinity.negativeReal:-0We
+  0 "infinity.negativeReal" -
+  21 ":" keyword.operator.assignment.q
+  22 "-0We" constant.numeric.infinity.q
+95: infinity.float:0w
+  0 "infinity.float" -
+  14 ":" keyword.operator.assignment.q
+  15 "0w" constant.numeric.infinity.q
+96: infinity.negativeFloat:-0w
+  0 "infinity.negativeFloat" -
+  22 ":" keyword.operator.assignment.q
+  23 "-0w" constant.numeric.infinity.q
+97: infinity.floatSuffixed:0Wf
+  0 "infinity.floatSuffixed" -
+  22 ":" keyword.operator.assignment.q
+  23 "0Wf" constant.numeric.infinity.q
+98: infinity.negativeFloatSuffixed:-0Wf
+  0 "infinity.negativeFloatSuffixed" -
+  30 ":" keyword.operator.assignment.q
+  31 "-0Wf" constant.numeric.infinity.q
+99: infinity.timestamp:0Wp
+  0 "infinity.timestamp" -
+  18 ":" keyword.operator.assignment.q
+  19 "0Wp" constant.numeric.infinity.q
+100: infinity.month:0Wm
+  0 "infinity.month" -
+  14 ":" keyword.operator.assignment.q
+  15 "0Wm" constant.numeric.infinity.q
+101: infinity.date:0Wd
+  0 "infinity.date" -
+  13 ":" keyword.operator.assignment.q
+  14 "0Wd" constant.numeric.infinity.q
+102: infinity.datetime:0Wz
+  0 "infinity.datetime" -
+  17 ":" keyword.operator.assignment.q
+  18 "0Wz" constant.numeric.infinity.q
+103: infinity.timespan:0Wn
+  0 "infinity.timespan" -
+  17 ":" keyword.operator.assignment.q
+  18 "0Wn" constant.numeric.infinity.q
+104: infinity.negativeTimespan:-0Wn
+  0 "infinity.negativeTimespan" -
+  25 ":" keyword.operator.assignment.q
+  26 "-0Wn" constant.numeric.infinity.q
+105: infinity.minute:0Wu
+  0 "infinity.minute" -
+  15 ":" keyword.operator.assignment.q
+  16 "0Wu" constant.numeric.infinity.q
+106: infinity.second:0Wv
+  0 "infinity.second" -
+  15 ":" keyword.operator.assignment.q
+  16 "0Wv" constant.numeric.infinity.q
+107: infinity.time:0Wt
+  0 "infinity.time" -
+  13 ":" keyword.operator.assignment.q
+  14 "0Wt" constant.numeric.infinity.q
+108: 
+109: / Strings and escapes
+  0 "/ Strings and escapes" comment.line.slash.q
+110: string.empty:""
+  0 "string" support.function.builtin.q
+  6 ".empty" -
+  12 ":" keyword.operator.assignment.q
+  13 "\"" string.quoted.double.q
+  14 "\"" string.quoted.double.q
+111: string.escapes:"tab\there\nnewline \"quoted\" back\\slash"
+  0 "string" support.function.builtin.q
+  6 ".escapes" -
+  14 ":" keyword.operator.assignment.q
+  15 "\"" string.quoted.double.q
+  16 "tab" string.quoted.double.q
+  19 "\\t" string.quoted.double.q constant.character.escape.q
+  21 "here" string.quoted.double.q
+  25 "\\n" string.quoted.double.q constant.character.escape.q
+  27 "newline " string.quoted.double.q
+  35 "\\\"" string.quoted.double.q constant.character.escape.q
+  37 "quoted" string.quoted.double.q
+  43 "\\\"" string.quoted.double.q constant.character.escape.q
+  45 " back" string.quoted.double.q
+  50 "\\\\" string.quoted.double.q constant.character.escape.q
+  52 "slash" string.quoted.double.q
+  57 "\"" string.quoted.double.q
+112: string.octal:"\001\377"
+  0 "string" support.function.builtin.q
+  6 ".octal" -
+  12 ":" keyword.operator.assignment.q
+  13 "\"" string.quoted.double.q
+  14 "\\001" string.quoted.double.q constant.character.escape.q
+  18 "\\377" string.quoted.double.q constant.character.escape.q
+  22 "\"" string.quoted.double.q
+113: string.slashes:"a / b \\ c"
+  0 "string" support.function.builtin.q
+  6 ".slashes" -
+  14 ":" keyword.operator.assignment.q
+  15 "\"" string.quoted.double.q
+  16 "a / b " string.quoted.double.q
+  22 "\\\\" string.quoted.double.q constant.character.escape.q
+  24 " c" string.quoted.double.q
+  26 "\"" string.quoted.double.q
+114: string.multiLine:"first
+  0 "string" support.function.builtin.q
+  6 ".multiLine" -
+  16 ":" keyword.operator.assignment.q
+  17 "\"" string.quoted.double.q
+  18 "first" string.quoted.double.q
+115:  second"
+  0 " second" string.quoted.double.q
+  7 "\"" string.quoted.double.q
+116: 
+117: / Symbols and file handles
+  0 "/ Symbols and file handles" comment.line.slash.q
+118: symbol.dotted:`.corpus.atom
+  0 "symbol.dotted" -
+  13 ":" keyword.operator.assignment.q
+  14 "`.corpus.atom" constant.language.symbol.q
+119: symbol.list:`a`b`c
+  0 "symbol.list" -
+  11 ":" keyword.operator.assignment.q
+  12 "`a`b`c" constant.language.symbol.q
+120: symbol.withColon:`a:b
+  0 "symbol.withColon" -
+  16 ":" keyword.operator.assignment.q
+  17 "`a:b" constant.language.symbol.q
+121: symbol.handle:`:data/trades.csv
+  0 "symbol.handle" -
+  13 ":" keyword.operator.assignment.q
+  14 "`:data/trades.csv" support.class.handle.q
+122: symbol.hostPort:`:localhost:5000
+  0 "symbol.hostPort" -
+  15 ":" keyword.operator.assignment.q
+  16 "`:localhost:5000" support.class.handle.q
+123: symbol.cast:`$"with space"
+  0 "symbol.cast" -
+  11 ":" keyword.operator.assignment.q
+  12 "`" support.type.cast.q
+  13 "$" keyword.operator.q
+  14 "\"" string.quoted.double.q
+  15 "with space" string.quoted.double.q
+  25 "\"" string.quoted.double.q
+124: 
+125: / Attributes
+  0 "/ Attributes" comment.line.slash.q
+126: attribute.sorted:`s#1 2 3
+  0 "attribute.sorted" -
+  16 ":" keyword.operator.assignment.q
+  17 "`s" storage.modifier.attribute.q
+  19 "#" keyword.operator.q
+  20 "1" constant.numeric.number.q
+  22 "2" constant.numeric.number.q
+  24 "3" constant.numeric.number.q
+127: attribute.unique:`u#`a`b`c
+  0 "attribute.unique" -
+  16 ":" keyword.operator.assignment.q
+  17 "`u" storage.modifier.attribute.q
+  19 "#" keyword.operator.q
+  20 "`a`b`c" constant.language.symbol.q
+128: attribute.parted:`p#1 1 2 2
+  0 "attribute.parted" -
+  16 ":" keyword.operator.assignment.q
+  17 "`p" storage.modifier.attribute.q
+  19 "#" keyword.operator.q
+  20 "1" constant.numeric.number.q
+  22 "1" constant.numeric.number.q
+  24 "2" constant.numeric.number.q
+  26 "2" constant.numeric.number.q
+129: attribute.grouped:`g#`a`b`a
+  0 "attribute.grouped" -
+  17 ":" keyword.operator.assignment.q
+  18 "`g" storage.modifier.attribute.q
+  20 "#" keyword.operator.q
+  21 "`a`b`a" constant.language.symbol.q
+130: 
+131: / General lists, dictionaries and tables
+  0 "/ General lists, dictionaries and tables" comment.line.slash.q
+132: list.mixed:(1;`a;"b";2.5)
+  0 "list.mixed" -
+  10 ":" keyword.operator.assignment.q
+  11 "(" -
+  12 "1" constant.numeric.number.q
+  13 ";" punctuation.separator.q
+  14 "`a" constant.language.symbol.q
+  16 ";" punctuation.separator.q
+  17 "\"" string.quoted.double.q
+  18 "b" string.quoted.double.q
+  19 "\"" string.quoted.double.q
+  20 ";" punctuation.separator.q
+  21 "2.5" constant.numeric.number.q
+  24 ")" -
+133: list.nested:(1 2;(3;`c);())
+  0 "list.nested" -
+  11 ":" keyword.operator.assignment.q
+  12 "(" -
+  13 "1" constant.numeric.number.q
+  15 "2" constant.numeric.number.q
+  16 ";" punctuation.separator.q
+  17 "(" -
+  18 "3" constant.numeric.number.q
+  19 ";" punctuation.separator.q
+  20 "`c" constant.language.symbol.q
+  22 ")" -
+  23 ";" punctuation.separator.q
+  24 "())" -
+134: list.empty:()
+  0 "list.empty" -
+  10 ":" keyword.operator.assignment.q
+  11 "()" -
+135: dict.simple:`a`b`c!1 2 3
+  0 "dict.simple" -
+  11 ":" keyword.operator.assignment.q
+  12 "`a`b`c" constant.language.symbol.q
+  18 "!" keyword.operator.q
+  19 "1" constant.numeric.number.q
+  21 "2" constant.numeric.number.q
+  23 "3" constant.numeric.number.q
+136: dict.mixed:`a`b!(1;"two")
+  0 "dict.mixed" -
+  10 ":" keyword.operator.assignment.q
+  11 "`a`b" constant.language.symbol.q
+  15 "!" keyword.operator.q
+  16 "(" -
+  17 "1" constant.numeric.number.q
+  18 ";" punctuation.separator.q
+  19 "\"" string.quoted.double.q
+  20 "two" string.quoted.double.q
+  23 "\"" string.quoted.double.q
+  24 ")" -
+137: dict.empty:(`symbol$())!()
+  0 "dict.empty" -
+  10 ":" keyword.operator.assignment.q
+  11 "(" -
+  12 "`symbol" support.type.cast.q
+  19 "$" keyword.operator.q
+  20 "())" -
+  23 "!" keyword.operator.q
+  24 "()" -
+138: table.trades:([] sym:`a`b`a; price:1.5 2.5 3.5; size:100 200 300)
+  0 "table.trades" -
+  12 ":" keyword.operator.assignment.q
+  13 "([] " -
+  17 "sym" -
+  20 ":" keyword.operator.assignment.q
+  21 "`a`b`a" constant.language.symbol.q
+  27 ";" punctuation.separator.q
+  29 "price" -
+  34 ":" keyword.operator.assignment.q
+  35 "1.5" constant.numeric.number.q
+  39 "2.5" constant.numeric.number.q
+  43 "3.5" constant.numeric.number.q
+  46 ";" punctuation.separator.q
+  48 "size" -
+  52 ":" keyword.operator.assignment.q
+  53 "100" constant.numeric.number.q
+  57 "200" constant.numeric.number.q
+  61 "300" constant.numeric.number.q
+  64 ")" -
+139: table.flipped:flip `x`y!(1 2;`p`q)
+  0 "table.flipped" -
+  13 ":" keyword.operator.assignment.q
+  14 "flip" support.function.builtin.q
+  19 "`x`y" constant.language.symbol.q
+  23 "!" keyword.operator.q
+  24 "(" -
+  25 "1" constant.numeric.number.q
+  27 "2" constant.numeric.number.q
+  28 ";" punctuation.separator.q
+  29 "`p`q" constant.language.symbol.q
+  33 ")" -
+140: table.empty:([] sym:`symbol$(); price:`float$())
+  0 "table.empty" -
+  11 ":" keyword.operator.assignment.q
+  12 "([] " -
+  16 "sym" -
+  19 ":" keyword.operator.assignment.q
+  20 "`symbol" support.type.cast.q
+  27 "$" keyword.operator.q
+  28 "()" -
+  30 ";" punctuation.separator.q
+  32 "price" -
+  37 ":" keyword.operator.assignment.q
+  38 "`float" support.type.cast.q
+  44 "$" keyword.operator.q
+  45 "())" -
+141: table.keyed:([sym:`a`b] price:1.5 2.5)
+  0 "table.keyed" -
+  11 ":" keyword.operator.assignment.q
+  12 "([" -
+  14 "sym" -
+  17 ":" keyword.operator.assignment.q
+  18 "`a`b" constant.language.symbol.q
+  22 "] " -
+  24 "price" -
+  29 ":" keyword.operator.assignment.q
+  30 "1.5" constant.numeric.number.q
+  34 "2.5" constant.numeric.number.q
+  37 ")" -
+142: table.multiKeyed:([sym:`a`b; ex:`n`l] price:1.5 2.5)
+  0 "table.multiKeyed" -
+  16 ":" keyword.operator.assignment.q
+  17 "([" -
+  19 "sym" -
+  22 ":" keyword.operator.assignment.q
+  23 "`a`b" constant.language.symbol.q
+  27 ";" punctuation.separator.q
+  29 "ex" -
+  31 ":" keyword.operator.assignment.q
+  32 "`n`l" constant.language.symbol.q
+  36 "] " -
+  38 "price" -
+  43 ":" keyword.operator.assignment.q
+  44 "1.5" constant.numeric.number.q
+  48 "2.5" constant.numeric.number.q
+  51 ")" -
+143: table.enumerated:([] sym:`.corpus.domain?`a`b`a)
+  0 "table.enumerated" -
+  16 ":" keyword.operator.assignment.q
+  17 "([] " -
+  21 "sym" -
+  24 ":" keyword.operator.assignment.q
+  25 "`.corpus.domain" constant.language.symbol.q
+  40 "?" keyword.operator.q
+  41 "`a`b`a" constant.language.symbol.q
+  47 ")" -
+144: 
+145: / Functions: implicit and explicit parameters, projections and compositions
+  0 "/ Functions: implicit and explicit parameters, projections and compositions" comment.line.slash.q
+146: fn.implicit:{x+y}
+  0 "fn.implicit" -
+  11 ":" keyword.operator.assignment.q
+  12 "{" -
+  13 "x" variable.parameter.implicit.q
+  14 "+" keyword.operator.arithmetic.q
+  15 "y" variable.parameter.implicit.q
+  16 "}" -
+147: fn.implicitZ:{x+y*z}
+  0 "fn.implicitZ" -
+  12 ":" keyword.operator.assignment.q
+  13 "{" -
+  14 "x" variable.parameter.implicit.q
+  15 "+" keyword.operator.arithmetic.q
+  16 "y" variable.parameter.implicit.q
+  17 "*" keyword.operator.arithmetic.q
+  18 "z" variable.parameter.implicit.q
+  19 "}" -
+148: fn.explicit:{[a;b] a+b}
+  0 "fn.explicit" -
+  11 ":" keyword.operator.assignment.q
+  12 "{" -
+  13 "[" -
+  14 "a" variable.parameter.q
+  15 ";" punctuation.separator.q
+  16 "b" variable.parameter.q
+  17 "]" -
+  19 "a" -
+  20 "+" keyword.operator.arithmetic.q
+  21 "b" -
+  22 "}" -
+149: fn.explicitSpaced:{[ a ; b ] a*b}
+  0 "fn.explicitSpaced" -
+  17 ":" keyword.operator.assignment.q
+  18 "{" -
+  19 "[" -
+  21 "a" variable.parameter.q
+  23 ";" punctuation.separator.q
+  25 "b" variable.parameter.q
+  27 "]" -
+  29 "a" -
+  30 "*" keyword.operator.arithmetic.q
+  31 "b" -
+  32 "}" -
+150: fn.noArgs:{[] 42}
+  0 "fn.noArgs" -
+  9 ":" keyword.operator.assignment.q
+  10 "{" -
+  11 "[" -
+  12 "]" -
+  14 "42" constant.numeric.number.q
+  16 "}" -
+151: fn.multiLine:{[t;n]
+  0 "fn.multiLine" -
+  12 ":" keyword.operator.assignment.q
+  13 "{" -
+  14 "[" -
+  15 "t" variable.parameter.q
+  16 ";" punctuation.separator.q
+  17 "n" variable.parameter.q
+  18 "]" -
+152:   r:select from t where size>n;
+  2 "r" -
+  3 ":" keyword.operator.assignment.q
+  4 "select" keyword.other.qsql.q
+  11 "from" keyword.other.qsql.q
+  16 "t" -
+  18 "where" keyword.other.qsql.q
+  24 "size" -
+  28 ">" keyword.operator.comparison.q
+  29 "n" -
+  30 ";" punctuation.separator.q
+153:   / a comment inside a function
+  2 "/ a comment inside a function" comment.line.slash.q
+154:   r }
+  2 "r" -
+  4 "}" -
+155: fn.global:{[v] `.corpus.fn.seen set v; v}
+  0 "fn.global" -
+  9 ":" keyword.operator.assignment.q
+  10 "{" -
+  11 "[" -
+  12 "v" variable.parameter.q
+  13 "]" -
+  15 "`.corpus.fn.seen" constant.language.symbol.q
+  32 "set" support.function.builtin.q
+  36 "v" -
+  37 ";" punctuation.separator.q
+  39 "v" -
+  40 "}" -
+156: fn.projection:{x+y}[1]
+  0 "fn.projection" -
+  13 ":" keyword.operator.assignment.q
+  14 "{" -
+  15 "x" variable.parameter.implicit.q
+  16 "+" keyword.operator.arithmetic.q
+  17 "y" variable.parameter.implicit.q
+  18 "}" -
+  19 "[" -
+  20 "1" constant.numeric.number.q
+  21 "]" -
+157: fn.composition:('[neg;abs])
+  0 "fn.composition" -
+  14 ":" keyword.operator.assignment.q
+  15 "(" -
+  16 "'" keyword.control.flow.signal.q
+  17 "[" -
+  18 "neg" support.function.builtin.q
+  21 ";" punctuation.separator.q
+  22 "abs" support.function.builtin.q
+  25 "])" -
+158: fn.iterated:+/
+  0 "fn.iterated" -
+  11 ":" keyword.operator.assignment.q
+  12 "+" keyword.operator.arithmetic.q
+  13 "/" keyword.operator.iterator.q
+159: fn.builtin:count
+  0 "fn.builtin" -
+  10 ":" keyword.operator.assignment.q
+  11 "count" support.function.builtin.q
+160: fn.dotted:.corpus.fn.implicit
+  0 "fn.dotted" -
+  9 ":" keyword.operator.assignment.q
+  10 ".corpus.fn.implicit" -
+161: 
+162: / Operators and iterators
+  0 "/ Operators and iterators" comment.line.slash.q
+163: op.arithmetic:(1+2;3-1;2*3;7%2)
+  0 "op.arithmetic" -
+  13 ":" keyword.operator.assignment.q
+  14 "(" -
+  15 "1" constant.numeric.number.q
+  16 "+" keyword.operator.arithmetic.q
+  17 "2" constant.numeric.number.q
+  18 ";" punctuation.separator.q
+  19 "3" constant.numeric.number.q
+  20 "-" keyword.operator.arithmetic.q
+  21 "1" constant.numeric.number.q
+  22 ";" punctuation.separator.q
+  23 "2" constant.numeric.number.q
+  24 "*" keyword.operator.arithmetic.q
+  25 "3" constant.numeric.number.q
+  26 ";" punctuation.separator.q
+  27 "7" constant.numeric.number.q
+  28 "%" keyword.operator.arithmetic.q
+  29 "2" constant.numeric.number.q
+  30 ")" -
+164: op.comparison:(1=1;1<>2;1<2;2>1;1<=1;1>=1;1~1)
+  0 "op.comparison" -
+  13 ":" keyword.operator.assignment.q
+  14 "(" -
+  15 "1" constant.numeric.number.q
+  16 "=" keyword.operator.comparison.q
+  17 "1" constant.numeric.number.q
+  18 ";" punctuation.separator.q
+  19 "1" constant.numeric.number.q
+  20 "<>" keyword.operator.comparison.q
+  22 "2" constant.numeric.number.q
+  23 ";" punctuation.separator.q
+  24 "1" constant.numeric.number.q
+  25 "<" keyword.operator.comparison.q
+  26 "2" constant.numeric.number.q
+  27 ";" punctuation.separator.q
+  28 "2" constant.numeric.number.q
+  29 ">" keyword.operator.comparison.q
+  30 "1" constant.numeric.number.q
+  31 ";" punctuation.separator.q
+  32 "1" constant.numeric.number.q
+  33 "<=" keyword.operator.comparison.q
+  35 "1" constant.numeric.number.q
+  36 ";" punctuation.separator.q
+  37 "1" constant.numeric.number.q
+  38 ">=" keyword.operator.comparison.q
+  40 "1" constant.numeric.number.q
+  41 ";" punctuation.separator.q
+  42 "1" constant.numeric.number.q
+  43 "~" keyword.operator.comparison.q
+  44 "1" constant.numeric.number.q
+  45 ")" -
+165: op.join:1 2,3
+  0 "op.join" -
+  7 ":" keyword.operator.assignment.q
+  8 "1" constant.numeric.number.q
+  10 "2" constant.numeric.number.q
+  11 "," keyword.operator.q
+  12 "3" constant.numeric.number.q
+166: op.take:2#1 2 3
+  0 "op.take" -
+  7 ":" keyword.operator.assignment.q
+  8 "2" constant.numeric.number.q
+  9 "#" keyword.operator.q
+  10 "1" constant.numeric.number.q
+  12 "2" constant.numeric.number.q
+  14 "3" constant.numeric.number.q
+167: op.drop:1_1 2 3
+  0 "op.drop" -
+  7 ":" keyword.operator.assignment.q
+  8 "1" constant.numeric.number.q
+  9 "_" keyword.operator.q
+  10 "1" constant.numeric.number.q
+  12 "2" constant.numeric.number.q
+  14 "3" constant.numeric.number.q
+168: op.apply:.corpus.fn.implicit . 1 2
+  0 "op.apply" -
+  8 ":" keyword.operator.assignment.q
+  9 ".corpus.fn.implicit" -
+  29 "." keyword.operator.q
+  31 "1" constant.numeric.number.q
+  33 "2" constant.numeric.number.q
+169: op.index:1 2 3@1
+  0 "op.index" -
+  8 ":" keyword.operator.assignment.q
+  9 "1" constant.numeric.number.q
+  11 "2" constant.numeric.number.q
+  13 "3" constant.numeric.number.q
+  14 "@" keyword.operator.q
+  15 "1" constant.numeric.number.q
+170: op.minusLiteral:(5 -1;5-1;(5)-1)
+  0 "op.minusLiteral" -
+  15 ":" keyword.operator.assignment.q
+  16 "(" -
+  17 "5" constant.numeric.number.q
+  19 "-1" constant.numeric.number.q
+  21 ";" punctuation.separator.q
+  22 "5" constant.numeric.number.q
+  23 "-" keyword.operator.arithmetic.q
+  24 "1" constant.numeric.number.q
+  25 ";" punctuation.separator.q
+  26 "(" -
+  27 "5" constant.numeric.number.q
+  28 ")" -
+  29 "-" keyword.operator.arithmetic.q
+  30 "1" constant.numeric.number.q
+  31 ")" -
+171: op.over:+/[1 2 3]
+  0 "op.over" -
+  7 ":" keyword.operator.assignment.q
+  8 "+" keyword.operator.arithmetic.q
+  9 "/" keyword.operator.iterator.q
+  10 "[" -
+  11 "1" constant.numeric.number.q
+  13 "2" constant.numeric.number.q
+  15 "3" constant.numeric.number.q
+  16 "]" -
+172: op.scan:+\[1 2 3]
+  0 "op.scan" -
+  7 ":" keyword.operator.assignment.q
+  8 "+" keyword.operator.arithmetic.q
+  9 "\\" keyword.operator.iterator.q
+  10 "[" -
+  11 "1" constant.numeric.number.q
+  13 "2" constant.numeric.number.q
+  15 "3" constant.numeric.number.q
+  16 "]" -
+173: op.each:count each (1 2;3 4 5)
+  0 "op.each" -
+  7 ":" keyword.operator.assignment.q
+  8 "count" support.function.builtin.q
+  14 "each" support.function.builtin.q
+  18 " (" -
+  20 "1" constant.numeric.number.q
+  22 "2" constant.numeric.number.q
+  23 ";" punctuation.separator.q
+  24 "3" constant.numeric.number.q
+  26 "4" constant.numeric.number.q
+  28 "5" constant.numeric.number.q
+  29 ")" -
+174: op.eachIterator:count'[(1 2;3 4 5)]
+  0 "op.eachIterator" -
+  15 ":" keyword.operator.assignment.q
+  16 "count" support.function.builtin.q
+  21 "'" keyword.operator.iterator.q
+  22 "[(" -
+  24 "1" constant.numeric.number.q
+  26 "2" constant.numeric.number.q
+  27 ";" punctuation.separator.q
+  28 "3" constant.numeric.number.q
+  30 "4" constant.numeric.number.q
+  32 "5" constant.numeric.number.q
+  33 ")]" -
+175: op.eachRight:1 2,/:3 4
+  0 "op.eachRight" -
+  12 ":" keyword.operator.assignment.q
+  13 "1" constant.numeric.number.q
+  15 "2" constant.numeric.number.q
+  16 "," keyword.operator.q
+  17 "/:" keyword.operator.iterator.q
+  19 "3" constant.numeric.number.q
+  21 "4" constant.numeric.number.q
+176: op.eachLeft:1 2,\:3 4
+  0 "op.eachLeft" -
+  11 ":" keyword.operator.assignment.q
+  12 "1" constant.numeric.number.q
+  14 "2" constant.numeric.number.q
+  15 "," keyword.operator.q
+  16 "\\:" keyword.operator.iterator.q
+  18 "3" constant.numeric.number.q
+  20 "4" constant.numeric.number.q
+177: op.eachPrior:-':[1 4 9]
+  0 "op.eachPrior" -
+  12 ":" keyword.operator.assignment.q
+  13 "-" keyword.operator.arithmetic.q
+  14 "':" keyword.operator.iterator.q
+  16 "[" -
+  17 "1" constant.numeric.number.q
+  19 "4" constant.numeric.number.q
+  21 "9" constant.numeric.number.q
+  22 "]" -
+178: op.amend:@[1 2 3;1;:;20]
+  0 "op.amend" -
+  8 ":" keyword.operator.assignment.q
+  9 "@" keyword.operator.q
+  10 "[" -
+  11 "1" constant.numeric.number.q
+  13 "2" constant.numeric.number.q
+  15 "3" constant.numeric.number.q
+  16 ";" punctuation.separator.q
+  17 "1" constant.numeric.number.q
+  18 ";" punctuation.separator.q
+  19 ":" keyword.operator.assignment.q
+  20 ";" punctuation.separator.q
+  21 "20" constant.numeric.number.q
+  23 "]" -
+179: op.amendInPlace:{x[1]+:10;x}1 2 3
+  0 "op.amendInPlace" -
+  15 ":" keyword.operator.assignment.q
+  16 "{" -
+  17 "x" variable.parameter.implicit.q
+  18 "[" -
+  19 "1" constant.numeric.number.q
+  20 "]" -
+  21 "+" keyword.operator.arithmetic.q
+  22 ":" keyword.operator.assignment.q
+  23 "10" constant.numeric.number.q
+  25 ";" punctuation.separator.q
+  26 "x" variable.parameter.implicit.q
+  27 "}" -
+  28 "1" constant.numeric.number.q
+  30 "2" constant.numeric.number.q
+  32 "3" constant.numeric.number.q
+180: op.globalAssign:{.corpus.op.touched::1b}[]
+  0 "op.globalAssign" -
+  15 ":" keyword.operator.assignment.q
+  16 "{" -
+  17 ".corpus.op.touched" -
+  35 "::" keyword.operator.assignment.q
+  37 "1b" constant.numeric.boolean.q
+  39 "}" -
+  40 "[]" -
+181: 
+182: / Casts and internal functions
+  0 "/ Casts and internal functions" comment.line.slash.q
+183: cast.lowercase:"j"$4.2
+  0 "cast.lowercase" -
+  14 ":" keyword.operator.assignment.q
+  15 "\"j\"" support.type.cast.q
+  18 "$" keyword.operator.q
+  19 "4.2" constant.numeric.number.q
+184: cast.symbol:`int$42
+  0 "cast.symbol" -
+  11 ":" keyword.operator.assignment.q
+  12 "`int" support.type.cast.q
+  16 "$" keyword.operator.q
+  17 "42" constant.numeric.number.q
+185: cast.short:5h$42
+  0 "cast.short" -
+  10 ":" keyword.operator.assignment.q
+  11 "5h" support.type.cast.q
+  13 "$" keyword.operator.q
+  14 "42" constant.numeric.number.q
+186: cast.parse:"D"$"2026.10.22"
+  0 "cast.parse" -
+  10 ":" keyword.operator.assignment.q
+  11 "\"D\"" support.type.cast.q
+  14 "$" keyword.operator.q
+  15 "\"" string.quoted.double.q
+  16 "2026.10.22" string.quoted.double.q
+  26 "\"" string.quoted.double.q
+187: internal.encode:-8!42
+  0 "internal.encode" -
+  15 ":" keyword.operator.assignment.q
+  16 "-8!" support.function.builtin.internal.q
+  19 "42" constant.numeric.number.q
+188: internal.decode:-9!-8!42
+  0 "internal.decode" -
+  15 ":" keyword.operator.assignment.q
+  16 "-9!" support.function.builtin.internal.q
+  19 "-8!" support.function.builtin.internal.q
+  22 "42" constant.numeric.number.q
+189: internal.type:type 42
+  0 "internal.type" -
+  13 ":" keyword.operator.assignment.q
+  14 "type" support.function.builtin.q
+  19 "42" constant.numeric.number.q
+190: 
+191: / Control flow and signals
+  0 "/ Control flow and signals" comment.line.slash.q
+192: control.cond:$[1b;`yes;`no]
+  0 "control.cond" -
+  12 ":" keyword.operator.assignment.q
+  13 "$" keyword.control.conditional.q
+  14 "[" -
+  15 "1b" constant.numeric.boolean.q
+  17 ";" punctuation.separator.q
+  18 "`yes" constant.language.symbol.q
+  22 ";" punctuation.separator.q
+  23 "`no" constant.language.symbol.q
+  26 "]" -
+193: control.vectorCond:?[101b;1 2 3;0]
+  0 "control.vectorCond" -
+  18 ":" keyword.operator.assignment.q
+  19 "?" keyword.control.conditional.q
+  20 "[" -
+  21 "101b" constant.numeric.boolean.q
+  25 ";" punctuation.separator.q
+  26 "1" constant.numeric.number.q
+  28 "2" constant.numeric.number.q
+  30 "3" constant.numeric.number.q
+  31 ";" punctuation.separator.q
+  32 "0" constant.numeric.number.q
+  33 "]" -
+194: control.if:{if[x;:`yes];`no}1b
+  0 "control.if" -
+  10 ":" keyword.operator.assignment.q
+  11 "{" -
+  12 "if" keyword.control.conditional.q
+  14 "[" -
+  15 "x" variable.parameter.implicit.q
+  16 ";" punctuation.separator.q
+  17 ":" keyword.operator.assignment.q
+  18 "`yes" constant.language.symbol.q
+  22 "]" -
+  23 ";" punctuation.separator.q
+  24 "`no" constant.language.symbol.q
+  27 "}" -
+  28 "1b" constant.numeric.boolean.q
+195: control.do:{n:0;do[x;n+:1];n}3
+  0 "control.do" -
+  10 ":" keyword.operator.assignment.q
+  11 "{" -
+  12 "n" -
+  13 ":" keyword.operator.assignment.q
+  14 "0" constant.numeric.number.q
+  15 ";" punctuation.separator.q
+  16 "do" keyword.control.loop.q
+  18 "[" -
+  19 "x" variable.parameter.implicit.q
+  20 ";" punctuation.separator.q
+  21 "n" -
+  22 "+" keyword.operator.arithmetic.q
+  23 ":" keyword.operator.assignment.q
+  24 "1" constant.numeric.number.q
+  25 "]" -
+  26 ";" punctuation.separator.q
+  27 "n" -
+  28 "}" -
+  29 "3" constant.numeric.number.q
+196: control.while:{n:0;while[n<x;n+:1];n}3
+  0 "control.while" -
+  13 ":" keyword.operator.assignment.q
+  14 "{" -
+  15 "n" -
+  16 ":" keyword.operator.assignment.q
+  17 "0" constant.numeric.number.q
+  18 ";" punctuation.separator.q
+  19 "while" keyword.control.loop.q
+  24 "[" -
+  25 "n" -
+  26 "<" keyword.operator.comparison.q
+  27 "x" variable.parameter.implicit.q
+  28 ";" punctuation.separator.q
+  29 "n" -
+  30 "+" keyword.operator.arithmetic.q
+  31 ":" keyword.operator.assignment.q
+  32 "1" constant.numeric.number.q
+  33 "]" -
+  34 ";" punctuation.separator.q
+  35 "n" -
+  36 "}" -
+  37 "3" constant.numeric.number.q
+197: control.signal:@[{'`oops};::;{x}]
+  0 "control.signal" -
+  14 ":" keyword.operator.assignment.q
+  15 "@" keyword.operator.q
+  16 "[" -
+  17 "{" -
+  18 "'" keyword.control.flow.signal.q
+  19 "`oops" constant.language.symbol.q
+  24 "}" -
+  25 ";" punctuation.separator.q
+  26 "::" keyword.operator.assignment.q
+  28 ";" punctuation.separator.q
+  29 "{" -
+  30 "x" variable.parameter.implicit.q
+  31 "}" -
+  32 "]" -
+198: control.signalAfterSemicolon:@[{x;'`late};::;{x}]
+  0 "control.signalAfterSemicolon" -
+  28 ":" keyword.operator.assignment.q
+  29 "@" keyword.operator.q
+  30 "[" -
+  31 "{" -
+  32 "x" variable.parameter.implicit.q
+  33 ";" punctuation.separator.q
+  34 "'" keyword.control.flow.signal.q
+  35 "`late" constant.language.symbol.q
+  40 "}" -
+  41 ";" punctuation.separator.q
+  42 "::" keyword.operator.assignment.q
+  44 ";" punctuation.separator.q
+  45 "{" -
+  46 "x" variable.parameter.implicit.q
+  47 "}" -
+  48 "]" -
+199: control.trap:.[{x+y};(1;`a);{x}]
+  0 "control.trap" -
+  12 ":" keyword.operator.assignment.q
+  13 "." keyword.operator.q
+  14 "[" -
+  15 "{" -
+  16 "x" variable.parameter.implicit.q
+  17 "+" keyword.operator.arithmetic.q
+  18 "y" variable.parameter.implicit.q
+  19 "}" -
+  20 ";" punctuation.separator.q
+  21 "(" -
+  22 "1" constant.numeric.number.q
+  23 ";" punctuation.separator.q
+  24 "`a" constant.language.symbol.q
+  26 ")" -
+  27 ";" punctuation.separator.q
+  28 "{" -
+  29 "x" variable.parameter.implicit.q
+  30 "}" -
+  31 "]" -
+200: 
+201: / qSQL
+  0 "/ qSQL" comment.line.slash.q
+202: qsql.select:select price by sym from table.trades where size>100
+  0 "qsql.select" -
+  11 ":" keyword.operator.assignment.q
+  12 "select" keyword.other.qsql.q
+  19 "price" -
+  25 "by" keyword.other.qsql.q
+  28 "sym" -
+  32 "from" keyword.other.qsql.q
+  37 "table.trades" -
+  50 "where" keyword.other.qsql.q
+  56 "size" -
+  60 ">" keyword.operator.comparison.q
+  61 "100" constant.numeric.number.q
+203: qsql.exec:exec sum size from table.trades
+  0 "qsql.exec" -
+  9 ":" keyword.operator.assignment.q
+  10 "exec" keyword.other.qsql.q
+  15 "sum" support.function.builtin.q
+  19 "size" -
+  24 "from" keyword.other.qsql.q
+  29 "table.trades" -
+204: qsql.update:update price*2 from table.trades
+  0 "qsql.update" -
+  11 ":" keyword.operator.assignment.q
+  12 "update" keyword.other.qsql.q
+  19 "price" -
+  24 "*" keyword.operator.arithmetic.q
+  25 "2" constant.numeric.number.q
+  27 "from" keyword.other.qsql.q
+  32 "table.trades" -
+205: qsql.delete:delete from table.trades where sym=`b
+  0 "qsql.delete" -
+  11 ":" keyword.operator.assignment.q
+  12 "delete" keyword.other.qsql.q
+  19 "from" keyword.other.qsql.q
+  24 "table.trades" -
+  37 "where" keyword.other.qsql.q
+  43 "sym" -
+  46 "=" keyword.operator.comparison.q
+  47 "`b" constant.language.symbol.q
+206: qsql.functional:?[table.trades;();0b;()]
+  0 "qsql.functional" -
+  15 ":" keyword.operator.assignment.q
+  16 "?" keyword.control.conditional.q
+  17 "[" -
+  18 "table.trades" -
+  30 ";" punctuation.separator.q
+  31 "()" -
+  33 ";" punctuation.separator.q
+  34 "0b" constant.numeric.boolean.q
+  36 ";" punctuation.separator.q
+  37 "()]" -
+207: 
+208: / System namespaces
+  0 "/ System namespaces" comment.line.slash.q
+209: system.zK:.z.K
+  0 "system" support.function.builtin.q
+  6 ".zK" -
+  9 ":" keyword.operator.assignment.q
+  10 ".z.K" support.class.namespace.dotz.q
+210: system.Qn:.Q.n
+  0 "system" support.function.builtin.q
+  6 ".Qn" -
+  9 ":" keyword.operator.assignment.q
+  10 ".Q.n" support.class.namespace.utilities.q
+211: system.hHtml:.h.htc[`p;"q"]
+  0 "system" support.function.builtin.q
+  6 ".hHtml" -
+  12 ":" keyword.operator.assignment.q
+  13 ".h.htc" support.class.namespace.http.q
+  19 "[" -
+  20 "`p" constant.language.symbol.q
+  22 ";" punctuation.separator.q
+  23 "\"" string.quoted.double.q
+  24 "q" string.quoted.double.q
+  25 "\"" string.quoted.double.q
+  26 "]" -
+212: system.jJson:.j.j `a`b!1 2
+  0 "system" support.function.builtin.q
+  6 ".jJson" -
+  12 ":" keyword.operator.assignment.q
+  13 ".j.j" support.class.namespace.json.q
+  18 "`a`b" constant.language.symbol.q
+  22 "!" keyword.operator.q
+  23 "1" constant.numeric.number.q
+  25 "2" constant.numeric.number.q
+213: 
+214: / Comments in awkward places
+  0 "/ Comments in awkward places" comment.line.slash.q
+215: comment.trailing:1 / a trailing comment
+  0 "comment.trailing" -
+  16 ":" keyword.operator.assignment.q
+  17 "1" constant.numeric.number.q
+  19 "/ a trailing comment" comment.line.slash.q
+216: comment.trailingTab:1	/ after a tab
+  0 "comment.trailingTab" -
+  19 ":" keyword.operator.assignment.q
+  20 "1" constant.numeric.number.q
+  22 "/ after a tab" comment.line.slash.q
+217: comment.notAComment:+/[1 2]
+  0 "comment.notAComment" -
+  19 ":" keyword.operator.assignment.q
+  20 "+" keyword.operator.arithmetic.q
+  21 "/" keyword.operator.iterator.q
+  22 "[" -
+  23 "1" constant.numeric.number.q
+  25 "2" constant.numeric.number.q
+  26 "]" -
+218: /
+  0 "/" comment.block.q
+219:   a block comment
+  0 "  a block comment" comment.block.q
+220:   /
+  0 "  /" comment.block.q
+221:     nested inside it
+  0 "    nested inside it" comment.block.q
+222:   \
+  0 "  \\" comment.block.q
+223:   still in the outer block
+  0 "  still in the outer block" comment.block.q
+224: \
+  0 "\\" comment.block.q
+225: comment.afterBlock:1
+  0 "comment.afterBlock" -
+  18 ":" keyword.operator.assignment.q
+  19 "1" constant.numeric.number.q
+226: 
+227: \d .corpus.nested.deeper
+  0 "\\d" meta.preprocessor.system.q
+  3 ".corpus.nested.deeper" -
+228: answer:42
+  0 "answer" -
+  6 ":" keyword.operator.assignment.q
+  7 "42" constant.numeric.number.q
+229: \d .
+  0 "\\d" meta.preprocessor.system.q
+  3 "." keyword.operator.q
+230: .corpus.nested.direct:{.corpus.nested.deeper.answer}[]
+  0 ".corpus.nested.direct" -
+  21 ":" keyword.operator.assignment.q
+  22 "{" -
+  23 ".corpus.nested.deeper.answer" -
+  51 "}" -
+  52 "[]" -
+231: 
+232: / System commands
+  0 "/ System commands" comment.line.slash.q
+233: \t:10 til 1000
+  0 "\\t:10" meta.preprocessor.system.q
+  6 "til" support.function.builtin.q
+  10 "1000" constant.numeric.number.q
+234: \ts til 1000 / timing with a comment
+  0 "\\ts" meta.preprocessor.system.q
+  4 "til" support.function.builtin.q
+  8 "1000" constant.numeric.number.q
+  13 "/ timing with a comment" comment.line.slash.q
+235: \c 25 80
+  0 "\\c" meta.preprocessor.system.q
+  3 "25" constant.numeric.number.q
+  6 "80" constant.numeric.number.q
+236: \P 7
+  0 "\\P" meta.preprocessor.system.q
+  3 "7" constant.numeric.number.q
+237: 
+238: k).corpus.k:+/1 2 3
+  0 "k)" meta.preprocessor.language.q
+  2 ".corpus.k:+/1 2 3" -
+239: 
+240: / A lone backslash ends the script: q ignores everything below it
+  0 "/ A lone backslash ends the script: q ignores everything below it" comment.line.slash.q
+241: \
+  0 "\\" comment.block.eof.q
+242: this is not q and is never read
+  0 "this is not q and is never read" comment.block.eof.q
+243: select from where
+  0 "select from where" comment.block.eof.q
+244: 

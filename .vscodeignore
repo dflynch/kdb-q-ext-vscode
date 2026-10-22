@@ -10,3 +10,4 @@ src/**
 out/test/**
 biome.json
 icons/quirk.svg
+test/**
