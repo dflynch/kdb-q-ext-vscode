@@ -202,6 +202,17 @@ suite("q grammar", () => {
 
     // System commands
     [
+      "namespace command",
+      "\\d .a.b / note\n\\d .",
+      [
+        ["\\d", "meta.preprocessor.system.q"],
+        [".a.b", "source.q"],
+        ["/ note", "comment.line.slash.q"],
+        ["\\d", "meta.preprocessor.system.q"],
+        [".", "source.q"],
+      ],
+    ],
+    [
       "load command",
       "\\l foo.q",
       [
@@ -401,6 +412,19 @@ suite("q grammar", () => {
         ["'", "keyword.control.flow.signal.q"],
         ["d", "source.q"],
         ["]", "source.q"],
+      ],
+    ],
+    [
+      "compose is not a signal",
+      "('[neg;abs])",
+      [
+        ["(", "source.q"],
+        ["'", "keyword.operator.iterator.q"],
+        ["[", "source.q"],
+        ["neg", "support.function.builtin.q"],
+        [";", "punctuation.separator.q"],
+        ["abs", "support.function.builtin.q"],
+        ["])", "source.q"],
       ],
     ],
     [
@@ -736,6 +760,17 @@ suite("q grammar", () => {
       ],
     ],
     [
+      "negative times and minus",
+      "-12:34 -00:00:01.5 a-12:34",
+      [
+        ["-12:34", "constant.numeric.time.q"],
+        ["-00:00:01.5", "constant.numeric.time.q"],
+        ["a", "source.q"],
+        ["-", "keyword.operator.arithmetic.q"],
+        ["12:34", "constant.numeric.time.q"],
+      ],
+    ],
+    [
       "timestamp",
       "2026.10.21D09:30:00.000000000",
       [["2026.10.21D09:30:00.000000000", "constant.numeric.timestamp.q"]],
@@ -1036,6 +1071,19 @@ suite("q grammar", () => {
         [",", "keyword.operator.q"],
         [".z.x", "support.class.namespace.dotz.q"],
         ["}", "source.q"],
+      ],
+    ],
+    [
+      "dotted names that start with a reserved word",
+      "null.a;do.b;select.c;count",
+      [
+        ["null.a", "source.q"],
+        [";", "punctuation.separator.q"],
+        ["do.b", "source.q"],
+        [";", "punctuation.separator.q"],
+        ["select.c", "source.q"],
+        [";", "punctuation.separator.q"],
+        ["count", "support.function.builtin.q"],
       ],
     ],
     [

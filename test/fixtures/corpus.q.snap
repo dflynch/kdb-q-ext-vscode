@@ -123,9 +123,7 @@
 35: temporal.negativeSecond:-00:00:01
   0 "temporal.negativeSecond" -
   23 ":" keyword.operator.assignment.q
-  24 "-00" constant.numeric.number.q
-  27 ":" keyword.operator.assignment.q
-  28 "00:01" constant.numeric.time.q
+  24 "-00:00:01" constant.numeric.time.q
 36: temporal.longTime:25:00:00.000
   0 "temporal.longTime" -
   17 ":" keyword.operator.assignment.q
@@ -133,9 +131,7 @@
 37: temporal.negativeTime:-12:34:56.789
   0 "temporal.negativeTime" -
   21 ":" keyword.operator.assignment.q
-  22 "-12" constant.numeric.number.q
-  25 ":" keyword.operator.assignment.q
-  26 "34:56.789" constant.numeric.time.q
+  22 "-12:34:56.789" constant.numeric.time.q
 38: temporal.preEpochDate:1999.12.31
   0 "temporal.preEpochDate" -
   21 ":" keyword.operator.assignment.q
@@ -262,99 +258,80 @@
 64: / Typed nulls
   0 "/ Typed nulls" comment.line.slash.q
 65: null.guid:0Ng
-  0 "null" support.function.builtin.q
-  4 ".guid" -
+  0 "null.guid" -
   9 ":" keyword.operator.assignment.q
   10 "0Ng" constant.numeric.null.q
 66: null.short:0Nh
-  0 "null" support.function.builtin.q
-  4 ".short" -
+  0 "null.short" -
   10 ":" keyword.operator.assignment.q
   11 "0Nh" constant.numeric.null.q
 67: null.int:0Ni
-  0 "null" support.function.builtin.q
-  4 ".int" -
+  0 "null.int" -
   8 ":" keyword.operator.assignment.q
   9 "0Ni" constant.numeric.null.q
 68: null.long:0N
-  0 "null" support.function.builtin.q
-  4 ".long" -
+  0 "null.long" -
   9 ":" keyword.operator.assignment.q
   10 "0N" constant.numeric.null.q
 69: null.longSuffixed:0Nj
-  0 "null" support.function.builtin.q
-  4 ".longSuffixed" -
+  0 "null.longSuffixed" -
   17 ":" keyword.operator.assignment.q
   18 "0Nj" constant.numeric.null.q
 70: null.real:0Ne
-  0 "null" support.function.builtin.q
-  4 ".real" -
+  0 "null.real" -
   9 ":" keyword.operator.assignment.q
   10 "0Ne" constant.numeric.null.q
 71: null.float:0n
-  0 "null" support.function.builtin.q
-  4 ".float" -
+  0 "null.float" -
   10 ":" keyword.operator.assignment.q
   11 "0n" constant.numeric.null.q
 72: null.floatSuffixed:0Nf
-  0 "null" support.function.builtin.q
-  4 ".floatSuffixed" -
+  0 "null.floatSuffixed" -
   18 ":" keyword.operator.assignment.q
   19 "0Nf" constant.numeric.null.q
 73: null.char:" "
-  0 "null" support.function.builtin.q
-  4 ".char" -
+  0 "null.char" -
   9 ":" keyword.operator.assignment.q
   10 "\"" string.quoted.double.q
   12 "\"" string.quoted.double.q
 74: null.symbol:`
-  0 "null" support.function.builtin.q
-  4 ".symbol" -
+  0 "null.symbol" -
   11 ":" keyword.operator.assignment.q
   12 "`" constant.language.symbol.q
 75: null.timestamp:0Np
-  0 "null" support.function.builtin.q
-  4 ".timestamp" -
+  0 "null.timestamp" -
   14 ":" keyword.operator.assignment.q
   15 "0Np" constant.numeric.null.q
 76: null.month:0Nm
-  0 "null" support.function.builtin.q
-  4 ".month" -
+  0 "null.month" -
   10 ":" keyword.operator.assignment.q
   11 "0Nm" constant.numeric.null.q
 77: null.date:0Nd
-  0 "null" support.function.builtin.q
-  4 ".date" -
+  0 "null.date" -
   9 ":" keyword.operator.assignment.q
   10 "0Nd" constant.numeric.null.q
 78: null.datetime:0Nz
-  0 "null" support.function.builtin.q
-  4 ".datetime" -
+  0 "null.datetime" -
   13 ":" keyword.operator.assignment.q
   14 "0Nz" constant.numeric.null.q
 79: null.timespan:0Nn
-  0 "null" support.function.builtin.q
-  4 ".timespan" -
+  0 "null.timespan" -
   13 ":" keyword.operator.assignment.q
   14 "0Nn" constant.numeric.null.q
 80: null.minute:0Nu
-  0 "null" support.function.builtin.q
-  4 ".minute" -
+  0 "null.minute" -
   11 ":" keyword.operator.assignment.q
   12 "0Nu" constant.numeric.null.q
 81: null.second:0Nv
-  0 "null" support.function.builtin.q
-  4 ".second" -
+  0 "null.second" -
   11 ":" keyword.operator.assignment.q
   12 "0Nv" constant.numeric.null.q
 82: null.time:0Nt
-  0 "null" support.function.builtin.q
-  4 ".time" -
+  0 "null.time" -
   9 ":" keyword.operator.assignment.q
   10 "0Nt" constant.numeric.null.q
 83: null.vector:1 0N 3
-  0 "null" support.function.builtin.q
-  4 ".vector" -
+  0 "null.vector" -
   11 ":" keyword.operator.assignment.q
   12 "1" constant.numeric.number.q
   14 "0N" constant.numeric.null.q
@@ -454,14 +431,12 @@
 109: / Strings and escapes
   0 "/ Strings and escapes" comment.line.slash.q
 110: string.empty:""
-  0 "string" support.function.builtin.q
-  6 ".empty" -
+  0 "string.empty" -
   12 ":" keyword.operator.assignment.q
   13 "\"" string.quoted.double.q
   14 "\"" string.quoted.double.q
 111: string.escapes:"tab\there\nnewline \"quoted\" back\\slash"
-  0 "string" support.function.builtin.q
-  6 ".escapes" -
+  0 "string.escapes" -
   14 ":" keyword.operator.assignment.q
   15 "\"" string.quoted.double.q
   16 "tab" string.quoted.double.q
@@ -477,16 +452,14 @@
   52 "slash" string.quoted.double.q
   57 "\"" string.quoted.double.q
 112: string.octal:"\001\377"
-  0 "string" support.function.builtin.q
-  6 ".octal" -
+  0 "string.octal" -
   12 ":" keyword.operator.assignment.q
   13 "\"" string.quoted.double.q
   14 "\\001" string.quoted.double.q constant.character.escape.q
   18 "\\377" string.quoted.double.q constant.character.escape.q
   22 "\"" string.quoted.double.q
 113: string.slashes:"a / b \\ c"
-  0 "string" support.function.builtin.q
-  6 ".slashes" -
+  0 "string.slashes" -
   14 ":" keyword.operator.assignment.q
   15 "\"" string.quoted.double.q
   16 "a / b " string.quoted.double.q
@@ -494,8 +467,7 @@
   24 " c" string.quoted.double.q
   26 "\"" string.quoted.double.q
 114: string.multiLine:"first
-  0 "string" support.function.builtin.q
-  6 ".multiLine" -
+  0 "string.multiLine" -
   16 ":" keyword.operator.assignment.q
   17 "\"" string.quoted.double.q
   18 "first" string.quoted.double.q
@@ -824,7 +796,7 @@
   0 "fn.composition" -
   14 ":" keyword.operator.assignment.q
   15 "(" -
-  16 "'" keyword.control.flow.signal.q
+  16 "'" keyword.operator.iterator.q
   17 "[" -
   18 "neg" support.function.builtin.q
   21 ";" punctuation.separator.q
@@ -1313,18 +1285,15 @@
 208: / System namespaces
   0 "/ System namespaces" comment.line.slash.q
 209: system.zK:.z.K
-  0 "system" support.function.builtin.q
-  6 ".zK" -
+  0 "system.zK" -
   9 ":" keyword.operator.assignment.q
   10 ".z.K" support.class.namespace.dotz.q
 210: system.Qn:.Q.n
-  0 "system" support.function.builtin.q
-  6 ".Qn" -
+  0 "system.Qn" -
   9 ":" keyword.operator.assignment.q
   10 ".Q.n" support.class.namespace.utilities.q
 211: system.hHtml:.h.htc[`p;"q"]
-  0 "system" support.function.builtin.q
-  6 ".hHtml" -
+  0 "system.hHtml" -
   12 ":" keyword.operator.assignment.q
   13 ".h.htc" support.class.namespace.http.q
   19 "[" -
@@ -1335,8 +1304,7 @@
   25 "\"" string.quoted.double.q
   26 "]" -
 212: system.jJson:.j.j `a`b!1 2
-  0 "system" support.function.builtin.q
-  6 ".jJson" -
+  0 "system.jJson" -
   12 ":" keyword.operator.assignment.q
   13 ".j.j" support.class.namespace.json.q
   18 "`a`b" constant.language.symbol.q
@@ -1393,7 +1361,7 @@
   7 "42" constant.numeric.number.q
 229: \d .
   0 "\\d" meta.preprocessor.system.q
-  3 "." keyword.operator.q
+  3 "." -
 230: .corpus.nested.direct:{.corpus.nested.deeper.answer}[]
   0 ".corpus.nested.direct" -
   21 ":" keyword.operator.assignment.q
