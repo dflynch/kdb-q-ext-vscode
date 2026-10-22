@@ -2,14 +2,14 @@
   0 "/ Corpus of q for the grammar snapshot and the codec fixtures." comment.line.slash.q
 > / Every value lives under .corpus, where fixtures.q walks it with key.
   0 "/ Every value lives under .corpus, where fixtures.q walks it with key." comment.line.slash.q
-> / It must load cleanly: q -q test/fixtures/corpus.q
-  0 "/ It must load cleanly: q -q test/fixtures/corpus.q" comment.line.slash.q
+> / It must load cleanly: npm run fixtures fails if it doesn't.
+  0 "/ It must load cleanly: npm run fixtures fails if it doesn't." comment.line.slash.q
 > / After a change, run npm run fixtures and UPDATE_SNAPSHOT=1 npm test
   0 "/ After a change, run npm run fixtures and UPDATE_SNAPSHOT=1 npm test" comment.line.slash.q
 > 
 > \d .corpus
   0 "\\d" meta.preprocessor.system.q
-  3 ".corpus" -
+  2 " .corpus" -
 > 
 > / Atoms, one per type
   0 "/ Atoms, one per type" comment.line.slash.q
@@ -138,10 +138,14 @@
   0 "temporal.preEpochDate" -
   21 ":" keyword.operator.assignment.q
   22 "1999.12.31" constant.numeric.date.q
-> temporal.preEpochTimestamp:1970.01.01D00:00:00.000000000
+> temporal.preEpochTimestamp:1999.12.31D23:59:59.999999999
   0 "temporal.preEpochTimestamp" -
   26 ":" keyword.operator.assignment.q
-  27 "1970.01.01D00:00:00.000000000" constant.numeric.timestamp.q
+  27 "1999.12.31D23:59:59.999999999" constant.numeric.timestamp.q
+> temporal.unixEpoch:1970.01.01D00:00:00.000000000
+  0 "temporal.unixEpoch" -
+  18 ":" keyword.operator.assignment.q
+  19 "1970.01.01D00:00:00.000000000" constant.numeric.timestamp.q
 > 
 > / Vectors, one per type
   0 "/ Vectors, one per type" comment.line.slash.q
@@ -247,18 +251,6 @@
   11 ":" keyword.operator.assignment.q
   12 "12:00:00.000" constant.numeric.time.q
   25 "12:00:00.001" constant.numeric.time.q
-> vector.emptyLong:`long$()
-  0 "vector.emptyLong" -
-  16 ":" keyword.operator.assignment.q
-  17 "`long" support.type.cast.q
-  22 "$" keyword.operator.q
-  23 "()" -
-> vector.emptySymbol:`$()
-  0 "vector.emptySymbol" -
-  18 ":" keyword.operator.assignment.q
-  19 "`" support.type.cast.q
-  20 "$" keyword.operator.q
-  21 "()" -
 > vector.singleton:enlist 42
   0 "vector.singleton" -
   16 ":" keyword.operator.assignment.q
@@ -340,12 +332,12 @@
   0 "null.time" -
   9 ":" keyword.operator.assignment.q
   10 "0Nt" constant.numeric.null.q
-> null.vector:1 0N 3
-  0 "null.vector" -
-  11 ":" keyword.operator.assignment.q
-  12 "1" constant.numeric.number.q
-  14 "0N" constant.numeric.null.q
-  17 "3" constant.numeric.number.q
+> null.generic:(::)
+  0 "null.generic" -
+  12 ":" keyword.operator.assignment.q
+  13 "(" -
+  14 "::" keyword.operator.assignment.q
+  16 ")" -
 > 
 > / Infinities, positive and negative
   0 "/ Infinities, positive and negative" comment.line.slash.q
@@ -405,18 +397,34 @@
   0 "infinity.timestamp" -
   18 ":" keyword.operator.assignment.q
   19 "0Wp" constant.numeric.infinity.q
+> infinity.negativeTimestamp:-0Wp
+  0 "infinity.negativeTimestamp" -
+  26 ":" keyword.operator.assignment.q
+  27 "-0Wp" constant.numeric.infinity.q
 > infinity.month:0Wm
   0 "infinity.month" -
   14 ":" keyword.operator.assignment.q
   15 "0Wm" constant.numeric.infinity.q
+> infinity.negativeMonth:-0Wm
+  0 "infinity.negativeMonth" -
+  22 ":" keyword.operator.assignment.q
+  23 "-0Wm" constant.numeric.infinity.q
 > infinity.date:0Wd
   0 "infinity.date" -
   13 ":" keyword.operator.assignment.q
   14 "0Wd" constant.numeric.infinity.q
+> infinity.negativeDate:-0Wd
+  0 "infinity.negativeDate" -
+  21 ":" keyword.operator.assignment.q
+  22 "-0Wd" constant.numeric.infinity.q
 > infinity.datetime:0Wz
   0 "infinity.datetime" -
   17 ":" keyword.operator.assignment.q
   18 "0Wz" constant.numeric.infinity.q
+> infinity.negativeDatetime:-0wz
+  0 "infinity.negativeDatetime" -
+  25 ":" keyword.operator.assignment.q
+  26 "-0wz" constant.numeric.infinity.q
 > infinity.timespan:0Wn
   0 "infinity.timespan" -
   17 ":" keyword.operator.assignment.q
@@ -429,14 +437,320 @@
   0 "infinity.minute" -
   15 ":" keyword.operator.assignment.q
   16 "0Wu" constant.numeric.infinity.q
+> infinity.negativeMinute:-0Wu
+  0 "infinity.negativeMinute" -
+  23 ":" keyword.operator.assignment.q
+  24 "-0Wu" constant.numeric.infinity.q
 > infinity.second:0Wv
   0 "infinity.second" -
   15 ":" keyword.operator.assignment.q
   16 "0Wv" constant.numeric.infinity.q
+> infinity.negativeSecond:-0Wv
+  0 "infinity.negativeSecond" -
+  23 ":" keyword.operator.assignment.q
+  24 "-0Wv" constant.numeric.infinity.q
 > infinity.time:0Wt
   0 "infinity.time" -
   13 ":" keyword.operator.assignment.q
   14 "0Wt" constant.numeric.infinity.q
+> infinity.negativeTime:-0Wt
+  0 "infinity.negativeTime" -
+  21 ":" keyword.operator.assignment.q
+  22 "-0Wt" constant.numeric.infinity.q
+> 
+> / Nulls and infinities inside vectors, where q drops the type suffix
+  0 "/ Nulls and infinities inside vectors, where q drops the type suffix" comment.line.slash.q
+> special.short:0N 0W -0W 1h
+  0 "special.short" -
+  13 ":" keyword.operator.assignment.q
+  14 "0N" constant.numeric.null.q
+  17 "0W" constant.numeric.infinity.q
+  20 "-0W" constant.numeric.infinity.q
+  24 "1h" constant.numeric.number.q
+> special.int:0N 0W -0W 1i
+  0 "special.int" -
+  11 ":" keyword.operator.assignment.q
+  12 "0N" constant.numeric.null.q
+  15 "0W" constant.numeric.infinity.q
+  18 "-0W" constant.numeric.infinity.q
+  22 "1i" constant.numeric.number.q
+> special.long:0N 0W -0W 1
+  0 "special.long" -
+  12 ":" keyword.operator.assignment.q
+  13 "0N" constant.numeric.null.q
+  16 "0W" constant.numeric.infinity.q
+  19 "-0W" constant.numeric.infinity.q
+  23 "1" constant.numeric.number.q
+> special.real:0N 0w -0w 1e
+  0 "special.real" -
+  12 ":" keyword.operator.assignment.q
+  13 "0N" constant.numeric.null.q
+  16 "0w" constant.numeric.infinity.q
+  19 "-0w" constant.numeric.infinity.q
+  23 "1e" constant.numeric.number.q
+> special.float:0n 0w -0w 1
+  0 "special.float" -
+  13 ":" keyword.operator.assignment.q
+  14 "0n" constant.numeric.null.q
+  17 "0w" constant.numeric.infinity.q
+  20 "-0w" constant.numeric.infinity.q
+  24 "1" constant.numeric.number.q
+> special.timestamp:(0Np;0Wp;-0Wp;2026.10.22D00:00)
+  0 "special.timestamp" -
+  17 ":" keyword.operator.assignment.q
+  18 "(" -
+  19 "0Np" constant.numeric.null.q
+  22 ";" punctuation.separator.q
+  23 "0Wp" constant.numeric.infinity.q
+  26 ";" punctuation.separator.q
+  27 "-0Wp" constant.numeric.infinity.q
+  31 ";" punctuation.separator.q
+  32 "2026.10.22D00:00" constant.numeric.timestamp.q
+  48 ")" -
+> special.month:(0Nm;0Wm;-0Wm;2026.10m)
+  0 "special.month" -
+  13 ":" keyword.operator.assignment.q
+  14 "(" -
+  15 "0Nm" constant.numeric.null.q
+  18 ";" punctuation.separator.q
+  19 "0Wm" constant.numeric.infinity.q
+  22 ";" punctuation.separator.q
+  23 "-0Wm" constant.numeric.infinity.q
+  27 ";" punctuation.separator.q
+  28 "2026.10m" constant.numeric.month.q
+  36 ")" -
+> special.date:(0Nd;0Wd;-0Wd;2026.10.22)
+  0 "special.date" -
+  12 ":" keyword.operator.assignment.q
+  13 "(" -
+  14 "0Nd" constant.numeric.null.q
+  17 ";" punctuation.separator.q
+  18 "0Wd" constant.numeric.infinity.q
+  21 ";" punctuation.separator.q
+  22 "-0Wd" constant.numeric.infinity.q
+  26 ";" punctuation.separator.q
+  27 "2026.10.22" constant.numeric.date.q
+  37 ")" -
+> special.datetime:(0Nz;0Wz;-0Wz;2026.10.22T00:00:00.000)
+  0 "special.datetime" -
+  16 ":" keyword.operator.assignment.q
+  17 "(" -
+  18 "0Nz" constant.numeric.null.q
+  21 ";" punctuation.separator.q
+  22 "0Wz" constant.numeric.infinity.q
+  25 ";" punctuation.separator.q
+  26 "-0Wz" constant.numeric.infinity.q
+  30 ";" punctuation.separator.q
+  31 "2026.10.22T00:00:00.000" constant.numeric.datetime.q
+  54 ")" -
+> special.timespan:(0Nn;0Wn;-0Wn;0D01)
+  0 "special.timespan" -
+  16 ":" keyword.operator.assignment.q
+  17 "(" -
+  18 "0Nn" constant.numeric.null.q
+  21 ";" punctuation.separator.q
+  22 "0Wn" constant.numeric.infinity.q
+  25 ";" punctuation.separator.q
+  26 "-0Wn" constant.numeric.infinity.q
+  30 ";" punctuation.separator.q
+  31 "0D01" constant.numeric.timespan.q
+  35 ")" -
+> special.minute:(0Nu;0Wu;-0Wu;12:00)
+  0 "special.minute" -
+  14 ":" keyword.operator.assignment.q
+  15 "(" -
+  16 "0Nu" constant.numeric.null.q
+  19 ";" punctuation.separator.q
+  20 "0Wu" constant.numeric.infinity.q
+  23 ";" punctuation.separator.q
+  24 "-0Wu" constant.numeric.infinity.q
+  28 ";" punctuation.separator.q
+  29 "12:00" constant.numeric.time.q
+  34 ")" -
+> special.second:(0Nv;0Wv;-0Wv;12:00:00)
+  0 "special.second" -
+  14 ":" keyword.operator.assignment.q
+  15 "(" -
+  16 "0Nv" constant.numeric.null.q
+  19 ";" punctuation.separator.q
+  20 "0Wv" constant.numeric.infinity.q
+  23 ";" punctuation.separator.q
+  24 "-0Wv" constant.numeric.infinity.q
+  28 ";" punctuation.separator.q
+  29 "12:00:00" constant.numeric.time.q
+  37 ")" -
+> special.time:(0Nt;0Wt;-0Wt;12:00:00.000)
+  0 "special.time" -
+  12 ":" keyword.operator.assignment.q
+  13 "(" -
+  14 "0Nt" constant.numeric.null.q
+  17 ";" punctuation.separator.q
+  18 "0Wt" constant.numeric.infinity.q
+  21 ";" punctuation.separator.q
+  22 "-0Wt" constant.numeric.infinity.q
+  26 ";" punctuation.separator.q
+  27 "12:00:00.000" constant.numeric.time.q
+  39 ")" -
+> special.symbol:`a``c
+  0 "special.symbol" -
+  14 ":" keyword.operator.assignment.q
+  15 "`a``c" constant.language.symbol.q
+> special.guid:(0Ng;"G"$"0a369037-75d3-b24d-6721-5a1d44d4bed5")
+  0 "special.guid" -
+  12 ":" keyword.operator.assignment.q
+  13 "(" -
+  14 "0Ng" constant.numeric.null.q
+  17 ";" punctuation.separator.q
+  18 "\"G\"" support.type.cast.q
+  21 "$" keyword.operator.q
+  22 "\"" string.quoted.double.q
+  23 "0a369037-75d3-b24d-6721-5a1d44d4bed5" string.quoted.double.q
+  59 "\"" string.quoted.double.q
+  60 ")" -
+> 
+> / Empty vectors, which q shows with a cast
+  0 "/ Empty vectors, which q shows with a cast" comment.line.slash.q
+> empty.boolean:`boolean$()
+  0 "empty.boolean" -
+  13 ":" keyword.operator.assignment.q
+  14 "`boolean" support.type.cast.q
+  22 "$" keyword.operator.q
+  23 "()" -
+> empty.guid:`guid$()
+  0 "empty.guid" -
+  10 ":" keyword.operator.assignment.q
+  11 "`guid" support.type.cast.q
+  16 "$" keyword.operator.q
+  17 "()" -
+> empty.byte:`byte$()
+  0 "empty.byte" -
+  10 ":" keyword.operator.assignment.q
+  11 "`byte" support.type.cast.q
+  16 "$" keyword.operator.q
+  17 "()" -
+> empty.short:`short$()
+  0 "empty.short" -
+  11 ":" keyword.operator.assignment.q
+  12 "`short" support.type.cast.q
+  18 "$" keyword.operator.q
+  19 "()" -
+> empty.int:`int$()
+  0 "empty.int" -
+  9 ":" keyword.operator.assignment.q
+  10 "`int" support.type.cast.q
+  14 "$" keyword.operator.q
+  15 "()" -
+> empty.long:`long$()
+  0 "empty.long" -
+  10 ":" keyword.operator.assignment.q
+  11 "`long" support.type.cast.q
+  16 "$" keyword.operator.q
+  17 "()" -
+> empty.real:`real$()
+  0 "empty.real" -
+  10 ":" keyword.operator.assignment.q
+  11 "`real" support.type.cast.q
+  16 "$" keyword.operator.q
+  17 "()" -
+> empty.float:`float$()
+  0 "empty.float" -
+  11 ":" keyword.operator.assignment.q
+  12 "`float" support.type.cast.q
+  18 "$" keyword.operator.q
+  19 "()" -
+> empty.char:""
+  0 "empty.char" -
+  10 ":" keyword.operator.assignment.q
+  11 "\"" string.quoted.double.q
+  12 "\"" string.quoted.double.q
+> empty.symbol:`$()
+  0 "empty.symbol" -
+  12 ":" keyword.operator.assignment.q
+  13 "`" support.type.cast.q
+  14 "$" keyword.operator.q
+  15 "()" -
+> empty.timestamp:`timestamp$()
+  0 "empty.timestamp" -
+  15 ":" keyword.operator.assignment.q
+  16 "`timestamp" support.type.cast.q
+  26 "$" keyword.operator.q
+  27 "()" -
+> empty.month:`month$()
+  0 "empty.month" -
+  11 ":" keyword.operator.assignment.q
+  12 "`month" support.type.cast.q
+  18 "$" keyword.operator.q
+  19 "()" -
+> empty.date:`date$()
+  0 "empty.date" -
+  10 ":" keyword.operator.assignment.q
+  11 "`date" support.type.cast.q
+  16 "$" keyword.operator.q
+  17 "()" -
+> empty.datetime:`datetime$()
+  0 "empty.datetime" -
+  14 ":" keyword.operator.assignment.q
+  15 "`datetime" support.type.cast.q
+  24 "$" keyword.operator.q
+  25 "()" -
+> empty.timespan:`timespan$()
+  0 "empty.timespan" -
+  14 ":" keyword.operator.assignment.q
+  15 "`timespan" support.type.cast.q
+  24 "$" keyword.operator.q
+  25 "()" -
+> empty.minute:`minute$()
+  0 "empty.minute" -
+  12 ":" keyword.operator.assignment.q
+  13 "`minute" support.type.cast.q
+  20 "$" keyword.operator.q
+  21 "()" -
+> empty.second:`second$()
+  0 "empty.second" -
+  12 ":" keyword.operator.assignment.q
+  13 "`second" support.type.cast.q
+  20 "$" keyword.operator.q
+  21 "()" -
+> empty.time:`time$()
+  0 "empty.time" -
+  10 ":" keyword.operator.assignment.q
+  11 "`time" support.type.cast.q
+  16 "$" keyword.operator.q
+  17 "()" -
+> 
+> / Floats that q rounds or writes in exponent form
+  0 "/ Floats that q rounds or writes in exponent form" comment.line.slash.q
+> float.negativeZero:-0.0
+  0 "float.negativeZero" -
+  18 ":" keyword.operator.assignment.q
+  19 "-0.0" constant.numeric.number.q
+> float.negativeZeroVector:-0.0 1
+  0 "float.negativeZeroVector" -
+  24 ":" keyword.operator.assignment.q
+  25 "-0.0" constant.numeric.number.q
+  30 "1" constant.numeric.number.q
+> float.rounded:1.23456789
+  0 "float.rounded" -
+  13 ":" keyword.operator.assignment.q
+  14 "1.23456789" constant.numeric.number.q
+> float.large:123456789.0
+  0 "float.large" -
+  11 ":" keyword.operator.assignment.q
+  12 "123456789.0" constant.numeric.number.q
+> float.small:1e-5
+  0 "float.small" -
+  11 ":" keyword.operator.assignment.q
+  12 "1e-5" constant.numeric.number.q
+> float.sum:0.1+0.2
+  0 "float.sum" -
+  9 ":" keyword.operator.assignment.q
+  10 "0.1" constant.numeric.number.q
+  13 "+" keyword.operator.arithmetic.q
+  14 "0.2" constant.numeric.number.q
+> float.realRounded:1.23456789e
+  0 "float.realRounded" -
+  17 ":" keyword.operator.assignment.q
+  18 "1.23456789e" constant.numeric.number.q
 > 
 > / Strings and escapes
   0 "/ Strings and escapes" comment.line.slash.q
@@ -484,6 +798,12 @@
 >  second"
   0 " second" string.quoted.double.q
   7 "\"" string.quoted.double.q
+> string.utf8:"Ã©tÃ©"
+  0 "string.utf8" -
+  11 ":" keyword.operator.assignment.q
+  12 "\"" string.quoted.double.q
+  13 "Ã©tÃ©" string.quoted.double.q
+  18 "\"" string.quoted.double.q
 > 
 > / Symbols and file handles
   0 "/ Symbols and file handles" comment.line.slash.q
@@ -515,6 +835,14 @@
   14 "\"" string.quoted.double.q
   15 "with space" string.quoted.double.q
   25 "\"" string.quoted.double.q
+> symbol.utf8:`$"Ã©tÃ©"
+  0 "symbol.utf8" -
+  11 ":" keyword.operator.assignment.q
+  12 "`" support.type.cast.q
+  13 "$" keyword.operator.q
+  14 "\"" string.quoted.double.q
+  15 "Ã©tÃ©" string.quoted.double.q
+  20 "\"" string.quoted.double.q
 > 
 > / Attributes
   0 "/ Attributes" comment.line.slash.q
@@ -582,6 +910,21 @@
   0 "list.empty" -
   10 ":" keyword.operator.assignment.q
   11 "()" -
+> list.dictAndTable:(`a`b!1 2;([] x:1 2))
+  0 "list.dictAndTable" -
+  17 ":" keyword.operator.assignment.q
+  18 "(" -
+  19 "`a`b" constant.language.symbol.q
+  23 "!" keyword.operator.q
+  24 "1" constant.numeric.number.q
+  26 "2" constant.numeric.number.q
+  27 ";" punctuation.separator.q
+  28 "([] " -
+  32 "x" -
+  33 ":" keyword.operator.assignment.q
+  34 "1" constant.numeric.number.q
+  36 "2" constant.numeric.number.q
+  37 "))" -
 > dict.simple:`a`b`c!1 2 3
   0 "dict.simple" -
   11 ":" keyword.operator.assignment.q
@@ -611,6 +954,22 @@
   20 "())" -
   23 "!" keyword.operator.q
   24 "()" -
+> dict.sorted:`s#`a`b!1 2
+  0 "dict.sorted" -
+  11 ":" keyword.operator.assignment.q
+  12 "`s" storage.modifier.attribute.q
+  14 "#" keyword.operator.q
+  15 "`a`b" constant.language.symbol.q
+  19 "!" keyword.operator.q
+  20 "1" constant.numeric.number.q
+  22 "2" constant.numeric.number.q
+> dict.nonSymbolKeys:1 2!`a`b
+  0 "dict.nonSymbolKeys" -
+  18 ":" keyword.operator.assignment.q
+  19 "1" constant.numeric.number.q
+  21 "2" constant.numeric.number.q
+  22 "!" keyword.operator.q
+  23 "`a`b" constant.language.symbol.q
 > table.trades:([] sym:`a`b`a; price:1.5 2.5 3.5; size:100 200 300)
   0 "table.trades" -
   12 ":" keyword.operator.assignment.q
@@ -688,6 +1047,90 @@
   44 "1.5" constant.numeric.number.q
   48 "2.5" constant.numeric.number.q
   51 ")" -
+> table.sortedKeyed:`s#([sym:`a`b] price:1.5 2.5)
+  0 "table.sortedKeyed" -
+  17 ":" keyword.operator.assignment.q
+  18 "`s" storage.modifier.attribute.q
+  20 "#" keyword.operator.q
+  21 "([" -
+  23 "sym" -
+  26 ":" keyword.operator.assignment.q
+  27 "`a`b" constant.language.symbol.q
+  31 "] " -
+  33 "price" -
+  38 ":" keyword.operator.assignment.q
+  39 "1.5" constant.numeric.number.q
+  43 "2.5" constant.numeric.number.q
+  46 ")" -
+> table.attributes:([] p:`p#1 1 2; s:`s#1 2 3; u:`u#`x`y`z; g:`g#`p`q`p)
+  0 "table.attributes" -
+  16 ":" keyword.operator.assignment.q
+  17 "([] " -
+  21 "p" -
+  22 ":" keyword.operator.assignment.q
+  23 "`p" storage.modifier.attribute.q
+  25 "#" keyword.operator.q
+  26 "1" constant.numeric.number.q
+  28 "1" constant.numeric.number.q
+  30 "2" constant.numeric.number.q
+  31 ";" punctuation.separator.q
+  33 "s" -
+  34 ":" keyword.operator.assignment.q
+  35 "`s" storage.modifier.attribute.q
+  37 "#" keyword.operator.q
+  38 "1" constant.numeric.number.q
+  40 "2" constant.numeric.number.q
+  42 "3" constant.numeric.number.q
+  43 ";" punctuation.separator.q
+  45 "u" -
+  46 ":" keyword.operator.assignment.q
+  47 "`u" storage.modifier.attribute.q
+  49 "#" keyword.operator.q
+  50 "`x`y`z" constant.language.symbol.q
+  56 ";" punctuation.separator.q
+  58 "g" -
+  59 ":" keyword.operator.assignment.q
+  60 "`g" storage.modifier.attribute.q
+  62 "#" keyword.operator.q
+  63 "`p`q`p" constant.language.symbol.q
+  69 ")" -
+> table.stringColumn:([] s:("ab";"c"); n:1 2)
+  0 "table.stringColumn" -
+  18 ":" keyword.operator.assignment.q
+  19 "([] " -
+  23 "s" -
+  24 ":" keyword.operator.assignment.q
+  25 "(" -
+  26 "\"" string.quoted.double.q
+  27 "ab" string.quoted.double.q
+  29 "\"" string.quoted.double.q
+  30 ";" punctuation.separator.q
+  31 "\"" string.quoted.double.q
+  32 "c" string.quoted.double.q
+  33 "\"" string.quoted.double.q
+  34 ")" -
+  35 ";" punctuation.separator.q
+  37 "n" -
+  38 ":" keyword.operator.assignment.q
+  39 "1" constant.numeric.number.q
+  41 "2" constant.numeric.number.q
+  42 ")" -
+> table.nestedColumn:([] v:(1 2;3 4 5))
+  0 "table.nestedColumn" -
+  18 ":" keyword.operator.assignment.q
+  19 "([] " -
+  23 "v" -
+  24 ":" keyword.operator.assignment.q
+  25 "(" -
+  26 "1" constant.numeric.number.q
+  28 "2" constant.numeric.number.q
+  29 ";" punctuation.separator.q
+  30 "3" constant.numeric.number.q
+  32 "4" constant.numeric.number.q
+  34 "5" constant.numeric.number.q
+  35 "))" -
+> / -8! sends an enumeration as plain symbols
+  0 "/ -8! sends an enumeration as plain symbols" comment.line.slash.q
 > table.enumerated:([] sym:`.corpus.domain?`a`b`a)
   0 "table.enumerated" -
   16 ":" keyword.operator.assignment.q
@@ -858,6 +1301,8 @@
   0 "fn.builtin" -
   10 ":" keyword.operator.assignment.q
   11 "count" support.function.builtin.q
+> / The same value as fn.implicit, for the grammar's dotted name
+  0 "/ The same value as fn.implicit, for the grammar's dotted name" comment.line.slash.q
 > fn.dotted:.corpus.fn.implicit
   0 "fn.dotted" -
   9 ":" keyword.operator.assignment.q
@@ -1078,15 +1523,17 @@
   28 "1" constant.numeric.number.q
   30 "2" constant.numeric.number.q
   32 "3" constant.numeric.number.q
-> op.globalAssign:{.corpus.op.touched::1b}[]
+> op.globalAssign:{.corpus.op.touched::x;x}1b
   0 "op.globalAssign" -
   15 ":" keyword.operator.assignment.q
   16 "{" -
   17 ".corpus.op.touched" -
   35 "::" keyword.operator.assignment.q
-  37 "1b" constant.numeric.boolean.q
-  39 "}" -
-  40 "[]" -
+  37 "x" variable.parameter.implicit.q
+  38 ";" punctuation.separator.q
+  39 "x" variable.parameter.implicit.q
+  40 "}" -
+  41 "1b" constant.numeric.boolean.q
 > 
 > / Casts and internal functions
   0 "/ Casts and internal functions" comment.line.slash.q
@@ -1336,10 +1783,10 @@
   11 ":" keyword.operator.assignment.q
   12 "til" support.function.builtin.q
   16 "2000" constant.numeric.number.q
-> large.symbols:1000#`a`b`c
+> large.symbols:3000#`a`b`c
   0 "large.symbols" -
   13 ":" keyword.operator.assignment.q
-  14 "1000" constant.numeric.number.q
+  14 "3000" constant.numeric.number.q
   18 "#" keyword.operator.q
   19 "`a`b`c" constant.language.symbol.q
 > large.table:([] sym:300#`a`b`c; price:300#1.5 2.5; size:til 300)
@@ -1437,14 +1884,14 @@
 > 
 > \d .corpus.nested.deeper
   0 "\\d" meta.preprocessor.system.q
-  3 ".corpus.nested.deeper" -
+  2 " .corpus.nested.deeper" -
 > answer:42
   0 "answer" -
   6 ":" keyword.operator.assignment.q
   7 "42" constant.numeric.number.q
 > \d .
   0 "\\d" meta.preprocessor.system.q
-  3 "." -
+  2 " ." -
 > .corpus.nested.direct:{.corpus.nested.deeper.answer}[]
   0 ".corpus.nested.direct" -
   21 ":" keyword.operator.assignment.q

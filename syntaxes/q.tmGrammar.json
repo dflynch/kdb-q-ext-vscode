@@ -79,9 +79,6 @@
           "patterns": [
             {
               "include": "#comments"
-            },
-            {
-              "match": "\\.\\w*(?:\\.\\w+)*"
             }
           ]
         },
@@ -269,11 +266,11 @@
         },
         {
           "name": "constant.numeric.null.q",
-          "match": "(?:0N[hijefcpmdznuvtg]?|0n)(?!\\w)"
+          "match": "0[Nn][hijefcpmdznuvtg]?(?!\\w)"
         },
         {
           "name": "constant.numeric.infinity.q",
-          "match": "-?(?:0W[hijefcpmdznuvt]?|0w)(?!\\w)"
+          "match": "-?0[Ww][hijefcpmdznuvt]?(?!\\w)"
         },
         {
           "name": "constant.numeric.boolean.q",
@@ -293,19 +290,19 @@
       "patterns": [
         {
           "name": "support.class.namespace.http.q",
-          "match": "\\.h\\.(?:HOME|br|c0|c1|cd|code|d|data|eb|ec|ed|edsn|es|ex|fram|ha|hb|hc|he|hn|hnz|hp|hr|ht|hta|htac|htc|html|http|hu|hug|hy|iso8601|jx|ka|logo|nbr|pre|sa|sb|sc|td|text|tx|ty|uh|val|xd|xmp|xs|xt)\\b"
+          "match": "\\.h\\.(?:HOME|br|c0|c1|cd|code|d|data|eb|ec|ed|edsn|es|ex|fram|ha|hb|hc|he|hn|hnz|hp|hr|ht|hta|htac|htc|html|http|hu|hug|hy|iso8601|jx|ka|logo|nbr|pre|sa|sb|sc|td|text|tx|ty|uh|val|xd|xmp|xs|xt)(?![\\w.])"
         },
         {
           "name": "support.class.namespace.json.q",
-          "match": "\\.j\\.(?:J|e|es|j|jd|k|q|s)\\b"
+          "match": "\\.j\\.(?:J|e|es|j|jd|k|q|s)(?![\\w.])"
         },
         {
           "name": "support.class.namespace.utilities.q",
-          "match": "\\.Q\\.(?:A|Aa|BP|DL|IN|K|L|L1|Ll|Lp|Ls|Lu|Lx|M|MAP|S|V|a|a0|a1|a2|addmonths|addr|ajf0|an|atob|b6|bc|bd|bp|bs|bt|btoa|btx|bu|bv|bvfp|bvi|cN|cfg|chk|cn|d0|dbg|dd|def|dpft|dpfts|dpt|dpts|dr|dsftg|dt|dw|en|ens|enx|enxs|err|f|fc|ff|fk|fl|fln|fmt|fobj|foo|fp|fpn|fps|fqk|fql|fs|fsn|ft|fu|gc|gz|hap|hdpf|hg|hmb|host|hp|id|ind|ipc|j10|j12|jl8|jp|k|l|ld|li|lim|lo|lu|m|n|nA|nct|nv|o|objp|opt|ord|p|p1|p2|par|pcnt|pfc|pl|pl0|pm|prf0|prr|ps|pt|q0|qO|qa|qb|qd|qe|qk|qp|qt|res|rp|s|s1|s2|sbt|sha1|sp|srr|sw|sx|t|t0|tab|tel|trp|trpd|ts|tt|tx|ty|ua|unm|v|view|vt|w|x0|x1|x10|x12|x2|xy)\\b"
+          "match": "\\.Q\\.(?:A|Aa|BP|DL|IN|K|L|L1|Ll|Lp|Ls|Lu|Lx|M|MAP|S|V|a|a0|a1|a2|addmonths|addr|ajf0|an|atob|b6|bc|bd|bp|bs|bt|btoa|btx|bu|bv|bvfp|bvi|cN|cfg|chk|cn|d0|dbg|dd|def|dpft|dpfts|dpt|dpts|dr|dsftg|dt|dw|en|ens|enx|enxs|err|f|fc|ff|fk|fl|fln|fmt|fobj|foo|fp|fpn|fps|fqk|fql|fs|fsn|ft|fu|gc|gz|hap|hdpf|hg|hmb|host|hp|id|ind|ipc|j10|j12|jl8|jp|k|l|ld|li|lim|lo|lu|m|n|nA|nct|nv|o|objp|opt|ord|p|p1|p2|par|pcnt|pfc|pl|pl0|pm|prf0|prr|ps|pt|q0|qO|qa|qb|qd|qe|qk|qp|qt|res|rp|s|s1|s2|sbt|sha1|sp|srr|sw|sx|t|t0|tab|tel|trp|trpd|ts|tt|tx|ty|ua|unm|v|view|vt|w|x0|x1|x10|x12|x2|xy)(?![\\w.])"
         },
         {
           "name": "support.class.namespace.dotz.q",
-          "match": "\\.z\\.(?:A|D|H|K|M|N|P|T|W|X|Z|a|ac|b|bm|c|d|e|ex|exit|ey|f|h|i|k|l|m|n|o|p|pc|pd|pg|ph|pi|pm|po|pp|pq|ps|pw|q|r|s|t|ts|u|v|vs|w|wc|wo|ws|x|z|zd)\\b"
+          "match": "\\.z\\.(?:A|D|H|K|M|N|P|T|W|X|Z|a|ac|b|bm|c|d|e|ex|exit|ey|f|h|i|k|l|m|n|o|p|pc|pd|pg|ph|pi|pm|po|pp|pq|ps|pw|q|r|s|t|ts|u|v|vs|w|wc|wo|ws|x|z|zd)(?![\\w.])"
         }
       ]
     },

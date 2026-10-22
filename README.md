@@ -13,10 +13,11 @@ alongside it. Today it highlights q, edits it and runs it in a terminal (see
 
 - Connecting to a kdb+ process and running a query against it
 - Results in a grid, shown as the q console shows them, using q's default
-  display settings: a long keeps every digit, a timestamp keeps its
-  nanoseconds, and a null shows which type of null it is. Copying a selection
-  copies the text you see. The aim is a faithful view of the result, not
-  text that's promised to read back into q
+  display settings: a long keeps every digit and a timestamp keeps its
+  nanoseconds. One deliberate difference: where the console leaves a null
+  blank in a table, the grid shows which type of null it is. Copying a
+  selection copies the text you see. The aim is a faithful view of the
+  result, not text that's promised to read back into q
 - Go to definition, references, outline and workspace symbol search that
   follow q's namespaces and know which names are local to a lambda
 

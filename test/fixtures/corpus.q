@@ -1,6 +1,6 @@
 / Corpus of q for the grammar snapshot and the codec fixtures.
 / Every value lives under .corpus, where fixtures.q walks it with key.
-/ It must load cleanly: q -q test/fixtures/corpus.q
+/ It must load cleanly: npm run fixtures fails if it doesn't.
 / After a change, run npm run fixtures and UPDATE_SNAPSHOT=1 npm test
 
 \d .corpus
@@ -37,7 +37,8 @@ temporal.negativeSecond:-00:00:01
 temporal.longTime:25:00:00.000
 temporal.negativeTime:-12:34:56.789
 temporal.preEpochDate:1999.12.31
-temporal.preEpochTimestamp:1970.01.01D00:00:00.000000000
+temporal.preEpochTimestamp:1999.12.31D23:59:59.999999999
+temporal.unixEpoch:1970.01.01D00:00:00.000000000
 
 / Vectors, one per type
 vector.boolean:101b
@@ -58,8 +59,6 @@ vector.timespan:0D00:00:01 0D00:00:02
 vector.minute:12:00 12:01
 vector.second:12:00:00 12:00:01
 vector.time:12:00:00.000 12:00:00.001
-vector.emptyLong:`long$()
-vector.emptySymbol:`$()
 vector.singleton:enlist 42
 
 / Typed nulls
@@ -81,7 +80,7 @@ null.timespan:0Nn
 null.minute:0Nu
 null.second:0Nv
 null.time:0Nt
-null.vector:1 0N 3
+null.generic:(::)
 
 / Infinities, positive and negative
 infinity.short:0Wh
@@ -98,14 +97,67 @@ infinity.negativeFloat:-0w
 infinity.floatSuffixed:0Wf
 infinity.negativeFloatSuffixed:-0Wf
 infinity.timestamp:0Wp
+infinity.negativeTimestamp:-0Wp
 infinity.month:0Wm
+infinity.negativeMonth:-0Wm
 infinity.date:0Wd
+infinity.negativeDate:-0Wd
 infinity.datetime:0Wz
+infinity.negativeDatetime:-0wz
 infinity.timespan:0Wn
 infinity.negativeTimespan:-0Wn
 infinity.minute:0Wu
+infinity.negativeMinute:-0Wu
 infinity.second:0Wv
+infinity.negativeSecond:-0Wv
 infinity.time:0Wt
+infinity.negativeTime:-0Wt
+
+/ Nulls and infinities inside vectors, where q drops the type suffix
+special.short:0N 0W -0W 1h
+special.int:0N 0W -0W 1i
+special.long:0N 0W -0W 1
+special.real:0N 0w -0w 1e
+special.float:0n 0w -0w 1
+special.timestamp:(0Np;0Wp;-0Wp;2026.10.22D00:00)
+special.month:(0Nm;0Wm;-0Wm;2026.10m)
+special.date:(0Nd;0Wd;-0Wd;2026.10.22)
+special.datetime:(0Nz;0Wz;-0Wz;2026.10.22T00:00:00.000)
+special.timespan:(0Nn;0Wn;-0Wn;0D01)
+special.minute:(0Nu;0Wu;-0Wu;12:00)
+special.second:(0Nv;0Wv;-0Wv;12:00:00)
+special.time:(0Nt;0Wt;-0Wt;12:00:00.000)
+special.symbol:`a``c
+special.guid:(0Ng;"G"$"0a369037-75d3-b24d-6721-5a1d44d4bed5")
+
+/ Empty vectors, which q shows with a cast
+empty.boolean:`boolean$()
+empty.guid:`guid$()
+empty.byte:`byte$()
+empty.short:`short$()
+empty.int:`int$()
+empty.long:`long$()
+empty.real:`real$()
+empty.float:`float$()
+empty.char:""
+empty.symbol:`$()
+empty.timestamp:`timestamp$()
+empty.month:`month$()
+empty.date:`date$()
+empty.datetime:`datetime$()
+empty.timespan:`timespan$()
+empty.minute:`minute$()
+empty.second:`second$()
+empty.time:`time$()
+
+/ Floats that q rounds or writes in exponent form
+float.negativeZero:-0.0
+float.negativeZeroVector:-0.0 1
+float.rounded:1.23456789
+float.large:123456789.0
+float.small:1e-5
+float.sum:0.1+0.2
+float.realRounded:1.23456789e
 
 / Strings and escapes
 string.empty:""
@@ -114,6 +166,7 @@ string.octal:"\001\377"
 string.slashes:"a / b \\ c"
 string.multiLine:"first
  second"
+string.utf8:"Ã©tÃ©"
 
 / Symbols and file handles
 symbol.dotted:`.corpus.atom
@@ -122,6 +175,7 @@ symbol.withColon:`a:b
 symbol.handle:`:data/trades.csv
 symbol.hostPort:`:localhost:5000
 symbol.cast:`$"with space"
+symbol.utf8:`$"Ã©tÃ©"
 
 / Attributes
 attribute.sorted:`s#1 2 3
@@ -133,14 +187,22 @@ attribute.grouped:`g#`a`b`a
 list.mixed:(1;`a;"b";2.5)
 list.nested:(1 2;(3;`c);())
 list.empty:()
+list.dictAndTable:(`a`b!1 2;([] x:1 2))
 dict.simple:`a`b`c!1 2 3
 dict.mixed:`a`b!(1;"two")
 dict.empty:(`symbol$())!()
+dict.sorted:`s#`a`b!1 2
+dict.nonSymbolKeys:1 2!`a`b
 table.trades:([] sym:`a`b`a; price:1.5 2.5 3.5; size:100 200 300)
 table.flipped:flip `x`y!(1 2;`p`q)
 table.empty:([] sym:`symbol$(); price:`float$())
 table.keyed:([sym:`a`b] price:1.5 2.5)
 table.multiKeyed:([sym:`a`b; ex:`n`l] price:1.5 2.5)
+table.sortedKeyed:`s#([sym:`a`b] price:1.5 2.5)
+table.attributes:([] p:`p#1 1 2; s:`s#1 2 3; u:`u#`x`y`z; g:`g#`p`q`p)
+table.stringColumn:([] s:("ab";"c"); n:1 2)
+table.nestedColumn:([] v:(1 2;3 4 5))
+/ -8! sends an enumeration as plain symbols
 table.enumerated:([] sym:`.corpus.domain?`a`b`a)
 
 / Functions: implicit and explicit parameters, projections and compositions
@@ -165,6 +227,7 @@ fn.prior:-':
 fn.eachRight:,/:
 fn.eachLeft:,\:
 fn.builtin:count
+/ The same value as fn.implicit, for the grammar's dotted name
 fn.dotted:.corpus.fn.implicit
 
 / Operators and iterators
@@ -185,7 +248,7 @@ op.eachLeft:1 2,\:3 4
 op.eachPrior:-':[1 4 9]
 op.amend:@[1 2 3;1;:;20]
 op.amendInPlace:{x[1]+:10;x}1 2 3
-op.globalAssign:{.corpus.op.touched::1b}[]
+op.globalAssign:{.corpus.op.touched::x;x}1b
 
 / Casts and internal functions
 cast.lowercase:"j"$4.2
@@ -215,7 +278,7 @@ qsql.functional:?[table.trades;();0b;()]
 
 / Large values, which -18! compresses
 large.longs:til 2000
-large.symbols:1000#`a`b`c
+large.symbols:3000#`a`b`c
 large.table:([] sym:300#`a`b`c; price:300#1.5 2.5; size:til 300)
 
 / System namespaces
