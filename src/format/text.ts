@@ -20,19 +20,31 @@ import * as temporal from "./temporal";
 // Text is written into a Text that stops taking more once it's full, so a
 // large vector costs only as much as the part that's shown.
 
+// How much text to take: lines past the limit, and the end of a line
+// wider than width, are cut
+export type Size = { lines: number; width: number };
+
 class Text {
   private parts: string[] = [];
-  private length = 0;
+  private lines = 1;
+  // The length of the last line
+  private line = 0;
 
-  constructor(private limit = Number.POSITIVE_INFINITY) {}
+  constructor(private size: Size) {}
 
   get full(): boolean {
-    return this.length > this.limit;
+    return this.line > this.size.width || this.lines > this.size.lines;
   }
 
   put(text: string): void {
     this.parts.push(text);
-    this.length += text.length;
+    const end = text.lastIndexOf("\n");
+    if (end < 0) {
+      this.line += text.length;
+    } else {
+      this.lines += text.split("\n").length - 1;
+      this.line = text.length - end - 1;
+    }
   }
 
   toString(): string {
@@ -40,9 +52,15 @@ class Text {
   }
 }
 
-// q's form of a value, with at least limit characters of it when it's longer
-export function qText(value: Value, limit?: number): string {
-  const text = new Text(limit);
+// q's form of a value, with at least as much of it as fits the size
+export function qText(
+  value: Value,
+  size: Size = {
+    lines: Number.POSITIVE_INFINITY,
+    width: Number.POSITIVE_INFINITY,
+  },
+): string {
+  const text = new Text(size);
   write(value, text);
   return text.toString();
 }
@@ -133,22 +151,39 @@ function special(type: number, x: unknown): Special {
 
 // A float as C's %.7g writes it, q's default \P 7: seven significant
 // digits, trailing zeros dropped, and exponent form for the very large and
-// the very small
+// the very small. JavaScript rounds as C does except for an exact tie,
+// which C rounds to even: 1000.0625 is 1000.062.
 function float(x: number): string {
   if (x === 0) {
     return Object.is(x, -0) ? "-0" : "0";
   }
-  const [mantissa, power] = x.toExponential(6).split("e");
-  const exponent = Number(power);
-  if (exponent < -4 || exponent >= 7) {
-    const sign = exponent < 0 ? "-" : "+";
-    return `${trim(mantissa)}e${sign}${String(Math.abs(exponent)).padStart(2, "0")}`;
+  // Twenty digits after the first are past a double's precision, so a tie
+  // shows as a 5 then zeros
+  const [m, e] = Math.abs(x).toExponential(20).split("e");
+  const all = m.replace(".", "");
+  const rest = all.slice(7);
+  const tie = /^50*$/.test(rest);
+  const up = rest[0] >= "5" && (!tie || Number(all[6]) % 2 === 1);
+  let digits = String(Number(all.slice(0, 7)) + (up ? 1 : 0));
+  let exponent = Number(e);
+  if (digits.length > 7) {
+    digits = digits.slice(0, 7);
+    exponent += 1;
   }
-  return trim(x.toFixed(6 - exponent));
+  const sign = x < 0 ? "-" : "";
+  if (exponent < -4 || exponent >= 7) {
+    const power = `${exponent < 0 ? "-" : "+"}${String(Math.abs(exponent)).padStart(2, "0")}`;
+    return `${sign}${trim(`${digits[0]}.${digits.slice(1)}`)}e${power}`;
+  }
+  const point =
+    exponent < 0
+      ? `0.${"0".repeat(-exponent - 1)}${digits}`
+      : `${digits.slice(0, exponent + 1)}.${digits.slice(exponent + 1)}`;
+  return `${sign}${trim(point)}`;
 }
 
 function trim(digits: string): string {
-  return digits.includes(".") ? digits.replace(/\.?0+$/, "") : digits;
+  return digits.includes(".") ? digits.replace(/\.?0*$/, "") : digits;
 }
 
 function hex(byte: number): string {
@@ -420,14 +455,14 @@ function list(l: List, text: Text): void {
   text.put(")");
 }
 
-// A dictionary's keys go in brackets when they'd otherwise run into the !,
-// as a singleton's comma or a table's flip would
+// A dictionary's keys go in brackets, as q puts them, when they're a table,
+// a dictionary, or a vector of fewer than two
 function keys(value: Value, text: Text): void {
   const bracket =
     value.type === 98 ||
     value.type === 99 ||
     value.type === 127 ||
-    count(value) === 1;
+    (value.type > 0 && value.type <= 19 && (count(value) ?? 0) < 2);
   if (bracket) {
     text.put("(");
   }
@@ -475,8 +510,7 @@ function fn(f: QFunction, text: Text): void {
         if (
           i < f.parts.length - 1 &&
           part.type === 101 &&
-          part.code >= 1 &&
-          part.code <= 19
+          unaries[part.code]?.endsWith(":")
         ) {
           text.put(unaries[part.code].slice(0, -1));
         } else {

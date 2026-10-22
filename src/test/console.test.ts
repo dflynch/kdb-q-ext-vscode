@@ -98,6 +98,16 @@ suite("console text", () => {
     );
   });
 
+  test("a projection of a large vector stops at the width", () => {
+    const projection: Value = {
+      type: 104,
+      parts: [{ type: 100, context: "", source: "{x+y}" }, longs(10_000_000)],
+    };
+    const start = performance.now();
+    assert.strictEqual(show(projection).length, 5000);
+    assert.ok(performance.now() - start < 100);
+  });
+
   test("a multi-line lambda's lines count against the limit", () => {
     assert.strictEqual(
       show(value("fn.multiLine"), { lines: 3, width: 10 }),

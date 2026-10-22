@@ -305,6 +305,10 @@ display.oneRow:enlist (1;`a)
 display.nested:(`a`b!1 2;([] x:1 2);([k:1 2] v:3 4);`s#`a`b!1 2;{x+y}[1];+[;1])
 display.compositions:('[neg;abs];'[count;+];'[{x};neg];neg abs@)
 display.emptyItems:(1;`long$();"";`symbol$();0x)
+display.cube:3 2 2#til 12
+display.cubeUneven:((1 22;3 4);(5 6;7 8))
+display.dictKeys:((enlist 1 2)!enlist 3;(enlist "ab")!enlist 2;(`long$())!`long$();(`$())!())
+display.compositionColons:('[::;neg];'[(0::);neg])
 
 / Floats and temporal values at q's edges
 float.exponentLarge:1e300
@@ -313,6 +317,10 @@ float.wholeLarge:1000000f
 float.roundedWhole:1234567.8
 float.realExponent:123456789e
 float.realNegativeZero:-0e
+/ C rounds an exact tie to even
+float.tie:1000.0625
+float.tieWhole:1234566.5
+float.realTie:-86463.625e
 temporal.firstDate:0001.01.01
 temporal.lastDate:9999.12.31
 temporal.outOfRange:9999.12.31+1
@@ -325,6 +333,7 @@ temporal.longestTimespan:"n"$0W-1
 temporal.datetimeRoundsUp:`datetime$0.00000001157
 temporal.datetimeTruncates:`datetime$0.99999999999
 temporal.datetimeNegative:`datetime$-0.0000000057
+temporal.datetimeOutOfRange:"z"$-923892.12
 temporal.allNullDates:2#0Nd
 temporal.allInfiniteDatetimes:2#0Wz
 

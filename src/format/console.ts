@@ -5,13 +5,13 @@ import {
   type Value,
   type Vector,
 } from "../codec/types";
-import { cell, qText } from "./text";
+import { cell, qText, type Size } from "./text";
 
-// How much of a value to show, as q's \c sets for its console: lines past
-// the first lines - 1 become .., and so does the end of a line wider than
-// width. The panel scrolls, so both are far beyond q's 25 by 80.
-export type Size = { lines: number; width: number };
+export type { Size };
 
+// How much of a value to show, like q's \c for its console but far larger,
+// as the panel scrolls: lines past the first lines - 1 become .., and so
+// does the end of a line wider than width
 export const defaultSize: Size = { lines: 5000, width: 5000 };
 
 // A value as the q console shows it, for any result but a table or a
@@ -21,9 +21,8 @@ export function show(value: Value, size: Size = defaultSize): string {
   if (value.type === 101 && value.code === 0) {
     return "";
   }
-  // Only a function's text can run over lines, a lambda's source as written
-  const limit = value.type >= 100 ? size.width * size.lines : size.width;
-  const lines = value.type === 0 ? column(value, size) : [qText(value, limit)];
+  // Only a lambda's source, as written, runs over lines
+  const lines = value.type === 0 ? column(value, size) : [qText(value, size)];
   return cut(
     lines.flatMap((line) => line.split("\n")),
     size,
@@ -47,22 +46,10 @@ function column(list: List, size: Size): string[] {
   const shown = Math.min(count(list) ?? 0, size.lines + 1);
   if (!("items" in list) || !matrix(list.items)) {
     return Array.from({ length: shown }, (_, i) =>
-      qText(itemAt(list, i), size.width),
+      qText(itemAt(list, i), size),
     );
   }
-  const rows = list.items.slice(0, shown) as (Vector | List)[];
-  const flat = rows.map((row) => row.type === 0 && matrix(itemsOf(row)));
-  const length = count(rows[0]) ?? 0;
-  const lines = rows.map(() => "");
-  // Column by column, until the lines are full
-  for (let j = 0; j < length && lines[0].length <= size.width; j++) {
-    const cells = rows.map((row, i) => entry(row, j, flat[i], size.width));
-    const width = Math.max(...cells.map((c) => c.length));
-    cells.forEach((c, i) => {
-      lines[i] += (j ? " " : "") + c.padEnd(width);
-    });
-  }
-  return lines;
+  return layout(list.items.slice(0, shown) as (Vector | List)[], size);
 }
 
 // Whether items are a matrix's rows: lists all of the same length, other
@@ -80,36 +67,32 @@ function matrix(items: Value[]): boolean {
   );
 }
 
-// The jth entry of a matrix's row. A vector's element is a cell, a list's
-// item is in q's form, and the item of a row that's a matrix itself is
-// flattened into cells.
-function entry(
-  row: Vector | List,
-  j: number,
-  flat: boolean,
-  limit: number,
-): string {
-  if (row.type !== 0) {
-    return cell(row, j);
+// A matrix's lines. A vector's element is a cell and a list's item is in
+// q's form, but a row that's a matrix itself is laid out as one, its jth
+// line its jth entry, so a 3-D array lines up as q's does.
+function layout(rows: (Vector | List)[], size: Size): string[] {
+  const length = count(rows[0]) ?? 0;
+  // Each entry takes at least a character and a space
+  const columns = Math.min(length, size.width);
+  const inner = rows.map((row) =>
+    row.type === 0 && "items" in row && matrix(row.items)
+      ? layout(row.items.slice(0, columns) as (Vector | List)[], size)
+      : undefined,
+  );
+  const lines = rows.map(() => "");
+  // Column by column, until the lines are full
+  for (let j = 0; j < columns && lines[0].length <= size.width; j++) {
+    const cells = rows.map((row, i) =>
+      row.type !== 0
+        ? cell(row, j)
+        : (inner[i]?.[j] ?? qText(itemAt(row, j), size)),
+    );
+    const width = Math.max(...cells.map((c) => c.length));
+    cells.forEach((c, i) => {
+      lines[i] += (j ? " " : "") + c.padEnd(width);
+    });
   }
-  const item = itemAt(row, j);
-  return flat ? cells(item as Vector | List, limit) : qText(item, limit);
-}
-
-// A list as cells side by side, flattening any matrix in it
-function cells(list: Vector | List, limit: number): string {
-  const flat = list.type === 0 && matrix(itemsOf(list));
-  const n = count(list) ?? 0;
-  const parts: string[] = [];
-  for (let j = 0, length = 0; j < n && length <= limit; j++) {
-    parts.push(entry(list, j, flat, limit));
-    length += parts[j].length + 1;
-  }
-  return parts.join(" ");
-}
-
-function itemsOf(list: List): Value[] {
-  return "items" in list ? list.items : [];
+  return lines;
 }
 
 // A list's ith item, with a list of strings' as a char vector

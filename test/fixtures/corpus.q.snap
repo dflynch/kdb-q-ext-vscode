@@ -2151,6 +2151,89 @@
   44 ";" punctuation.separator.q
   45 "0x" constant.numeric.byte.q
   47 ")" -
+> display.cube:3 2 2#til 12
+  0 "display.cube" -
+  12 ":" keyword.operator.assignment.q
+  13 "3" constant.numeric.number.q
+  15 "2" constant.numeric.number.q
+  17 "2" constant.numeric.number.q
+  18 "#" keyword.operator.q
+  19 "til" support.function.builtin.q
+  23 "12" constant.numeric.number.q
+> display.cubeUneven:((1 22;3 4);(5 6;7 8))
+  0 "display.cubeUneven" -
+  18 ":" keyword.operator.assignment.q
+  19 "((" -
+  21 "1" constant.numeric.number.q
+  23 "22" constant.numeric.number.q
+  25 ";" punctuation.separator.q
+  26 "3" constant.numeric.number.q
+  28 "4" constant.numeric.number.q
+  29 ")" -
+  30 ";" punctuation.separator.q
+  31 "(" -
+  32 "5" constant.numeric.number.q
+  34 "6" constant.numeric.number.q
+  35 ";" punctuation.separator.q
+  36 "7" constant.numeric.number.q
+  38 "8" constant.numeric.number.q
+  39 "))" -
+> display.dictKeys:((enlist 1 2)!enlist 3;(enlist "ab")!enlist 2;(`long$())!`long$();(`$())!())
+  0 "display.dictKeys" -
+  16 ":" keyword.operator.assignment.q
+  17 "((" -
+  19 "enlist" support.function.builtin.q
+  26 "1" constant.numeric.number.q
+  28 "2" constant.numeric.number.q
+  29 ")" -
+  30 "!" keyword.operator.q
+  31 "enlist" support.function.builtin.q
+  38 "3" constant.numeric.number.q
+  39 ";" punctuation.separator.q
+  40 "(" -
+  41 "enlist" support.function.builtin.q
+  48 "\"" string.quoted.double.q
+  49 "ab" string.quoted.double.q
+  51 "\"" string.quoted.double.q
+  52 ")" -
+  53 "!" keyword.operator.q
+  54 "enlist" support.function.builtin.q
+  61 "2" constant.numeric.number.q
+  62 ";" punctuation.separator.q
+  63 "(" -
+  64 "`long" support.type.cast.q
+  69 "$" keyword.operator.q
+  70 "())" -
+  73 "!" keyword.operator.q
+  74 "`long" support.type.cast.q
+  79 "$" keyword.operator.q
+  80 "()" -
+  82 ";" punctuation.separator.q
+  83 "(" -
+  84 "`" support.type.cast.q
+  85 "$" keyword.operator.q
+  86 "())" -
+  89 "!" keyword.operator.q
+  90 "())" -
+> display.compositionColons:('[::;neg];'[(0::);neg])
+  0 "display.compositionColons" -
+  25 ":" keyword.operator.assignment.q
+  26 "(" -
+  27 "'" keyword.operator.iterator.q
+  28 "[" -
+  29 "::" keyword.operator.assignment.q
+  31 ";" punctuation.separator.q
+  32 "neg" support.function.builtin.q
+  35 "]" -
+  36 ";" punctuation.separator.q
+  37 "'" keyword.operator.iterator.q
+  38 "[(" -
+  40 "0:" support.function.builtin.io.q
+  42 ":" keyword.operator.assignment.q
+  43 ")" -
+  44 ";" punctuation.separator.q
+  45 "neg" support.function.builtin.q
+  48 "])" -
 > 
 > / Floats and temporal values at q's edges
   0 "/ Floats and temporal values at q's edges" comment.line.slash.q
@@ -2178,6 +2261,20 @@
   0 "float.realNegativeZero" -
   22 ":" keyword.operator.assignment.q
   23 "-0e" constant.numeric.number.q
+> / C rounds an exact tie to even
+  0 "/ C rounds an exact tie to even" comment.line.slash.q
+> float.tie:1000.0625
+  0 "float.tie" -
+  9 ":" keyword.operator.assignment.q
+  10 "1000.0625" constant.numeric.number.q
+> float.tieWhole:1234566.5
+  0 "float.tieWhole" -
+  14 ":" keyword.operator.assignment.q
+  15 "1234566.5" constant.numeric.number.q
+> float.realTie:-86463.625e
+  0 "float.realTie" -
+  13 ":" keyword.operator.assignment.q
+  14 "-86463.625e" constant.numeric.number.q
 > temporal.firstDate:0001.01.01
   0 "temporal.firstDate" -
   18 ":" keyword.operator.assignment.q
@@ -2252,6 +2349,12 @@
   26 "`datetime" support.type.cast.q
   35 "$" keyword.operator.q
   36 "-0.0000000057" constant.numeric.number.q
+> temporal.datetimeOutOfRange:"z"$-923892.12
+  0 "temporal.datetimeOutOfRange" -
+  27 ":" keyword.operator.assignment.q
+  28 "\"z\"" support.type.cast.q
+  31 "$" keyword.operator.q
+  32 "-923892.12" constant.numeric.number.q
 > temporal.allNullDates:2#0Nd
   0 "temporal.allNullDates" -
   21 ":" keyword.operator.assignment.q

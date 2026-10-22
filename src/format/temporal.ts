@@ -90,7 +90,8 @@ export function datetime(days: number): string {
   const us = Math.round(days * 86_400_000_000);
   const ms = Math.floor(us / 1000);
   const whole = Math.floor(ms / 86_400_000);
-  const rest = ms - whole * 86_400_000;
+  // Outside q's dates the time is zeros too
+  const rest = date(whole).startsWith("0000") ? 0 : ms - whole * 86_400_000;
   return `${date(whole)}T${clock(Math.floor(rest / 1000), 3)}.${digits(rest % 1000, 3)}`;
 }
 
