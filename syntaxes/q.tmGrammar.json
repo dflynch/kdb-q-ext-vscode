@@ -9,28 +9,7 @@
       "include": "#commands"
     },
     {
-      "include": "#lambdas"
-    },
-    {
-      "include": "#casts"
-    },
-    {
-      "include": "#strings"
-    },
-    {
-      "include": "#keywords"
-    },
-    {
-      "include": "#literals"
-    },
-    {
-      "include": "#namespaces"
-    },
-    {
-      "include": "#variables"
-    },
-    {
-      "include": "#punctuation"
+      "include": "#expression"
     }
   ],
   "repository": {
@@ -59,6 +38,34 @@
         }
       ]
     },
+    "expression": {
+      "patterns": [
+        {
+          "include": "#lambdas"
+        },
+        {
+          "include": "#casts"
+        },
+        {
+          "include": "#strings"
+        },
+        {
+          "include": "#keywords"
+        },
+        {
+          "include": "#literals"
+        },
+        {
+          "include": "#namespaces"
+        },
+        {
+          "include": "#variables"
+        },
+        {
+          "include": "#punctuation"
+        }
+      ]
+    },
     "commands": {
       "patterns": [
         {
@@ -79,28 +86,10 @@
           "end": "$",
           "patterns": [
             {
-              "include": "#lambdas"
+              "include": "#comments"
             },
             {
-              "include": "#casts"
-            },
-            {
-              "include": "#strings"
-            },
-            {
-              "include": "#keywords"
-            },
-            {
-              "include": "#literals"
-            },
-            {
-              "include": "#namespaces"
-            },
-            {
-              "include": "#variables"
-            },
-            {
-              "include": "#punctuation"
+              "include": "#expression"
             }
           ]
         },
@@ -219,7 +208,7 @@
         },
         {
           "name": "support.function.builtin.q",
-          "match": "\\b(?:each|over|scan|prior|peach|abs|acos|aj|aj0|ajf|ajf0|all|and|any|asc|asin|asof|atan|attr|avg|avgs|bin|binr|ceiling|cols|cor|cos|count|cov|cross|csv|cut|delete|deltas|desc|dev|differ|distinct|div|dsave|ej|ema|enlist|eval|except|exec|exp|fby|fills|first|fkeys|flip|floor|get|getenv|group|gtime|hclose|hcount|hdel|hopen|hsym|iasc|idesc|ij|ijf|in|insert|inter|inv|key|keys|last|like|lj|ljf|load|log|lower|lsq|ltime|ltrim|mavg|max|maxs|mcount|md5|mdev|med|meta|min|mins|mmax|mmin|mmu|mod|msum|neg|next|not|null|or|parse|pj|prd|prds|prev|rand|rank|ratios|raze|read0|read1|reciprocal|reval|reverse|rload|rotate|rsave|rtrim|save|scov|sdev|select|set|setenv|show|signum|sin|sqrt|ss|ssr|string|sublist|sum|sums|sv|svar|system|tables|tan|til|trim|type|uj|ujf|ungroup|union|update|upper|upsert|value|var|view|views|vs|wavg|where|within|wj|wj1|wsum|ww|xasc|xbar|xcol|xcols|xdesc|xexp|xgroup|xkey|xlog|xprev|xrank)\\b"
+          "match": "\\b(?:each|over|scan|prior|peach|abs|acos|aj|aj0|ajf|ajf0|all|and|any|asc|asin|asof|atan|attr|avg|avgs|bin|binr|ceiling|cols|cor|cos|count|cov|cross|csv|cut|deltas|desc|dev|differ|distinct|div|dsave|ej|ema|enlist|eval|except|exp|fby|fills|first|fkeys|flip|floor|get|getenv|group|gtime|hclose|hcount|hdel|hopen|hsym|iasc|idesc|ij|ijf|in|insert|inter|inv|key|keys|last|like|lj|ljf|load|log|lower|lsq|ltime|ltrim|mavg|max|maxs|mcount|md5|mdev|med|meta|min|mins|mmax|mmin|mmu|mod|msum|neg|next|not|null|or|parse|pj|prd|prds|prev|rand|rank|ratios|raze|read0|read1|reciprocal|reval|reverse|rload|rotate|rsave|rtrim|save|scov|sdev|set|setenv|show|signum|sin|sqrt|ss|ssr|string|sublist|sum|sums|sv|svar|system|tables|tan|til|trim|type|uj|ujf|ungroup|union|upper|upsert|value|var|view|views|vs|wavg|within|wj|wj1|wsum|ww|xasc|xbar|xcol|xcols|xdesc|xexp|xgroup|xkey|xlog|xprev|xrank)\\b"
         }
       ]
     },

@@ -253,13 +253,22 @@ suite("q grammar", () => {
       ],
     ],
     [
-      "expression arguments are not comments",
-      "\\ts f /x",
+      "iterator in a timing command",
+      "\\ts f/x",
       [
         ["\\ts", "meta.preprocessor.system.q"],
         ["f", "source.q"],
         ["/", "keyword.operator.iterator.q"],
         ["x", "source.q"],
+      ],
+    ],
+    [
+      "trailing comment after a timing command",
+      "\\ts f /x",
+      [
+        ["\\ts", "meta.preprocessor.system.q"],
+        ["f", "source.q"],
+        ["/x", "comment.line.slash.q"],
       ],
     ],
     [
@@ -289,8 +298,7 @@ suite("q grammar", () => {
         ["\\ts:10", "meta.preprocessor.system.q"],
         ["f", "source.q"],
         ["x", "source.q"],
-        ["/", "keyword.operator.iterator.q"],
-        ["y", "source.q"],
+        ["/ y", "comment.line.slash.q"],
       ],
     ],
     [
