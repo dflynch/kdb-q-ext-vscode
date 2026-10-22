@@ -1,4 +1,4 @@
-# kdb-q-ext-vscode
+# Quirk: kdb+/q toolkit
 
 A lightweight extension for kdb+/q programming.
 

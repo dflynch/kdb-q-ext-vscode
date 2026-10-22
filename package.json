@@ -1,6 +1,6 @@
 {
   "name": "kdb-q-ext-vscode",
-  "displayName": "kdb+/q",
+  "displayName": "Quirk: kdb+/q toolkit",
   "description": "A lightweight extension for kdb+/q programming",
   "icon": "./icons/purple-q.png",
   "version": "1.1.0",
