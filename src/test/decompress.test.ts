@@ -50,6 +50,12 @@ suite("decompress", () => {
         /ends early/,
       );
     });
+    test("a length too short for the header", () => {
+      assert.throws(
+        () => decompress(Uint8Array.of(1, 0, 1, 0, 12, 0, 0, 0, 7, 0, 0, 0)),
+        /malformed/,
+      );
+    });
     test("data that ends early", () => {
       const message = sized(compressed("large.longs").subarray(0, -1));
       assert.throws(() => decode(message), /malformed/);

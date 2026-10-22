@@ -19,6 +19,10 @@ export function decompress(message: Uint8Array): Uint8Array {
     message.byteOffset,
     message.byteLength,
   ).getUint32(8, true);
+  // Too short to hold even the header
+  if (length < 8) {
+    throw new Error("the compressed message is malformed");
+  }
   const out = new Uint8Array(length);
   out.set(message.subarray(0, 4));
   out[2] = 0;
