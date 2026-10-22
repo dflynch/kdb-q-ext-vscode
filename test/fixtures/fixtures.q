@@ -1,9 +1,11 @@
-/ Writes corpus.ipc.json: each value in corpus.q with its -8! bytes, and its
-/ -18! bytes where q compresses them. The header records the md5 of this
+/ Writes corpus.ipc.json: each value in corpus.q with its -8! bytes, its
+/ -18! bytes where q compresses them, and the console's text for it. The header records the md5 of this
 / script and of the corpus, and the q version that wrote the file.
 / Run after changing either script: npm run fixtures
 
 \l corpus.q
+/ The console at its largest, so that only the largest values are cut
+\c 2000 2000
 
 / A namespace is a dictionary whose first value is ::
 isNamespace:{(99h=type x) and (::)~first x}
@@ -13,7 +15,7 @@ hex:{raze string x}
 digest:{hex md5 "c"$read1 x}
 entry:{[p]
   v:get p;
-  e:`name`type`bytes!(string p;type v;hex b:-8!v);
+  e:`name`type`bytes`console!(string p;type v;hex b:-8!v;.Q.s v);
   $[b~c:-18!v; e; e,enlist[`compressed]!enlist hex c]}
 
 header:`corpus`script`q!(digest `:corpus.q;digest `:fixtures.q;string[.z.K]," ",string .z.k)
