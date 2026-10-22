@@ -61,7 +61,7 @@ export class Connection {
       // timeout would restart with every write and read
       const timer = setTimeout(
         () => fail(new Error("timeout")),
-        server.timeout ?? 5000,
+        server.timeout ?? 2000,
       );
       const login = () => {
         // Version 3: compression, timestamps, timespans and GUIDs
