@@ -27,17 +27,9 @@ export class OverLimit extends Error {
   constructor(
     readonly size: number,
     readonly limit: number,
-    compressed = false,
   ) {
-    super(
-      `the result is ${bytes(size)} bytes${compressed ? " compressed" : ""}, over the ${bytes(limit)} byte limit`,
-    );
+    super("the result is too big");
   }
-}
-
-// Exact, as rounding could show a size just over the limit as equal to it
-function bytes(n: number): string {
-  return n.toLocaleString("en-US");
 }
 
 const what = ["async message", "sync call", "response"];
@@ -190,7 +182,7 @@ export class Connection {
             );
           }
           if (length > this.limit) {
-            throw new OverLimit(length, this.limit, this.header[2] === 1);
+            throw new OverLimit(length, this.limit);
           }
           this.message = Buffer.allocUnsafe(length);
           this.header.copy(this.message);

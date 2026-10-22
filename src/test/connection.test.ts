@@ -304,7 +304,9 @@ suite("connection", () => {
       connection.query("x"),
       (error) =>
         error instanceof OverLimit &&
-        error.message === "the result is 17 bytes, over the 16 byte limit",
+        error.message === "the result is too big" &&
+        error.size === 17 &&
+        error.limit === 16,
     );
     await server.closed;
   });
@@ -326,10 +328,7 @@ suite("connection", () => {
     const connection = await limited(server, uncompressed - 1);
     await assert.rejects(
       connection.query("x"),
-      (error) =>
-        error instanceof OverLimit &&
-        error.size === uncompressed &&
-        !/compressed/.test(error.message),
+      (error) => error instanceof OverLimit && error.size === uncompressed,
     );
     await server.closed;
   });
@@ -340,13 +339,6 @@ suite("connection", () => {
     const connection = await limited(server, message.readUInt32LE(8));
     assert.strictEqual((await connection.query("x")).type, 7);
     connection.close();
-  });
-
-  test("sizes are exact, so one just over the limit doesn't read as equal to it", () => {
-    assert.strictEqual(
-      new OverLimit(10_000_001, 10e6, true).message,
-      "the result is 10,000,001 bytes compressed, over the 10,000,000 byte limit",
-    );
   });
 
   test("one query at a time", async () => {
