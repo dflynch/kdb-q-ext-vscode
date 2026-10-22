@@ -166,7 +166,7 @@ string.octal:"\001\377"
 string.slashes:"a / b \\ c"
 string.multiLine:"first
  second"
-string.utf8:"Ã©tÃ©"
+string.utf8:"\303\251t\303\251"
 
 / Symbols and file handles
 symbol.dotted:`.corpus.atom
@@ -175,7 +175,7 @@ symbol.withColon:`a:b
 symbol.handle:`:data/trades.csv
 symbol.hostPort:`:localhost:5000
 symbol.cast:`$"with space"
-symbol.utf8:`$"Ã©tÃ©"
+symbol.utf8:`$"\303\251t\303\251"
 
 / Attributes
 attribute.sorted:`s#1 2 3
