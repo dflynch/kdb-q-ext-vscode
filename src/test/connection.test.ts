@@ -220,7 +220,7 @@ suite("connection", () => {
     const connection = await open(server);
     await assert.rejects(
       connection.query("x"),
-      /the server sent an async message without being asked/,
+      /^Error: unexpected async message from the server$/,
     );
     await server.closed;
   });
@@ -234,7 +234,7 @@ suite("connection", () => {
     const connection = await open(server);
     await assert.rejects(
       connection.query("x"),
-      /the server sent a sync call without being asked/,
+      /^Error: unexpected sync call from the server$/,
     );
     await server.closed;
   });
@@ -255,7 +255,7 @@ suite("connection", () => {
       (error) =>
         error instanceof Error &&
         error.message === "the connection is closed" &&
-        /async message without being asked/.test(String(error.cause)),
+        /unexpected async message from the server/.test(String(error.cause)),
     );
   });
 

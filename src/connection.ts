@@ -17,7 +17,7 @@ export type Server = {
 // An error the server signalled, with q's text as the message
 export class QError extends Error {}
 
-const what = ["an async message", "a sync call", "a response"];
+const what = ["async message", "sync call", "response"];
 
 // A connection to a q process, running one query at a time. Cancelling a
 // query means closing the connection: the server can't be interrupted, and
@@ -140,7 +140,7 @@ export class Connection {
           }
           if (this.header[1] !== 2 || !this.pending) {
             throw new Error(
-              `the server sent ${what[this.header[1]]} without being asked, so the connection was closed`,
+              `unexpected ${what[this.header[1]]} from the server`,
             );
           }
           this.message = Buffer.allocUnsafe(length);
