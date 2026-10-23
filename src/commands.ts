@@ -163,9 +163,9 @@ export function definitions(): servers.Definition[] {
 }
 
 // A server picked from those defined, or from the ones that meet a test,
-// saying why if none does
+// saying why if none does, under the command's title
 async function pickServer(
-  placeHolder: string,
+  title: string,
   test: (server: servers.Definition) => boolean = () => true,
   none = "",
   detail: (server: servers.Definition) => string | undefined = () => undefined,
@@ -194,7 +194,7 @@ async function pickServer(
       detail: detail(server),
       server,
     })),
-    { placeHolder },
+    { title, placeHolder: "Server" },
   );
   return picked?.server;
 }
@@ -274,8 +274,9 @@ export async function addServer(
 // Keep a server's password in VS Code's secure storage, for the servers
 // whose password comes from there
 export async function setPassword(secrets: vscode.SecretStorage) {
+  const title = "kdb+/q: Set Server Password";
   const server = await pickServer(
-    "The server to set the password for",
+    title,
     (server) => server.auth === undefined,
     "Every server gets its password from its auth setting.",
   );
@@ -283,7 +284,8 @@ export async function setPassword(secrets: vscode.SecretStorage) {
     return;
   }
   const password = await vscode.window.showInputBox({
-    prompt: `The password for ${server.name}`,
+    title,
+    prompt: `Password for ${server.name}`,
     password: true,
     validateInput: servers.passwordProblem,
   });
@@ -295,7 +297,7 @@ export async function setPassword(secrets: vscode.SecretStorage) {
 
 // Any server, so that a password kept before its auth was set can go too
 export async function clearPassword(secrets: vscode.SecretStorage) {
-  const server = await pickServer("The server to clear the password for");
+  const server = await pickServer("kdb+/q: Clear Server Password");
   if (server) {
     await secrets.delete(servers.secretKey(server));
   }
@@ -309,8 +311,9 @@ function certified(server: servers.Definition): boolean {
 // Keep the passphrase of a server's client certificate in VS Code's secure
 // storage, under the certificate's file
 export async function setPassphrase(secrets: vscode.SecretStorage) {
+  const title = "kdb+/q: Set Certificate Passphrase";
   const server = await pickServer(
-    "The server whose client certificate to set the passphrase for",
+    title,
     certified,
     "No server has a client certificate in its tls setting.",
   );
@@ -319,7 +322,8 @@ export async function setPassphrase(secrets: vscode.SecretStorage) {
     return;
   }
   const passphrase = await vscode.window.showInputBox({
-    prompt: `The passphrase for ${server.name}'s client certificate`,
+    title,
+    prompt: `Passphrase for ${server.name}'s client certificate`,
     password: true,
   });
   if (passphrase !== undefined) {
@@ -329,7 +333,7 @@ export async function setPassphrase(secrets: vscode.SecretStorage) {
 
 export async function clearPassphrase(secrets: vscode.SecretStorage) {
   const server = await pickServer(
-    "The server whose client certificate to clear the passphrase for",
+    "kdb+/q: Clear Certificate Passphrase",
     certified,
     "No server has a client certificate in its tls setting.",
   );
@@ -360,7 +364,8 @@ export function sources(secrets: vscode.SecretStorage): Sources {
     stored: (key) => secrets.get(key),
     ask: (server) =>
       vscode.window.showInputBox({
-        prompt: `The password for ${server.name}, not kept`,
+        title: "kdb+/q: Connect to Server",
+        prompt: `Password for ${server.name} (not stored)`,
         password: true,
         ignoreFocusOut: true,
         validateInput: servers.passwordProblem,
@@ -406,7 +411,7 @@ function describe(state: State): string {
 // Connect to a server picked, or make its connection active if it's open
 export async function connect(connections: Connections<Connection>) {
   const server = await pickServer(
-    "The server to connect to",
+    "kdb+/q: Connect to Server",
     undefined,
     undefined,
     (server) => {
@@ -444,7 +449,8 @@ export async function disconnect(connections: Connections<Connection>) {
     names.length === 1
       ? names[0]
       : await vscode.window.showQuickPick(names, {
-          placeHolder: "The server to disconnect from",
+          title: "kdb+/q: Disconnect from Server",
+          placeHolder: "Server",
         });
   if (name) {
     connections.disconnect(name);
