@@ -529,10 +529,43 @@ export type Status = vscode.Disposable & {
   timed(name: string, timing: Timing | undefined): void;
 };
 
+// How long a query took: the server's time, as \t gives, with protected
+// evaluation, and the roundtrip
+function took(timing: Timing): string {
+  return timing.execution === undefined
+    ? `$(watch) ${timing.roundtrip} ms roundtrip`
+    : `$(watch) ${timing.execution} ms (${timing.roundtrip} ms roundtrip)`;
+}
+
+// A server's settings, all but secrets: where the password comes from, not
+// what it is, and an extension's name, not the fields it's given
+function details(server: servers.Definition, timeout: number): string[] {
+  const auth =
+    server.auth === undefined
+      ? "Stored password"
+      : server.auth === "prompt"
+        ? "Ask each time"
+        : `Extension ${server.auth.extension}`;
+  const tls =
+    server.tls === undefined
+      ? "Off"
+      : server.tls.pfx || server.tls.cert
+        ? "On, with a client certificate"
+        : "On";
+  const wait = server.timeout ?? timeout;
+  return [
+    `Host: ${server.host}:${server.port}`,
+    ...(server.user ? [`User: ${server.user}`] : []),
+    `Authentication: ${auth}`,
+    `TLS: ${tls}`,
+    `Protected evaluation: ${server.protect === false ? "Off" : "On"}`,
+    `Connection timeout: ${wait === 0 ? "None" : `${wait} ms`}`,
+  ];
+}
+
 // The active connection in the status bar, which picks one when clicked,
 // with how long its last query took, and a warning when a connection closes
-// without being disconnected. The time shown is the server's, as \t gives,
-// or without protected evaluation the roundtrip.
+// without being disconnected. Its tooltip gives the server's settings.
 export function showStatus(connections: Connections<Connection>): Status {
   const item = vscode.window.createStatusBarItem(
     "kdb-q-ext-vscode.connection",
@@ -544,6 +577,7 @@ export function showStatus(connections: Connections<Connection>): Status {
   let last: { name: string; timing: Timing } | undefined;
   const update = () => {
     const active = connections.active;
+    const server = active && connections.server(active.name);
     const icon = !active
       ? "plug"
       : active.state.kind === "connecting"
@@ -552,16 +586,22 @@ export function showStatus(connections: Connections<Connection>): Status {
           ? "database"
           : "debug-disconnect";
     const timing = last?.name === active?.name ? last?.timing : undefined;
-    item.text = `$(${icon}) ${active?.name ?? "kdb+/q"}${timing ? `  ${timing.execution ?? timing.roundtrip} ms` : ""}`;
-    item.tooltip = active
-      ? `kdb+/q: ${active.name}, ${describe(active.state)}${
-          timing === undefined
-            ? ""
-            : timing.execution === undefined
-              ? `\nLast query: ${timing.roundtrip} ms roundtrip`
-              : `\nLast query: ${timing.execution} ms execution, ${timing.roundtrip} ms roundtrip`
-        }`
-      : "kdb+/q: Connect to a server";
+    item.text = `$(${icon}) ${active?.name ?? "kdb+/q"}${timing ? `  ${took(timing)}` : ""}`;
+    item.tooltip =
+      active && server
+        ? [
+            `kdb+/q: ${active.name}, ${describe(active.state)}`,
+            ...details(
+              server,
+              servers.settings(
+                vscode.workspace
+                  .getConfiguration("kdb-q-ext-vscode")
+                  .get("connectTimeout"),
+                undefined,
+              ).defaults.timeout,
+            ),
+          ].join("\n")
+        : "kdb+/q: Connect to a server";
     item.backgroundColor =
       active?.state.kind === "closed"
         ? new vscode.ThemeColor("statusBarItem.warningBackground")
