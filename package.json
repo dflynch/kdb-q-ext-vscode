@@ -92,7 +92,7 @@
         "kdb-q-ext-vscode.servers": {
           "type": "object",
           "default": {},
-          "markdownDescription": "The kdb+ processes to connect to, by name. Passwords aren't kept here: set one with **kdb+/q: Set Server Password**, which keeps it in VS Code's secure storage for the user, host and port.",
+          "markdownDescription": "The kdb+ processes to connect to, by name. Passwords aren't kept here: set one with **kdb+/q: Set Server Password**, which keeps it in VS Code's secure storage for the user, host and port, or have it come from elsewhere with `auth`.",
           "additionalProperties": {
             "type": "object",
             "required": [
@@ -121,6 +121,29 @@
                 "type": "integer",
                 "minimum": 1,
                 "description": "How long to wait to connect and log in, in milliseconds, overriding the connect timeout."
+              },
+              "auth": {
+                "markdownDescription": "Where the password comes from, when it isn't the one kept by **kdb+/q: Set Server Password**: `\"prompt\"` asks for it at every connect and doesn't keep it, for a one-time code; `{ \"extension\": \"publisher.name\", … }` asks that extension at every connect, for a firm's own sign-on. The rest of the object goes to the extension.",
+                "oneOf": [
+                  {
+                    "const": "prompt",
+                    "description": "Ask for the password at every connect, and don't keep it."
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "extension"
+                    ],
+                    "properties": {
+                      "extension": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9-]*\\.[a-zA-Z0-9][a-zA-Z0-9-]*$",
+                        "description": "The ID of the extension that gives the credentials."
+                      }
+                    },
+                    "description": "Ask an extension for the credentials at every connect."
+                  }
+                ]
               }
             }
           }

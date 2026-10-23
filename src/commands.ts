@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as comments from "./comments";
+import type { Sources } from "./credentials";
 import * as servers from "./servers";
 import * as statements from "./statements";
 
@@ -156,10 +157,19 @@ export function definitions(): servers.Definition[] {
   return defined;
 }
 
+// A server picked from those defined, or from the ones that meet a test
 async function pickServer(
   placeHolder: string,
+  test: (server: servers.Definition) => boolean = () => true,
 ): Promise<servers.Definition | undefined> {
-  const defined = definitions();
+  const all = definitions();
+  const defined = all.filter(test);
+  if (all.length > 0 && defined.length === 0) {
+    vscode.window.showInformationMessage(
+      "kdb+/q: Every server gets its password from its auth setting.",
+    );
+    return undefined;
+  }
   if (defined.length === 0) {
     const open = "Open Settings";
     const choice = await vscode.window.showInformationMessage(
@@ -185,9 +195,13 @@ async function pickServer(
   return picked?.server;
 }
 
-// Keep a server's password in VS Code's secure storage
+// Keep a server's password in VS Code's secure storage, for the servers
+// whose password comes from there
 export async function setPassword(secrets: vscode.SecretStorage) {
-  const server = await pickServer("The server to set the password for");
+  const server = await pickServer(
+    "The server to set the password for",
+    (server) => server.auth === undefined,
+  );
   if (!server) {
     return;
   }
@@ -202,6 +216,7 @@ export async function setPassword(secrets: vscode.SecretStorage) {
   await secrets.store(servers.secretKey(server), password);
 }
 
+// Any server, so that a password kept before its auth was set can go too
 export async function clearPassword(secrets: vscode.SecretStorage) {
   const server = await pickServer("The server to clear the password for");
   if (server) {
@@ -222,4 +237,22 @@ export function connectionDefaults(): servers.Defaults {
     );
   }
   return defaults;
+}
+
+// Where credentials come from in VS Code
+export function sources(secrets: vscode.SecretStorage): Sources {
+  return {
+    stored: (key) => secrets.get(key),
+    ask: (server) =>
+      vscode.window.showInputBox({
+        prompt: `The password for ${server.name}, not kept`,
+        password: true,
+        ignoreFocusOut: true,
+        validateInput: servers.passwordProblem,
+      }),
+    extension: async (id) => {
+      const extension = vscode.extensions.getExtension(id);
+      return extension === undefined ? undefined : await extension.activate();
+    },
+  };
 }

@@ -1,5 +1,6 @@
 import * as assert from "node:assert";
 import {
+  credentialsProblem,
   defaults,
   definitions,
   passwordProblem,
@@ -70,6 +71,75 @@ suite("servers", () => {
     ]);
   });
 
+  test("auth is a prompt, or an extension given the rest of it", () => {
+    assert.deepStrictEqual(
+      definitions({
+        otp: { host: "h", port: 1, auth: "prompt" },
+        sso: {
+          host: "h",
+          port: 1,
+          auth: { extension: "acme.kdb-auth", realm: "EXAMPLE.COM" },
+        },
+      }).servers,
+      [
+        { name: "otp", host: "h", port: 1, auth: "prompt" },
+        {
+          name: "sso",
+          host: "h",
+          port: 1,
+          auth: {
+            extension: "acme.kdb-auth",
+            fields: { realm: "EXAMPLE.COM" },
+          },
+        },
+      ],
+    );
+  });
+
+  test("auth that's neither is a problem", () => {
+    assert.deepStrictEqual(
+      definitions({
+        a: { host: "h", port: 1, auth: "stored" },
+        b: { host: "h", port: 1, auth: { realm: "EXAMPLE.COM" } },
+        c: { host: "h", port: 1, auth: { extension: "kdb-auth" } },
+        d: { host: "h", port: 1, auth: ["prompt"] },
+      }).problems,
+      [
+        'a: auth is "prompt" or names an extension',
+        "b: auth's extension isn't an extension ID",
+        "c: auth's extension isn't an extension ID",
+        'd: auth is "prompt" or names an extension',
+      ],
+    );
+  });
+
+  test("an extension's user replaces the server's", () => {
+    const prod = { name: "prod", host: "h", port: 1, user: "dan" };
+    assert.strictEqual(server(prod, {}, defaults).user, "dan");
+    assert.strictEqual(
+      server(prod, { user: "token", password: "jwt" }, defaults).user,
+      "token",
+    );
+  });
+
+  test("an extension's credentials are checked", () => {
+    assert.strictEqual(credentialsProblem({ password: "p" }), undefined);
+    assert.strictEqual(
+      credentialsProblem({ user: "token", password: "p" }),
+      undefined,
+    );
+    assert.strictEqual(credentialsProblem("user:p"), "not an object");
+    assert.strictEqual(credentialsProblem({ user: "dan" }), "no password");
+    assert.strictEqual(
+      credentialsProblem({ user: "a:b", password: "p" }),
+      "the user can't contain : or a 0 byte",
+    );
+    assert.strictEqual(
+      credentialsProblem({ password: "a\0b" }),
+      "a password can't contain a 0 byte",
+    );
+  });
+
   test("the connect timeout and the size limit", () => {
     assert.deepStrictEqual(settings(undefined, undefined), {
       defaults,
@@ -127,14 +197,18 @@ suite("servers", () => {
 
   test("a server's own timeout overrides the default", () => {
     const local = { name: "local", host: "localhost", port: 5000 };
-    assert.deepStrictEqual(server(local, undefined, defaults), {
+    assert.deepStrictEqual(server(local, {}, defaults), {
       host: "localhost",
       port: 5000,
       timeout: 2000,
       limit: 10e6,
     });
     assert.deepStrictEqual(
-      server({ ...local, user: "dan", timeout: 500 }, "pw", defaults),
+      server(
+        { ...local, user: "dan", timeout: 500 },
+        { password: "pw" },
+        defaults,
+      ),
       {
         host: "localhost",
         port: 5000,
