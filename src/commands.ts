@@ -4,10 +4,12 @@ import * as comments from "./comments";
 import { Connection } from "./connection";
 import type { Connections, State } from "./connections";
 import { credentials, type Sources } from "./credentials";
+import type { Size } from "./format/console";
 import { quickInput } from "./quickInput";
 import * as servers from "./servers";
 import * as statements from "./statements";
 import { passphraseKey, secure } from "./tls";
+import * as transcript from "./transcript";
 
 // Send the selected text, or the current line, to the active terminal one
 // statement at a time. With several selections, each is sent in turn from the
@@ -39,6 +41,59 @@ export function runSelectedText(editor: vscode.TextEditor) {
       terminal.sendText(statement);
     }
   }
+}
+
+// The console size, with any problem in it shown
+function consoleSize(): Size {
+  const { size, problems } = transcript.consoleSize(
+    vscode.workspace.getConfiguration("kdb-q-ext-vscode").get("consoleSize"),
+  );
+  if (problems.length > 0) {
+    vscode.window.showWarningMessage(
+      `kdb+/q: Using the default, as ${problems.join(" and ")}.`,
+    );
+  }
+  return size;
+}
+
+// Run the selected text, or the current line, on the active connection as
+// one query, as written, showing it with its result as the q console does.
+// With several selections, the primary one.
+export async function runOnServer(
+  editor: vscode.TextEditor,
+  connections: Connections<Connection>,
+  output: vscode.OutputChannel,
+) {
+  const selection = editor.selection;
+  const query = selection.isEmpty
+    ? editor.document.lineAt(selection.active.line).text
+    : editor.document.getText(selection);
+  if (query.trim() === "") {
+    return;
+  }
+  // With no open connection active, pick one, as Connect does
+  if (connections.active?.state.kind !== "open") {
+    await connect(connections);
+  }
+  const name = connections.active?.name;
+  const link = name && connections.link(name);
+  if (!name || !link) {
+    return;
+  }
+  const size = consoleSize();
+  output.show(true);
+  const outcome = await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Window,
+      title: `kdb+/q: Running on ${name}`,
+    },
+    () =>
+      link.query(query).then(
+        (result) => ({ result }),
+        (error: Error) => ({ error }),
+      ),
+  );
+  output.appendLine(transcript.entry(query, name, outcome, size));
 }
 
 // Comment out the selected lines with "/" and "\" marker lines, or remove the
