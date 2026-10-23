@@ -21,26 +21,20 @@ import * as temporal from "./temporal";
 // vector costs only as much as the part that's shown. Loops also stop when
 // it's full, so as not to format what would be dropped.
 
-// How much text to show: as many lines, each as wide as width, and in all
-// no more than characters, where it's given. Our own measure, not q's \c,
-// which leaves room for the prompt: \c 25 80 shows 23 lines of 79.
-export type Size = { lines: number; width: number; characters?: number };
+// How much text to take: past as many lines, or a line as wide as width,
+// it's cut
+export type Bounds = { lines: number; width: number };
 
 class Text {
   private parts: string[] = [];
   private lines = 1;
-  // The length of the last line, and of all of it
+  // The length of the last line
   private line = 0;
-  private length = 0;
 
-  constructor(private size: Size) {}
+  constructor(private size: Bounds) {}
 
   get full(): boolean {
-    return (
-      this.line > this.size.width ||
-      this.lines > this.size.lines ||
-      this.length > (this.size.characters ?? Number.POSITIVE_INFINITY)
-    );
+    return this.line > this.size.width || this.lines > this.size.lines;
   }
 
   // Once full, what's there is cut anyway
@@ -49,7 +43,6 @@ class Text {
       return;
     }
     this.parts.push(text);
-    this.length += text.length;
     const end = text.lastIndexOf("\n");
     if (end < 0) {
       this.line += text.length;
@@ -65,13 +58,7 @@ class Text {
 }
 
 // q's form of a value, with at least as much of it as fits the size
-export function qText(
-  value: Value,
-  size: Size = {
-    lines: Number.POSITIVE_INFINITY,
-    width: Number.POSITIVE_INFINITY,
-  },
-): string {
+export function qText(value: Value, size: Bounds): string {
   const text = new Text(size);
   write(value, text);
   return text.toString();
@@ -105,9 +92,9 @@ const names = [
   "char", "symbol", "timestamp", "month", "date", "datetime", "timespan",
   "minute", "second", "time",
 ];
-// The letters q writes after a null or infinity, or a vector, by type. A
-// long has none.
-const letters = " bg xhi efcspmdznuvt";
+// The letters q writes after a null or infinity, or a vector, by type, as
+// .Q.t has them. A long's j is never written.
+const letters = " bg xhijefcspmdznuvt";
 
 // Which special value an element is, if any. Each integer type keeps its
 // smallest value for null and the largest, and its negation, for infinity;
@@ -277,11 +264,9 @@ function infinity(type: number, which: "infinity" | "-infinity"): string {
 
 // q's form of an atom
 function atom(a: Atom): string {
-  const which = special(a.type, a.value);
-  if (which) {
-    // A float has no letter
-    const letter = a.type === -9 ? "" : letters[-a.type].trim();
-    return `${which === "null" ? (a.type === -9 ? "0n" : "0N") : infinity(a.type, which)}${letter}`;
+  if (special(a.type, a.value)) {
+    // A long and a float have no letter
+    return `${inVector(a)}${[-7, -9].includes(a.type) ? "" : letters[-a.type]}`;
   }
   switch (a.type) {
     case -1:
@@ -319,29 +304,14 @@ function inVector(a: Atom): string {
 }
 
 // An element as the console shows it in a column: a null is blank, though a
-// null guid shows its zeros, and a char that can't be shown is escaped.
-// The grid shows which null it is instead, in q's form, as 0Ni or `.
-export function cell(
-  vector: Vector,
-  i: number,
-  nulls: "blank" | "typed" = "blank",
-): string {
+// null guid shows its zeros, and a char that can't be shown is escaped
+export function cell(vector: Vector, i: number): string {
   const a = element(vector, i);
   const which = special(a.type, a.value);
-  if (which === "null" || (a.type === -11 && a.value === "")) {
-    return nulls === "typed" ? atom(a) : "";
+  if (which === "null") {
+    return "";
   }
   return which ? infinity(a.type, which) : plain(a);
-}
-
-// A type's letter, as meta shows it, and its name, as a cast takes it: j
-// and long. A general list's are a space and an empty name.
-export function typeLetter(type: number): string {
-  return " bg xhijefcspmdznuvt"[Math.abs(type)] ?? " ";
-}
-
-export function typeName(type: number): string {
-  return names[Math.abs(type)] ?? "";
 }
 
 function attribute(value: { attribute: Attribute }, text: Text): void {

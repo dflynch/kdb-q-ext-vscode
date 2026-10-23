@@ -3,20 +3,18 @@ import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import { decode } from "../codec/decode";
 import type { Value, Vector } from "../codec/types";
-import { columnCells, show } from "../format/console";
-import { cell, typeLetter, typeName } from "../format/text";
+import { show } from "../format/console";
 
-const fixtures: {
-  name: string;
-  type: number;
-  bytes: string;
-  console: string;
-}[] = JSON.parse(
+// q's text for each value, and the size .Q.s shows it at
+const { size, values: fixtures } = JSON.parse(
   readFileSync(
     path.join(__dirname, "../../test/fixtures/corpus.ipc.json"),
     "utf8",
   ),
-).values;
+) as {
+  size: [number, number];
+  values: { name: string; type: number; bytes: string; console: string }[];
+};
 
 function value(name: string): Value {
   const fixture = fixtures.find((f) => f.name === `.corpus.${name}`);
@@ -31,16 +29,23 @@ const longs = (n: number): Vector => ({
 });
 
 suite("console text", () => {
-  // The fixtures hold q's text at \c 2000 2000, where .Q.s shows 1998 lines
-  // of 1999 characters, so the widest values are cut as q cuts them
-  const size = { lines: 1998, width: 1999 };
+  // At the size q showed them, so the widest values are cut as q cuts them
+  const [lines, width] = size;
   for (const f of fixtures) {
     test(`${f.name} as q shows it`, () => {
       // q ends the last line with a newline
       const want = f.console.replace(/\n$/, "");
-      assert.strictEqual(show(decode(Buffer.from(f.bytes, "hex")), size), want);
+      const value = decode(Buffer.from(f.bytes, "hex"));
+      assert.strictEqual(show(value, { lines, width }), want);
     });
   }
+
+  // ,0 then 0 1 and so on, a line each
+  const ragged: Value = {
+    type: 0,
+    attribute: 0,
+    items: [1, 2, 3, 4].map((n) => longs(n)),
+  };
 
   test("a line wider than the width ends in ..", () => {
     assert.strictEqual(
@@ -54,14 +59,9 @@ suite("console text", () => {
   });
 
   test("lines past the limit become ..", () => {
-    const rows: Value = {
-      type: 0,
-      attribute: 0,
-      items: [1, 2, 3, 4].map((n) => longs(n)),
-    };
-    assert.strictEqual(show(rows, { lines: 3, width: 80 }), ",0\n0 1\n..");
+    assert.strictEqual(show(ragged, { lines: 3, width: 80 }), ",0\n0 1\n..");
     assert.strictEqual(
-      show(rows, { lines: 4, width: 80 }),
+      show(ragged, { lines: 4, width: 80 }),
       ",0\n0 1\n0 1 2\n0 1 2 3",
     );
   });
@@ -86,25 +86,17 @@ suite("console text", () => {
     );
   });
 
-  test("a projection is cut like any other value", () => {
-    const projection: Value = {
-      type: 104,
-      parts: [{ type: 100, context: "", source: "{x+y}" }, longs(1000)],
-    };
-    assert.strictEqual(
-      show(projection, { lines: 10, width: 12 }),
-      "{x+y}[0 1 ..",
-    );
-  });
-
-  test("a projection of a large vector stops at the width", () => {
+  test("a projection is cut like any other value, quickly", () => {
     const projection: Value = {
       type: 104,
       parts: [{ type: 100, context: "", source: "{x+y}" }, longs(10_000_000)],
     };
     const start = performance.now();
-    assert.strictEqual(show(projection).length, 5000);
+    const text = show(projection);
     assert.ok(performance.now() - start < 100);
+    assert.strictEqual(text.length, 5000);
+    assert.ok(text.startsWith("{x+y}[0 1 2 "));
+    assert.ok(text.endsWith(".."));
   });
 
   test("a multi-line lambda's lines count against the limit", () => {
@@ -155,14 +147,9 @@ suite("console text", () => {
   });
 
   test("lines past the characters in all become ..", () => {
-    const rows: Value = {
-      type: 0,
-      attribute: 0,
-      items: [1, 2, 3, 4].map((n) => longs(n)),
-    };
     // ,0 and 0 1 with their newlines are 7
     assert.strictEqual(
-      show(rows, { lines: 10, width: 80, characters: 8 }),
+      show(ragged, { lines: 10, width: 80, characters: 8 }),
       ",0\n0 1\n..",
     );
   });
@@ -183,77 +170,5 @@ suite("console text", () => {
 
   test("an error shows as q signals it", () => {
     assert.strictEqual(show({ type: -128, message: "type" }), "'type");
-  });
-});
-
-suite("cells for the grid", () => {
-  const chars = (text: string): Vector => ({
-    type: 10,
-    attribute: 0,
-    data: new TextEncoder().encode(text),
-  });
-  const floats = (...values: number[]): Vector => ({
-    type: 9,
-    attribute: 0,
-    data: Float64Array.from(values),
-  });
-  const list = (...items: Value[]): Value & { type: 0 } => ({
-    type: 0,
-    attribute: 0,
-    items,
-  });
-
-  // As q shows ([]a:...) for each column
-  test("a column of strings, quoted", () => {
-    assert.deepStrictEqual(columnCells(list(chars("ab"), chars("cd")), 10), [
-      '"ab"',
-      '"cd"',
-    ]);
-  });
-
-  test("a column of lists of one length, as a matrix's rows", () => {
-    assert.deepStrictEqual(columnCells(list(floats(1, 2), floats(3, 4)), 10), [
-      "1 2",
-      "3 4",
-    ]);
-  });
-
-  test("a column of lists of different lengths, in q's form", () => {
-    const nulls: Vector = {
-      type: 7,
-      attribute: 0,
-      data: BigInt64Array.of(-0x8000000000000000n),
-    };
-    assert.deepStrictEqual(columnCells(list(nulls, longs(2)), 10), [
-      ",0N",
-      "0 1",
-    ]);
-  });
-
-  test("only the rows asked for", () => {
-    assert.deepStrictEqual(columnCells(longs(1_000_000), 3), ["0", "1", "2"]);
-  });
-
-  test("a null as blank, or as which null it is", () => {
-    const ints: Vector = {
-      type: 6,
-      attribute: 0,
-      data: Int32Array.of(-2147483648, 1),
-    };
-    assert.strictEqual(cell(ints, 0), "");
-    assert.strictEqual(cell(ints, 0, "typed"), "0Ni");
-    assert.strictEqual(cell(ints, 1, "typed"), "1");
-    assert.strictEqual(cell(floats(Number.NaN), 0, "typed"), "0n");
-  });
-
-  test("a type's letter and name", () => {
-    assert.deepStrictEqual(
-      [7, -12, 0].map((t) => [typeLetter(t), typeName(t)]),
-      [
-        ["j", "long"],
-        ["p", "timestamp"],
-        [" ", ""],
-      ],
-    );
   });
 });

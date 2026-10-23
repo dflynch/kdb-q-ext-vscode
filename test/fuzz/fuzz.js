@@ -2,22 +2,30 @@
 // needs q on the path. Not part of npm test: run npm run fuzz [seed]
 
 const { execFileSync } = require("node:child_process");
-const { mkdtempSync, readFileSync } = require("node:fs");
+const { mkdtempSync, readFileSync, rmSync } = require("node:fs");
 const { tmpdir } = require("node:os");
 const path = require("node:path");
 const { decode } = require("../../out/codec/decode");
 const { show } = require("../../out/format/console");
 
 const seed = process.argv[2] ?? String(Date.now() % 100000);
-const out = path.join(mkdtempSync(path.join(tmpdir(), "fuzz-")), "fuzz.json");
-execFileSync("q", ["fuzz.q", seed, out, "-q"], {
-  cwd: __dirname,
-  stdio: ["ignore", "inherit", "inherit"],
-});
+const dir = mkdtempSync(path.join(tmpdir(), "fuzz-"));
+const out = path.join(dir, "fuzz.json");
+let fuzz;
+try {
+  execFileSync("q", ["fuzz.q", seed, out, "-q"], {
+    cwd: __dirname,
+    stdio: ["ignore", "inherit", "inherit"],
+  });
+  fuzz = JSON.parse(readFileSync(out, "utf8"));
+} finally {
+  rmSync(dir, { recursive: true, force: true });
+}
 
-// .Q.s at \c 2000 2000 shows 1998 lines of 1999 characters
-const size = { lines: 1998, width: 1999 };
-const values = JSON.parse(readFileSync(out, "utf8"));
+// At the size q showed them
+const [lines, width] = fuzz.size;
+const size = { lines, width };
+const values = fuzz.values;
 const wrong = values.filter((v) => {
   const ours = show(decode(Buffer.from(v.bytes, "hex")), size);
   // q ends the last line with a newline

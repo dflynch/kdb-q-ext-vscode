@@ -62,5 +62,6 @@ vals,:{n:1+rand 4; tbl[1+rand 2;n]!vector[first 1?types;n]} each til 20;
 vals,:{n:1+rand 3; (n?`3)!{nested 1} each til n} each til 20;
 
 b:-8!'vals;
-(hsym `$.z.x 1) 0: enlist .j.j {`bytes`console!(raze string x;.Q.s -9!x)} each b;
+/ With the lines and width .Q.s shows at this \c
+(hsym `$.z.x 1) 0: enlist .j.j `size`values!((system "c")-2 1;{`bytes`console!(raze string x;.Q.s -9!x)} each b);
 exit 0

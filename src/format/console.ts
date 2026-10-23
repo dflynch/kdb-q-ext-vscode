@@ -7,12 +7,15 @@ import {
   type Value,
   type Vector,
 } from "../codec/types";
-import { cell, qText, type Size } from "./text";
+import { type Bounds, cell, qText } from "./text";
 
 // A value as text, as the q console shows it: a port of q's own .Q.s2 and
-// .Q.S, which q prints for comparison when it changes
+// .Q.S, whose source q prints, to compare with when q changes
 
-export type { Size };
+// How much text to show: as many lines, each as wide as width, and in all
+// no more than characters, where it's given. Our own measure, not q's \c,
+// which leaves room for the prompt: \c 25 80 shows 23 lines of 79.
+export type Size = Bounds & { characters?: number };
 
 // How much of a value to show: far more than q's \c, as the panel scrolls.
 // A value with more lines shows the first 4999 and then .., and a wider
@@ -62,17 +65,6 @@ function cut(lines: string[], size: Size): string[] {
     }
   }
   return shown;
-}
-
-// A table column's first rows cells, as q shows them in a table: a
-// vector's elements, and a list's items in q's form or, when they're all
-// lists of one length, lined up as a matrix's rows
-export function columnCells(
-  column: Vector | List,
-  rows: number,
-  size: Size = defaultSize,
-): string[] {
-  return lines(column, rows, size);
 }
 
 // The lines of a value's first rows items, as q's .Q.s2 lays them out: a

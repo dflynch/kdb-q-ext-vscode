@@ -11,7 +11,6 @@ import {
   type Vector,
 } from "./types";
 
-// Keeping a leading byte-order mark, which q would show as part of the symbol
 // The primitives q sends as lambdas in .Q, by source
 const sentAsLambdas = new Map<string, QFunction>([
   ["{var x}", { type: 101, code: 42 }],
@@ -21,6 +20,7 @@ const sentAsLambdas = new Map<string, QFunction>([
   ["{cor[x;y]}", { type: 102, code: 36 }],
 ]);
 
+// Keeping a leading byte-order mark, which q would show as part of the symbol
 const utf8 = new TextDecoder("utf-8", { ignoreBOM: true });
 
 // Decode a q IPC message, as a server sends it or -8! or -18! writes it.

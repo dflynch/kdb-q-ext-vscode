@@ -1,7 +1,7 @@
 / Writes corpus.ipc.json: each value in corpus.q and display.q with its -8!
 / bytes, its -18! bytes where q compresses them, and the console's text for
-/ it. The header records the md5 of this script and of both value files, and
-/ the q version that wrote the file.
+/ it. The header records the md5 of this script and of both value files,
+/ the q version that wrote the file, and the size .Q.s shows values at.
 / Run after changing any of them: npm run fixtures
 
 \l corpus.q
@@ -23,7 +23,8 @@ entry:{[p]
   e:`name`type`bytes`console!(string p;type v;hex b;.Q.s -9!b);
   $[b~c:-18!v; e; e,enlist[`compressed]!enlist hex c]}
 
-header:`corpus`display`script`q!(digest `:corpus.q;digest `:display.q;digest `:fixtures.q;string[.z.K]," ",string .z.k)
+/ The lines and width .Q.s shows at this \c
+header:`corpus`display`script`q`size!(digest `:corpus.q;digest `:display.q;digest `:fixtures.q;string[.z.K]," ",string .z.k;(system "c")-2 1)
 
 / One value per line, so a change to the corpus gives a readable diff
 body:.j.j each entry each leaves `.corpus
