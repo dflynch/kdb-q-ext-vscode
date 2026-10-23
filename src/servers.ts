@@ -21,8 +21,9 @@ export type Definition = {
   auth?: Auth;
 };
 
-// A password asked for at every connect and never kept, for a one-time code;
-// or one an extension gives, for a firm's own sign-on: a Kerberos ticket or
+// A password asked for at every connect and never kept, where a firm doesn't
+// allow one to be stored or it changes too often to keep; or one an extension
+// gives, for a firm's own sign-on: a Kerberos ticket or
 // an access token, say, which the server checks in .z.pw. The setting names
 // the extension, so no other extension is given the server's login by
 // taking a name agreed in advance. The rest of the setting goes to it as it
@@ -61,7 +62,7 @@ const fields = new Set([
 const tlsFields = new Set(["ca", "cert", "key", "pfx"]);
 
 // A Marketplace extension ID, publisher.name
-const extensionId = /^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9-]*$/i;
+export const extensionId = /^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9-]*$/i;
 
 function isCount(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
@@ -222,6 +223,17 @@ export function settings(
   return { defaults: result, problems };
 }
 
+// A server's address as typed, host:port, split at its last colon
+export function address(
+  text: string,
+): { host: string; port: number } | undefined {
+  const match = /^(.+):(\d+)$/.exec(text.trim());
+  const port = Number(match?.[2]);
+  return match && match[1].trim() !== "" && port >= 1 && port <= 65535
+    ? { host: match[1].trim(), port }
+    : undefined;
+}
+
 // Where a server's password is kept. Keyed by where it's sent, not by the
 // server's name, so that a password is never sent to a host other than the
 // one it was given for, if a server's host is changed
@@ -230,7 +242,7 @@ export function secretKey(server: Definition): string {
 }
 
 // A user q can take: the login is user:password, ending at a 0 byte
-function userProblem(user: string): boolean {
+export function userProblem(user: string): boolean {
   return /[:\0]/.test(user);
 }
 

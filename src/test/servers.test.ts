@@ -1,5 +1,6 @@
 import * as assert from "node:assert";
 import {
+  address,
   credentialsProblem,
   defaults,
   definitions,
@@ -216,6 +217,24 @@ suite("servers", () => {
         "the size limit isn't a positive number of megabytes",
       ],
     });
+  });
+
+  test("an address is host:port, split at the last colon", () => {
+    assert.deepStrictEqual(address(" kdb1.example.com:5010 "), {
+      host: "kdb1.example.com",
+      port: 5010,
+    });
+    assert.deepStrictEqual(address("::1:5000"), { host: "::1", port: 5000 });
+    for (const text of [
+      "kdb1",
+      "kdb1:",
+      ":5000",
+      "kdb1:0",
+      "kdb1:65536",
+      "kdb1:5.5",
+    ]) {
+      assert.strictEqual(address(text), undefined, text);
+    }
   });
 
   test("a password is kept for where it's sent, not the server's name", () => {

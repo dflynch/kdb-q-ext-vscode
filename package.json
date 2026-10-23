@@ -51,6 +51,11 @@
         "title": "Toggle Block Comment"
       },
       {
+        "command": "kdb-q-ext-vscode.addServer",
+        "category": "kdb+/q",
+        "title": "Add Server"
+      },
+      {
         "command": "kdb-q-ext-vscode.connect",
         "category": "kdb+/q",
         "title": "Connect to Server"
@@ -112,7 +117,7 @@
         "kdb-q-ext-vscode.servers": {
           "type": "object",
           "default": {},
-          "markdownDescription": "The kdb+ processes to connect to, by name. Passwords aren't kept here: set one with **kdb+/q: Set Server Password**, which keeps it in VS Code's secure storage for the user, host and port, or have it come from elsewhere with `auth`.",
+          "markdownDescription": "The kdb+ processes to connect to, by name: add one with **kdb+/q: Add Server**. Passwords aren't kept here: set one with **kdb+/q: Set Server Password**, which keeps it in VS Code's secure storage for the user, host and port, or have it come from elsewhere with `auth`.",
           "additionalProperties": {
             "type": "object",
             "required": [
@@ -182,7 +187,7 @@
                 ]
               },
               "auth": {
-                "markdownDescription": "Where the password comes from, when it isn't the one kept by **kdb+/q: Set Server Password**: `\"prompt\"` asks for it at every connect and doesn't keep it, for a one-time code; `{ \"extension\": \"publisher.name\", … }` asks that extension at every connect, for a firm's own sign-on. The rest of the object goes to the extension.",
+                "markdownDescription": "Where the password comes from, when it isn't the one kept by **kdb+/q: Set Server Password**: `\"prompt\"` asks for it at every connect and doesn't keep it, where a password can't be stored or changes too often to keep; `{ \"extension\": \"publisher.name\", … }` asks that extension at every connect, for a firm's own sign-on. The rest of the object goes to the extension.",
                 "oneOf": [
                   {
                     "const": "prompt",

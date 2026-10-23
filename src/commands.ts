@@ -175,16 +175,13 @@ async function pickServer(
     return undefined;
   }
   if (defined.length === 0) {
-    const open = "Open Settings";
+    const add = "Add Server";
     const choice = await vscode.window.showInformationMessage(
       "kdb+/q: No servers are defined in the settings.",
-      open,
+      add,
     );
-    if (choice === open) {
-      await vscode.commands.executeCommand(
-        "workbench.action.openSettings",
-        "kdb-q-ext-vscode.servers",
-      );
+    if (choice === add) {
+      await vscode.commands.executeCommand("kdb-q-ext-vscode.addServer");
     }
     return undefined;
   }
@@ -198,6 +195,195 @@ async function pickServer(
     { placeHolder },
   );
   return picked?.server;
+}
+
+// Add a server to the user's or the workspace's settings, asking for what
+// every server has: its name, address, user and where its password comes
+// from. The rest, such as tls, is set in settings.json, which can be opened
+// at the setting once it's added.
+export async function addServer(
+  secrets: vscode.SecretStorage,
+  connections: Connections<Connection>,
+) {
+  const title = "kdb+/q: Add Server";
+  const config = vscode.workspace.getConfiguration("kdb-q-ext-vscode");
+  const setting = config.get("servers");
+  const taken =
+    typeof setting === "object" && setting !== null ? Object.keys(setting) : [];
+  const name = (
+    await vscode.window.showInputBox({
+      title,
+      prompt: "The server's name",
+      ignoreFocusOut: true,
+      validateInput: (text) =>
+        text.trim() === ""
+          ? "A server needs a name"
+          : taken.includes(text.trim())
+            ? `There's a server named ${text.trim()} already`
+            : undefined,
+    })
+  )?.trim();
+  if (name === undefined) {
+    return;
+  }
+  const typed = await vscode.window.showInputBox({
+    title,
+    prompt: "The server's host and port",
+    placeHolder: "localhost:5000",
+    ignoreFocusOut: true,
+    validateInput: (text) =>
+      servers.address(text) ? undefined : "host:port, such as localhost:5000",
+  });
+  const at = typed === undefined ? undefined : servers.address(typed);
+  if (at === undefined) {
+    return;
+  }
+  const user = (
+    await vscode.window.showInputBox({
+      title,
+      prompt: "The user to log in as, or none",
+      ignoreFocusOut: true,
+      validateInput: (text) =>
+        servers.userProblem(text.trim())
+          ? "The user can't contain : or a 0 byte"
+          : undefined,
+    })
+  )?.trim();
+  if (user === undefined) {
+    return;
+  }
+  const how = await vscode.window.showQuickPick(
+    [
+      {
+        label: "Store a password",
+        description: "in VS Code's secure storage",
+        auth: undefined,
+      },
+      {
+        label: "Ask each time",
+        description: "and never keep it",
+        auth: "prompt" as const,
+      },
+      {
+        label: "Use an extension",
+        description: "that gives the login, for a firm's own sign-on",
+        auth: "extension" as const,
+      },
+    ],
+    {
+      title,
+      placeHolder: "Where the password comes from",
+      ignoreFocusOut: true,
+    },
+  );
+  if (how === undefined) {
+    return;
+  }
+  let auth: "prompt" | { extension: string } | undefined;
+  let password = "";
+  if (how.auth === "extension") {
+    const extension = await vscode.window.showInputBox({
+      title,
+      prompt: "The ID of the extension that gives the login",
+      placeHolder: "publisher.name",
+      ignoreFocusOut: true,
+      validateInput: (text) =>
+        servers.extensionId.test(text.trim())
+          ? undefined
+          : "An extension ID, publisher.name",
+    });
+    if (extension === undefined) {
+      return;
+    }
+    auth = { extension: extension.trim() };
+  } else if (how.auth === "prompt") {
+    auth = how.auth;
+  } else {
+    const given = await vscode.window.showInputBox({
+      title,
+      prompt: `The password for ${name}, or none`,
+      password: true,
+      ignoreFocusOut: true,
+      validateInput: servers.passwordProblem,
+    });
+    if (given === undefined) {
+      return;
+    }
+    password = given;
+  }
+  // A workspace's settings are shared with whoever opens it
+  const scope = vscode.workspace.workspaceFolders
+    ? await vscode.window.showQuickPick(
+        [
+          {
+            label: "User settings",
+            description: "for every workspace",
+            target: vscode.ConfigurationTarget.Global,
+          },
+          {
+            label: "Workspace settings",
+            description: "for this workspace, and anyone who opens it",
+            target: vscode.ConfigurationTarget.Workspace,
+          },
+        ],
+        {
+          title,
+          placeHolder: "Where to keep the server",
+          ignoreFocusOut: true,
+        },
+      )
+    : { target: vscode.ConfigurationTarget.Global };
+  if (scope === undefined) {
+    return;
+  }
+  const inspected = config.inspect("servers");
+  const current =
+    scope.target === vscode.ConfigurationTarget.Global
+      ? inspected?.globalValue
+      : inspected?.workspaceValue;
+  if (
+    current !== undefined &&
+    (typeof current !== "object" || current === null || Array.isArray(current))
+  ) {
+    vscode.window.showErrorMessage(
+      "kdb+/q: The servers setting there isn't an object, so a server can't be added to it.",
+    );
+    return;
+  }
+  // As written in the setting, and read back as connecting reads it
+  const value = {
+    ...at,
+    ...(user === "" ? {} : { user }),
+    ...(auth === undefined ? {} : { auth }),
+  };
+  const read = servers.definitions({ [name]: value });
+  const [definition] = read.servers;
+  if (definition === undefined) {
+    throw new Error(`kdb+/q: ${read.problems.join("; ")}`);
+  }
+  await config.update("servers", { ...current, [name]: value }, scope.target);
+  if (password !== "") {
+    await secrets.store(servers.secretKey(definition), password);
+  }
+  const connect = "Connect";
+  const edit = "Open settings.json";
+  const choice = await vscode.window.showInformationMessage(
+    `kdb+/q: Added ${name}.${auth !== undefined && auth !== "prompt" ? " Any fields its extension takes go in settings.json." : ""}`,
+    connect,
+    edit,
+  );
+  if (choice === connect) {
+    await connectTo(connections, definition);
+  } else if (choice === edit) {
+    // The Settings editor can't edit an object; a query naming a setting
+    // reveals it in the file
+    await vscode.commands.executeCommand(
+      scope.target === vscode.ConfigurationTarget.Global
+        ? "workbench.action.openSettingsJson"
+        : "workbench.action.openWorkspaceSettingsFile",
+      { query: "kdb-q-ext-vscode.servers" },
+    );
+  }
 }
 
 // Keep a server's password in VS Code's secure storage, for the servers
@@ -344,9 +530,15 @@ export async function connect(connections: Connections<Connection>) {
       return state && `${active ? "Active, " : ""}${describe(state)}`;
     },
   );
-  if (!server) {
-    return;
+  if (server) {
+    await connectTo(connections, server);
   }
+}
+
+async function connectTo(
+  connections: Connections<Connection>,
+  server: servers.Definition,
+) {
   try {
     await connections.connect(server);
   } catch (error) {

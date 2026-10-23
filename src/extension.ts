@@ -28,6 +28,9 @@ export function activate(context: vscode.ExtensionContext) {
         }
       },
     ),
+    vscode.commands.registerCommand("kdb-q-ext-vscode.addServer", () =>
+      commands.addServer(context.secrets, connections),
+    ),
     vscode.commands.registerCommand("kdb-q-ext-vscode.setPassword", () =>
       commands.setPassword(context.secrets),
     ),
