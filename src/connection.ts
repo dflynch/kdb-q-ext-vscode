@@ -19,14 +19,13 @@ export type Server = {
   protect?: boolean;
 };
 
-// How long a query took
+// How long a query took, in whole milliseconds, as \t gives
 export type Timing = {
-  // From sending the query to the last of its result arriving, in
-  // milliseconds
+  // From sending the query to the last of its result arriving
   roundtrip: number;
-  // The server's own time evaluating it, in nanoseconds, with protected
-  // evaluation
-  elapsed?: bigint;
+  // The server's time evaluating it, with protected evaluation, when it
+  // succeeds: not serialising the result, nor formatting a backtrace
+  evaluation?: number;
 };
 
 // What a query returns
@@ -51,15 +50,16 @@ export class QError extends Error {
 }
 
 // Protected evaluation: q's default .z.pg applies this to the query, which
-// it evaluates under .Q.trp. It returns ``result`elapsed!(::;result;time),
-// or ``error`backtrace`elapsed!(::;error;backtrace;time): named so that more
-// can be added, and the null key's :: keeps the values a general list, as a
-// namespace's does. The time is a timespan, from .z.p as .z.n goes back at
-// midnight. The backtrace leaves out this function's own frames, and those
+// it evaluates under .Q.trp. It returns ``result`evaluation!(::;result;ms),
+// or ``error`backtrace!(::;error;backtrace): named so that more can be
+// added, and the null key's :: keeps the values a general list, as a
+// namespace's does. The time is from .z.p, as .z.n goes back at midnight,
+// and its locals can't be seen by the query, which value evaluates as
+// global. The backtrace leaves out this function's own frames, and those
 // outside it, such as a customised .z.pg's, and is numbered from the
 // query's frame as 0.
 export const wrapper =
-  "{s:.z.p;f:{(``result)!(::;value x)};r:.Q.trp[f;x;{[f;e;b]b:(last where f~/:b[;0;0])#b;(``error`backtrace)!(::;e;.Q.sbt{@[x;3;-;y]}[;last b[;3]]each b)}f];r,(1#`elapsed)!enlist .z.p-s}";
+  "{f:{s:.z.p;r:value x;(``result`evaluation)!(::;r;(`long$.z.p-s)div 1000000)};.Q.trp[f;x;{[f;e;b]b:(last where f~/:b[;0;0])#b;(``error`backtrace)!(::;e;.Q.sbt{@[x;3;-;y]}[;last b[;3]]each b)}f]}";
 
 // What a failure with protected evaluation on says, as a server whose .z.pg
 // is customised, or takes only strings, can't evaluate it
@@ -89,30 +89,25 @@ function fields(value: Value): Map<string, Value> | undefined {
 }
 
 // The result inside protected evaluation's dictionary, or the error it
-// caught, and the time the server took. Names it doesn't know are left for
-// later.
-function unwrap(
-  value: Value,
-  roundtrip: number,
-): { value: Value; timing: Timing } {
+// caught. Names it doesn't know are left for later.
+function unwrap(value: Value, roundtrip: number): Result {
   const named = fields(value);
   const result = named?.get("result");
+  const evaluation = named?.get("evaluation");
   const error = named?.get("error");
   const backtrace = named?.get("backtrace");
-  const elapsed = named?.get("elapsed");
-  const timing =
-    elapsed?.type === -16
-      ? { roundtrip, elapsed: elapsed.value }
-      : { roundtrip };
+  if (result && evaluation?.type === -7) {
+    return {
+      value: result,
+      timing: { roundtrip, evaluation: Number(evaluation.value) },
+    };
+  }
   if (error?.type === 10 && backtrace?.type === 10) {
     throw new QError(
       utf8.decode(error.data),
-      timing,
+      { roundtrip },
       utf8.decode(backtrace.data),
     );
-  }
-  if (result && !error) {
-    return { value: result, timing };
   }
   throw new Error("the server didn't evaluate the query protected", {
     cause: unprotected,
@@ -332,7 +327,7 @@ export class Connection {
       return;
     }
     this.pending = undefined;
-    const roundtrip = performance.now() - pending.sent;
+    const roundtrip = Math.floor(performance.now() - pending.sent);
     let value: Value;
     try {
       value = decode(message);
