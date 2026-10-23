@@ -64,6 +64,8 @@ export class QError extends Error {
 //   0. Those outside, this function's and a customised .z.pg's, go. The
 //   frames' layout isn't documented, so if stripping them fails, the
 //   backtrace is shown whole rather than the error lost
+// - The wrapper's frame is found with ~/:, not ?, which misses when the
+//   list starts with (), as a frame for the query's own text holds
 // - The query, evaluated by value, sees only globals, so these locals can't
 //   clash with its names. None is named for a q keyword, such as trim, which
 //   can't be assigned
