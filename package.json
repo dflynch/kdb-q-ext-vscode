@@ -83,7 +83,7 @@
     "compile": "npm run clean && tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
-    "lint": "biome check",
+    "lint": "biome check && tsc -p tsconfig.web.json",
     "test": "vscode-test",
     "package": "vsce package",
     "format": "biome check --write",

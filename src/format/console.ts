@@ -7,11 +7,14 @@ import {
 } from "../codec/types";
 import { cell, qText, type Size } from "./text";
 
+// A value as text, as the q console shows it: a port of q's own .Q.s2 and
+// .Q.S, which q prints for comparison when it changes
+
 export type { Size };
 
-// How much of a value to show, like q's \c for its console but far larger,
-// as the panel scrolls: lines past the first lines - 1 become .., and so
-// does the end of a line wider than width
+// How much of a value to show: far more than q's \c, as the panel scrolls.
+// A value with more lines shows the first 4999 and then .., and a wider
+// line shows its first 4998 characters and then ..
 export const defaultSize: Size = { lines: 5000, width: 5000 };
 
 // A value as the q console shows it, for any result but a table or a

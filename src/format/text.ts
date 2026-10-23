@@ -17,8 +17,9 @@ import * as temporal from "./temporal";
 // - a cell's form, as the console shows an element of a vector in a column:
 //   no suffix, quotes or backtick, and a blank for a null
 //
-// Text is written into a Text that stops taking more once it's full, so a
-// large vector costs only as much as the part that's shown.
+// Text is written into a Text that takes no more once it's full, so a large
+// vector costs only as much as the part that's shown. Loops also stop when
+// it's full, so as not to format what would be dropped.
 
 // How much text to take: lines past the limit, and the end of a line
 // wider than width, are cut
@@ -36,7 +37,11 @@ class Text {
     return this.line > this.size.width || this.lines > this.size.lines;
   }
 
+  // Once full, what's there is cut anyway
   put(text: string): void {
+    if (this.full) {
+      return;
+    }
     this.parts.push(text);
     const end = text.lastIndexOf("\n");
     if (end < 0) {
@@ -102,51 +107,26 @@ const letters = " bg xhi efcspmdznuvt";
 // the floating-point types keep NaN and infinities. Other types have none.
 type Special = "null" | "infinity" | "-infinity" | undefined;
 
+const short = [-32768, 32767, -32767];
+const int = [-2147483648, 2147483647, -2147483647];
+const long = [-0x8000000000000000n, 0x7fffffffffffffffn, -0x7fffffffffffffffn];
+const floating = [
+  Number.NaN,
+  Number.POSITIVE_INFINITY,
+  Number.NEGATIVE_INFINITY,
+];
+// Null, infinity and -infinity, by type
+// biome-ignore format: a table
+const specials: Partial<Record<number, unknown[]>> = {
+  5: short, 6: int, 7: long, 8: floating, 9: floating, 12: long, 13: int,
+  14: int, 15: floating, 16: long, 17: int, 18: int, 19: int,
+};
+
 function special(type: number, x: unknown): Special {
-  switch (Math.abs(type)) {
-    case 5:
-      return x === -32768
-        ? "null"
-        : x === 32767
-          ? "infinity"
-          : x === -32767
-            ? "-infinity"
-            : undefined;
-    case 6:
-    case 13:
-    case 14:
-    case 17:
-    case 18:
-    case 19:
-      return x === -2147483648
-        ? "null"
-        : x === 2147483647
-          ? "infinity"
-          : x === -2147483647
-            ? "-infinity"
-            : undefined;
-    case 7:
-    case 12:
-    case 16:
-      return x === -0x8000000000000000n
-        ? "null"
-        : x === 0x7fffffffffffffffn
-          ? "infinity"
-          : x === -0x7fffffffffffffffn
-            ? "-infinity"
-            : undefined;
-    case 8:
-    case 9:
-    case 15:
-      return Number.isNaN(x)
-        ? "null"
-        : x === Number.POSITIVE_INFINITY
-          ? "infinity"
-          : x === Number.NEGATIVE_INFINITY
-            ? "-infinity"
-            : undefined;
-  }
-  return undefined;
+  const values = specials[Math.abs(type)];
+  // Object.is, as NaN isn't equal to itself
+  const i = values ? values.findIndex((v) => Object.is(v, x)) : -1;
+  return i < 0 ? undefined : (["null", "infinity", "-infinity"] as const)[i];
 }
 
 // A float as C's %.7g writes it, q's default \P 7: seven significant
@@ -281,12 +261,8 @@ function plain(atom: Atom): string {
 }
 
 // q writes infinities in floating-point types with a lowercase w
-function floating(type: number): boolean {
-  return type === 8 || type === 9 || type === 15;
-}
-
 function infinity(type: number, which: "infinity" | "-infinity"): string {
-  const w = floating(Math.abs(type)) ? "0w" : "0W";
+  const w = specials[Math.abs(type)] === floating ? "0w" : "0W";
   return which === "infinity" ? w : `-${w}`;
 }
 
@@ -544,10 +520,7 @@ function write(value: Value, text: Text): void {
         text.put(`\`${value.reference}`);
         return;
       }
-      keys(
-        { type: 11, attribute: Attribute.None, data: symbols(value.columns) },
-        text,
-      );
+      text.put(columns(value.columns));
       text.put("!");
       list({ type: 0, attribute: Attribute.None, items: value.data }, text);
       return;
@@ -571,18 +544,15 @@ function write(value: Value, text: Text): void {
   vector(value as Vector, text);
 }
 
-const encoder = new TextEncoder();
-
-// Column names as a symbol vector's data
-function symbols(names: string[]): Texts {
-  const encoded = names.map((name) => encoder.encode(name));
-  const offsets = new Uint32Array(names.length + 1);
-  encoded.forEach((bytes, i) => {
-    offsets[i + 1] = offsets[i] + bytes.length;
-  });
-  const bytes = new Uint8Array(offsets[names.length]);
-  encoded.forEach((b, i) => {
-    bytes.set(b, offsets[i]);
-  });
-  return { bytes, offsets };
+// A table's column names as its dictionary's keys, which q brackets when
+// there are fewer than two
+function columns(names: string[]): string {
+  const symbols = names.map((name) => `\`${name}`).join("");
+  switch (names.length) {
+    case 0:
+      return "(`symbol$())";
+    case 1:
+      return `(,${symbols})`;
+  }
+  return symbols;
 }
