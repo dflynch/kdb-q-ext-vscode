@@ -5,9 +5,10 @@ import { Connections } from "./connections";
 export function activate(context: vscode.ExtensionContext) {
   const connections = new Connections(commands.opener(context.secrets));
   const output = vscode.window.createOutputChannel("kdb+/q");
+  const status = commands.showStatus(connections);
   context.subscriptions.push(
     output,
-    commands.showStatus(connections),
+    status,
     connections,
     vscode.commands.registerCommand("kdb-q-ext-vscode.connect", () =>
       commands.connect(connections),
@@ -26,7 +27,7 @@ export function activate(context: vscode.ExtensionContext) {
       async () => {
         const editor = vscode.window.activeTextEditor;
         if (editor) {
-          await commands.runOnServer(editor, connections, output);
+          await commands.runOnServer(editor, connections, output, status);
         }
       },
     ),

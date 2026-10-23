@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { type Asker, add } from "./adding";
 import * as comments from "./comments";
-import { Connection } from "./connection";
+import { Connection, QError, type Timing } from "./connection";
 import type { Connections, State } from "./connections";
 import { credentials, type Sources } from "./credentials";
 import type { Size } from "./format/console";
@@ -57,12 +57,14 @@ function consoleSize(): Size {
 }
 
 // Run the selected text, or the current line, on the active connection as
-// one query, as written, showing it with its result as the q console does.
-// With several selections, the primary one.
+// one query, as written, showing it with its result as the q console does,
+// and how long it took in the status bar. With several selections, the
+// primary one.
 export async function runOnServer(
   editor: vscode.TextEditor,
   connections: Connections<Connection>,
   output: vscode.OutputChannel,
+  status: Pick<Status, "timed">,
 ) {
   const selection = editor.selection;
   const query = selection.isEmpty
@@ -93,7 +95,15 @@ export async function runOnServer(
         (error: Error) => ({ error }),
       ),
   );
-  output.appendLine(transcript.entry(query, name, outcome, size));
+  output.appendLine(transcript.entry(query, outcome, size));
+  status.timed(
+    name,
+    "result" in outcome
+      ? outcome.result.timing
+      : outcome.error instanceof QError
+        ? outcome.error.timing
+        : undefined,
+  );
 }
 
 // Comment out the selected lines with "/" and "\" marker lines, or remove the
@@ -514,17 +524,24 @@ export async function disconnect(connections: Connections<Connection>) {
   }
 }
 
+// The status bar, which can be told how long a server's last query took
+export type Status = vscode.Disposable & {
+  timed(name: string, timing: Timing | undefined): void;
+};
+
 // The active connection in the status bar, which picks one when clicked,
-// and a warning when a connection closes without being disconnected
-export function showStatus(
-  connections: Connections<Connection>,
-): vscode.Disposable {
+// with how long its last query took, and a warning when a connection closes
+// without being disconnected. The time shown is the server's, as \t gives,
+// or without protected evaluation the roundtrip.
+export function showStatus(connections: Connections<Connection>): Status {
   const item = vscode.window.createStatusBarItem(
     "kdb-q-ext-vscode.connection",
     vscode.StatusBarAlignment.Left,
   );
   item.name = "kdb+/q Connection";
   item.command = "kdb-q-ext-vscode.connect";
+  // The last query's timing, kept while its connection is open
+  let last: { name: string; timing: Timing } | undefined;
   const update = () => {
     const active = connections.active;
     const icon = !active
@@ -534,9 +551,16 @@ export function showStatus(
         : active.state.kind === "open"
           ? "database"
           : "debug-disconnect";
-    item.text = `$(${icon}) ${active?.name ?? "kdb+/q"}`;
+    const timing = last?.name === active?.name ? last?.timing : undefined;
+    item.text = `$(${icon}) ${active?.name ?? "kdb+/q"}${timing ? `  ${timing.execution ?? timing.roundtrip} ms` : ""}`;
     item.tooltip = active
-      ? `kdb+/q: ${active.name}, ${describe(active.state)}`
+      ? `kdb+/q: ${active.name}, ${describe(active.state)}${
+          timing === undefined
+            ? ""
+            : timing.execution === undefined
+              ? `\nLast query: ${timing.roundtrip} ms roundtrip`
+              : `\nLast query: ${timing.execution} ms execution, ${timing.roundtrip} ms roundtrip`
+        }`
       : "kdb+/q: Connect to a server";
     item.backgroundColor =
       active?.state.kind === "closed"
@@ -546,6 +570,9 @@ export function showStatus(
   update();
   item.show();
   const stop = connections.onChange(({ lost }) => {
+    if (last && connections.state(last.name)?.kind !== "open") {
+      last = undefined;
+    }
     update();
     if (lost) {
       vscode.window.showWarningMessage(
@@ -554,6 +581,10 @@ export function showStatus(
     }
   });
   return {
+    timed: (name, timing) => {
+      last = timing && { name, timing };
+      update();
+    },
     dispose: () => {
       stop();
       item.dispose();
