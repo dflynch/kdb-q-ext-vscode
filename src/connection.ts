@@ -69,16 +69,14 @@ export class QError extends Error {
 //   can't be assigned
 export const wrapper = [
   "{[query]",
-  "  strip:{[self;stack]",
-  "    stack:(-1+last where self~/:stack[;0;0])#stack;",
-  "    stack[;3]-:last stack[;3];",
-  "    stack};",
   "  start:.z.p;",
   "  outcome:.Q.trp['[(1b;);value];query;(0b;;)];",
   "  elapsed:(`long$.z.p-start)div 1000000;",
-  "  if[first outcome;:``result`elapsed!(::;outcome 1;elapsed)];",
-  "  stack:outcome 2;",
-  "  backtrace:.Q.sbt @[strip .z.s;stack;stack];",
+  "  if[outcome 0;:``result`elapsed!(::;outcome 1;elapsed)];",
+  "  strip:{[self;stack]",
+  "    stack:(-1+last where self~/:stack[;0;0])#stack;",
+  "    .[stack;(::;3);-;last stack[;3]]};",
+  "  backtrace:.Q.sbt @[strip .z.s;outcome 2;outcome 2];",
   "  ``error`backtrace`elapsed!(::;outcome 1;backtrace;elapsed)}",
 ].join("\n");
 
