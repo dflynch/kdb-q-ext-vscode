@@ -1,9 +1,11 @@
 import * as vscode from "vscode";
 import * as comments from "./comments";
-import type { Sources } from "./credentials";
+import { Connection } from "./connection";
+import type { Connections, State } from "./connections";
+import { credentials, type Sources } from "./credentials";
 import * as servers from "./servers";
 import * as statements from "./statements";
-import { passphraseKey } from "./tls";
+import { passphraseKey, secure } from "./tls";
 
 // Send the selected text, or the current line, to the active terminal one
 // statement at a time. With several selections, each is sent in turn from the
@@ -164,6 +166,7 @@ async function pickServer(
   placeHolder: string,
   test: (server: servers.Definition) => boolean = () => true,
   none = "",
+  detail: (server: servers.Definition) => string | undefined = () => undefined,
 ): Promise<servers.Definition | undefined> {
   const all = definitions();
   const defined = all.filter(test);
@@ -189,6 +192,7 @@ async function pickServer(
     defined.map((server) => ({
       label: server.name,
       description: `${server.user ? `${server.user}@` : ""}${server.host}:${server.port}`,
+      detail: detail(server),
       server,
     })),
     { placeHolder },
@@ -293,6 +297,126 @@ export function sources(secrets: vscode.SecretStorage): Sources {
     extension: async (id) => {
       const extension = vscode.extensions.getExtension(id);
       return extension === undefined ? undefined : await extension.activate();
+    },
+  };
+}
+
+// A connection to a server as its settings define it, with its password or
+// credentials and its TLS files got at each connect, so that a token is
+// fresh. Undefined if the user cancels being asked for a password.
+export function opener(secrets: vscode.SecretStorage) {
+  return async (definition: servers.Definition) => {
+    const given = await credentials(definition, sources(secrets));
+    if (given === undefined) {
+      return undefined;
+    }
+    const key = definition.tls && passphraseKey(definition.tls);
+    const tls =
+      definition.tls &&
+      (await secure(definition.tls, key && (await secrets.get(key))));
+    return Connection.open(
+      servers.server(definition, given, connectionDefaults(), tls),
+    );
+  };
+}
+
+// A state as a few words
+function describe(state: State): string {
+  switch (state.kind) {
+    case "connecting":
+      return "connecting";
+    case "open":
+      return "connected";
+    case "closed":
+      return `closed: ${state.reason.message}`;
+  }
+}
+
+// Connect to a server picked, or make its connection active if it's open
+export async function connect(connections: Connections<Connection>) {
+  const server = await pickServer(
+    "The server to connect to",
+    undefined,
+    undefined,
+    (server) => {
+      const state = connections.state(server.name);
+      const active = connections.active?.name === server.name;
+      return state && `${active ? "Active, " : ""}${describe(state)}`;
+    },
+  );
+  if (!server) {
+    return;
+  }
+  try {
+    await connections.connect(server);
+  } catch (error) {
+    vscode.window.showErrorMessage(
+      `kdb+/q: ${server.name}: ${(error as Error).message}`,
+    );
+  }
+}
+
+// Close a connection: the only one, or one picked
+export async function disconnect(connections: Connections<Connection>) {
+  const names = connections.names;
+  if (names.length === 0) {
+    vscode.window.showInformationMessage("kdb+/q: No server is connected.");
+    return;
+  }
+  const name =
+    names.length === 1
+      ? names[0]
+      : await vscode.window.showQuickPick(names, {
+          placeHolder: "The server to disconnect from",
+        });
+  if (name) {
+    connections.disconnect(name);
+  }
+}
+
+// The active connection in the status bar, which picks one when clicked,
+// and a warning when a connection closes without being disconnected
+export function showStatus(
+  connections: Connections<Connection>,
+): vscode.Disposable {
+  const item = vscode.window.createStatusBarItem(
+    "kdb-q-ext-vscode.connection",
+    vscode.StatusBarAlignment.Left,
+  );
+  item.name = "kdb+/q Connection";
+  item.command = "kdb-q-ext-vscode.connect";
+  const update = () => {
+    const active = connections.active;
+    const icon = !active
+      ? "plug"
+      : active.state.kind === "connecting"
+        ? "loading~spin"
+        : active.state.kind === "open"
+          ? "database"
+          : "debug-disconnect";
+    item.text = `$(${icon}) ${active?.name ?? "kdb+/q"}`;
+    item.tooltip = active
+      ? `kdb+/q: ${active.name}, ${describe(active.state)}`
+      : "kdb+/q: Connect to a server";
+    item.backgroundColor =
+      active?.state.kind === "closed"
+        ? new vscode.ThemeColor("statusBarItem.warningBackground")
+        : undefined;
+  };
+  update();
+  item.show();
+  const stop = connections.onChange(({ lost }) => {
+    update();
+    if (lost) {
+      vscode.window.showWarningMessage(
+        `kdb+/q: ${lost.name}: ${lost.reason.message}`,
+      );
+    }
+  });
+  return {
+    dispose: () => {
+      stop();
+      item.dispose();
     },
   };
 }

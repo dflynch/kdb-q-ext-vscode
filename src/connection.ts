@@ -189,6 +189,11 @@ export class Connection {
   };
   // Why the connection closed, once it has
   private reason?: Error;
+  private ended: (reason: Error) => void = () => {};
+  // Resolves with why the connection closed, once it has, however it did
+  readonly closed = new Promise<Error>((resolve) => {
+    this.ended = resolve;
+  });
   // A message's header, then the message, as they arrive
   private header = Buffer.alloc(8);
   private headerLength = 0;
@@ -329,6 +334,7 @@ export class Connection {
       return;
     }
     this.reason = reason;
+    this.ended(reason);
     this.socket.destroy();
     this.pending?.reject(reason);
     this.pending = undefined;

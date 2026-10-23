@@ -462,6 +462,19 @@ suite("connection", () => {
     await assert.rejects(first);
   });
 
+  test("closed resolves with why, however it closed", async () => {
+    const server = await fake();
+    const connection = await open(server);
+    connection.close();
+    assert.strictEqual(
+      (await connection.closed).message,
+      "the query was cancelled",
+    );
+    const other = await open(server);
+    server.stop();
+    assert.strictEqual((await other.closed).message, "the connection closed");
+  });
+
   test("closing cancels the query and closes the socket", async () => {
     const server = await fake();
     const connection = await open(server);

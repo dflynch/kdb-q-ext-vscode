@@ -51,6 +51,16 @@
         "title": "Toggle Block Comment"
       },
       {
+        "command": "kdb-q-ext-vscode.connect",
+        "category": "kdb+/q",
+        "title": "Connect to Server"
+      },
+      {
+        "command": "kdb-q-ext-vscode.disconnect",
+        "category": "kdb+/q",
+        "title": "Disconnect from Server"
+      },
+      {
         "command": "kdb-q-ext-vscode.setPassword",
         "category": "kdb+/q",
         "title": "Set Server Password"
