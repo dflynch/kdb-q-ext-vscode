@@ -6,6 +6,7 @@ import {
   add,
   back,
   type Context,
+  port,
   type Reply,
 } from "../adding";
 import { addServer } from "../commands";
@@ -49,7 +50,11 @@ function scripted(answers: Answer[]): Asker & { asked: string[] } {
   };
 }
 
-const context: Context = { taken: ["old"], timeout: 2000, workspace: false };
+const context: Context = {
+  taken: ["old"],
+  timeout: 2000,
+  workspaceOpen: false,
+};
 
 suite("adding a server", () => {
   test("asks for each setting, and the password to store", async () => {
@@ -66,8 +71,7 @@ suite("adding a server", () => {
       name: "prod",
       value: { host: "kdb1", port: 5010, user: "dan", timeout: 2000 },
       password: "secret",
-      passphrase: "",
-      workspace: false,
+      target: "user",
     } satisfies Adding);
     assert.deepStrictEqual(ask.asked, [
       "1/6 Name",
@@ -114,16 +118,14 @@ suite("adding a server", () => {
     assert.deepStrictEqual(adding, {
       name: "uat",
       value: { host: "kdb1", port: 5010, timeout: 2000 },
-      password: "",
-      passphrase: "",
-      workspace: false,
+      target: "user",
     });
   });
 
-  test("going back from the first question stays there", async () => {
-    const ask = scripted([back, "prod", undefined]);
-    assert.strictEqual(await add(ask, context), undefined);
-    assert.deepStrictEqual(ask.asked, ["1/6 Name", "1/6 Name", "2/6 Host"]);
+  test("there's no going back from the first question", async () => {
+    await assert.rejects(add(scripted([back]), context), {
+      message: "there's no question before the first",
+    });
   });
 
   test("asking each time, or an extension named, its fields left out", async () => {
@@ -186,9 +188,8 @@ suite("adding a server", () => {
         protect: false,
         timeout: 0,
       },
-      password: "",
       passphrase: "secret",
-      workspace: false,
+      target: "user",
     });
     assert.strictEqual(ask.asked.at(-1), "12/12 Passphrase (optional)");
   });
@@ -231,9 +232,35 @@ suite("adding a server", () => {
       ["protect", "timeout"],
       "workspace",
     ]);
-    const adding = await add(ask, { ...context, workspace: true });
-    assert.strictEqual(adding?.workspace, true);
+    const adding = await add(ask, { ...context, workspaceOpen: true });
+    assert.strictEqual(adding?.target, "workspace");
     assert.strictEqual(ask.asked.at(-1), "7/7 Save to");
+  });
+
+  test("a port is a whole number up to 65535", () => {
+    assert.strictEqual(port(" 5000 "), 5000);
+    assert.strictEqual(port("65535"), 65535);
+    for (const text of ["", "0", "65536", "5.5", "-1", "5e3", "50a"]) {
+      assert.strictEqual(port(text), undefined, text);
+    }
+  });
+
+  test("a connection timeout of none is said so", async () => {
+    let shown: string | undefined;
+    const ask = scripted(["a", "kdb1", "1", "", "none"]);
+    await add(
+      {
+        ...ask,
+        tick: async (question) => {
+          shown = question.choices.find(
+            ({ id }) => id === "timeout",
+          )?.description;
+          return undefined;
+        },
+      },
+      { ...context, timeout: 0 },
+    );
+    assert.strictEqual(shown, "none, edit in settings.json");
   });
 
   test("a cancel adds nothing", async () => {
@@ -247,7 +274,7 @@ suite("adding a server", () => {
     const problems: (string | undefined)[] = [];
     const tries: Record<string, string[]> = {
       Name: ["old", " ", "prod"],
-      Host: [" ", "kdb1:5000", "kdb1"],
+      Host: [" ", "kdb1:5000", "fe80::1", "kdb1"],
       "Port on kdb1": ["0", "65536", "5.5", "5000"],
       "User (optional)": ["a:b", ""],
       Password: ["", "secret"],
@@ -270,6 +297,7 @@ suite("adding a server", () => {
       undefined,
       "Required",
       "Port comes next",
+      undefined,
       undefined,
       "From 1 to 65535",
       "From 1 to 65535",
@@ -397,6 +425,31 @@ suite("addServer", () => {
       ]),
     );
     assert.match(told[0], /fields its extension takes go in settings.json/);
+  });
+
+  test("a servers setting that isn't an object is said before asking", async () => {
+    await config().update(
+      "servers",
+      [{ host: "kdb1", port: 1 }],
+      vscode.ConfigurationTarget.Global,
+    );
+    const window = vscode.window as unknown as Record<string, unknown>;
+    const saved = window.showErrorMessage;
+    const errors: string[] = [];
+    window.showErrorMessage = async (message: string) => {
+      errors.push(message);
+      return undefined;
+    };
+    const ask = scripted([]);
+    try {
+      await addServer(secrets({}), connections, ask);
+    } finally {
+      window.showErrorMessage = saved;
+    }
+    assert.deepStrictEqual(ask.asked, []);
+    assert.deepStrictEqual(errors, [
+      "kdb+/q: The servers setting isn't an object, so a server can't be added to it.",
+    ]);
   });
 
   test("a cancel writes nothing", async () => {

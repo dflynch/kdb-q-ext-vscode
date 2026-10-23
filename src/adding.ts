@@ -9,14 +9,14 @@ export type Reply<T> = T | typeof back | undefined;
 // Where a question is in the flow, for its title
 export type Placed = { step: number; total: number };
 
-// A box to type in, which can offer to browse for a file
+// A box to type in, which can offer to browse for a file of the types given
 export type Input = {
   prompt: string;
   placeholder?: string;
   value?: string;
   password?: boolean;
   validate?: (text: string) => string | undefined;
-  browse?: { label: string; filters: Record<string, string[]> };
+  browse?: Record<string, string[]>;
 };
 
 // A list to pick one from, or to tick any of, answered with their ids. What
@@ -28,29 +28,29 @@ export type Choices = {
   chosen?: string[];
 };
 
-// How the flow asks its questions: VS Code's quick input, or a script. A
-// step asks without saying where it is, which the flow adds.
-type Asks<Where> = {
-  input(question: Input & Where): Promise<Reply<string>>;
-  pick(question: Choices & Where): Promise<Reply<string>>;
-  tick(question: Choices & Where): Promise<Reply<string[]>>;
+// How the flow asks its questions: VS Code's quick input, or a script
+export type Asker = {
+  input(question: Input & Placed): Promise<Reply<string>>;
+  pick(question: Choices & Placed): Promise<Reply<string>>;
+  tick(question: Choices & Placed): Promise<Reply<string[]>>;
 };
-export type Asker = Asks<Placed>;
-type Ask = Asks<Record<never, never>>;
 
 // What the flow needs to know: the names taken, the default connect timeout
-// and whether there's a workspace to keep the server in
-export type Context = { taken: string[]; timeout: number; workspace: boolean };
+// and whether a workspace is open to save the server to
+export type Context = {
+  taken: string[];
+  timeout: number;
+  workspaceOpen: boolean;
+};
 
-// A server to add: its name, its setting as written, what to keep in secure
-// storage, which can be empty, and whether it goes in the workspace's
-// settings
+// A server to add: its name, its setting as written, any password and
+// passphrase to keep in secure storage, and the settings it's saved to
 export type Adding = {
   name: string;
   value: Record<string, unknown>;
-  password: string;
-  passphrase: string;
-  workspace: boolean;
+  password?: string;
+  passphrase?: string;
+  target: "user" | "workspace";
 };
 
 // The answers so far, kept as given, so that going back shows them again
@@ -70,18 +70,43 @@ type State = {
   key?: string;
   pfx?: string;
   passphrase?: string;
-  scope?: string;
+  target?: string;
 };
 
-// A question, giving the answers it adds to the state
-type Step = (ask: Ask, state: State) => Promise<Reply<State>>;
+// A question, and what its answer adds to the state
+type Question =
+  | (Input & { kind: "input"; take: (answer: string) => State })
+  | (Choices & { kind: "pick"; take: (answer: string) => State })
+  | (Choices & { kind: "tick"; take: (answer: string[]) => State });
 
-// A reply's answer as the state takes it
-function then<T>(reply: Reply<T>, take: (answer: T) => State): Reply<State> {
-  if (reply === undefined) {
-    return undefined;
-  }
-  return reply === back ? back : take(reply as T);
+// A step asks its question with the answers so far, to show them again
+type Step = (state: State) => Question;
+
+// The options as first shown: on, as a server has them by default
+const optionsAtFirst = ["protect", "timeout"];
+
+// What the answers so far lead to, an option not answered yet counting as
+// first shown. Both the questions asked and the server made follow it, so
+// that an answer given before going back and choosing otherwise is dropped.
+function reached(state: State) {
+  const options = state.options ?? optionsAtFirst;
+  const tls = options.includes("tls");
+  const client = tls && (state.files ?? []).includes("client");
+  return {
+    tls,
+    ca: tls && (state.files ?? []).includes("ca"),
+    client,
+    pfx: client && state.form === "pfx",
+    pem: client && state.form !== "pfx",
+    protect: options.includes("protect"),
+    timeout: options.includes("timeout"),
+  };
+}
+
+// A port as typed
+export function port(text: string): number | undefined {
+  const port = /^\d+$/.test(text.trim()) ? Number(text) : 0;
+  return port >= 1 && port <= 65535 ? port : undefined;
 }
 
 const pem = { PEM: ["pem", "crt", "cer", "key"] };
@@ -90,269 +115,240 @@ const pem = { PEM: ["pem", "crt", "cer", "key"] };
 function file(
   key: "ca" | "cert" | "key" | "pfx",
   prompt: string,
-  label: string,
-  filters: Record<string, string[]>,
+  browse: Record<string, string[]>,
 ): Step {
-  return async (ask, state) =>
-    then(
-      await ask.input({
-        prompt,
-        value: state[key],
-        validate: (text) =>
-          filePath.test(text.trim())
-            ? undefined
-            : "An absolute path, or one from ~/",
-        browse: { label, filters },
-      }),
-      (path) => ({ [key]: path.trim() }),
-    );
+  return (state) => ({
+    kind: "input",
+    prompt,
+    value: state[key],
+    validate: (text) =>
+      filePath.test(text.trim())
+        ? undefined
+        : "An absolute path, or one from ~/",
+    browse,
+    take: (path) => ({ [key]: path.trim() }),
+  });
 }
 
 function name(taken: string[]): Step {
-  return async (ask, state) =>
-    then(
-      await ask.input({
-        prompt: "Name",
-        value: state.name,
-        validate: (text) =>
-          text.trim() === ""
-            ? "Required"
-            : taken.includes(text.trim())
-              ? `${text.trim()} already exists`
-              : undefined,
-      }),
-      (name) => ({ name: name.trim() }),
-    );
-}
-
-const host: Step = async (ask, state) =>
-  then(
-    await ask.input({
-      prompt: "Host",
-      placeholder: "localhost",
-      value: state.host,
-      validate: (text) =>
-        text.trim() === ""
-          ? "Required"
-          : /:\d+$/.test(text.trim())
-            ? "Port comes next"
-            : undefined,
-    }),
-    (host) => ({ host: host.trim() }),
-  );
-
-const port: Step = async (ask, state) =>
-  then(
-    await ask.input({
-      prompt: `Port on ${state.host}`,
-      placeholder: "5000",
-      value: state.port,
-      validate: (text) => (servers.port(text) ? undefined : "From 1 to 65535"),
-    }),
-    (port) => ({ port: port.trim() }),
-  );
-
-const user: Step = async (ask, state) =>
-  then(
-    await ask.input({
-      prompt: "User (optional)",
-      value: state.user,
-      validate: (text) =>
-        servers.userProblem(text.trim())
-          ? "Can't contain : or a 0 byte"
+  return (state) => ({
+    kind: "input",
+    prompt: "Name",
+    value: state.name,
+    validate: (text) =>
+      text.trim() === ""
+        ? "Required"
+        : taken.includes(text.trim())
+          ? `${text.trim()} already exists`
           : undefined,
-    }),
-    (user) => ({ user: user.trim() }),
-  );
-
-const login: Step = async (ask, state) =>
-  then(
-    await ask.pick({
-      placeholder: "Password",
-      choices: [
-        { id: "none", label: "No password" },
-        {
-          id: "store",
-          label: "Store password",
-          description: "in VS Code's secure storage",
-        },
-        {
-          id: "prompt",
-          label: "Ask each time",
-          description: "never stored",
-        },
-        {
-          id: "extension",
-          label: "Use extension",
-          description: "for a firm's own sign-on",
-        },
-      ],
-      chosen: state.login === undefined ? undefined : [state.login],
-    }),
-    (login) => ({ login }),
-  );
-
-const password: Step = async (ask, state) =>
-  then(
-    await ask.input({
-      prompt: "Password",
-      value: state.password,
-      password: true,
-      validate: (text) =>
-        text === "" ? "Required" : servers.passwordProblem(text),
-    }),
-    (password) => ({ password }),
-  );
-
-const extension: Step = async (ask, state) =>
-  then(
-    await ask.input({
-      prompt: "Extension ID",
-      placeholder: "publisher.name",
-      value: state.extension,
-      validate: (text) =>
-        servers.extensionId.test(text.trim()) ? undefined : "publisher.name",
-    }),
-    (extension) => ({ extension: extension.trim() }),
-  );
-
-// The options as first shown: on, as a server has them by default
-const optionsAtFirst = ["protect", "timeout"];
-
-// Whether an option or a file TLS needs is ticked, the options counting as
-// first shown until answered
-function ticked(state: State, key: "options" | "files", id: string): boolean {
-  return (state[key] ?? (key === "options" ? optionsAtFirst : [])).includes(id);
+    take: (name) => ({ name: name.trim() }),
+  });
 }
+
+// A host with :port after it is one typed with its port; an IPv6 address
+// has colons too, but more than one
+const host: Step = (state) => ({
+  kind: "input",
+  prompt: "Host",
+  placeholder: "localhost",
+  value: state.host,
+  validate: (text) =>
+    text.trim() === ""
+      ? "Required"
+      : /^[^:]+:\d+$/.test(text.trim())
+        ? "Port comes next"
+        : undefined,
+  take: (host) => ({ host: host.trim() }),
+});
+
+const portOn: Step = (state) => ({
+  kind: "input",
+  prompt: `Port on ${state.host}`,
+  placeholder: "5000",
+  value: state.port,
+  validate: (text) => (port(text) ? undefined : "From 1 to 65535"),
+  take: (port) => ({ port: port.trim() }),
+});
+
+const user: Step = (state) => ({
+  kind: "input",
+  prompt: "User (optional)",
+  value: state.user,
+  validate: (text) =>
+    servers.userProblem(text.trim())
+      ? "Can't contain : or a 0 byte"
+      : undefined,
+  take: (user) => ({ user: user.trim() }),
+});
+
+const login: Step = (state) => ({
+  kind: "pick",
+  placeholder: "Password",
+  choices: [
+    { id: "none", label: "No password" },
+    {
+      id: "store",
+      label: "Store password",
+      description: "in VS Code's secure storage",
+    },
+    { id: "prompt", label: "Ask each time", description: "never stored" },
+    {
+      id: "extension",
+      label: "Use extension",
+      description: "for a firm's own sign-on",
+    },
+  ],
+  chosen: state.login === undefined ? undefined : [state.login],
+  take: (login) => ({ login }),
+});
+
+const password: Step = (state) => ({
+  kind: "input",
+  prompt: "Password",
+  value: state.password,
+  password: true,
+  validate: (text) =>
+    text === "" ? "Required" : servers.passwordProblem(text),
+  take: (password) => ({ password }),
+});
+
+const extension: Step = (state) => ({
+  kind: "input",
+  prompt: "Extension ID",
+  placeholder: "publisher.name",
+  value: state.extension,
+  validate: (text) =>
+    servers.extensionId.test(text.trim()) ? undefined : "publisher.name",
+  take: (extension) => ({ extension: extension.trim() }),
+});
 
 function options(timeout: number): Step {
-  return async (ask, state) =>
-    then(
-      await ask.tick({
-        placeholder: "Options",
-        choices: [
-          { id: "tls", label: "TLS" },
-          {
-            id: "protect",
-            label: "Protected evaluation",
-            description: "untick when the server enforces an allowlist",
-          },
-          {
-            id: "timeout",
-            label: "Connection timeout",
-            description: `${timeout} ms, edit in settings.json`,
-          },
-        ],
-        chosen: state.options ?? optionsAtFirst,
-      }),
-      (options) => ({ options }),
-    );
+  return (state) => ({
+    kind: "tick",
+    placeholder: "Options",
+    choices: [
+      { id: "tls", label: "TLS" },
+      {
+        id: "protect",
+        label: "Protected evaluation",
+        description: "untick when the server enforces an allowlist",
+      },
+      {
+        id: "timeout",
+        label: "Connection timeout",
+        description: `${timeout === 0 ? "none" : `${timeout} ms`}, edit in settings.json`,
+      },
+    ],
+    chosen: state.options ?? optionsAtFirst,
+    take: (options) => ({ options }),
+  });
 }
 
-const files: Step = async (ask, state) =>
-  then(
-    await ask.tick({
-      placeholder: "TLS files (optional)",
-      choices: [
-        {
-          id: "ca",
-          label: "CA",
-          description: "trusted besides the system's",
-        },
-        {
-          id: "client",
-          label: "Client certificate",
-          description: "for a server that requires one",
-        },
-      ],
-      chosen: state.files,
-    }),
-    (files) => ({ files }),
-  );
+const files: Step = (state) => ({
+  kind: "tick",
+  placeholder: "TLS files (optional)",
+  choices: [
+    { id: "ca", label: "CA", description: "trusted besides the system's" },
+    {
+      id: "client",
+      label: "Client certificate",
+      description: "for a server that requires one",
+    },
+  ],
+  chosen: state.files,
+  take: (files) => ({ files }),
+});
 
-const form: Step = async (ask, state) =>
-  then(
-    await ask.pick({
-      placeholder: "Client certificate format",
-      choices: [
-        {
-          id: "pem",
-          label: "Certificate and key",
-          description: "in PEM",
-        },
-        { id: "pfx", label: "PKCS#12", description: ".p12 or .pfx" },
-      ],
-      chosen: state.form === undefined ? undefined : [state.form],
-    }),
-    (form) => ({ form }),
-  );
+const form: Step = (state) => ({
+  kind: "pick",
+  placeholder: "Client certificate format",
+  choices: [
+    { id: "pem", label: "Certificate and key", description: "in PEM" },
+    { id: "pfx", label: "PKCS#12", description: ".p12 or .pfx" },
+  ],
+  chosen: state.form === undefined ? undefined : [state.form],
+  take: (form) => ({ form }),
+});
 
-const passphrase: Step = async (ask, state) =>
-  then(
-    await ask.input({
-      prompt: "Passphrase (optional)",
-      value: state.passphrase,
-      password: true,
-    }),
-    (passphrase) => ({ passphrase }),
-  );
+const passphrase: Step = (state) => ({
+  kind: "input",
+  prompt: "Passphrase (optional)",
+  value: state.passphrase,
+  password: true,
+  take: (passphrase) => ({ passphrase }),
+});
 
-const scope: Step = async (ask, state) =>
-  then(
-    await ask.pick({
-      placeholder: "Save to",
-      choices: [
-        {
-          id: "user",
-          label: "User settings",
-          description: "all workspaces",
-        },
-        {
-          id: "workspace",
-          label: "Workspace settings",
-          description: "this workspace, and anyone who opens it",
-        },
-      ],
-      chosen: state.scope === undefined ? undefined : [state.scope],
-    }),
-    (scope) => ({ scope }),
-  );
+const target: Step = (state) => ({
+  kind: "pick",
+  placeholder: "Save to",
+  choices: [
+    { id: "user", label: "User settings", description: "all workspaces" },
+    {
+      id: "workspace",
+      label: "Workspace settings",
+      description: "this workspace, and anyone who opens it",
+    },
+  ],
+  chosen: state.target === undefined ? undefined : [state.target],
+  take: (target) => ({ target }),
+});
 
-// The questions the answers so far lead to, in order. One not answered yet
-// counts as its first choice, so that the total is a fair guess.
+// The questions the answers so far lead to, in order. A question not
+// answered yet counts as first shown, so that the total is a fair guess.
 function plan(state: State, context: Context): Step[] {
-  const tls = ticked(state, "options", "tls");
-  const client = tls && ticked(state, "files", "client");
+  const to = reached(state);
   return [
     name(context.taken),
     host,
-    port,
+    portOn,
     user,
     login,
     ...(state.login === "store" ? [password] : []),
     ...(state.login === "extension" ? [extension] : []),
     options(context.timeout),
-    ...(tls ? [files] : []),
-    ...(tls && ticked(state, "files", "ca")
-      ? [file("ca", "CA certificate (PEM)", "Select", pem)]
+    ...(to.tls ? [files] : []),
+    ...(to.ca ? [file("ca", "CA certificate (PEM)", pem)] : []),
+    ...(to.client ? [form] : []),
+    ...(to.pfx
+      ? [file("pfx", "PKCS#12 file", { "PKCS#12": ["p12", "pfx"] })]
       : []),
-    ...(client ? [form] : []),
-    ...(client && state.form === "pfx"
-      ? [
-          file("pfx", "PKCS#12 file", "Select", {
-            "PKCS#12": ["p12", "pfx"],
-          }),
-        ]
+    ...(to.pem
+      ? [file("cert", "Certificate (PEM)", pem), file("key", "Key (PEM)", pem)]
       : []),
-    ...(client && state.form !== "pfx"
-      ? [
-          file("cert", "Certificate (PEM)", "Select", pem),
-          file("key", "Key (PEM)", "Select", pem),
-        ]
-      : []),
-    ...(client ? [passphrase] : []),
-    ...(context.workspace ? [scope] : []),
+    ...(to.client ? [passphrase] : []),
+    ...(context.workspaceOpen ? [target] : []),
   ];
+}
+
+// A question asked where it is in the flow, with its answer as the state
+// takes it
+async function asked(
+  ask: Asker,
+  question: Question,
+  placed: Placed,
+): Promise<Reply<State>> {
+  const answered = <T>(
+    reply: Reply<T>,
+    take: (answer: T) => State,
+  ): Reply<State> =>
+    reply === undefined ? undefined : reply === back ? back : take(reply as T);
+  switch (question.kind) {
+    case "input":
+      return answered(
+        await ask.input({ ...question, ...placed }),
+        question.take,
+      );
+    case "pick":
+      return answered(
+        await ask.pick({ ...question, ...placed }),
+        question.take,
+      );
+    case "tick":
+      return answered(
+        await ask.tick({ ...question, ...placed }),
+        question.take,
+      );
+  }
 }
 
 // Ask each question the answers lead to, going back a question when asked,
@@ -368,18 +364,18 @@ export async function add(
     if (at === steps.length) {
       return adding(state, context);
     }
-    const placed = { step: at + 1, total: steps.length };
-    const asking: Ask = {
-      input: (question) => ask.input({ ...question, ...placed }),
-      pick: (question) => ask.pick({ ...question, ...placed }),
-      tick: (question) => ask.tick({ ...question, ...placed }),
-    };
-    const reply = await steps[at](asking, state);
+    const reply = await asked(ask, steps[at](state), {
+      step: at + 1,
+      total: steps.length,
+    });
     if (reply === undefined) {
       return undefined;
     }
+    if (reply === back && at === 0) {
+      throw new Error("there's no question before the first");
+    }
     if (reply === back) {
-      at = Math.max(at - 1, 0);
+      at -= 1;
     } else {
       state = { ...state, ...reply };
       at += 1;
@@ -387,13 +383,10 @@ export async function add(
   }
 }
 
-// The server the answers make, using only the answers their choices lead
-// to: one given before going back and choosing otherwise is dropped. The
+// The server the answers make. Every answer the plan leads to is given. The
 // timeout is written, as the default if on, so that it's there to edit.
 function adding(state: State, context: Context): Adding {
-  const tls = ticked(state, "options", "tls");
-  const ca = tls && ticked(state, "files", "ca");
-  const client = tls && ticked(state, "files", "client");
+  const to = reached(state);
   const auth =
     state.login === "prompt"
       ? "prompt"
@@ -401,33 +394,29 @@ function adding(state: State, context: Context): Adding {
         ? { extension: state.extension }
         : undefined;
   return {
-    name: state.name ?? "",
+    name: state.name as string,
     value: {
       host: state.host,
-      port: servers.port(state.port ?? ""),
+      port: port(state.port as string),
       ...(state.user ? { user: state.user } : {}),
       ...(auth === undefined ? {} : { auth }),
-      ...(tls
+      ...(to.tls
         ? {
             tls:
-              !ca && !client
-                ? true
-                : {
-                    ...(ca ? { ca: state.ca } : {}),
-                    ...(client && state.form === "pfx"
-                      ? { pfx: state.pfx }
-                      : {}),
-                    ...(client && state.form !== "pfx"
-                      ? { cert: state.cert, key: state.key }
-                      : {}),
-                  },
+              to.ca || to.client
+                ? {
+                    ...(to.ca ? { ca: state.ca } : {}),
+                    ...(to.pfx ? { pfx: state.pfx } : {}),
+                    ...(to.pem ? { cert: state.cert, key: state.key } : {}),
+                  }
+                : true,
           }
         : {}),
-      ...(ticked(state, "options", "protect") ? {} : { protect: false }),
-      timeout: ticked(state, "options", "timeout") ? context.timeout : 0,
+      ...(to.protect ? {} : { protect: false }),
+      timeout: to.timeout ? context.timeout : 0,
     },
-    password: state.login === "store" ? (state.password ?? "") : "",
-    passphrase: client ? (state.passphrase ?? "") : "",
-    workspace: state.scope === "workspace",
+    ...(state.login === "store" ? { password: state.password } : {}),
+    ...(to.client && state.passphrase ? { passphrase: state.passphrase } : {}),
+    target: state.target === "workspace" ? "workspace" : "user",
   };
 }

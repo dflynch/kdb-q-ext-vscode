@@ -4,7 +4,6 @@ import {
   defaults,
   definitions,
   passwordProblem,
-  port,
   secretKey,
   server,
   settings,
@@ -225,14 +224,6 @@ suite("servers", () => {
         "the size limit isn't a positive number of megabytes",
       ],
     });
-  });
-
-  test("a port is a whole number up to 65535", () => {
-    assert.strictEqual(port(" 5000 "), 5000);
-    assert.strictEqual(port("65535"), 65535);
-    for (const text of ["", "0", "65536", "5.5", "-1", "5e3", "50a"]) {
-      assert.strictEqual(port(text), undefined, text);
-    }
   });
 
   test("a password is kept for where it's sent, not the server's name", () => {

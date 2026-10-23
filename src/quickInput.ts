@@ -48,23 +48,25 @@ function show<T>(
 // Ask a flow's questions with VS Code's quick input, titled as given
 export function quickInput(title: string): Asker {
   const pick = <T>(
-    { placeholder, choices, chosen = [], step, total }: Choices & Placed,
+    question: Choices & Placed,
     many: boolean,
     answer: (ids: string[]) => T,
   ) => {
     const list = vscode.window.createQuickPick<
       vscode.QuickPickItem & { id: string }
     >();
-    list.placeholder = placeholder;
-    list.items = choices;
+    list.placeholder = question.placeholder;
+    list.items = question.choices;
     list.canSelectMany = many;
-    const before = list.items.filter((item) => chosen.includes(item.id));
+    const before = list.items.filter((item) =>
+      (question.chosen ?? []).includes(item.id),
+    );
     if (many) {
       list.selectedItems = before;
     } else if (before.length > 0) {
       list.activeItems = before;
     }
-    return show<T>(list, title, { step, total }, (settle) => {
+    return show<T>(list, title, question, (settle) => {
       list.onDidAccept(() => {
         const ids = (many ? list.selectedItems : list.activeItems).map(
           (item) => item.id,
@@ -76,22 +78,23 @@ export function quickInput(title: string): Asker {
     });
   };
   return {
-    input: ({ step, total, ...question }) => {
+    input: (question) => {
       const box = vscode.window.createInputBox();
       box.prompt = question.prompt;
       box.placeholder = question.placeholder;
       box.value = question.value ?? "";
       box.password = question.password ?? false;
-      const browse = question.browse && {
+      const filters = question.browse;
+      const browse = {
         iconPath: new vscode.ThemeIcon("folder-opened"),
         tooltip: "Browse",
       };
-      box.buttons = browse ? [browse] : [];
+      box.buttons = filters ? [browse] : [];
       const check = () => {
         box.validationMessage = question.validate?.(box.value);
         return box.validationMessage === undefined;
       };
-      return show<string>(box, title, { step, total }, (settle) => {
+      return show<string>(box, title, question, (settle) => {
         box.onDidChangeValue(check);
         box.onDidAccept(() => {
           if (check()) {
@@ -99,14 +102,14 @@ export function quickInput(title: string): Asker {
           }
         });
         box.onDidTriggerButton(async (button) => {
-          if (button !== browse || !question.browse) {
+          if (button !== browse || !filters) {
             return;
           }
           const [picked] =
             (await vscode.window.showOpenDialog({
               title: `${title}: ${question.prompt}`,
-              openLabel: question.browse.label,
-              filters: question.browse.filters,
+              openLabel: "Select",
+              filters,
             })) ?? [];
           if (picked) {
             box.value = home(picked.fsPath);

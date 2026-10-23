@@ -33,8 +33,8 @@ export function home(file: string): string {
 
 // Where a client certificate's passphrase is kept: under its file, since
 // one certificate can serve several servers. None without a certificate.
-export function passphraseKey(settings: Tls): string | undefined {
-  const file = settings.pfx ?? settings.key;
+export function passphraseKey(settings?: Tls): string | undefined {
+  const file = settings?.pfx ?? settings?.key;
   return file === undefined ? undefined : `passphrase:${resolve(file)}`;
 }
 

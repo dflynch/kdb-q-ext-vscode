@@ -229,12 +229,6 @@ export function settings(
   return { defaults: result, problems };
 }
 
-// A port as typed
-export function port(text: string): number | undefined {
-  const port = /^\d+$/.test(text.trim()) ? Number(text) : 0;
-  return port >= 1 && port <= 65535 ? port : undefined;
-}
-
 // Where a server's password is kept. Keyed by where it's sent, not by the
 // server's name, so that a password is never sent to a host other than the
 // one it was given for, if a server's host is changed

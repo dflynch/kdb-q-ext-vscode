@@ -162,16 +162,22 @@ export function definitions(): servers.Definition[] {
   return defined;
 }
 
-// A server picked from those defined, or from the ones that meet a test,
-// saying why if none does, under the command's title
+// A server picked from those defined, under the command's title: any, or
+// those that meet a test, saying why if none does, each with any detail
 async function pickServer(
   title: string,
-  test: (server: servers.Definition) => boolean = () => true,
-  none = "",
-  detail: (server: servers.Definition) => string | undefined = () => undefined,
+  {
+    test,
+    none,
+    detail,
+  }: {
+    test?: (server: servers.Definition) => boolean;
+    none?: string;
+    detail?: (server: servers.Definition) => string | undefined;
+  } = {},
 ): Promise<servers.Definition | undefined> {
   const all = definitions();
-  const defined = all.filter(test);
+  const defined = test ? all.filter(test) : all;
   if (all.length > 0 && defined.length === 0) {
     vscode.window.showInformationMessage(`kdb+/q: ${none}`);
     return undefined;
@@ -191,12 +197,17 @@ async function pickServer(
     defined.map((server) => ({
       label: server.name,
       description: `${server.user ? `${server.user}@` : ""}${server.host}:${server.port}`,
-      detail: detail(server),
+      detail: detail?.(server),
       server,
     })),
     { title, placeHolder: "Server" },
   );
   return picked?.server;
+}
+
+// Whether a setting's value is an object, as the servers setting is
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 // Add a server to the user's or the workspace's settings, asking for each of
@@ -208,47 +219,45 @@ export async function addServer(
   ask: Asker = quickInput("kdb+/q: Add Server"),
 ) {
   const config = vscode.workspace.getConfiguration("kdb-q-ext-vscode");
-  const setting = config.get("servers");
+  const inspected = config.inspect("servers");
+  const scopes = {
+    user: inspected?.globalValue ?? {},
+    workspace: inspected?.workspaceValue ?? {},
+  };
+  // Checked before asking, rather than refusing once everything's answered
+  if (!isObject(scopes.user) || !isObject(scopes.workspace)) {
+    vscode.window.showErrorMessage(
+      "kdb+/q: The servers setting isn't an object, so a server can't be added to it.",
+    );
+    return;
+  }
   const adding = await add(ask, {
-    taken:
-      typeof setting === "object" && setting !== null
-        ? Object.keys(setting)
-        : [],
+    taken: Object.keys({ ...scopes.user, ...scopes.workspace }),
     timeout: connectionDefaults().timeout,
-    workspace: vscode.workspace.workspaceFolders !== undefined,
+    workspaceOpen: vscode.workspace.workspaceFolders !== undefined,
   });
   if (adding === undefined) {
     return;
   }
-  const { name, value, password, passphrase } = adding;
-  const target = adding.workspace
-    ? vscode.ConfigurationTarget.Workspace
-    : vscode.ConfigurationTarget.Global;
-  const inspected = config.inspect("servers");
-  const current = adding.workspace
-    ? inspected?.workspaceValue
-    : inspected?.globalValue;
-  if (
-    current !== undefined &&
-    (typeof current !== "object" || current === null || Array.isArray(current))
-  ) {
-    vscode.window.showErrorMessage(
-      "kdb+/q: The servers setting there isn't an object, so a server can't be added to it.",
-    );
-    return;
-  }
+  const { name, value, password, passphrase, target } = adding;
   // Read back as connecting reads it
   const read = servers.definitions({ [name]: value });
   const [definition] = read.servers;
   if (definition === undefined) {
     throw new Error(`kdb+/q: ${read.problems.join("; ")}`);
   }
-  await config.update("servers", { ...current, [name]: value }, target);
-  if (password !== "") {
+  await config.update(
+    "servers",
+    { ...scopes[target], [name]: value },
+    target === "workspace"
+      ? vscode.ConfigurationTarget.Workspace
+      : vscode.ConfigurationTarget.Global,
+  );
+  if (password !== undefined) {
     await secrets.store(servers.secretKey(definition), password);
   }
-  const key = definition.tls && passphraseKey(definition.tls);
-  if (key && passphrase !== "") {
+  const key = passphraseKey(definition.tls);
+  if (key && passphrase !== undefined) {
     await secrets.store(key, passphrase);
   }
   const connect = "Connect";
@@ -264,7 +273,7 @@ export async function addServer(
     // The Settings editor can't edit an object; a query naming a setting
     // reveals it in the file
     await vscode.commands.executeCommand(
-      adding.workspace
+      target === "workspace"
         ? "workbench.action.openWorkspaceSettingsFile"
         : "workbench.action.openSettingsJson",
       { query: "kdb-q-ext-vscode.servers" },
@@ -276,11 +285,10 @@ export async function addServer(
 // whose password comes from there
 export async function setPassword(secrets: vscode.SecretStorage) {
   const title = "kdb+/q: Set Server Password";
-  const server = await pickServer(
-    title,
-    (server) => server.auth === undefined,
-    "Every server gets its password from its auth setting.",
-  );
+  const server = await pickServer(title, {
+    test: (server) => server.auth === undefined,
+    none: "Every server gets its password from its auth setting.",
+  });
   if (!server) {
     return;
   }
@@ -304,21 +312,18 @@ export async function clearPassword(secrets: vscode.SecretStorage) {
   }
 }
 
-// Whether a server has a client certificate, which can need a passphrase
-function certified(server: servers.Definition): boolean {
-  return server.tls !== undefined && passphraseKey(server.tls) !== undefined;
-}
+// The servers with a client certificate, which can need a passphrase
+const certified = {
+  test: (server: servers.Definition) => passphraseKey(server.tls) !== undefined,
+  none: "No server has a client certificate in its tls setting.",
+};
 
 // Keep the passphrase of a server's client certificate in VS Code's secure
 // storage, under the certificate's file
 export async function setPassphrase(secrets: vscode.SecretStorage) {
   const title = "kdb+/q: Set Certificate Passphrase";
-  const server = await pickServer(
-    title,
-    certified,
-    "No server has a client certificate in its tls setting.",
-  );
-  const key = server?.tls && passphraseKey(server.tls);
+  const server = await pickServer(title, certified);
+  const key = passphraseKey(server?.tls);
   if (!key) {
     return;
   }
@@ -336,9 +341,8 @@ export async function clearPassphrase(secrets: vscode.SecretStorage) {
   const server = await pickServer(
     "kdb+/q: Clear Certificate Passphrase",
     certified,
-    "No server has a client certificate in its tls setting.",
   );
-  const key = server?.tls && passphraseKey(server.tls);
+  const key = passphraseKey(server?.tls);
   if (key) {
     await secrets.delete(key);
   }
@@ -387,7 +391,7 @@ export function opener(secrets: vscode.SecretStorage) {
     if (given === undefined) {
       return undefined;
     }
-    const key = definition.tls && passphraseKey(definition.tls);
+    const key = passphraseKey(definition.tls);
     const tls =
       definition.tls &&
       (await secure(definition.tls, key && (await secrets.get(key))));
@@ -411,16 +415,13 @@ function describe(state: State): string {
 
 // Connect to a server picked, or make its connection active if it's open
 export async function connect(connections: Connections<Connection>) {
-  const server = await pickServer(
-    "kdb+/q: Connect to Server",
-    undefined,
-    undefined,
-    (server) => {
+  const server = await pickServer("kdb+/q: Connect to Server", {
+    detail: (server) => {
       const state = connections.state(server.name);
       const active = connections.active?.name === server.name;
       return state && `${active ? "Active, " : ""}${describe(state)}`;
     },
-  );
+  });
   if (server) {
     await connectTo(connections, server);
   }
