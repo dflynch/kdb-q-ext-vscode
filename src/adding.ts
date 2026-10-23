@@ -183,7 +183,7 @@ const user: Step = (state) => ({
 
 const login: Step = (state) => ({
   kind: "pick",
-  placeholder: "Password",
+  placeholder: "Authentication",
   choices: [
     { id: "none", label: "No password" },
     {

@@ -78,7 +78,7 @@ suite("adding a server", () => {
       "2/6 Host",
       "3/6 Port on kdb1",
       "4/6 User (optional)",
-      "5/6 Password",
+      "5/6 Authentication",
       "6/7 Password",
       "7/7 Options [protect,timeout]",
     ]);
@@ -112,7 +112,7 @@ suite("adding a server", () => {
     assert.deepStrictEqual(ask.asked.slice(10), [
       "7/7 Options [protect,timeout]",
       "6/7 Password [secret]",
-      "5/7 Password [store]",
+      "5/7 Authentication [store]",
       "6/6 Options [protect,timeout]",
     ]);
     assert.deepStrictEqual(adding, {
