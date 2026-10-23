@@ -5,7 +5,7 @@ import type { Connections, State } from "./connections";
 import { credentials, type Sources } from "./credentials";
 import * as servers from "./servers";
 import * as statements from "./statements";
-import { passphraseKey, secure } from "./tls";
+import { home, passphraseKey, secure } from "./tls";
 
 // Send the selected text, or the current line, to the active terminal one
 // statement at a time. With several selections, each is sent in turn from the
@@ -197,148 +197,315 @@ async function pickServer(
   return picked?.server;
 }
 
-// Add a server to the user's or the workspace's settings, asking for what
-// every server has: its name, address, user and where its password comes
-// from. The rest, such as tls, is set in settings.json, which can be opened
-// at the setting once it's added.
-export async function addServer(
-  secrets: vscode.SecretStorage,
-  connections: Connections<Connection>,
-) {
-  const title = "kdb+/q: Add Server";
-  const config = vscode.workspace.getConfiguration("kdb-q-ext-vscode");
-  const setting = config.get("servers");
-  const taken =
-    typeof setting === "object" && setting !== null ? Object.keys(setting) : [];
-  const name = (
+// The title of each of Add Server's questions
+const adding = "kdb+/q: Add Server";
+
+// Ask for text, trimmed; undefined if cancelled
+async function ask(
+  options: vscode.InputBoxOptions,
+): Promise<string | undefined> {
+  return (
     await vscode.window.showInputBox({
-      title,
-      prompt: "The server's name",
+      title: adding,
       ignoreFocusOut: true,
-      validateInput: (text) =>
-        text.trim() === ""
-          ? "A server needs a name"
-          : taken.includes(text.trim())
-            ? `There's a server named ${text.trim()} already`
-            : undefined,
+      ...options,
     })
   )?.trim();
-  if (name === undefined) {
-    return;
-  }
-  const typed = await vscode.window.showInputBox({
-    title,
-    prompt: "The server's host and port",
-    placeHolder: "localhost:5000",
+}
+
+// Ask to pick one of a few; undefined if cancelled
+function choose<T extends vscode.QuickPickItem>(
+  placeHolder: string,
+  items: T[],
+): Thenable<T | undefined> {
+  return vscode.window.showQuickPick(items, {
+    title: adding,
+    placeHolder,
     ignoreFocusOut: true,
-    validateInput: (text) =>
-      servers.address(text) ? undefined : "host:port, such as localhost:5000",
   });
-  const at = typed === undefined ? undefined : servers.address(typed);
-  if (at === undefined) {
-    return;
-  }
-  const user = (
-    await vscode.window.showInputBox({
-      title,
-      prompt: "The user to log in as, or none",
-      ignoreFocusOut: true,
-      validateInput: (text) =>
-        servers.userProblem(text.trim())
-          ? "The user can't contain : or a 0 byte"
+}
+
+// Ask to tick any of a few; undefined if cancelled
+function tick<T extends vscode.QuickPickItem>(
+  placeHolder: string,
+  items: T[],
+): Thenable<T[] | undefined> {
+  return vscode.window.showQuickPick(items, {
+    title: adding,
+    placeHolder,
+    ignoreFocusOut: true,
+    canPickMany: true,
+  });
+}
+
+// Ask for a file, written as the settings take it; undefined if cancelled
+async function file(
+  openLabel: string,
+  filters: Record<string, string[]>,
+): Promise<string | undefined> {
+  const [picked] =
+    (await vscode.window.showOpenDialog({
+      title: `${adding}: ${openLabel}`,
+      openLabel,
+      filters,
+    })) ?? [];
+  return picked && home(picked.fsPath);
+}
+
+// A server's name, host and port
+async function askAddress(
+  taken: string[],
+): Promise<{ name: string; host: string; port: number } | undefined> {
+  const name = await ask({
+    prompt: "The server's name",
+    validateInput: (text) =>
+      text.trim() === ""
+        ? "A server needs a name"
+        : taken.includes(text.trim())
+          ? `There's a server named ${text.trim()} already`
           : undefined,
-    })
-  )?.trim();
+  });
+  if (name === undefined) {
+    return undefined;
+  }
+  const typed = await ask({
+    prompt: "The server's host, or host:port",
+    placeHolder: "localhost",
+    validateInput: (text) => (text.trim() === "" ? "A host" : undefined),
+  });
+  if (typed === undefined) {
+    return undefined;
+  }
+  const given = servers.address(typed);
+  const host = given?.host ?? typed;
+  const port = await ask({
+    prompt: `The port on ${host}`,
+    placeHolder: "5000",
+    value: given ? `${given.port}` : undefined,
+    validateInput: (text) =>
+      servers.port(text) ? undefined : "A port, from 1 to 65535",
+  });
+  return port === undefined
+    ? undefined
+    : { name, host, port: servers.port(port) as number };
+}
+
+// The user to log in as and where the password comes from, with a password
+// to store, which can be empty
+async function askLogin(name: string): Promise<
+  | {
+      user?: string;
+      auth?: "prompt" | { extension: string };
+      password: string;
+    }
+  | undefined
+> {
+  const user = await ask({
+    prompt: "The user to log in as, or none",
+    validateInput: (text) =>
+      servers.userProblem(text.trim())
+        ? "The user can't contain : or a 0 byte"
+        : undefined,
+  });
   if (user === undefined) {
-    return;
+    return undefined;
   }
-  const how = await vscode.window.showQuickPick(
-    [
-      {
-        label: "Store a password",
-        description: "in VS Code's secure storage",
-        auth: undefined,
-      },
-      {
-        label: "Ask each time",
-        description: "and never keep it",
-        auth: "prompt" as const,
-      },
-      {
-        label: "Use an extension",
-        description: "that gives the login, for a firm's own sign-on",
-        auth: "extension" as const,
-      },
-    ],
+  const login = user === "" ? {} : { user };
+  const how = await choose("Where the password comes from", [
+    { label: "Store a password", description: "in VS Code's secure storage" },
+    { label: "Ask each time", description: "and never keep it" },
     {
-      title,
-      placeHolder: "Where the password comes from",
-      ignoreFocusOut: true,
+      label: "Use an extension",
+      description: "that gives the login, for a firm's own sign-on",
     },
-  );
-  if (how === undefined) {
-    return;
+  ]);
+  if (how?.label === "Ask each time") {
+    return { ...login, auth: "prompt", password: "" };
   }
-  let auth: "prompt" | { extension: string } | undefined;
-  let password = "";
-  if (how.auth === "extension") {
-    const extension = await vscode.window.showInputBox({
-      title,
+  if (how?.label === "Use an extension") {
+    const extension = await ask({
       prompt: "The ID of the extension that gives the login",
       placeHolder: "publisher.name",
-      ignoreFocusOut: true,
       validateInput: (text) =>
         servers.extensionId.test(text.trim())
           ? undefined
           : "An extension ID, publisher.name",
     });
-    if (extension === undefined) {
-      return;
-    }
-    auth = { extension: extension.trim() };
-  } else if (how.auth === "prompt") {
-    auth = how.auth;
-  } else {
-    const given = await vscode.window.showInputBox({
-      title,
+    return extension === undefined
+      ? undefined
+      : { ...login, auth: { extension }, password: "" };
+  }
+  const password =
+    how &&
+    (await vscode.window.showInputBox({
+      title: adding,
       prompt: `The password for ${name}, or none`,
       password: true,
       ignoreFocusOut: true,
       validateInput: servers.passwordProblem,
-    });
-    if (given === undefined) {
-      return;
-    }
-    password = given;
+    }));
+  return password === undefined ? undefined : { ...login, password };
+}
+
+// The files TLS needs besides the system's, as the setting takes them, with
+// a client certificate's passphrase to store, which can be empty
+async function askTls(): Promise<
+  { tls: true | servers.Tls; passphrase: string } | undefined
+> {
+  const needs = await tick("The files TLS needs, if any (Enter for none)", [
+    {
+      label: "A CA",
+      description: "to trust besides the system's, such as a firm's own",
+    },
+    {
+      label: "A client certificate",
+      description: "for a server that requires one",
+    },
+  ]);
+  if (needs === undefined) {
+    return undefined;
   }
-  // A workspace's settings are shared with whoever opens it
-  const scope = vscode.workspace.workspaceFolders
-    ? await vscode.window.showQuickPick(
-        [
-          {
-            label: "User settings",
-            description: "for every workspace",
-            target: vscode.ConfigurationTarget.Global,
-          },
-          {
-            label: "Workspace settings",
-            description: "for this workspace, and anyone who opens it",
-            target: vscode.ConfigurationTarget.Workspace,
-          },
-        ],
-        {
-          title,
-          placeHolder: "Where to keep the server",
-          ignoreFocusOut: true,
-        },
-      )
-    : { target: vscode.ConfigurationTarget.Global };
-  if (scope === undefined) {
+  const labels = needs.map((item) => item.label);
+  const files: servers.Tls = {};
+  if (labels.includes("A CA")) {
+    const ca = await file("Trust this CA", {
+      "PEM certificates": ["pem", "crt", "cer"],
+    });
+    if (ca === undefined) {
+      return undefined;
+    }
+    files.ca = ca;
+  }
+  if (!labels.includes("A client certificate")) {
+    return { tls: labels.length === 0 ? true : files, passphrase: "" };
+  }
+  const form = await choose("The client certificate's form", [
+    { label: "A certificate and its key", description: "in PEM" },
+    { label: "One PKCS#12 file", description: ".p12 or .pfx" },
+  ]);
+  if (form === undefined) {
+    return undefined;
+  }
+  if (form.label === "One PKCS#12 file") {
+    files.pfx = await file("Use this certificate", {
+      "PKCS#12": ["p12", "pfx"],
+    });
+    if (files.pfx === undefined) {
+      return undefined;
+    }
+  } else {
+    files.cert = await file("Use this certificate", {
+      PEM: ["pem", "crt", "cer"],
+    });
+    files.key =
+      files.cert && (await file("Use this key", { PEM: ["pem", "key"] }));
+    if (files.key === undefined) {
+      return undefined;
+    }
+  }
+  const passphrase = await vscode.window.showInputBox({
+    title: adding,
+    prompt: "The client certificate's passphrase, or none",
+    password: true,
+    ignoreFocusOut: true,
+  });
+  return passphrase === undefined ? undefined : { tls: files, passphrase };
+}
+
+// The settings a server can do without, with a passphrase to store, which
+// can be empty
+async function askOptions(): Promise<
+  | {
+      tls?: true | servers.Tls;
+      protect?: false;
+      timeout?: number;
+      passphrase: string;
+    }
+  | undefined
+> {
+  const timeout = connectionDefaults().timeout;
+  const options = await tick("Options, if any (Enter for none)", [
+    { label: "Connect with TLS" },
+    {
+      label: "Turn off protected evaluation",
+      description: "for a gateway whose .z.pg is its own",
+    },
+    { label: "Set a connect timeout", description: `${timeout} ms otherwise` },
+  ]);
+  if (options === undefined) {
+    return undefined;
+  }
+  const labels = options.map((item) => item.label);
+  const encrypted = labels.includes("Connect with TLS")
+    ? await askTls()
+    : { passphrase: "" };
+  if (encrypted === undefined) {
+    return undefined;
+  }
+  const given = labels.includes("Set a connect timeout")
+    ? await ask({
+        prompt: "How long to wait to connect and log in, in milliseconds",
+        value: `${timeout}`,
+        validateInput: (text) =>
+          /^\d+$/.test(text.trim()) && Number(text) > 0
+            ? undefined
+            : "A whole number of milliseconds",
+      })
+    : "";
+  if (given === undefined) {
+    return undefined;
+  }
+  return {
+    ...encrypted,
+    ...(labels.includes("Turn off protected evaluation")
+      ? { protect: false as const }
+      : {}),
+    ...(given === "" ? {} : { timeout: Number(given) }),
+  };
+}
+
+// Where to keep a server: the user's settings, or the workspace's if one is
+// open and picked
+async function askScope(): Promise<vscode.ConfigurationTarget | undefined> {
+  if (!vscode.workspace.workspaceFolders) {
+    return vscode.ConfigurationTarget.Global;
+  }
+  const scope = await choose("Where to keep the server", [
+    {
+      label: "User settings",
+      description: "for every workspace",
+      target: vscode.ConfigurationTarget.Global,
+    },
+    {
+      label: "Workspace settings",
+      description: "for this workspace, and anyone who opens it",
+      target: vscode.ConfigurationTarget.Workspace,
+    },
+  ]);
+  return scope?.target;
+}
+
+// Add a server to the user's or the workspace's settings, asking for each of
+// its settings but an extension's own, which go in settings.json. That can
+// be opened at the setting once it's added.
+export async function addServer(
+  secrets: vscode.SecretStorage,
+  connections: Connections<Connection>,
+) {
+  const config = vscode.workspace.getConfiguration("kdb-q-ext-vscode");
+  const setting = config.get("servers");
+  const taken =
+    typeof setting === "object" && setting !== null ? Object.keys(setting) : [];
+  const address = await askAddress(taken);
+  const login = address && (await askLogin(address.name));
+  const options = login && (await askOptions());
+  const target = options && (await askScope());
+  if (!address || !login || !options || target === undefined) {
     return;
   }
   const inspected = config.inspect("servers");
   const current =
-    scope.target === vscode.ConfigurationTarget.Global
+    target === vscode.ConfigurationTarget.Global
       ? inspected?.globalValue
       : inspected?.workspaceValue;
   if (
@@ -350,25 +517,28 @@ export async function addServer(
     );
     return;
   }
+  const { name, ...at } = address;
+  const { password, ...signIn } = login;
+  const { passphrase, ...rest } = options;
   // As written in the setting, and read back as connecting reads it
-  const value = {
-    ...at,
-    ...(user === "" ? {} : { user }),
-    ...(auth === undefined ? {} : { auth }),
-  };
+  const value = { ...at, ...signIn, ...rest };
   const read = servers.definitions({ [name]: value });
   const [definition] = read.servers;
   if (definition === undefined) {
     throw new Error(`kdb+/q: ${read.problems.join("; ")}`);
   }
-  await config.update("servers", { ...current, [name]: value }, scope.target);
+  await config.update("servers", { ...current, [name]: value }, target);
   if (password !== "") {
     await secrets.store(servers.secretKey(definition), password);
+  }
+  const key = definition.tls && passphraseKey(definition.tls);
+  if (key && passphrase !== "") {
+    await secrets.store(key, passphrase);
   }
   const connect = "Connect";
   const edit = "Open settings.json";
   const choice = await vscode.window.showInformationMessage(
-    `kdb+/q: Added ${name}.${auth !== undefined && auth !== "prompt" ? " Any fields its extension takes go in settings.json." : ""}`,
+    `kdb+/q: Added ${name}.${typeof signIn.auth === "object" ? " Any fields its extension takes go in settings.json." : ""}`,
     connect,
     edit,
   );
@@ -378,7 +548,7 @@ export async function addServer(
     // The Settings editor can't edit an object; a query naming a setting
     // reveals it in the file
     await vscode.commands.executeCommand(
-      scope.target === vscode.ConfigurationTarget.Global
+      target === vscode.ConfigurationTarget.Global
         ? "workbench.action.openSettingsJson"
         : "workbench.action.openWorkspaceSettingsFile",
       { query: "kdb-q-ext-vscode.servers" },

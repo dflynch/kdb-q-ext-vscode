@@ -9,6 +9,7 @@ import { Connection } from "../connection";
 import {
   authorities,
   filePath,
+  home,
   passphraseKey,
   read as readTls,
   resolve,
@@ -267,6 +268,22 @@ suite("tls", () => {
     assert.strictEqual(resolve("~/a.pem"), path.join(os.homedir(), "a.pem"));
     assert.strictEqual(resolve("~\\a.pem"), path.join(os.homedir(), "a.pem"));
     assert.strictEqual(resolve("/a/~/b.pem"), "/a/~/b.pem");
+  });
+
+  test("a file in the home directory is written from ~", () => {
+    const at = (...parts: string[]) => path.join(os.homedir(), ...parts);
+    assert.strictEqual(
+      home(at("certs", "a.pem")),
+      `~${path.sep}certs${path.sep}a.pem`,
+    );
+    assert.strictEqual(
+      home(at("..a", "b.pem")),
+      `~${path.sep}..a${path.sep}b.pem`,
+    );
+    assert.strictEqual(resolve(home(at("a.pem"))), at("a.pem"));
+    const outside = path.join(path.parse(os.homedir()).root, "etc", "a.pem");
+    assert.strictEqual(home(outside), outside);
+    assert.strictEqual(home(os.homedir()), os.homedir());
   });
 
   test("a passphrase is kept under its certificate's file", () => {

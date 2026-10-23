@@ -223,15 +223,20 @@ export function settings(
   return { defaults: result, problems };
 }
 
-// A server's address as typed, host:port, split at its last colon
+// A port as typed
+export function port(text: string): number | undefined {
+  const port = /^\d+$/.test(text.trim()) ? Number(text) : 0;
+  return port >= 1 && port <= 65535 ? port : undefined;
+}
+
+// A host typed with its port, as host:port. A host with a colon in it is an
+// IPv6 address, which has no port.
 export function address(
   text: string,
 ): { host: string; port: number } | undefined {
-  const match = /^(.+):(\d+)$/.exec(text.trim());
-  const port = Number(match?.[2]);
-  return match && match[1].trim() !== "" && port >= 1 && port <= 65535
-    ? { host: match[1].trim(), port }
-    : undefined;
+  const match = /^([^:]+):(\d+)$/.exec(text.trim());
+  const at = match && port(match[2]);
+  return match && at ? { host: match[1].trim(), port: at } : undefined;
 }
 
 // Where a server's password is kept. Keyed by where it's sent, not by the

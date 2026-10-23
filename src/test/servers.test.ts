@@ -5,6 +5,7 @@ import {
   defaults,
   definitions,
   passwordProblem,
+  port,
   secretKey,
   server,
   settings,
@@ -219,21 +220,28 @@ suite("servers", () => {
     });
   });
 
-  test("an address is host:port, split at the last colon", () => {
+  test("a host can be typed with its port", () => {
     assert.deepStrictEqual(address(" kdb1.example.com:5010 "), {
       host: "kdb1.example.com",
       port: 5010,
     });
-    assert.deepStrictEqual(address("::1:5000"), { host: "::1", port: 5000 });
     for (const text of [
       "kdb1",
       "kdb1:",
       ":5000",
       "kdb1:0",
-      "kdb1:65536",
-      "kdb1:5.5",
+      "::1:5000",
+      "::1",
     ]) {
       assert.strictEqual(address(text), undefined, text);
+    }
+  });
+
+  test("a port is a whole number up to 65535", () => {
+    assert.strictEqual(port(" 5000 "), 5000);
+    assert.strictEqual(port("65535"), 65535);
+    for (const text of ["", "0", "65536", "5.5", "-1", "5e3", "50a"]) {
+      assert.strictEqual(port(text), undefined, text);
     }
   });
 
