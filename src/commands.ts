@@ -285,7 +285,7 @@ export async function setPassword(secrets: vscode.SecretStorage) {
   }
   const password = await vscode.window.showInputBox({
     title,
-    prompt: `Password for ${server.name}`,
+    prompt: "Password",
     password: true,
     validateInput: servers.passwordProblem,
   });
@@ -323,7 +323,7 @@ export async function setPassphrase(secrets: vscode.SecretStorage) {
   }
   const passphrase = await vscode.window.showInputBox({
     title,
-    prompt: `Passphrase for ${server.name}'s client certificate`,
+    prompt: "Passphrase for client certificate",
     password: true,
   });
   if (passphrase !== undefined) {
@@ -362,10 +362,10 @@ export function connectionDefaults(): servers.Defaults {
 export function sources(secrets: vscode.SecretStorage): Sources {
   return {
     stored: (key) => secrets.get(key),
-    ask: (server) =>
+    ask: () =>
       vscode.window.showInputBox({
         title: "kdb+/q: Connect to Server",
-        prompt: `Password for ${server.name} (not stored)`,
+        prompt: "Password",
         password: true,
         ignoreFocusOut: true,
         validateInput: servers.passwordProblem,
