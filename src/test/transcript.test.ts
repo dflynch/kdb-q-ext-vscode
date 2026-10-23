@@ -121,11 +121,11 @@ function scripted(answers: (Result | Error)[]) {
   return { link: link as unknown as Connection, sent };
 }
 
-// An output channel keeping what's written, and a status bar keeping the
-// timings it's told
+// An output channel keeping what's written, and a status bar keeping what
+// it's told: a query running, then its timing
 function shown() {
   const lines: string[] = [];
-  const timed: [string, Timing | undefined][] = [];
+  const timed: [string, Timing | "running" | undefined][] = [];
   return {
     lines,
     timed,
@@ -134,6 +134,7 @@ function shown() {
       show: () => {},
     } as unknown as vscode.OutputChannel,
     status: {
+      running: (name: string) => timed.push([name, "running"]),
       timed: (name: string, timing?: Timing) => timed.push([name, timing]),
     },
   };
@@ -172,7 +173,10 @@ suite("runOnServer", () => {
     );
     assert.deepStrictEqual(sent, ["f:{\n  x+1} / add one\nf 1"]);
     assert.deepStrictEqual(lines, ["q)f:{\n  x+1} / add one\nf 1\n2"]);
-    assert.deepStrictEqual(timed, [["prod", timing]]);
+    assert.deepStrictEqual(timed, [
+      ["prod", "running"],
+      ["prod", timing],
+    ]);
   });
 
   test("with nothing selected, the current line, and an error", async () => {
@@ -186,7 +190,10 @@ suite("runOnServer", () => {
     await runOnServer(editor, connections, output, status);
     assert.deepStrictEqual(sent, ["1+`a"]);
     assert.deepStrictEqual(lines, ["q)1+`a\n'type"]);
-    assert.deepStrictEqual(timed, [["prod", timing]]);
+    assert.deepStrictEqual(timed, [
+      ["prod", "running"],
+      ["prod", timing],
+    ]);
   });
 
   test("an error of ours has no timing", async () => {
@@ -196,6 +203,9 @@ suite("runOnServer", () => {
     const { lines, timed, output, status } = shown();
     await runOnServer(await selecting("1"), connections, output, status);
     assert.deepStrictEqual(lines, ["q)1\n'the connection closed"]);
-    assert.deepStrictEqual(timed, [["prod", undefined]]);
+    assert.deepStrictEqual(timed, [
+      ["prod", "running"],
+      ["prod", undefined],
+    ]);
   });
 });

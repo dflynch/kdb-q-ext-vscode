@@ -64,7 +64,7 @@ export async function runOnServer(
   editor: vscode.TextEditor,
   connections: Connections<Connection>,
   output: vscode.OutputChannel,
-  status: Pick<Status, "timed">,
+  status: Pick<Status, "running" | "timed">,
 ) {
   const selection = editor.selection;
   const query = selection.isEmpty
@@ -84,16 +84,10 @@ export async function runOnServer(
   }
   const size = consoleSize();
   output.show(true);
-  const outcome = await vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Window,
-      title: `kdb+/q: Running on ${name}`,
-    },
-    () =>
-      link.query(query).then(
-        (result) => ({ result }),
-        (error: Error) => ({ error }),
-      ),
+  status.running(name);
+  const outcome = await link.query(query).then(
+    (result) => ({ result }),
+    (error: Error) => ({ error }),
   );
   output.appendLine(transcript.entry(query, outcome, size));
   status.timed(
@@ -524,8 +518,10 @@ export async function disconnect(connections: Connections<Connection>) {
   }
 }
 
-// The status bar, which can be told how long a server's last query took
+// The status bar, which is told when a query starts on a server, and when
+// it ends, with how long it took if that's known
 export type Status = vscode.Disposable & {
+  running(name: string): void;
   timed(name: string, timing: Timing | undefined): void;
 };
 
@@ -565,8 +561,9 @@ function details(server: servers.Definition, timeout: number): string[] {
 
 // The active connection in the status bar, which picks one when clicked,
 // with how long its last query took, and a warning when a connection closes
-// without being disconnected. The icon says the connection's state, and the
-// tooltip gives the server's settings.
+// without being disconnected. The icon says the connection's state, a plug
+// joined or pulled apart, spinning while it connects or runs a query, and
+// the tooltip gives the server's settings.
 export function showStatus(connections: Connections<Connection>): Status {
   const item = vscode.window.createStatusBarItem(
     "kdb-q-ext-vscode.connection",
@@ -574,24 +571,29 @@ export function showStatus(connections: Connections<Connection>): Status {
   );
   item.name = "kdb+/q Connection";
   item.command = "kdb-q-ext-vscode.connect";
-  // The last query's timing, kept while its connection is open
+  // The last query's timing, kept while its connection is open, and how
+  // many queries are running on each server: another can be tried while one
+  // runs, though the connection refuses it
   let last: { name: string; timing: Timing } | undefined;
+  const running = new Map<string, number>();
   const update = () => {
     const active = connections.active;
     const server = active && connections.server(active.name);
-    const icon = !active
-      ? "plug"
-      : active.state.kind === "connecting"
+    const busy =
+      active?.state.kind === "open" && (running.get(active.name) ?? 0) > 0;
+    const icon =
+      active?.state.kind === "connecting" || busy
         ? "loading~spin"
-        : active.state.kind === "open"
-          ? "database"
+        : active?.state.kind === "open"
+          ? "debug-connected"
           : "debug-disconnect";
-    const timing = last?.name === active?.name ? last?.timing : undefined;
+    const timing =
+      !busy && last?.name === active?.name ? last?.timing : undefined;
     item.text = `$(${icon}) ${active?.name ?? "kdb+/q"}${timing ? `  $(watch) ${took(timing)}` : ""}`;
     // The icon says the state, so screen readers are told it in words
     item.accessibilityInformation = {
       label: active
-        ? `kdb+/q: ${active.name}, ${describe(active.state)}${timing ? `, last query ${took(timing)}` : ""}`
+        ? `kdb+/q: ${active.name}, ${busy ? "running a query" : describe(active.state)}${timing ? `, last query ${took(timing)}` : ""}`
         : "kdb+/q: not connected",
     };
     item.tooltip = server
@@ -624,7 +626,12 @@ export function showStatus(connections: Connections<Connection>): Status {
     }
   });
   return {
+    running: (name) => {
+      running.set(name, (running.get(name) ?? 0) + 1);
+      update();
+    },
     timed: (name, timing) => {
+      running.set(name, (running.get(name) ?? 1) - 1);
       last = timing && { name, timing };
       update();
     },
