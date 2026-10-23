@@ -108,11 +108,8 @@ suite("tls", () => {
     );
   });
 
-  test("a certificate for another host is refused", async () => {
-    await assert.rejects(
-      query(await fake("elsewhere"), { ca }),
-      /^Error: hop\. SSL reports: .*elsewhere\.invalid/,
-    );
+  test("a certificate for another host is accepted, as q's client does", async () => {
+    assert.strictEqual((await query(await fake("elsewhere"), { ca })).type, -7);
   });
 
   test("a client certificate, as a certificate and key or PKCS#12", async () => {

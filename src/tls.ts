@@ -6,7 +6,7 @@ import type { Tls } from "./servers";
 // What a connection needs for TLS, as tls.connect takes it
 export type Secure = Pick<
   tls.ConnectionOptions,
-  "ca" | "cert" | "key" | "pfx" | "passphrase"
+  "ca" | "cert" | "key" | "pfx" | "passphrase" | "checkServerIdentity"
 >;
 
 // A file's path, with a leading ~ as the home directory
@@ -36,7 +36,11 @@ function trusted(): string[] {
 }
 
 // The options for a server's TLS settings, its files read with read. A CA
-// given is trusted as well as the others, not instead.
+// given is trusted as well as the others, not instead. The server's
+// certificate must chain to one of them, but needn't name the host, as q's
+// client checks by default (SSL_VERIFY_SERVER=YES, where HOSTIP checks the
+// name too): servers are reached by aliases and addresses their
+// certificates don't list.
 export function secure(
   settings: Tls,
   read: (file: string) => Buffer,
@@ -56,5 +60,6 @@ export function secure(
     ...(key === undefined ? {} : { key: file(key) }),
     ...(pfx === undefined ? {} : { pfx: file(pfx) }),
     ...(passphrase === undefined ? {} : { passphrase }),
+    checkServerIdentity: () => undefined,
   };
 }
