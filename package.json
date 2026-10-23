@@ -87,7 +87,8 @@
     "test": "vscode-test",
     "package": "vsce package",
     "format": "biome check --write",
-    "fixtures": "cd test/fixtures && q fixtures.q -q"
+    "fixtures": "cd test/fixtures && q fixtures.q -q",
+    "fuzz": "npm run compile && node test/fuzz/fuzz.js"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.2",

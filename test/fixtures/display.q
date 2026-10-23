@@ -44,6 +44,10 @@ float.realNegativeZero:-0e
 float.tie:1000.0625
 float.tieWhole:1234566.5
 float.realTie:-86463.625e
+/ In exponent form, a tie rounded down keeps its zeros
+float.tieExponent:10541605f
+float.realTieExponent:12000005e
+float.tieExponentUp:10541595f
 temporal.firstDate:0001.01.01
 temporal.lastDate:9999.12.31
 temporal.outOfRange:9999.12.31+1

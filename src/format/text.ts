@@ -153,7 +153,9 @@ function float(x: number): string {
   const sign = x < 0 ? "-" : "";
   if (exponent < -4 || exponent >= 7) {
     const power = `${exponent < 0 ? "-" : "+"}${String(Math.abs(exponent)).padStart(2, "0")}`;
-    return `${sign}${trim(`${digits[0]}.${digits.slice(1)}`)}e${power}`;
+    const mantissa = `${digits[0]}.${digits.slice(1)}`;
+    // q keeps the zeros of a tie it rounds down: 10541605 is 1.054160e+07
+    return `${sign}${tie && !up ? mantissa : trim(mantissa)}e${power}`;
   }
   const point =
     exponent < 0

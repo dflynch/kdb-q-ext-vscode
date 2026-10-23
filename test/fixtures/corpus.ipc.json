@@ -1,4 +1,4 @@
-{"corpus":"1d61d7f487791ac2804b6cf7262646bb","display":"d9c13922b2ee9d75fc11b1cb9c0ad90a","script":"8520e979a33eb5e318577e9ab1907a8a","q":"5 2026.10.15","values":[
+{"corpus":"1d61d7f487791ac2804b6cf7262646bb","display":"c1498c247f5ba66fdd33faaeb55c53b4","script":"8520e979a33eb5e318577e9ab1907a8a","q":"5 2026.10.15","values":[
 {"name":".corpus.atom.boolean","type":-1,"bytes":"010000000a000000ff01","console":"1b\n"},
 {"name":".corpus.atom.guid","type":-2,"bytes":"0100000019000000fe0a36903775d3b24d67215a1d44d4bed5","console":"0a369037-75d3-b24d-6721-5a1d44d4bed5\n"},
 {"name":".corpus.atom.byte","type":-4,"bytes":"010000000a000000fc2a","console":"0x2a\n"},
@@ -161,6 +161,9 @@
 {"name":".corpus.float.tie","type":-9,"bytes":"0100000011000000f70000000080408f40","console":"1000.062\n"},
 {"name":".corpus.float.tieWhole","type":-9,"bytes":"0100000011000000f70000008086d63241","console":"1234566f\n"},
 {"name":".corpus.float.realTie","type":-8,"bytes":"010000000d000000f8d0dfa8c7","console":"-86463.62e\n"},
+{"name":".corpus.float.tieExponent","type":-9,"bytes":"0100000011000000f7000000a0441b6441","console":"1.054160e+07\n"},
+{"name":".corpus.float.realTieExponent","type":-8,"bytes":"010000000d000000f8051b374b","console":"1.200000e+07e\n"},
+{"name":".corpus.float.tieExponentUp","type":-9,"bytes":"0100000011000000f700000060431b6441","console":"1.05416e+07\n"},
 {"name":".corpus.string.empty","type":10,"bytes":"010000000e0000000a0000000000","console":"\"\"\n"},
 {"name":".corpus.string.escapes","type":10,"bytes":"01000000320000000a002400000074616209686572650a6e65776c696e65202271756f74656422206261636b5c736c617368","console":"\"tab\\there\\nnewline \\\"quoted\\\" back\\\\slash\"\n"},
 {"name":".corpus.string.octal","type":10,"bytes":"01000000100000000a000200000001ff","console":"\"\\001\\377\"\n"},
