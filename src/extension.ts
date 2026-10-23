@@ -24,5 +24,11 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("kdb-q-ext-vscode.clearPassword", () =>
       commands.clearPassword(context.secrets),
     ),
+    vscode.commands.registerCommand("kdb-q-ext-vscode.setPassphrase", () =>
+      commands.setPassphrase(context.secrets),
+    ),
+    vscode.commands.registerCommand("kdb-q-ext-vscode.clearPassphrase", () =>
+      commands.clearPassphrase(context.secrets),
+    ),
   );
 }

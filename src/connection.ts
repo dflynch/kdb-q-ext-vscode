@@ -1,9 +1,11 @@
 import * as net from "node:net";
+import * as tls from "node:tls";
 import { getSystemErrorMessage } from "node:util";
 import { decode } from "./codec/decode";
 import { encode } from "./codec/encode";
 import { badmsg } from "./codec/errors";
 import type { Value } from "./codec/types";
+import type { Secure } from "./tls";
 
 export type Server = {
   host: string;
@@ -17,6 +19,8 @@ export type Server = {
   // Whether to evaluate queries protected; off unless set, though the
   // servers setting turns it on by default
   protect?: boolean;
+  // TLS, if it's set, as tcps:// in q
+  tls?: Secure;
 };
 
 // How long a query took, in whole milliseconds, as \t gives
@@ -187,7 +191,20 @@ export class Connection {
   // Failures are q's errors for hopen.
   static open(server: Server): Promise<Connection> {
     return new Promise((resolve, reject) => {
-      const socket = net.connect(server.port, server.host);
+      let socket: net.Socket;
+      try {
+        socket = server.tls
+          ? tls.connect({ host: server.host, port: server.port, ...server.tls })
+          : net.connect(server.port, server.host);
+      } catch (cause) {
+        // A client certificate or key that can't be read, or decrypted with
+        // the passphrase given
+        reject(new Error("the client certificate can't be used", { cause }));
+        return;
+      }
+      // Logging in waits for the TLS handshake, which checks the server's
+      // certificate
+      const connected = server.tls ? "secureConnect" : "connect";
       socket.setNoDelay(true);
       // A deadline for connecting and logging in together; the socket's own
       // timeout would restart with every write and read
@@ -202,8 +219,18 @@ export class Connection {
           "utf8",
         );
       };
-      // q names the host when it can't be found, and says hop otherwise
+      // q names the host when it can't be found, and says hop otherwise.
+      // TLS fails as hop too, with what the TLS library reports.
       const error = (cause: NodeJS.ErrnoException) => {
+        if (server.tls && cause.syscall === undefined) {
+          // OpenSSL's reason, as q gives, where there is one, and without
+          // the hint Node adds, as the system's CAs are trusted already
+          const reason =
+            (cause as { reason?: string }).reason ??
+            cause.message.replace(/; if the root CA .*$/, "");
+          fail(new Error(`hop. SSL reports: ${reason}`, { cause }));
+          return;
+        }
         const word = cause.syscall === "getaddrinfo" ? server.host : "hop";
         const reason =
           cause.errno === undefined
@@ -228,7 +255,7 @@ export class Connection {
       // Only the listeners added here: the socket has Node's own too
       const done = () => {
         clearTimeout(timer);
-        socket.off("connect", login);
+        socket.off(connected, login);
         socket.off("error", error);
         socket.off("close", refused);
         socket.off("data", accepted);
@@ -238,7 +265,7 @@ export class Connection {
         socket.destroy();
         reject(reason);
       };
-      socket.once("connect", login);
+      socket.once(connected, login);
       socket.once("error", error);
       socket.once("close", refused);
       socket.once("data", accepted);
