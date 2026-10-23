@@ -1,11 +1,19 @@
 import * as assert from "node:assert";
 import { once } from "node:events";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import * as net from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as tls from "node:tls";
 import { Connection } from "../connection";
-import { passphraseKey, resolve, secure } from "../tls";
+import {
+  authorities,
+  filePath,
+  passphraseKey,
+  read as readTls,
+  resolve,
+  secure,
+} from "../tls";
 
 const dir = path.join(__dirname, "../../test/fixtures/tls");
 const file = (name: string) => path.join(dir, name);
@@ -78,7 +86,7 @@ suite("tls", () => {
       host: options.host ?? "localhost",
       port,
       timeout: 1000,
-      tls: secure(settings, readFileSync, options.passphrase),
+      tls: await secure(settings, options.passphrase),
     });
     try {
       return (await connection.query("1+1")).value;
@@ -105,6 +113,54 @@ suite("tls", () => {
     await assert.rejects(
       query(await fake("self"), { ca }),
       /^Error: hop\. SSL reports: self.signed certificate$/,
+    );
+  });
+
+  test("an expired certificate is refused", async () => {
+    await assert.rejects(
+      query(await fake("expired"), { ca }),
+      /^Error: hop\. SSL reports: certificate has expired$/,
+    );
+  });
+
+  test("the chain is checked whatever NODE_TLS_REJECT_UNAUTHORIZED says", async () => {
+    const port = await fake("self");
+    const before = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+    try {
+      await assert.rejects(query(port, { ca }), /^Error: hop\. SSL reports: /);
+    } finally {
+      if (before === undefined) {
+        delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+      } else {
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = before;
+      }
+    }
+  });
+
+  test("a server without TLS is q's protocol error", async () => {
+    const plain = net.createServer((socket) => socket.end());
+    plain.listen(0, "127.0.0.1");
+    await once(plain, "listening");
+    stops.push(() => plain.close());
+    await assert.rejects(
+      query((plain.address() as net.AddressInfo).port, { ca }),
+      { message: "hop. OS reports: Protocol error" },
+    );
+  });
+
+  test("a refused connection by name is the OS's error, with TLS or without", async () => {
+    // localhost has more than one address, each tried
+    const closed = net.createServer();
+    closed.listen(0, "127.0.0.1");
+    await once(closed, "listening");
+    const port = (closed.address() as net.AddressInfo).port;
+    closed.close();
+    const refused = { message: "hop. OS reports: Connection refused" };
+    await assert.rejects(query(port, { ca }), refused);
+    await assert.rejects(
+      Connection.open({ host: "localhost", port, timeout: 1000 }),
+      refused,
     );
   });
 
@@ -147,21 +203,69 @@ suite("tls", () => {
     );
   });
 
-  test("a file that can't be read says so", () => {
-    assert.throws(() => secure({ ca: file("nope.pem") }, readFileSync), {
+  test("a file that can't be read, or isn't a small file, says so", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "quirk-tls-"));
+    const big = path.join(dir, "big.pem");
+    writeFileSync(big, Buffer.alloc(1e6 + 1));
+    for (const name of [file("nope.pem"), dir, big]) {
+      await assert.rejects(readTls(name), {
+        message: "a tls file can't be read",
+      });
+    }
+    await assert.rejects(secure({ ca: file("nope.pem") }), {
       message: "a tls file can't be read",
     });
   });
 
+  test("a ca that isn't a certificate in PEM says so", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "quirk-tls-"));
+    const der = path.join(dir, "ca.der");
+    writeFileSync(
+      der,
+      new (await import("node:crypto")).X509Certificate(read("ca.pem")).raw,
+    );
+    for (const name of [file("server.key"), der]) {
+      await assert.rejects(secure({ ca: name }), {
+        message: "the tls ca can't be used",
+      });
+    }
+  });
+
   test("a CA given is trusted as well as the others", () => {
-    const { ca: trusted } = secure({ ca }, readFileSync);
-    const others = secure({}, readFileSync).ca as string[];
+    const others = authorities();
     assert.ok(others.length > 0);
-    assert.deepStrictEqual(trusted, [...others, read("ca.pem").toString()]);
+    assert.deepStrictEqual(authorities(read("ca.pem")), [
+      ...others,
+      read("ca.pem").toString().trim(),
+    ]);
+  });
+
+  test("tls paths are absolute, on Windows or not, or from ~", () => {
+    for (const ok of [
+      "/a.pem",
+      "~/a.pem",
+      "~\\a.pem",
+      "C:\\a.pem",
+      "c:/a.pem",
+      "\\\\host\\a.pem",
+    ]) {
+      assert.ok(filePath.test(ok), ok);
+    }
+    for (const bad of ["a.pem", "./a.pem", "~a.pem", "\\a.pem", "C:a.pem"]) {
+      assert.ok(!filePath.test(bad), bad);
+    }
+    const schema = JSON.parse(
+      readFileSync(path.join(__dirname, "../../package.json"), "utf8"),
+    ).contributes.configuration.properties["kdb-q-ext-vscode.servers"]
+      .additionalProperties.properties.tls.oneOf[1].properties;
+    for (const field of ["ca", "cert", "key", "pfx"]) {
+      assert.strictEqual(schema[field].pattern, filePath.source, field);
+    }
   });
 
   test("~ is the home directory", () => {
     assert.strictEqual(resolve("~/a.pem"), path.join(os.homedir(), "a.pem"));
+    assert.strictEqual(resolve("~\\a.pem"), path.join(os.homedir(), "a.pem"));
     assert.strictEqual(resolve("/a/~/b.pem"), "/a/~/b.pem");
   });
 

@@ -1,3 +1,5 @@
+import { X509Certificate } from "node:crypto";
+import { readFile, stat } from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as tls from "node:tls";
@@ -6,8 +8,12 @@ import type { Tls } from "./servers";
 // What a connection needs for TLS, as tls.connect takes it
 export type Secure = Pick<
   tls.ConnectionOptions,
-  "ca" | "cert" | "key" | "pfx" | "passphrase" | "checkServerIdentity"
+  "secureContext" | "rejectUnauthorized" | "checkServerIdentity"
 >;
+
+// A path tls files can have: absolute, as on Windows or not, whichever the
+// system, or from the home directory. The settings' schema has the same.
+export const filePath = /^(\/|\\\\|[A-Za-z]:[\\/]|~[\\/])/;
 
 // A file's path, with a leading ~ as the home directory
 export function resolve(file: string): string {
@@ -21,45 +27,91 @@ export function passphraseKey(settings: Tls): string | undefined {
   return file === undefined ? undefined : `passphrase:${resolve(file)}`;
 }
 
-// The CAs Node trusts, and the system's, as a firm's own CA is often added
-// there. Node before 22.15 has only its own.
-function trusted(): string[] {
-  if (typeof tls.getCACertificates !== "function") {
-    return [...tls.rootCertificates];
+// Certificates and keys are small, so anything bigger isn't one
+const largest = 1e6;
+
+// A tls file's contents. Only a file of at most a megabyte, so that a path
+// in the settings to a pipe, a device or something huge can't hold up the
+// extension host.
+export async function read(file: string): Promise<Buffer> {
+  try {
+    const info = await stat(file);
+    if (!info.isFile() || info.size > largest) {
+      throw new Error(`not a file of at most ${largest} bytes`);
+    }
+    return await readFile(file);
+  } catch (cause) {
+    throw new Error("a tls file can't be read", { cause: { file, cause } });
   }
+}
+
+// The CA certificates in a file in PEM, each checked, as TLS ignores one it
+// can't use and fails later only for want of it
+function certificates(pem: Buffer): string[] {
+  const found =
+    pem
+      .toString()
+      .match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g) ??
+    [];
+  try {
+    if (found.length === 0) {
+      throw new Error("no PEM certificate");
+    }
+    for (const certificate of found) {
+      new X509Certificate(certificate);
+    }
+  } catch (cause) {
+    throw new Error("the tls ca can't be used", { cause });
+  }
+  return found;
+}
+
+// The CAs to trust: Node's, the system's, as a firm's own CA is often added
+// there, and those in a file given, as well rather than instead
+export function authorities(file?: Buffer): string[] {
   return [
     ...new Set([
       ...tls.getCACertificates("default"),
       ...tls.getCACertificates("system"),
+      ...(file === undefined ? [] : certificates(file)),
     ]),
   ];
 }
 
-// The options for a server's TLS settings, its files read with read. A CA
-// given is trusted as well as the others, not instead. The server's
-// certificate must chain to one of them, but needn't name the host, as q's
-// client checks by default (SSL_VERIFY_SERVER=YES, where HOSTIP checks the
-// name too): servers are reached by aliases and addresses their
-// certificates don't list.
-export function secure(
+// The options for a server's TLS settings, its files read with get.
+// - The server's certificate must chain to one of them, whatever
+//   NODE_TLS_REJECT_UNAUTHORIZED says, but needn't name the host, as q's
+//   client checks by default (SSL_VERIFY_SERVER=YES, where HOSTIP checks
+//   the name too): servers are reached by aliases and addresses their
+//   certificates don't list
+export async function secure(
   settings: Tls,
-  read: (file: string) => Buffer,
   passphrase?: string,
-): Secure {
-  const file = (name: string) => {
-    try {
-      return read(resolve(name));
-    } catch (cause) {
-      throw new Error("a tls file can't be read", { cause });
-    }
-  };
-  const { ca, cert, key, pfx } = settings;
+  get: (file: string) => Promise<Buffer> = read,
+): Promise<Secure> {
+  const file = (name: string | undefined) =>
+    name === undefined ? undefined : get(resolve(name));
+  const [caFile, cert, key, pfx] = await Promise.all(
+    [settings.ca, settings.cert, settings.key, settings.pfx].map(file),
+  );
+  const ca = authorities(caFile);
+  let secureContext: tls.SecureContext;
+  try {
+    secureContext = tls.createSecureContext({
+      ca,
+      ...(cert === undefined ? {} : { cert }),
+      ...(key === undefined ? {} : { key }),
+      ...(pfx === undefined ? {} : { pfx }),
+      ...(passphrase === undefined ? {} : { passphrase }),
+    });
+  } catch (cause) {
+    // A key that can't be decrypted with the passphrase, or doesn't go with
+    // its certificate
+    throw new Error("the client certificate can't be used", { cause });
+  }
   return {
-    ca: ca === undefined ? trusted() : [...trusted(), file(ca).toString()],
-    ...(cert === undefined ? {} : { cert: file(cert) }),
-    ...(key === undefined ? {} : { key: file(key) }),
-    ...(pfx === undefined ? {} : { pfx: file(pfx) }),
-    ...(passphrase === undefined ? {} : { passphrase }),
+    secureContext,
+    rejectUnauthorized: true,
     checkServerIdentity: () => undefined,
   };
 }

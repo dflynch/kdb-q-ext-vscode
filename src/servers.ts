@@ -1,6 +1,5 @@
-import * as path from "node:path";
 import type { Server } from "./connection";
-import type { Secure } from "./tls";
+import { filePath, type Secure } from "./tls";
 
 // A server as the settings define it: everything but the password, which is
 // kept in VS Code's secure storage, never in a settings file
@@ -162,9 +161,7 @@ function tlsProblem(tls: unknown): string | undefined {
   const files = tls as Record<string, unknown>;
   if (
     Object.values(files).some(
-      (file) =>
-        typeof file !== "string" ||
-        !(/^~[\\/]/.test(file) || path.isAbsolute(file)),
+      (file) => typeof file !== "string" || !filePath.test(file),
     )
   ) {
     return "tls's files are absolute paths or start with ~/";

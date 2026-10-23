@@ -149,22 +149,22 @@
                     "properties": {
                       "ca": {
                         "type": "string",
-                        "pattern": "^(~[\\\\/]|/|[A-Za-z]:[\\\\/]|\\\\\\\\)",
+                        "pattern": "^(\\/|\\\\\\\\|[A-Za-z]:[\\\\/]|~[\\\\/])",
                         "description": "A CA certificate to trust as well as the system's, in PEM, such as a firm's own."
                       },
                       "cert": {
                         "type": "string",
-                        "pattern": "^(~[\\\\/]|/|[A-Za-z]:[\\\\/]|\\\\\\\\)",
+                        "pattern": "^(\\/|\\\\\\\\|[A-Za-z]:[\\\\/]|~[\\\\/])",
                         "description": "A client certificate in PEM, for a server that requires one. Goes with key."
                       },
                       "key": {
                         "type": "string",
-                        "pattern": "^(~[\\\\/]|/|[A-Za-z]:[\\\\/]|\\\\\\\\)",
+                        "pattern": "^(\\/|\\\\\\\\|[A-Za-z]:[\\\\/]|~[\\\\/])",
                         "description": "The client certificate's private key in PEM, encrypted or not."
                       },
                       "pfx": {
                         "type": "string",
-                        "pattern": "^(~[\\\\/]|/|[A-Za-z]:[\\\\/]|\\\\\\\\)",
+                        "pattern": "^(\\/|\\\\\\\\|[A-Za-z]:[\\\\/]|~[\\\\/])",
                         "description": "A client certificate and its key in one PKCS#12 file, instead of cert and key."
                       }
                     }
