@@ -20,8 +20,10 @@ alongside it. Today it highlights q, edits it and runs it in a terminal (see
   result, not text that's promised to read back into q
 - Results as text too, as a q client shows them when they arrive, nulls
   left blank as q leaves them. There's more of it than q's console shows:
-  5000 lines of 5000 characters, and a million characters in all, with `..`
-  where it's cut, as q has. Where the text differs from q's:
+  1000 lines of 1000 characters, with `..` where it's cut, as q has. Where
+  the text differs from q's:
+  - A cell in a table, a matrix or a dictionary is cut at 256 characters, so
+    that one long value doesn't widen every line of its column
   - A table or matrix wider than that ends in `..`, where q drops the
     columns past 1000 without saying so
   - A dictionary whose keys are a table is cut at the line limit, where q

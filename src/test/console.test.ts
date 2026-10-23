@@ -94,7 +94,7 @@ suite("console text", () => {
     const start = performance.now();
     const text = show(projection);
     assert.ok(performance.now() - start < 100);
-    assert.strictEqual(text.length, 5000);
+    assert.strictEqual(text.length, 1000);
     assert.ok(text.startsWith("{x+y}[0 1 2 "));
     assert.ok(text.endsWith(".."));
   });
@@ -106,9 +106,9 @@ suite("console text", () => {
     );
   });
 
-  test("a large vector by default shows 5000 characters", () => {
+  test("a large vector by default shows 1000 characters", () => {
     const text = show(longs(10_000_000));
-    assert.strictEqual(text.length, 5000);
+    assert.strictEqual(text.length, 1000);
     assert.ok(text.endsWith(".."));
   });
 
@@ -141,20 +141,12 @@ suite("console text", () => {
     const large = table(10, 10_000_000);
     const start = performance.now();
     const lines = show(large).split("\n");
-    assert.strictEqual(lines.length, 5000);
+    assert.strictEqual(lines.length, 1000);
     assert.strictEqual(lines.at(-1), "..");
     assert.ok(performance.now() - start < 1000);
   });
 
-  test("lines past the characters in all become ..", () => {
-    // ,0 and 0 1 with their newlines are 7
-    assert.strictEqual(
-      show(ragged, { lines: 10, width: 80, characters: 8 }),
-      ",0\n0 1\n..",
-    );
-  });
-
-  test("a large matrix stops at a million characters", () => {
+  test("a large matrix shows only what fits, quickly", () => {
     const row = longs(5000);
     const rows: Value = {
       type: 0,
@@ -162,10 +154,64 @@ suite("console text", () => {
       items: Array.from({ length: 6000 }, () => row),
     };
     const start = performance.now();
-    const text = show(rows);
-    assert.ok(text.length <= 1_000_002);
-    assert.ok(text.endsWith("\n.."));
-    assert.ok(performance.now() - start < 2000);
+    const lines = show(rows).split("\n");
+    assert.strictEqual(lines.length, 1000);
+    assert.strictEqual(lines.at(-1), "..");
+    assert.ok(lines.every((line) => line.length <= 1000));
+    assert.ok(performance.now() - start < 1000);
+  });
+
+  // Symbols, as a symbol vector holds them
+  const symbols = (names: string[]): Vector => {
+    const bytes = Buffer.from(names.join(""));
+    const offsets = new Uint32Array(names.length + 1);
+    names.forEach((name, i) => {
+      offsets[i + 1] = offsets[i] + Buffer.byteLength(name);
+    });
+    return { type: 11, attribute: 0, data: { bytes, offsets } };
+  };
+  const long = "n".repeat(300);
+
+  test("a long cell is cut, so its column isn't as wide", () => {
+    const t: Value = {
+      type: 98,
+      attribute: 0,
+      columns: ["name", "x"],
+      data: [symbols(["a", long]), longs(2)],
+    };
+    const [header, , first, second] = show(t).split("\n");
+    assert.strictEqual(header, `${"name".padEnd(256)} x`);
+    assert.strictEqual(first, `${"a".padEnd(256)} 0`);
+    assert.strictEqual(second, `${"n".repeat(254)}.. 1`);
+  });
+
+  test("a dictionary's long keys and values are cut", () => {
+    const d: Value = {
+      type: 99,
+      keys: symbols(["a", long]),
+      values: symbols([long, "b"]),
+    };
+    assert.deepStrictEqual(show(d).split("\n"), [
+      `${"a".padEnd(256)}| ${"n".repeat(254)}..`,
+      `${"n".repeat(254)}..| b`,
+    ]);
+  });
+
+  test("a long value alone isn't a cell, so isn't cut", () => {
+    assert.strictEqual(show(symbols([long, "b"])), `\`${long}\`b`);
+  });
+
+  test("cells aren't cut unless a size is given for them, as in q", () => {
+    const t: Value = {
+      type: 98,
+      attribute: 0,
+      columns: ["name"],
+      data: [symbols(["a", long])],
+    };
+    assert.strictEqual(
+      show(t, { lines: 10, width: 1000 }).split("\n")[3],
+      long,
+    );
   });
 
   test("an error shows as q signals it", () => {
