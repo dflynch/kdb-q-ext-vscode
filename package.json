@@ -59,6 +59,16 @@
         "command": "kdb-q-ext-vscode.clearPassword",
         "category": "kdb+/q",
         "title": "Clear Server Password"
+      },
+      {
+        "command": "kdb-q-ext-vscode.setPassphrase",
+        "category": "kdb+/q",
+        "title": "Set Certificate Passphrase"
+      },
+      {
+        "command": "kdb-q-ext-vscode.clearPassphrase",
+        "category": "kdb+/q",
+        "title": "Clear Certificate Passphrase"
       }
     ],
     "menus": {
@@ -126,6 +136,40 @@
                 "type": "boolean",
                 "default": true,
                 "markdownDescription": "Run each query under `.Q.trp`, so that an error comes back with its backtrace and its full text. The query is sent as written, as a list with the function that traps it, for q's default `.z.pg` to evaluate. Turn this off for a server whose `.z.pg` is customised or only takes strings, such as a gateway."
+              },
+              "tls": {
+                "markdownDescription": "Connect with TLS, as `tcps://` in q: `true`, or the files it needs besides the system's. The server's certificate is checked against the system's CAs and Node's, and any `ca` given. A client certificate's passphrase is kept by **kdb+/q: Set Certificate Passphrase**. Paths are absolute or start with `~/`.",
+                "oneOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "ca": {
+                        "type": "string",
+                        "pattern": "^(\\/|\\\\\\\\|[A-Za-z]:[\\\\/]|~[\\\\/])",
+                        "description": "A CA certificate to trust as well as the system's, in PEM, such as a firm's own."
+                      },
+                      "cert": {
+                        "type": "string",
+                        "pattern": "^(\\/|\\\\\\\\|[A-Za-z]:[\\\\/]|~[\\\\/])",
+                        "description": "A client certificate in PEM, for a server that requires one. Goes with key."
+                      },
+                      "key": {
+                        "type": "string",
+                        "pattern": "^(\\/|\\\\\\\\|[A-Za-z]:[\\\\/]|~[\\\\/])",
+                        "description": "The client certificate's private key in PEM, encrypted or not."
+                      },
+                      "pfx": {
+                        "type": "string",
+                        "pattern": "^(\\/|\\\\\\\\|[A-Za-z]:[\\\\/]|~[\\\\/])",
+                        "description": "A client certificate and its key in one PKCS#12 file, instead of cert and key."
+                      }
+                    }
+                  }
+                ]
               },
               "auth": {
                 "markdownDescription": "Where the password comes from, when it isn't the one kept by **kdb+/q: Set Server Password**: `\"prompt\"` asks for it at every connect and doesn't keep it, for a one-time code; `{ \"extension\": \"publisher.name\", … }` asks that extension at every connect, for a firm's own sign-on. The rest of the object goes to the extension.",

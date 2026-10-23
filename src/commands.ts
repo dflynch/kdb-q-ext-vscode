@@ -3,6 +3,7 @@ import * as comments from "./comments";
 import type { Sources } from "./credentials";
 import * as servers from "./servers";
 import * as statements from "./statements";
+import { passphraseKey } from "./tls";
 
 // Send the selected text, or the current line, to the active terminal one
 // statement at a time. With several selections, each is sent in turn from the
@@ -157,17 +158,17 @@ export function definitions(): servers.Definition[] {
   return defined;
 }
 
-// A server picked from those defined, or from the ones that meet a test
+// A server picked from those defined, or from the ones that meet a test,
+// saying why if none does
 async function pickServer(
   placeHolder: string,
   test: (server: servers.Definition) => boolean = () => true,
+  none = "",
 ): Promise<servers.Definition | undefined> {
   const all = definitions();
   const defined = all.filter(test);
   if (all.length > 0 && defined.length === 0) {
-    vscode.window.showInformationMessage(
-      "kdb+/q: Every server gets its password from its auth setting.",
-    );
+    vscode.window.showInformationMessage(`kdb+/q: ${none}`);
     return undefined;
   }
   if (defined.length === 0) {
@@ -201,6 +202,7 @@ export async function setPassword(secrets: vscode.SecretStorage) {
   const server = await pickServer(
     "The server to set the password for",
     (server) => server.auth === undefined,
+    "Every server gets its password from its auth setting.",
   );
   if (!server) {
     return;
@@ -221,6 +223,44 @@ export async function clearPassword(secrets: vscode.SecretStorage) {
   const server = await pickServer("The server to clear the password for");
   if (server) {
     await secrets.delete(servers.secretKey(server));
+  }
+}
+
+// Whether a server has a client certificate, which can need a passphrase
+function certified(server: servers.Definition): boolean {
+  return server.tls !== undefined && passphraseKey(server.tls) !== undefined;
+}
+
+// Keep the passphrase of a server's client certificate in VS Code's secure
+// storage, under the certificate's file
+export async function setPassphrase(secrets: vscode.SecretStorage) {
+  const server = await pickServer(
+    "The server whose client certificate to set the passphrase for",
+    certified,
+    "No server has a client certificate in its tls setting.",
+  );
+  const key = server?.tls && passphraseKey(server.tls);
+  if (!key) {
+    return;
+  }
+  const passphrase = await vscode.window.showInputBox({
+    prompt: `The passphrase for ${server.name}'s client certificate`,
+    password: true,
+  });
+  if (passphrase !== undefined) {
+    await secrets.store(key, passphrase);
+  }
+}
+
+export async function clearPassphrase(secrets: vscode.SecretStorage) {
+  const server = await pickServer(
+    "The server whose client certificate to clear the passphrase for",
+    certified,
+    "No server has a client certificate in its tls setting.",
+  );
+  const key = server?.tls && passphraseKey(server.tls);
+  if (key) {
+    await secrets.delete(key);
   }
 }
 

@@ -1,9 +1,11 @@
 import * as net from "node:net";
-import { getSystemErrorMessage } from "node:util";
+import * as tls from "node:tls";
+import { getSystemErrorMap, getSystemErrorMessage } from "node:util";
 import { decode } from "./codec/decode";
 import { encode } from "./codec/encode";
 import { badmsg } from "./codec/errors";
 import type { Value } from "./codec/types";
+import type { Secure } from "./tls";
 
 export type Server = {
   host: string;
@@ -17,6 +19,8 @@ export type Server = {
   // Whether to evaluate queries protected; off unless set, though the
   // servers setting turns it on by default
   protect?: boolean;
+  // TLS, if it's set, as tcps:// in q
+  tls?: Secure;
 };
 
 // How long a query took, in whole milliseconds, as \t gives
@@ -30,6 +34,29 @@ export type Timing = {
 
 // What a query returns
 export type Result = { value: Value; timing: Timing };
+
+// A system error's number, as Node has it on every system
+function errno(name: string): number | undefined {
+  for (const [number, [code]] of getSystemErrorMap()) {
+    if (code === name) {
+      return number;
+    }
+  }
+  return undefined;
+}
+
+// q's error for a failing system call, as hop. OS reports: and the OS's
+// message, capitalised as the OS's own messages that q quotes are
+function oserror(
+  word: string,
+  errno: number | undefined,
+  cause: unknown,
+  message = "",
+): Error {
+  const reason = errno === undefined ? message : getSystemErrorMessage(errno);
+  const text = reason.charAt(0).toUpperCase() + reason.slice(1);
+  return new Error(`${word}. OS reports: ${text}`, { cause });
+}
 
 // An error the server signalled, with q's text as the message, how long the
 // query took, and where protected evaluation caught it, the stack as q
@@ -187,7 +214,18 @@ export class Connection {
   // Failures are q's errors for hopen.
   static open(server: Server): Promise<Connection> {
     return new Promise((resolve, reject) => {
-      const socket = net.connect(server.port, server.host);
+      const socket = server.tls
+        ? tls.connect({ host: server.host, port: server.port, ...server.tls })
+        : net.connect(server.port, server.host);
+      // Logging in waits for the TLS handshake, which checks the server's
+      // certificate
+      const connected = server.tls ? "secureConnect" : "connect";
+      // Connecting, then with TLS shaking hands, then logging in. Once TCP
+      // has connected, an error without a system call is TLS's.
+      let phase: "connecting" | "handshake" | "login" = "connecting";
+      const tcp = () => {
+        phase = server.tls ? "handshake" : "login";
+      };
       socket.setNoDelay(true);
       // A deadline for connecting and logging in together; the socket's own
       // timeout would restart with every write and read
@@ -196,22 +234,41 @@ export class Connection {
         server.timeout ?? 2000,
       );
       const login = () => {
+        phase = "login";
         // Version 3: compression, timestamps, timespans and GUIDs
         socket.write(
           `${server.user ?? ""}:${server.password ?? ""}\x03\x00`,
           "utf8",
         );
       };
-      // q names the host when it can't be found, and says hop otherwise
-      const error = (cause: NodeJS.ErrnoException) => {
-        const word = cause.syscall === "getaddrinfo" ? server.host : "hop";
-        const reason =
-          cause.errno === undefined
-            ? cause.message
-            : getSystemErrorMessage(cause.errno);
-        // Capitalised, as the OS's own messages that q quotes are
-        const os = reason.charAt(0).toUpperCase() + reason.slice(1);
-        fail(new Error(`${word}. OS reports: ${os}`, { cause }));
+      // q names the host when it can't be found, and says hop otherwise.
+      // TLS fails as hop too, with what the TLS library reports.
+      const error = (cause: Error) => {
+        // Trying each of a name's addresses fails with all their errors
+        const last = (
+          cause instanceof AggregateError ? cause.errors.at(-1) : cause
+        ) as NodeJS.ErrnoException;
+        // A server that resets the handshake, as one without TLS does, is
+        // q's protocol error
+        if (phase === "handshake" && last.code === "ECONNRESET") {
+          fail(oserror("hop", errno("EPROTO"), cause));
+          return;
+        }
+        if (
+          server.tls &&
+          phase !== "connecting" &&
+          last.syscall === undefined
+        ) {
+          // OpenSSL's reason, as q gives, where there is one, and without
+          // the hint Node adds, as the system's CAs are trusted already
+          const reason =
+            (last as { reason?: string }).reason ??
+            last.message.replace(/; if the root CA .*$/, "");
+          fail(new Error(`hop. SSL reports: ${reason}`, { cause }));
+          return;
+        }
+        const word = last.syscall === "getaddrinfo" ? server.host : "hop";
+        fail(oserror(word, last.errno, cause, last.message));
       };
       const refused = () => fail(new Error("access"));
       const accepted = (chunk: Buffer) => {
@@ -228,7 +285,8 @@ export class Connection {
       // Only the listeners added here: the socket has Node's own too
       const done = () => {
         clearTimeout(timer);
-        socket.off("connect", login);
+        socket.off("connect", tcp);
+        socket.off(connected, login);
         socket.off("error", error);
         socket.off("close", refused);
         socket.off("data", accepted);
@@ -238,7 +296,8 @@ export class Connection {
         socket.destroy();
         reject(reason);
       };
-      socket.once("connect", login);
+      socket.once("connect", tcp);
+      socket.once(connected, login);
       socket.once("error", error);
       socket.once("close", refused);
       socket.once("data", accepted);
