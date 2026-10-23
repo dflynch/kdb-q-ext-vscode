@@ -9,6 +9,10 @@ export type Definition = {
   user?: string;
   // Overrides the connect timeout for this server, in milliseconds
   timeout?: number;
+  // Whether to evaluate queries protected, so that an error comes back with
+  // its backtrace: on unless false, as a gateway whose .z.pg is customised
+  // may not evaluate it
+  protect?: boolean;
   // Where the password comes from: secure storage when there's no auth
   auth?: Auth;
 };
@@ -36,7 +40,7 @@ export type Defaults = {
 
 export const defaults: Defaults = { timeout: 2000, limit: 10e6 };
 
-const fields = new Set(["host", "port", "user", "timeout", "auth"]);
+const fields = new Set(["host", "port", "user", "timeout", "protect", "auth"]);
 
 // A Marketplace extension ID, publisher.name
 const extensionId = /^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9-]*$/i;
@@ -67,7 +71,7 @@ export function definitions(setting: unknown): {
       problems.push(`${name || '""'}: ${problem}`);
       continue;
     }
-    const { host, port, user, timeout, auth } = value as Omit<
+    const { host, port, user, timeout, protect, auth } = value as Omit<
       Definition,
       "name" | "auth"
     > & { auth?: "prompt" | Record<string, unknown> };
@@ -77,6 +81,7 @@ export function definitions(setting: unknown): {
       port,
       ...(user === undefined ? {} : { user }),
       ...(timeout === undefined ? {} : { timeout }),
+      ...(protect === undefined ? {} : { protect }),
       ...(auth === undefined ? {} : { auth: readAuth(auth) }),
     });
   }
@@ -94,7 +99,10 @@ function check(name: string, value: unknown): string | undefined {
   if (unknown.length > 0) {
     return `unknown ${unknown.length === 1 ? "field" : "fields"} ${unknown.join(", ")}`;
   }
-  const { host, port, user, timeout, auth } = value as Record<string, unknown>;
+  const { host, port, user, timeout, protect, auth } = value as Record<
+    string,
+    unknown
+  >;
   if (typeof host !== "string" || host.trim() === "") {
     return "no host";
   }
@@ -107,6 +115,9 @@ function check(name: string, value: unknown): string | undefined {
   }
   if (timeout !== undefined && !isCount(timeout)) {
     return "the timeout isn't a whole number of milliseconds";
+  }
+  if (protect !== undefined && typeof protect !== "boolean") {
+    return "protect is true or false";
   }
   return auth === undefined ? undefined : authProblem(auth);
 }
@@ -207,5 +218,6 @@ export function server(
     ...(password === undefined ? {} : { password }),
     timeout: definition.timeout ?? timeout,
     limit,
+    protect: definition.protect ?? true,
   };
 }

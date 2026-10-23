@@ -122,6 +122,11 @@
                 "minimum": 1,
                 "description": "How long to wait to connect and log in, in milliseconds, overriding the connect timeout."
               },
+              "protect": {
+                "type": "boolean",
+                "default": true,
+                "markdownDescription": "Run each query under `.Q.trp`, so that an error comes back with its backtrace and its full text. The query is sent as written, as a list with the function that traps it, for q's default `.z.pg` to evaluate. Turn this off for a server whose `.z.pg` is customised or only takes strings, such as a gateway."
+              },
               "auth": {
                 "markdownDescription": "Where the password comes from, when it isn't the one kept by **kdb+/q: Set Server Password**: `\"prompt\"` asks for it at every connect and doesn't keep it, for a one-time code; `{ \"extension\": \"publisher.name\", … }` asks that extension at every connect, for a firm's own sign-on. The rest of the object goes to the extension.",
                 "oneOf": [

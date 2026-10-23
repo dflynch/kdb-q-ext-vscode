@@ -14,10 +14,58 @@ export type Server = {
   timeout?: number;
   // The largest result to take, in bytes, uncompressed
   limit?: number;
+  // Whether to evaluate queries protected; off unless set, though the
+  // servers setting turns it on by default
+  protect?: boolean;
 };
 
-// An error the server signalled, with q's text as the message
-export class QError extends Error {}
+// An error the server signalled, with q's text as the message, and where
+// protected evaluation caught it, the stack as q shows it
+export class QError extends Error {
+  constructor(
+    message: string,
+    readonly backtrace?: string,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+  }
+}
+
+// Protected evaluation: q's default .z.pg applies this to the query, which
+// it evaluates under .Q.trp. It returns (::;result), or (::;error;backtrace);
+// :: keeps both a general list of the same shape. The backtrace leaves out
+// this function's own frames, and those outside it, such as a customised
+// .z.pg's, and is numbered from the query's frame as 0.
+export const wrapper =
+  "{f:{(::;value x)};.Q.trp[f;x;{[f;e;b]b:(last where f~/:b[;0;0])#b;(::;e;.Q.sbt{@[x;3;-;y]}[;last b[;3]]each b)}f]}";
+
+// What a failure with protected evaluation on says, as a server whose .z.pg
+// is customised, or takes only strings, can't evaluate it
+const unprotected =
+  "if the server's .z.pg is customised, turn off protect for it in the servers setting";
+
+const utf8 = new TextDecoder("utf-8", { ignoreBOM: true });
+
+function isString(value: Value | undefined): value is Value & { type: 10 } {
+  return value?.type === 10;
+}
+
+// The result inside protected evaluation's list, or the error it caught
+function unwrap(value: Value): Value {
+  const items = value.type === 0 && "items" in value ? value.items : [];
+  const [head, result, backtrace] = items;
+  if (head?.type === 101 && head.code === 0) {
+    if (items.length === 2) {
+      return result;
+    }
+    if (items.length === 3 && isString(result) && isString(backtrace)) {
+      throw new QError(utf8.decode(result.data), utf8.decode(backtrace.data));
+    }
+  }
+  throw new Error("the server didn't evaluate the query protected", {
+    cause: unprotected,
+  });
+}
 
 // A result over the limit. The extension host's heap is capped, and going
 // over it kills the host, so results are refused well before: a general
@@ -53,6 +101,7 @@ export class Connection {
   private constructor(
     private socket: net.Socket,
     private limit: number,
+    private protect: boolean,
     rest: Buffer,
   ) {
     socket.on("data", (chunk) => this.receive(chunk));
@@ -98,7 +147,12 @@ export class Connection {
       const accepted = (chunk: Buffer) => {
         done();
         resolve(
-          new Connection(socket, server.limit ?? 10e6, chunk.subarray(1)),
+          new Connection(
+            socket,
+            server.limit ?? 10e6,
+            server.protect ?? false,
+            chunk.subarray(1),
+          ),
         );
       };
       // Only the listeners added here: the socket has Node's own too
@@ -132,7 +186,7 @@ export class Connection {
     }
     return new Promise((resolve, reject) => {
       this.pending = { resolve, reject };
-      this.socket.write(encode(text));
+      this.socket.write(this.protect ? encode(text, wrapper) : encode(text));
     });
   }
 
@@ -232,9 +286,21 @@ export class Connection {
       return;
     }
     if (value.type === -128) {
-      pending.reject(new QError(value.message));
-    } else {
-      pending.resolve(value);
+      // With protected evaluation on, a signalled error means the query
+      // wasn't run under it
+      pending.reject(
+        new QError(
+          value.message,
+          undefined,
+          this.protect ? { cause: unprotected } : undefined,
+        ),
+      );
+      return;
+    }
+    try {
+      pending.resolve(this.protect ? unwrap(value) : value);
+    } catch (error) {
+      pending.reject(error as Error);
     }
   }
 }

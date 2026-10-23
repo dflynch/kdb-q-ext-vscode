@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import * as net from "node:net";
 import * as path from "node:path";
 import { encode } from "../codec/encode";
-import { Connection, QError } from "../connection";
+import { Connection, QError, wrapper } from "../connection";
 
 const fixtures: { name: string; bytes: string; compressed?: string }[] =
   JSON.parse(
@@ -291,6 +291,94 @@ suite("connection", () => {
     const connection = await open(server);
     await assert.rejects(connection.query("x"), { message: "badmsg" });
     await assert.rejects(connection.query("x"), /the connection is closed/);
+  });
+
+  // Each reply is q's -8! of what protected evaluation returns, as a
+  // response
+  function reply(hex: string): Buffer {
+    const message = Buffer.from(hex, "hex");
+    message[1] = 2;
+    return message;
+  }
+  function protect(server: Fake): Promise<Connection> {
+    return Connection.open({
+      host: "127.0.0.1",
+      port: server.port,
+      protect: true,
+    });
+  }
+
+  test("protected, sends the wrapper and the query, and resolves with the result", async () => {
+    // (::;42)
+    const server = await fake((socket) =>
+      socket.write(reply("01000000190000000000020000006500f92a00000000000000")),
+    );
+    const connection = await protect(server);
+    assert.deepStrictEqual(await connection.query("42"), {
+      type: -7,
+      value: 42n,
+    });
+    assert.deepStrictEqual(server.messages, [
+      Buffer.from(encode("42", wrapper)),
+    ]);
+    connection.close();
+  });
+
+  test("protected, an error caught rejects with q's text and the backtrace", async () => {
+    // (::;"type";"  [0]  1+`a\n        ^\n")
+    const server = await fake((socket) =>
+      socket.write(
+        reply(
+          "010000003600000000000300000065000a0004000000747970650a001600000020205b305d2020312b60610a20202020202020205e0a",
+        ),
+      ),
+    );
+    const connection = await protect(server);
+    await assert.rejects(
+      connection.query("1+`a"),
+      (error) =>
+        error instanceof QError &&
+        error.message === "type" &&
+        error.backtrace === "  [0]  1+`a\n        ^\n",
+    );
+    connection.close();
+  });
+
+  test("protected, an error signalled says how to turn it off", async () => {
+    const server = await fake((socket) => socket.write(qError("type")));
+    const connection = await protect(server);
+    await assert.rejects(
+      connection.query("1+`a"),
+      (error) =>
+        error instanceof QError &&
+        error.message === "type" &&
+        error.backtrace === undefined &&
+        /turn off protect/.test(String(error.cause)),
+    );
+    connection.close();
+  });
+
+  test("protected, a result not wrapped says how to turn it off, leaving the connection open", async () => {
+    const answers = [
+      response("atom.long"),
+      // (::;`type;"bt"), where the error should be a string
+      reply("010000001e0000000000030000006500f574797065000a00020000006274"),
+      // (::;42)
+      reply("01000000190000000000020000006500f92a00000000000000"),
+    ];
+    const server = await fake((socket) => socket.write(answers.shift() ?? ""));
+    const connection = await protect(server);
+    for (const _ of [1, 2]) {
+      await assert.rejects(
+        connection.query("x"),
+        (error) =>
+          error instanceof Error &&
+          error.message === "the server didn't evaluate the query protected" &&
+          /turn off protect/.test(String(error.cause)),
+      );
+    }
+    assert.strictEqual((await connection.query("x")).type, -7);
+    connection.close();
   });
 
   function limited(server: Fake, limit: number): Promise<Connection> {
