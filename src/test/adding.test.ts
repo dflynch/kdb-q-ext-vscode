@@ -64,7 +64,7 @@ suite("adding a server", () => {
     ]);
     assert.deepStrictEqual(await add(ask, context), {
       name: "prod",
-      value: { host: "kdb1", port: 5010, user: "dan" },
+      value: { host: "kdb1", port: 5010, user: "dan", timeout: 2000 },
       password: "secret",
       passphrase: "",
       workspace: false,
@@ -113,7 +113,7 @@ suite("adding a server", () => {
     ]);
     assert.deepStrictEqual(adding, {
       name: "uat",
-      value: { host: "kdb1", port: 5010 },
+      value: { host: "kdb1", port: 5010, timeout: 2000 },
       password: "",
       passphrase: "",
       workspace: false,
@@ -139,6 +139,7 @@ suite("adding a server", () => {
       host: "kdb1",
       port: 1,
       auth: "prompt",
+      timeout: 2000,
     });
     const sso = scripted([
       "sso",
@@ -153,6 +154,7 @@ suite("adding a server", () => {
       host: "kdb2",
       port: 5000,
       auth: { extension: "acme.kdb-auth" },
+      timeout: 2000,
     });
   });
 
@@ -346,7 +348,12 @@ suite("addServer", () => {
     );
     assert.deepStrictEqual(added(), {
       old: { host: "kdb0", port: 1 },
-      prod: { host: "kdb1.example.com", port: 5010, user: "dan" },
+      prod: {
+        host: "kdb1.example.com",
+        port: 5010,
+        user: "dan",
+        timeout: 2000,
+      },
     });
     assert.deepStrictEqual(kept, {
       "password:dan@kdb1.example.com:5010": "secret",

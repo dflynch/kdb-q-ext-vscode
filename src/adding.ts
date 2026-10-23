@@ -235,11 +235,11 @@ function options(timeout: number): Step {
           {
             id: "protect",
             label: "Protected evaluation",
-            description: "off for a gateway with its own .z.pg",
+            description: "untick when the server enforces an allowlist",
           },
           {
             id: "timeout",
-            label: "Connect timeout",
+            label: "Connection timeout",
             description: `${timeout} ms, edit in settings.json`,
           },
         ],
@@ -366,7 +366,7 @@ export async function add(
   for (;;) {
     const steps = plan(state, context);
     if (at === steps.length) {
-      return adding(state);
+      return adding(state, context);
     }
     const placed = { step: at + 1, total: steps.length };
     const asking: Ask = {
@@ -388,8 +388,9 @@ export async function add(
 }
 
 // The server the answers make, using only the answers their choices lead
-// to: one given before going back and choosing otherwise is dropped
-function adding(state: State): Adding {
+// to: one given before going back and choosing otherwise is dropped. The
+// timeout is written, as the default if on, so that it's there to edit.
+function adding(state: State, context: Context): Adding {
   const tls = ticked(state, "options", "tls");
   const ca = tls && ticked(state, "files", "ca");
   const client = tls && ticked(state, "files", "client");
@@ -423,7 +424,7 @@ function adding(state: State): Adding {
           }
         : {}),
       ...(ticked(state, "options", "protect") ? {} : { protect: false }),
-      ...(ticked(state, "options", "timeout") ? {} : { timeout: 0 }),
+      timeout: ticked(state, "options", "timeout") ? context.timeout : 0,
     },
     password: state.login === "store" ? (state.password ?? "") : "",
     passphrase: client ? (state.passphrase ?? "") : "",
