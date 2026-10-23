@@ -14,10 +14,126 @@ export type Server = {
   timeout?: number;
   // The largest result to take, in bytes, uncompressed
   limit?: number;
+  // Whether to evaluate queries protected; off unless set, though the
+  // servers setting turns it on by default
+  protect?: boolean;
 };
 
-// An error the server signalled, with q's text as the message
-export class QError extends Error {}
+// How long a query took, in whole milliseconds, as \t gives
+export type Timing = {
+  // From sending the query to the last of its result arriving
+  roundtrip: number;
+  // The server's time running it, with protected evaluation: not
+  // serialising the result, nor formatting a backtrace
+  execution?: number;
+};
+
+// What a query returns
+export type Result = { value: Value; timing: Timing };
+
+// An error the server signalled, with q's text as the message, how long the
+// query took, and where protected evaluation caught it, the stack as q
+// shows it
+export class QError extends Error {
+  readonly backtrace?: string;
+  constructor(
+    message: string,
+    readonly timing: Timing,
+    backtrace?: string,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+    if (backtrace !== undefined) {
+      this.backtrace = backtrace;
+    }
+  }
+}
+
+// Protected evaluation: q's .z.pg applies this to the query, which it runs
+// under .Q.trp. It returns ``result`elapsed!(::;result;ms), or
+// ``error`backtrace`elapsed!(::;error;backtrace;ms): named so that more
+// can be added, and the null key's :: keeps the values a general list, as a
+// namespace's does.
+// - value is composed with a flag rather than wrapped in a lambda, so it
+//   adds no frame, and the flag tells a result from an error whatever the
+//   query returns
+// - The time is taken once .Q.trp returns, before a backtrace is formatted,
+//   from .z.p, as .z.n goes back at midnight
+// - The backtrace keeps the frames inside .Q.trp's, the one inside this
+//   function's (.z.s), which are the query's, numbered from the query's as
+//   0. Those outside, this function's and a customised .z.pg's, go. The
+//   frames' layout isn't documented, so if stripping them fails, the
+//   backtrace is shown whole rather than the error lost
+// - The wrapper's frame is found with ~/:, not ?, which misses when the
+//   list starts with (), as a frame for the query's own text holds
+// - The query, evaluated by value, sees only globals, so these locals can't
+//   clash with its names. None is named for a q keyword, such as trim, which
+//   can't be assigned
+export const wrapper = [
+  "{[query]",
+  "  started:.z.p;",
+  "  outcome:.Q.trp['[(1b;);value];query;(0b;;)];",
+  "  elapsed:(`long$.z.p-started)div 1000000;",
+  "  if[outcome 0;:``result`elapsed!(::;outcome 1;elapsed)];",
+  "  strip:{[self;stack]",
+  "    stack:(-1+last where self~/:stack[;0;0])#stack;",
+  "    .[stack;(::;3);-;last stack[;3]]};",
+  "  backtrace:.Q.sbt @[strip .z.s;outcome 2;outcome 2];",
+  "  ``error`backtrace`elapsed!(::;outcome 1;backtrace;elapsed)}",
+].join("\n");
+
+// What a failure with protected evaluation on says, as a server whose .z.pg
+// is customised, or takes only strings, can't evaluate it
+const unprotected =
+  "if the server's .z.pg is customised, turn off protect for it in the servers setting";
+
+const utf8 = new TextDecoder("utf-8", { ignoreBOM: true });
+
+// Protected evaluation's dictionary by name, or undefined if it isn't one
+function fields(value: Value): Map<string, Value> | undefined {
+  if (value.type !== 99) {
+    return undefined;
+  }
+  const { keys, values } = value;
+  if (keys.type !== 11 || values.type !== 0 || !("items" in values)) {
+    return undefined;
+  }
+  const { bytes, offsets } = keys.data;
+  const names = Array.from(offsets.subarray(1), (end, i) =>
+    utf8.decode(bytes.subarray(offsets[i], end)),
+  );
+  const [head] = values.items;
+  if (names[0] !== "" || head?.type !== 101 || head.code !== 0) {
+    return undefined;
+  }
+  return new Map(names.map((name, i) => [name, values.items[i]]));
+}
+
+// The result inside protected evaluation's dictionary, or the error it
+// caught. Names it doesn't know are left for later.
+function unwrap(value: Value, roundtrip: number): Result {
+  const named = fields(value);
+  const result = named?.get("result");
+  const error = named?.get("error");
+  const backtrace = named?.get("backtrace");
+  const elapsed = named?.get("elapsed");
+  if (elapsed?.type === -7) {
+    const timing = { roundtrip, execution: Number(elapsed.value) };
+    if (result) {
+      return { value: result, timing };
+    }
+    if (error?.type === 10 && backtrace?.type === 10) {
+      throw new QError(
+        utf8.decode(error.data),
+        timing,
+        utf8.decode(backtrace.data),
+      );
+    }
+  }
+  throw new Error("the server didn't evaluate the query protected", {
+    cause: unprotected,
+  });
+}
 
 // A result over the limit. The extension host's heap is capped, and going
 // over it kills the host, so results are refused well before: a general
@@ -39,8 +155,10 @@ const what = ["async message", "sync call", "response"];
 // unnoticed; and nothing it sends is ever evaluated.
 export class Connection {
   private pending?: {
-    resolve: (value: Value) => void;
+    resolve: (result: Result) => void;
     reject: (error: Error) => void;
+    // When the query was sent, from performance.now()
+    sent: number;
   };
   // Why the connection closed, once it has
   private reason?: Error;
@@ -53,6 +171,7 @@ export class Connection {
   private constructor(
     private socket: net.Socket,
     private limit: number,
+    private protect: boolean,
     rest: Buffer,
   ) {
     socket.on("data", (chunk) => this.receive(chunk));
@@ -98,7 +217,12 @@ export class Connection {
       const accepted = (chunk: Buffer) => {
         done();
         resolve(
-          new Connection(socket, server.limit ?? 10e6, chunk.subarray(1)),
+          new Connection(
+            socket,
+            server.limit ?? 10e6,
+            server.protect ?? false,
+            chunk.subarray(1),
+          ),
         );
       };
       // Only the listeners added here: the socket has Node's own too
@@ -121,7 +245,7 @@ export class Connection {
     });
   }
 
-  query(text: string): Promise<Value> {
+  query(text: string): Promise<Result> {
     if (this.reason) {
       return Promise.reject(
         new Error("the connection is closed", { cause: this.reason }),
@@ -131,8 +255,8 @@ export class Connection {
       return Promise.reject(new Error("a query is already running"));
     }
     return new Promise((resolve, reject) => {
-      this.pending = { resolve, reject };
-      this.socket.write(encode(text));
+      this.pending = { resolve, reject, sent: performance.now() };
+      this.socket.write(this.protect ? encode(text, wrapper) : encode(text));
     });
   }
 
@@ -224,6 +348,7 @@ export class Connection {
       return;
     }
     this.pending = undefined;
+    const roundtrip = Math.floor(performance.now() - pending.sent);
     let value: Value;
     try {
       value = decode(message);
@@ -232,9 +357,26 @@ export class Connection {
       return;
     }
     if (value.type === -128) {
-      pending.reject(new QError(value.message));
-    } else {
-      pending.resolve(value);
+      // With protected evaluation on, a signalled error means the query
+      // wasn't run under it
+      pending.reject(
+        new QError(
+          value.message,
+          { roundtrip },
+          undefined,
+          this.protect ? { cause: unprotected } : undefined,
+        ),
+      );
+      return;
+    }
+    try {
+      pending.resolve(
+        this.protect
+          ? unwrap(value, roundtrip)
+          : { value, timing: { roundtrip } },
+      );
+    } catch (error) {
+      pending.reject(error as Error);
     }
   }
 }

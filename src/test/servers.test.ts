@@ -26,6 +26,17 @@ suite("servers", () => {
     );
   });
 
+  test("protected evaluation is on unless a server turns it off", () => {
+    const { servers } = definitions({
+      gateway: { host: "gw", port: 5000, protect: false },
+      local: { host: "localhost", port: 5000 },
+    });
+    assert.deepStrictEqual(
+      servers.map((s) => server(s, {}, defaults).protect),
+      [false, true],
+    );
+  });
+
   test("no setting is no servers", () => {
     assert.deepStrictEqual(definitions(undefined), {
       servers: [],
@@ -50,6 +61,7 @@ suite("servers", () => {
       f: { host: "h", port: 1, user: "a:b" },
       g: { host: "h", port: 1, user: "a\0" },
       h: { host: "h", port: 1, timeout: 0 },
+      h2: { host: "h", port: 1, protect: "no" },
       i: { host: "h", port: 1, usr: "dan" },
       j: "h:1",
       "": { host: "h", port: 1 },
@@ -65,6 +77,7 @@ suite("servers", () => {
       "f: the user can't contain : or a 0 byte",
       "g: the user can't contain : or a 0 byte",
       "h: the timeout isn't a whole number of milliseconds",
+      "h2: protect is true or false",
       "i: unknown field usr",
       "j: not an object",
       '"": a server needs a name',
@@ -202,6 +215,7 @@ suite("servers", () => {
       port: 5000,
       timeout: 2000,
       limit: 10e6,
+      protect: true,
     });
     assert.deepStrictEqual(
       server(
@@ -216,6 +230,7 @@ suite("servers", () => {
         password: "pw",
         timeout: 500,
         limit: 10e6,
+        protect: true,
       },
     );
   });
