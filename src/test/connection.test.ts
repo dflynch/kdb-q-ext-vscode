@@ -188,7 +188,7 @@ suite("connection", () => {
     const { value, timing } = await connection.query("42");
     assert.strictEqual(value.type, -7);
     assert.ok(timing.roundtrip >= 0);
-    assert.strictEqual(timing.evaluation, undefined);
+    assert.strictEqual(timing.execution, undefined);
     assert.deepStrictEqual(server.messages, [Buffer.from(encode("42"))]);
     connection.close();
   });
@@ -310,19 +310,19 @@ suite("connection", () => {
     });
   }
 
-  test("protected, sends the wrapper and the query, and resolves with the result and the evaluation time", async () => {
-    // ``result`evaluation!(::;42;7)
+  test("protected, sends the wrapper and the query, and resolves with the result and the execution time", async () => {
+    // ``result`execution!(::;42;7)
     const server = await fake((socket) =>
       socket.write(
         reply(
-          "010000003c000000630b000300000000726573756c74006576616c756174696f6e000000030000006500f92a00000000000000f90700000000000000",
+          "010000003b000000630b000300000000726573756c7400657865637574696f6e000000030000006500f92a00000000000000f90700000000000000",
         ),
       ),
     );
     const connection = await protect(server);
     const { value, timing } = await connection.query("42");
     assert.deepStrictEqual(value, { type: -7, value: 42n });
-    assert.strictEqual(timing.evaluation, 7);
+    assert.strictEqual(timing.execution, 7);
     assert.ok(timing.roundtrip >= 0);
     assert.deepStrictEqual(server.messages, [
       Buffer.from(encode("42", wrapper)),
@@ -330,12 +330,12 @@ suite("connection", () => {
     connection.close();
   });
 
-  test("protected, an error caught rejects with q's text and the backtrace", async () => {
-    // ``error`backtrace!(::;"type";"  [0]  1+`a\n        ^\n")
+  test("protected, an error caught rejects with q's text, the backtrace and the execution time", async () => {
+    // ``error`backtrace`execution!(::;"type";"  [0]  1+`a\n        ^\n";3)
     const server = await fake((socket) =>
       socket.write(
         reply(
-          "010000004e000000630b0003000000006572726f72006261636b74726163650000000300000065000a0004000000747970650a001600000020205b305d2020312b60610a20202020202020205e0a",
+          "0100000061000000630b0004000000006572726f72006261636b747261636500657865637574696f6e0000000400000065000a0004000000747970650a001600000020205b305d2020312b60610a20202020202020205e0af90300000000000000",
         ),
       ),
     );
@@ -346,7 +346,7 @@ suite("connection", () => {
         error instanceof QError &&
         error.message === "type" &&
         error.backtrace === "  [0]  1+`a\n        ^\n" &&
-        error.timing.evaluation === undefined,
+        error.timing.execution === 3,
     );
     connection.close();
   });
@@ -368,23 +368,23 @@ suite("connection", () => {
   test("protected, a result not wrapped says how to turn it off, leaving the connection open; a name it doesn't know is ignored", async () => {
     const answers = [
       response("atom.long"),
-      // ``error`backtrace!(::;`type;"bt"), where the error should be a
-      // string
+      // ``error`backtrace`execution!(::;`type;"bt";3), where the error
+      // should be a string
       reply(
-        "0100000036000000630b0003000000006572726f72006261636b7472616365000000030000006500f574797065000a00020000006274",
+        "0100000049000000630b0004000000006572726f72006261636b747261636500657865637574696f6e000000040000006500f574797065000a00020000006274f90300000000000000",
       ),
-      // ``result!(::;42), with no evaluation time
+      // ``result!(::;42), with no execution time
       reply(
         "0100000028000000630b000200000000726573756c74000000020000006500f92a00000000000000",
       ),
-      // ``result`evaluation!(::;42;0D00:00:01), where the time should be a
+      // ``result`execution!(::;42;0D00:00:01), where the time should be a
       // long
       reply(
-        "010000003c000000630b000300000000726573756c74006576616c756174696f6e000000030000006500f92a00000000000000f000ca9a3b00000000",
+        "010000003b000000630b000300000000726573756c7400657865637574696f6e000000030000006500f92a00000000000000f000ca9a3b00000000",
       ),
-      // ``result`evaluation`later!(::;42;7;1b), a name it doesn't know yet
+      // ``result`execution`later!(::;42;7;1b), a name it doesn't know yet
       reply(
-        "0100000044000000630b000400000000726573756c74006576616c756174696f6e006c61746572000000040000006500f92a00000000000000f90700000000000000ff01",
+        "0100000043000000630b000400000000726573756c7400657865637574696f6e006c61746572000000040000006500f92a00000000000000f90700000000000000ff01",
       ),
     ];
     const server = await fake((socket) => socket.write(answers.shift() ?? ""));

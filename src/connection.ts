@@ -23,9 +23,9 @@ export type Server = {
 export type Timing = {
   // From sending the query to the last of its result arriving
   roundtrip: number;
-  // The server's time evaluating it, with protected evaluation, when it
-  // succeeds: not serialising the result, nor formatting a backtrace
-  evaluation?: number;
+  // The server's time running it, with protected evaluation: not
+  // serialising the result, nor formatting a backtrace
+  execution?: number;
 };
 
 // What a query returns
@@ -49,17 +49,37 @@ export class QError extends Error {
   }
 }
 
-// Protected evaluation: q's default .z.pg applies this to the query, which
-// it evaluates under .Q.trp. It returns ``result`evaluation!(::;result;ms),
-// or ``error`backtrace!(::;error;backtrace): named so that more can be
-// added, and the null key's :: keeps the values a general list, as a
-// namespace's does. The time is from .z.p, as .z.n goes back at midnight,
-// and its locals can't be seen by the query, which value evaluates as
-// global. The backtrace leaves out this function's own frames, and those
-// outside it, such as a customised .z.pg's, and is numbered from the
-// query's frame as 0.
-export const wrapper =
-  "{f:{s:.z.p;r:value x;(``result`evaluation)!(::;r;(`long$.z.p-s)div 1000000)};.Q.trp[f;x;{[f;e;b]b:(last where f~/:b[;0;0])#b;(``error`backtrace)!(::;e;.Q.sbt{@[x;3;-;y]}[;last b[;3]]each b)}f]}";
+// Protected evaluation: q's .z.pg applies this to the query, which it runs
+// under .Q.trp. It returns ``result`execution!(::;result;ms), or
+// ``error`backtrace`execution!(::;error;backtrace;ms): named so that more
+// can be added, and the null key's :: keeps the values a general list, as a
+// namespace's does.
+// - The time is from .z.p, as .z.n goes back at midnight, taken as an error
+//   is caught, before its backtrace is formatted
+// - The backtrace keeps the frames inside run's, which are the query's,
+//   numbered from the query's as 0. Those outside, the wrapper's and a
+//   customised .z.pg's, go. The frames' layout isn't documented, so if
+//   picking them out fails, the backtrace is shown whole rather than the
+//   error lost
+// - Each function is given what it uses, as q's lambdas see only their own
+//   locals and globals; and the query, evaluated by value, sees only
+//   globals, so the wrapper's locals can't clash with its names
+// - No local is named for a q keyword, such as trim, which can't be assigned
+export const wrapper = [
+  "{[query]",
+  "  run:{[start;query]",
+  "    result:value query;",
+  "    (``result`execution)!(::;result;(`long$.z.p-start)div 1000000)};",
+  "  frames:{[run;stack]",
+  "    stack:(last where run~/:stack[;0;0])#stack;",
+  "    {@[x;3;-;y]}[;last stack[;3]] each stack};",
+  "  caught:{[run;frames;start;error;stack]",
+  "    execution:(`long$.z.p-start)div 1000000;",
+  "    backtrace:.Q.sbt @[frames run;stack;stack];",
+  "    (``error`backtrace`execution)!(::;error;backtrace;execution)};",
+  "  start:.z.p;",
+  "  .Q.trp[run start;query;caught[run;frames;start]]}",
+].join("\n");
 
 // What a failure with protected evaluation on says, as a server whose .z.pg
 // is customised, or takes only strings, can't evaluate it
@@ -93,21 +113,21 @@ function fields(value: Value): Map<string, Value> | undefined {
 function unwrap(value: Value, roundtrip: number): Result {
   const named = fields(value);
   const result = named?.get("result");
-  const evaluation = named?.get("evaluation");
   const error = named?.get("error");
   const backtrace = named?.get("backtrace");
-  if (result && evaluation?.type === -7) {
-    return {
-      value: result,
-      timing: { roundtrip, evaluation: Number(evaluation.value) },
-    };
-  }
-  if (error?.type === 10 && backtrace?.type === 10) {
-    throw new QError(
-      utf8.decode(error.data),
-      { roundtrip },
-      utf8.decode(backtrace.data),
-    );
+  const execution = named?.get("execution");
+  if (execution?.type === -7) {
+    const timing = { roundtrip, execution: Number(execution.value) };
+    if (result) {
+      return { value: result, timing };
+    }
+    if (error?.type === 10 && backtrace?.type === 10) {
+      throw new QError(
+        utf8.decode(error.data),
+        timing,
+        utf8.decode(backtrace.data),
+      );
+    }
   }
   throw new Error("the server didn't evaluate the query protected", {
     cause: unprotected,
