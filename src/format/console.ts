@@ -12,21 +12,17 @@ import { type Bounds, cell, qText } from "./text";
 // A value as text, as the q console shows it: a port of q's own .Q.s2 and
 // .Q.S, whose source q prints, to compare with when q changes
 
-// How much text to show: as many lines, each as wide as width, and in all
-// no more than characters, where it's given. Our own measure, not q's \c,
-// which leaves room for the prompt: \c 25 80 shows 23 lines of 79.
-export type Size = Bounds & { characters?: number };
+// How much text to show: as many lines, each as wide as width, as q's \c
+// does, though not leaving room for a prompt: \c 25 80 shows 23 lines of 79.
+// Laying out stops there, so a value costs only what's shown. A cell in a
+// table, a matrix or a dictionary is cut at cell, where it's given, unlike
+// in q, so that one long one can't widen every line of its column.
+export type Size = Bounds & { cell?: number };
 
 // How much of a value to show: far more than q's \c, as the panel scrolls.
-// A value with more lines shows the first 4999 and then .., and a wider
-// line shows its first 4998 characters and then ... Lines past a million
-// characters in all become .. too, so that what reaches the panel stays
-// small even when many lines are wide.
-export const defaultSize: Size = {
-  lines: 5000,
-  width: 5000,
-  characters: 1_000_000,
-};
+// A value with more lines shows the first 999 and then .., and a wider line
+// or cell shows all but its last two characters that fit and then ...
+export const defaultSize: Size = { lines: 1000, width: 1000, cell: 256 };
 
 // A value as the q console shows it
 export function show(value: Value, size: Size = defaultSize): string {
@@ -46,25 +42,17 @@ export function show(value: Value, size: Size = defaultSize): string {
   ).join("\n");
 }
 
-function cut(lines: string[], size: Size): string[] {
-  const shown = (
+function cut(lines: string[], size: Bounds): string[] {
+  return (
     lines.length > size.lines
       ? [...lines.slice(0, size.lines - 1), ".."]
       : lines
-  ).map((line) =>
-    line.length > size.width ? `${line.slice(0, size.width - 2)}..` : line,
-  );
-  // Then the line that takes it past the characters, with the newlines
-  // between, becomes .., and any after it go
-  const characters = size.characters ?? Number.POSITIVE_INFINITY;
-  let total = -1;
-  for (let i = 0; i < shown.length; i++) {
-    total += shown[i].length + 1;
-    if (total > characters) {
-      return [...shown.slice(0, i), ".."];
-    }
-  }
-  return shown;
+  ).map((line) => clip(line, size.width));
+}
+
+// Text as wide as width at most, ending in .. if it's cut
+function clip(text: string, width: number): string {
+  return text.length > width ? `${text.slice(0, width - 2)}..` : text;
 }
 
 // The lines of a value's first rows items, as q's .Q.s2 lays them out: a
@@ -146,7 +134,7 @@ function besides(
 ): string[] {
   const lines = Array.from({ length: height }, () => "");
   for (let j = 0; j < columns && lines[0].length <= size.width; j++) {
-    const column = cells(j);
+    const column = cells(j).map((c) => clip(c, size.cell ?? c.length));
     const width = Math.max(...column.map((c) => c.length));
     lines.forEach((line, i) => {
       lines[i] = `${line}${j ? " " : ""}${(column[i] ?? "").padEnd(width)}`;
@@ -172,8 +160,15 @@ function table(t: Table, rows: number, size: Size): string[] {
 // A dictionary: its keys, padded, beside their values. A table on one side
 // gives that side a header, and the other a blank line and dashes to match.
 function dictionary(d: Dictionary, rows: number, size: Size): string[] {
-  let keys = lines(d.keys, rows, size);
-  let values = lines(d.values, rows, size);
+  // A table's cells are cut as it's laid out
+  const cells = (side: Value) => {
+    const laid = lines(side, rows, size);
+    return side.type === 98
+      ? laid
+      : laid.map((c) => clip(c, size.cell ?? c.length));
+  };
+  let keys = cells(d.keys);
+  let values = cells(d.values);
   if (values.length > keys.length) {
     keys = headed(keys);
   } else if (keys.length > values.length) {
