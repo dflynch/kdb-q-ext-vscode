@@ -533,8 +533,8 @@ export type Status = vscode.Disposable & {
 // evaluation, and the roundtrip
 function took(timing: Timing): string {
   return timing.execution === undefined
-    ? `$(watch) ${timing.roundtrip} ms roundtrip`
-    : `$(watch) ${timing.execution} ms (${timing.roundtrip} ms roundtrip)`;
+    ? `${timing.roundtrip} ms roundtrip`
+    : `${timing.execution} ms (${timing.roundtrip} ms roundtrip)`;
 }
 
 // A server's settings, all but secrets: where the password comes from, not
@@ -565,7 +565,8 @@ function details(server: servers.Definition, timeout: number): string[] {
 
 // The active connection in the status bar, which picks one when clicked,
 // with how long its last query took, and a warning when a connection closes
-// without being disconnected. Its tooltip gives the server's settings.
+// without being disconnected. The icon says the connection's state, and the
+// tooltip gives the server's settings.
 export function showStatus(connections: Connections<Connection>): Status {
   const item = vscode.window.createStatusBarItem(
     "kdb-q-ext-vscode.connection",
@@ -586,22 +587,24 @@ export function showStatus(connections: Connections<Connection>): Status {
           ? "database"
           : "debug-disconnect";
     const timing = last?.name === active?.name ? last?.timing : undefined;
-    item.text = `$(${icon}) ${active?.name ?? "kdb+/q"}${timing ? `  ${took(timing)}` : ""}`;
-    item.tooltip =
-      active && server
-        ? [
-            `kdb+/q: ${active.name}, ${describe(active.state)}`,
-            ...details(
-              server,
-              servers.settings(
-                vscode.workspace
-                  .getConfiguration("kdb-q-ext-vscode")
-                  .get("connectTimeout"),
-                undefined,
-              ).defaults.timeout,
-            ),
-          ].join("\n")
-        : "kdb+/q: Connect to a server";
+    item.text = `$(${icon}) ${active?.name ?? "kdb+/q"}${timing ? `  $(watch) ${took(timing)}` : ""}`;
+    // The icon says the state, so screen readers are told it in words
+    item.accessibilityInformation = {
+      label: active
+        ? `kdb+/q: ${active.name}, ${describe(active.state)}${timing ? `, last query ${took(timing)}` : ""}`
+        : "kdb+/q: not connected",
+    };
+    item.tooltip = server
+      ? details(
+          server,
+          servers.settings(
+            vscode.workspace
+              .getConfiguration("kdb-q-ext-vscode")
+              .get("connectTimeout"),
+            undefined,
+          ).defaults.timeout,
+        ).join("\n")
+      : "kdb+/q: Connect to a server";
     item.backgroundColor =
       active?.state.kind === "closed"
         ? new vscode.ThemeColor("statusBarItem.warningBackground")
