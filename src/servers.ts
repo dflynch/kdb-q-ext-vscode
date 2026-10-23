@@ -229,16 +229,6 @@ export function port(text: string): number | undefined {
   return port >= 1 && port <= 65535 ? port : undefined;
 }
 
-// A host typed with its port, as host:port. A host with a colon in it is an
-// IPv6 address, which has no port.
-export function address(
-  text: string,
-): { host: string; port: number } | undefined {
-  const match = /^([^:]+):(\d+)$/.exec(text.trim());
-  const at = match && port(match[2]);
-  return match && at ? { host: match[1].trim(), port: at } : undefined;
-}
-
 // Where a server's password is kept. Keyed by where it's sent, not by the
 // server's name, so that a password is never sent to a host other than the
 // one it was given for, if a server's host is changed

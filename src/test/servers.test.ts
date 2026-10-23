@@ -1,6 +1,5 @@
 import * as assert from "node:assert";
 import {
-  address,
   credentialsProblem,
   defaults,
   definitions,
@@ -218,23 +217,6 @@ suite("servers", () => {
         "the size limit isn't a positive number of megabytes",
       ],
     });
-  });
-
-  test("a host can be typed with its port", () => {
-    assert.deepStrictEqual(address(" kdb1.example.com:5010 "), {
-      host: "kdb1.example.com",
-      port: 5010,
-    });
-    for (const text of [
-      "kdb1",
-      "kdb1:",
-      ":5000",
-      "kdb1:0",
-      "::1:5000",
-      "::1",
-    ]) {
-      assert.strictEqual(address(text), undefined, text);
-    }
   });
 
   test("a port is a whole number up to 65535", () => {

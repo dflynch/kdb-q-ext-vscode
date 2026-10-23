@@ -60,7 +60,8 @@ suite("adding a server", () => {
       "dan",
       "store",
       "secret",
-      [],
+      ["protect", "timeout"],
+      "2000",
     ]);
     assert.deepStrictEqual(await add(ask, context), {
       name: "prod",
@@ -71,24 +72,14 @@ suite("adding a server", () => {
     } satisfies Adding);
     assert.deepStrictEqual(ask.asked, [
       "1/7 The server's name",
-      "2/7 The server's host, or host:port",
+      "2/7 The server's host",
       "3/7 The port on kdb1",
       "4/7 The user to log in as, or none",
       "5/7 Where the password comes from",
-      "6/7 The password for prod, or none",
-      "7/7 Options, if any (Enter for none)",
+      "6/8 The password for prod",
+      "7/8 Options [protect,timeout]",
+      "8/8 How long to wait to connect and log in, in milliseconds [2000]",
     ]);
-  });
-
-  test("a host typed with its port gives the port", async () => {
-    const ask = scripted(["prod", "kdb1:5010", "5010", "", "prompt", []]);
-    const adding = await add(ask, context);
-    assert.strictEqual(ask.asked[2], "3/7 The port on kdb1 [5010]");
-    assert.deepStrictEqual(adding?.value, {
-      host: "kdb1",
-      port: 5010,
-      auth: "prompt",
-    });
   });
 
   test("going back shows the answers given, and keeps them", async () => {
@@ -105,30 +96,26 @@ suite("adding a server", () => {
       "secret",
       back,
       back,
-      "prompt",
-      [],
+      "none",
+      ["protect"],
     ]);
     const adding = await add(ask, context);
     assert.deepStrictEqual(ask.asked.slice(2, 6), [
       "3/7 The port on kdb1",
-      "2/7 The server's host, or host:port [kdb1]",
+      "2/7 The server's host [kdb1]",
       "1/7 The server's name [prod]",
-      "2/7 The server's host, or host:port [kdb1]",
+      "2/7 The server's host [kdb1]",
     ]);
-    // Asking each time asks no password, so a password given before isn't
-    // kept
-    assert.deepStrictEqual(ask.asked.slice(10, 13), [
-      "7/7 Options, if any (Enter for none)",
-      "6/7 The password for uat, or none [secret]",
-      "5/7 Where the password comes from [store]",
+    // No password asks for none, so the password given before isn't kept
+    assert.deepStrictEqual(ask.asked.slice(10), [
+      "7/8 Options [protect,timeout]",
+      "6/8 The password for uat [secret]",
+      "5/8 Where the password comes from [store]",
+      "6/7 Options [protect,timeout]",
     ]);
-    assert.strictEqual(
-      ask.asked.at(-1),
-      "6/6 Options, if any (Enter for none)",
-    );
     assert.deepStrictEqual(adding, {
       name: "uat",
-      value: { host: "kdb1", port: 5010, auth: "prompt" },
+      value: { host: "kdb1", port: 5010 },
       password: "",
       passphrase: "",
       workspace: false,
@@ -141,35 +128,41 @@ suite("adding a server", () => {
     assert.deepStrictEqual(ask.asked, [
       "1/7 The server's name",
       "1/7 The server's name",
-      "2/7 The server's host, or host:port",
+      "2/7 The server's host",
     ]);
   });
 
-  test("an extension is named, its fields left for settings.json", async () => {
-    const ask = scripted([
+  test("asking each time, or an extension named, its fields left out", async () => {
+    const prompt = scripted(["otp", "kdb1", "1", "", "prompt", ["protect"]]);
+    assert.deepStrictEqual((await add(prompt, context))?.value, {
+      host: "kdb1",
+      port: 1,
+      auth: "prompt",
+    });
+    const sso = scripted([
       "sso",
       "kdb2",
       "5000",
       "",
       "extension",
       "acme.kdb-auth",
-      [],
+      ["protect"],
     ]);
-    assert.deepStrictEqual((await add(ask, context))?.value, {
+    assert.deepStrictEqual((await add(sso, context))?.value, {
       host: "kdb2",
       port: 5000,
       auth: { extension: "acme.kdb-auth" },
     });
   });
 
-  test("the options: TLS with its files, protect and a timeout", async () => {
+  test("the options: TLS with its files, protect off and a timeout", async () => {
     const ask = scripted([
       "prod",
       "kdb1",
       "5010",
       "",
-      "prompt",
-      ["tls", "protect", "timeout"],
+      "none",
+      ["tls", "timeout"],
       ["ca", "client"],
       "~/certs/ca.pem",
       "pem",
@@ -183,7 +176,6 @@ suite("adding a server", () => {
       value: {
         host: "kdb1",
         port: 5010,
-        auth: "prompt",
         tls: {
           ca: "~/certs/ca.pem",
           cert: "~/certs/client.pem",
@@ -202,16 +194,50 @@ suite("adding a server", () => {
     );
   });
 
+  test("a timeout left at the default isn't written", async () => {
+    const left = scripted([
+      "a",
+      "kdb1",
+      "1",
+      "",
+      "none",
+      ["protect", "timeout"],
+      "2000",
+    ]);
+    assert.deepStrictEqual((await add(left, context))?.value, {
+      host: "kdb1",
+      port: 1,
+    });
+    const set = scripted([
+      "b",
+      "kdb1",
+      "1",
+      "",
+      "none",
+      ["protect", "timeout"],
+      "2500",
+    ]);
+    assert.strictEqual((await add(set, context))?.value.timeout, 2500);
+  });
+
   test("TLS needing no files is true, and a PKCS#12 file is a pfx", async () => {
-    const plain = scripted(["a", "kdb1", "1", "", "prompt", ["tls"], []]);
+    const plain = scripted([
+      "a",
+      "kdb1",
+      "1",
+      "",
+      "none",
+      ["tls", "protect"],
+      [],
+    ]);
     assert.deepStrictEqual((await add(plain, context))?.value.tls, true);
     const pfx = scripted([
       "b",
       "kdb1",
       "2",
       "",
-      "prompt",
-      ["tls"],
+      "none",
+      ["tls", "protect"],
       ["client"],
       "pfx",
       "/etc/client.p12",
@@ -223,7 +249,15 @@ suite("adding a server", () => {
   });
 
   test("with a workspace open, asks where to keep it", async () => {
-    const ask = scripted(["prod", "kdb1", "1", "", "prompt", [], "workspace"]);
+    const ask = scripted([
+      "prod",
+      "kdb1",
+      "1",
+      "",
+      "none",
+      ["protect"],
+      "workspace",
+    ]);
     const adding = await add(ask, { ...context, workspace: true });
     assert.strictEqual(adding?.workspace, true);
     assert.strictEqual(ask.asked.at(-1), "7/7 Where to keep the server");
@@ -236,16 +270,17 @@ suite("adding a server", () => {
     );
   });
 
-  test("the checks: a name taken or empty, a host, a port, a file", async () => {
+  test("the checks: name, host, port, user, password and file", async () => {
     const problems: (string | undefined)[] = [];
     const tries: Record<string, string[]> = {
       "The server's name": ["old", " ", "prod"],
-      "The server's host, or host:port": [" ", "kdb1"],
+      "The server's host": [" ", "kdb1:5000", "kdb1"],
       "The port on kdb1": ["0", "65536", "5.5", "5000"],
       "The user to log in as, or none": ["a:b", ""],
+      "The password for prod": ["", "secret"],
       "The CA's certificate, in PEM": ["ca.pem", "~/ca.pem"],
     };
-    const picks = ["prompt", ["tls"], ["ca"]];
+    const picks = ["store", ["tls", "protect"], ["ca"]];
     const ask: Asker = {
       input: async (question) => {
         const texts = tries[question.prompt] ?? [];
@@ -261,12 +296,15 @@ suite("adding a server", () => {
       "A server needs a name",
       undefined,
       "A host",
+      "The port goes in the next step",
       undefined,
       "A port, from 1 to 65535",
       "A port, from 1 to 65535",
       "A port, from 1 to 65535",
       undefined,
       "The user can't contain : or a 0 byte",
+      undefined,
+      "A password",
       undefined,
       "An absolute path, or one starting with ~/",
       undefined,
@@ -332,7 +370,7 @@ suite("addServer", () => {
         "dan",
         "store",
         "secret",
-        [],
+        ["protect"],
       ]),
     );
     assert.deepStrictEqual(added(), {
@@ -356,7 +394,7 @@ suite("addServer", () => {
         "5010",
         "",
         "prompt",
-        ["tls"],
+        ["tls", "protect"],
         ["client"],
         "pfx",
         "/etc/client.p12",
@@ -370,7 +408,15 @@ suite("addServer", () => {
     await addServer(
       secrets({}),
       connections,
-      scripted(["sso", "kdb2", "5000", "", "extension", "acme.kdb-auth", []]),
+      scripted([
+        "sso",
+        "kdb2",
+        "5000",
+        "",
+        "extension",
+        "acme.kdb-auth",
+        ["protect"],
+      ]),
     );
     assert.match(told[0], /fields its extension takes go in settings.json/);
   });

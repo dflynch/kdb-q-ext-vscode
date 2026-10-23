@@ -129,26 +129,25 @@ function name(taken: string[]): Step {
 const host: Step = async (ask, state) =>
   then(
     await ask.input({
-      prompt: "The server's host, or host:port",
+      prompt: "The server's host",
       placeholder: "localhost",
       value: state.host,
-      validate: (text) => (text.trim() === "" ? "A host" : undefined),
+      validate: (text) =>
+        text.trim() === ""
+          ? "A host"
+          : /:\d+$/.test(text.trim())
+            ? "The port goes in the next step"
+            : undefined,
     }),
     (host) => ({ host: host.trim() }),
   );
 
-// The host, as typed or without its port
-function hostOf(state: State): string {
-  const typed = state.host ?? "";
-  return servers.address(typed)?.host ?? typed;
-}
-
 const port: Step = async (ask, state) =>
   then(
     await ask.input({
-      prompt: `The port on ${hostOf(state)}`,
+      prompt: `The port on ${state.host}`,
       placeholder: "5000",
-      value: state.port ?? servers.address(state.host ?? "")?.port.toString(),
+      value: state.port,
       validate: (text) =>
         servers.port(text) ? undefined : "A port, from 1 to 65535",
     }),
@@ -173,6 +172,7 @@ const login: Step = async (ask, state) =>
     await ask.pick({
       placeholder: "Where the password comes from",
       choices: [
+        { id: "none", label: "No password" },
         {
           id: "store",
           label: "Store a password",
@@ -197,10 +197,11 @@ const login: Step = async (ask, state) =>
 const password: Step = async (ask, state) =>
   then(
     await ask.input({
-      prompt: `The password for ${state.name}, or none`,
+      prompt: `The password for ${state.name}`,
       value: state.password,
       password: true,
-      validate: servers.passwordProblem,
+      validate: (text) =>
+        text === "" ? "A password" : servers.passwordProblem(text),
     }),
     (password) => ({ password }),
   );
@@ -219,29 +220,33 @@ const extension: Step = async (ask, state) =>
     (extension) => ({ extension: extension.trim() }),
   );
 
-function options(timeout: number): Step {
-  return async (ask, state) =>
-    then(
-      await ask.tick({
-        placeholder: "Options, if any (Enter for none)",
-        choices: [
-          { id: "tls", label: "Connect with TLS" },
-          {
-            id: "protect",
-            label: "Turn off protected evaluation",
-            description: "for a gateway whose .z.pg is its own",
-          },
-          {
-            id: "timeout",
-            label: "Set a connect timeout",
-            description: `${timeout} ms otherwise`,
-          },
-        ],
-        chosen: state.options,
-      }),
-      (options) => ({ options }),
-    );
+// The options as first shown: protected evaluation on, as a server has it
+// by default, and the timeout, to be shown with its default
+const optionsAtFirst = ["protect", "timeout"];
+
+// Whether an option or a file TLS needs is ticked, the options counting as
+// first shown until answered
+function ticked(state: State, key: "options" | "files", id: string): boolean {
+  return (state[key] ?? (key === "options" ? optionsAtFirst : [])).includes(id);
 }
+
+const options: Step = async (ask, state) =>
+  then(
+    await ask.tick({
+      placeholder: "Options",
+      choices: [
+        { id: "tls", label: "Connect with TLS" },
+        {
+          id: "protect",
+          label: "Protected evaluation",
+          description: "off for a gateway whose .z.pg is its own",
+        },
+        { id: "timeout", label: "Set a connect timeout" },
+      ],
+      chosen: state.options ?? optionsAtFirst,
+    }),
+    (options) => ({ options }),
+  );
 
 const files: Step = async (ask, state) =>
   then(
@@ -330,38 +335,37 @@ const scope: Step = async (ask, state) =>
 // The questions the answers so far lead to, in order. One not answered yet
 // counts as its first choice, so that the total is a fair guess.
 function plan(state: State, context: Context): Step[] {
-  const ticked = (key: "options" | "files", id: string) =>
-    state[key]?.includes(id) ?? false;
-  const client = ticked("files", "client");
+  const tls = ticked(state, "options", "tls");
+  const client = tls && ticked(state, "files", "client");
   return [
     name(context.taken),
     host,
     port,
     user,
     login,
-    ...((state.login ?? "store") === "store" ? [password] : []),
+    ...(state.login === "store" ? [password] : []),
     ...(state.login === "extension" ? [extension] : []),
-    options(context.timeout),
-    ...(ticked("options", "tls") ? [files] : []),
-    ...(ticked("options", "tls") && ticked("files", "ca")
+    options,
+    ...(tls ? [files] : []),
+    ...(tls && ticked(state, "files", "ca")
       ? [file("ca", "The CA's certificate, in PEM", "Trust this CA", pem)]
       : []),
-    ...(ticked("options", "tls") && client ? [form] : []),
-    ...(ticked("options", "tls") && client && state.form === "pfx"
+    ...(client ? [form] : []),
+    ...(client && state.form === "pfx"
       ? [
           file("pfx", "The PKCS#12 file", "Use this certificate", {
             "PKCS#12": ["p12", "pfx"],
           }),
         ]
       : []),
-    ...(ticked("options", "tls") && client && state.form !== "pfx"
+    ...(client && state.form !== "pfx"
       ? [
           file("cert", "The certificate, in PEM", "Use this certificate", pem),
           file("key", "The certificate's key, in PEM", "Use this key", pem),
         ]
       : []),
-    ...(ticked("options", "tls") && client ? [passphrase] : []),
-    ...(ticked("options", "timeout") ? [timeout(context.timeout)] : []),
+    ...(client ? [passphrase] : []),
+    ...(ticked(state, "options", "timeout") ? [timeout(context.timeout)] : []),
     ...(context.workspace ? [scope] : []),
   ];
 }
@@ -377,7 +381,7 @@ export async function add(
   for (;;) {
     const steps = plan(state, context);
     if (at === steps.length) {
-      return adding(state);
+      return adding(state, context);
     }
     const placed = { step: at + 1, total: steps.length };
     const asking: Ask = {
@@ -399,39 +403,46 @@ export async function add(
 }
 
 // The server the answers make, using only the answers their choices lead
-// to: one given before going back and choosing otherwise is dropped
-function adding(state: State): Adding {
-  const ticked = (key: "options" | "files", id: string) =>
-    state[key]?.includes(id) ?? false;
-  const client = ticked("files", "client");
-  const tls = !ticked("options", "tls")
-    ? undefined
-    : !ticked("files", "ca") && !client
-      ? true
-      : {
-          ...(ticked("files", "ca") ? { ca: state.ca } : {}),
-          ...(client && state.form === "pfx" ? { pfx: state.pfx } : {}),
-          ...(client && state.form !== "pfx"
-            ? { cert: state.cert, key: state.key }
-            : {}),
-        };
+// to: one given before going back and choosing otherwise is dropped. A
+// timeout left at the default isn't written, so that the server follows the
+// default.
+function adding(state: State, context: Context): Adding {
+  const tls = ticked(state, "options", "tls");
+  const ca = tls && ticked(state, "files", "ca");
+  const client = tls && ticked(state, "files", "client");
   const auth =
     state.login === "prompt"
       ? "prompt"
       : state.login === "extension"
         ? { extension: state.extension }
         : undefined;
+  const timeout = Number(state.timeout);
   return {
     name: state.name ?? "",
     value: {
-      host: hostOf(state),
+      host: state.host,
       port: servers.port(state.port ?? ""),
       ...(state.user ? { user: state.user } : {}),
       ...(auth === undefined ? {} : { auth }),
-      ...(tls === undefined ? {} : { tls }),
-      ...(ticked("options", "protect") ? { protect: false } : {}),
-      ...(ticked("options", "timeout")
-        ? { timeout: Number(state.timeout) }
+      ...(tls
+        ? {
+            tls:
+              !ca && !client
+                ? true
+                : {
+                    ...(ca ? { ca: state.ca } : {}),
+                    ...(client && state.form === "pfx"
+                      ? { pfx: state.pfx }
+                      : {}),
+                    ...(client && state.form !== "pfx"
+                      ? { cert: state.cert, key: state.key }
+                      : {}),
+                  },
+          }
+        : {}),
+      ...(ticked(state, "options", "protect") ? {} : { protect: false }),
+      ...(ticked(state, "options", "timeout") && timeout !== context.timeout
+        ? { timeout }
         : {}),
     },
     password: state.login === "store" ? (state.password ?? "") : "",
