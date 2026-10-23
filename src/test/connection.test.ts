@@ -309,9 +309,13 @@ suite("connection", () => {
   }
 
   test("protected, sends the wrapper and the query, and resolves with the result", async () => {
-    // (::;42)
+    // ``result!(::;42)
     const server = await fake((socket) =>
-      socket.write(reply("01000000190000000000020000006500f92a00000000000000")),
+      socket.write(
+        reply(
+          "0100000028000000630b000200000000726573756c74000000020000006500f92a00000000000000",
+        ),
+      ),
     );
     const connection = await protect(server);
     assert.deepStrictEqual(await connection.query("42"), {
@@ -325,11 +329,11 @@ suite("connection", () => {
   });
 
   test("protected, an error caught rejects with q's text and the backtrace", async () => {
-    // (::;"type";"  [0]  1+`a\n        ^\n")
+    // ``error`backtrace!(::;"type";"  [0]  1+`a\n        ^\n")
     const server = await fake((socket) =>
       socket.write(
         reply(
-          "010000003600000000000300000065000a0004000000747970650a001600000020205b305d2020312b60610a20202020202020205e0a",
+          "010000004e000000630b0003000000006572726f72006261636b74726163650000000300000065000a0004000000747970650a001600000020205b305d2020312b60610a20202020202020205e0a",
         ),
       ),
     );
@@ -358,13 +362,18 @@ suite("connection", () => {
     connection.close();
   });
 
-  test("protected, a result not wrapped says how to turn it off, leaving the connection open", async () => {
+  test("protected, a result not wrapped says how to turn it off, leaving the connection open; a name it doesn't know is ignored", async () => {
     const answers = [
       response("atom.long"),
-      // (::;`type;"bt"), where the error should be a string
-      reply("010000001e0000000000030000006500f574797065000a00020000006274"),
-      // (::;42)
-      reply("01000000190000000000020000006500f92a00000000000000"),
+      // ``error`backtrace!(::;`type;"bt"), where the error should be a
+      // string
+      reply(
+        "0100000036000000630b0003000000006572726f72006261636b7472616365000000030000006500f574797065000a00020000006274",
+      ),
+      // ``result`elapsed!(::;42;0D00:00:01), a name it doesn't know yet
+      reply(
+        "0100000039000000630b000300000000726573756c7400656c6170736564000000030000006500f92a00000000000000f000ca9a3b00000000",
+      ),
     ];
     const server = await fake((socket) => socket.write(answers.shift() ?? ""));
     const connection = await protect(server);

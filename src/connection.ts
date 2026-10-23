@@ -32,12 +32,14 @@ export class QError extends Error {
 }
 
 // Protected evaluation: q's default .z.pg applies this to the query, which
-// it evaluates under .Q.trp. It returns (::;result), or (::;error;backtrace);
-// :: keeps both a general list of the same shape. The backtrace leaves out
-// this function's own frames, and those outside it, such as a customised
-// .z.pg's, and is numbered from the query's frame as 0.
+// it evaluates under .Q.trp. It returns ``result!(::;result), or
+// ``error`backtrace!(::;error;backtrace): named so that more can be added,
+// and the null key's :: keeps the values a general list, as a namespace's
+// does. The backtrace leaves out this function's own frames, and those
+// outside it, such as a customised .z.pg's, and is numbered from the
+// query's frame as 0.
 export const wrapper =
-  "{f:{(::;value x)};.Q.trp[f;x;{[f;e;b]b:(last where f~/:b[;0;0])#b;(::;e;.Q.sbt{@[x;3;-;y]}[;last b[;3]]each b)}f]}";
+  "{f:{(``result)!(::;value x)};.Q.trp[f;x;{[f;e;b]b:(last where f~/:b[;0;0])#b;(``error`backtrace)!(::;e;.Q.sbt{@[x;3;-;y]}[;last b[;3]]each b)}f]}";
 
 // What a failure with protected evaluation on says, as a server whose .z.pg
 // is customised, or takes only strings, can't evaluate it
@@ -46,21 +48,38 @@ const unprotected =
 
 const utf8 = new TextDecoder("utf-8", { ignoreBOM: true });
 
-function isString(value: Value | undefined): value is Value & { type: 10 } {
-  return value?.type === 10;
+// Protected evaluation's dictionary by name, or undefined if it isn't one
+function fields(value: Value): Map<string, Value> | undefined {
+  if (value.type !== 99) {
+    return undefined;
+  }
+  const { keys, values } = value;
+  if (keys.type !== 11 || values.type !== 0 || !("items" in values)) {
+    return undefined;
+  }
+  const { bytes, offsets } = keys.data;
+  const names = Array.from(offsets.subarray(1), (end, i) =>
+    utf8.decode(bytes.subarray(offsets[i], end)),
+  );
+  const [head] = values.items;
+  if (names[0] !== "" || head?.type !== 101 || head.code !== 0) {
+    return undefined;
+  }
+  return new Map(names.map((name, i) => [name, values.items[i]]));
 }
 
-// The result inside protected evaluation's list, or the error it caught
+// The result inside protected evaluation's dictionary, or the error it
+// caught. Names it doesn't know are left for later.
 function unwrap(value: Value): Value {
-  const items = value.type === 0 && "items" in value ? value.items : [];
-  const [head, result, backtrace] = items;
-  if (head?.type === 101 && head.code === 0) {
-    if (items.length === 2) {
-      return result;
-    }
-    if (items.length === 3 && isString(result) && isString(backtrace)) {
-      throw new QError(utf8.decode(result.data), utf8.decode(backtrace.data));
-    }
+  const named = fields(value);
+  const result = named?.get("result");
+  const error = named?.get("error");
+  const backtrace = named?.get("backtrace");
+  if (error?.type === 10 && backtrace?.type === 10) {
+    throw new QError(utf8.decode(error.data), utf8.decode(backtrace.data));
+  }
+  if (result && !error) {
+    return result;
   }
   throw new Error("the server didn't evaluate the query protected", {
     cause: unprotected,
