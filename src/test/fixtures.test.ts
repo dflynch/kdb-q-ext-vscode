@@ -31,11 +31,23 @@ async function md5(file: string) {
 }
 
 suite("corpus fixtures", () => {
+  // The text of both value files
   let corpus: string;
-  let ipc: { corpus: string; script: string; values: Fixture[] };
+  let ipc: {
+    corpus: string;
+    display: string;
+    script: string;
+    values: Fixture[];
+  };
 
   suiteSetup(async () => {
-    corpus = await readFile(path.join(fixtures, "corpus.q"), "utf8");
+    corpus = (
+      await Promise.all(
+        ["corpus.q", "display.q"].map((f) =>
+          readFile(path.join(fixtures, f), "utf8"),
+        ),
+      )
+    ).join("\n");
     ipc = JSON.parse(
       await readFile(path.join(fixtures, "corpus.ipc.json"), "utf8"),
     );
@@ -44,6 +56,11 @@ suite("corpus fixtures", () => {
   test("were written from the current corpus and script", async () => {
     const stale = "changed: run npm run fixtures (needs q)";
     assert.strictEqual(ipc.corpus, await md5("corpus.q"), `corpus.q ${stale}`);
+    assert.strictEqual(
+      ipc.display,
+      await md5("display.q"),
+      `display.q ${stale}`,
+    );
     assert.strictEqual(
       ipc.script,
       await md5("fixtures.q"),

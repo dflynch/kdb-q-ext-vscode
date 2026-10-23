@@ -83,11 +83,12 @@
     "compile": "npm run clean && tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
-    "lint": "biome check",
+    "lint": "biome check && tsc -p tsconfig.web.json",
     "test": "vscode-test",
     "package": "vsce package",
     "format": "biome check --write",
-    "fixtures": "cd test/fixtures && q fixtures.q -q"
+    "fixtures": "cd test/fixtures && q fixtures.q -q",
+    "fuzz": "npm run compile && node test/fuzz/fuzz.js"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.2",

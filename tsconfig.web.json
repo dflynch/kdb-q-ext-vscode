@@ -1,0 +1,11 @@
+{
+  // The codec and the formatter will run in the webview too, so they mustn't
+  // use Node: this checks them without Node's types
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": [],
+    "lib": ["ES2024", "DOM"],
+    "noEmit": true
+  },
+  "include": ["src/codec", "src/format"]
+}
