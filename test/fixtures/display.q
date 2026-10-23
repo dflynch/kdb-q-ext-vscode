@@ -60,6 +60,8 @@ temporal.longestTimespan:"n"$0W-1
 temporal.datetimeRoundsUp:`datetime$0.00000001157
 temporal.datetimeTruncates:`datetime$0.99999999999
 temporal.datetimeNegative:`datetime$-0.0000000057
+/ Past 2^53 microseconds, which only exact division keeps
+temporal.datetimeFarFuture:`datetime$2258814.5758304745
 temporal.datetimeOutOfRange:"z"$-923892.12
 temporal.allNullDates:2#0Nd
 temporal.allInfiniteDatetimes:2#0Wz

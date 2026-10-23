@@ -85,17 +85,25 @@ export function timespan(ns: bigint): string {
 }
 
 // Days since 2000.01.01 as a float, with T between the date and the time.
-// q rounds to the microsecond, then drops the microseconds. Past 2^20 days,
-// about the year 4870, a double holds the time to only about 0.02 ms, and
-// about 1 in 200 of q's show a millisecond less than this: no rule tried,
-// exact arithmetic included, matches q's there.
+// q rounds to the microsecond, half away from zero, then drops the
+// microseconds. The microseconds can pass 2^53, so they're divided exactly.
+// About 1 in 50,000 of q's show a millisecond more than this, where the
+// microseconds come to exactly 999: no rule tried matches q's there.
 export function datetime(days: number): string {
-  const us = Math.round(days * 86_400_000_000);
-  const ms = Math.floor(us / 1000);
-  const whole = Math.floor(ms / 86_400_000);
+  const product = days * 86_400_000_000;
+  const us = BigInt(Math.sign(product) * Math.round(Math.abs(product)));
+  const ms = floor(us, 1000n);
+  const whole = floor(ms, 86_400_000n);
   // Outside q's dates the time is zeros too
-  const rest = date(whole).startsWith("0000") ? 0 : ms - whole * 86_400_000;
-  return `${date(whole)}T${clock(Math.floor(rest / 1000), 3)}.${digits(rest % 1000, 3)}`;
+  const d = date(Number(whole));
+  const rest = d.startsWith("0000") ? 0 : Number(ms - whole * 86_400_000n);
+  return `${d}T${clock(Math.floor(rest / 1000), 3)}.${digits(rest % 1000, 3)}`;
+}
+
+// Division rounded down, where a bigint's rounds toward zero
+function floor(n: bigint, d: bigint): bigint {
+  const q = n / d;
+  return n % d < 0n ? q - 1n : q;
 }
 
 function signed(n: number, write: (n: number) => string): string {

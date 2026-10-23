@@ -1,7 +1,9 @@
 import {
   Attribute,
   count,
+  type Dictionary,
   type List,
+  type Table,
   type Value,
   type Vector,
 } from "../codec/types";
@@ -17,17 +19,20 @@ export type { Size };
 // line shows its first 4998 characters and then ..
 export const defaultSize: Size = { lines: 5000, width: 5000 };
 
-// A value as the q console shows it, for any result but a table or a
-// dictionary, which go to the grid
+// A value as the q console shows it
 export function show(value: Value, size: Size = defaultSize): string {
   // The generic null
   if (value.type === 101 && value.code === 0) {
     return "";
   }
-  // Only a lambda's source, as written, runs over lines
-  const lines = value.type === 0 ? column(value, size) : [qText(value, size)];
+  // Lists, tables and dictionaries are laid out a line to an item, so need
+  // only as many items as there are lines. Anything else is in q's form,
+  // where only a lambda's source, as written, runs over lines.
+  const laid = [0, 98, 99, 127].includes(value.type)
+    ? lines(value, size.lines + 1, size)
+    : [qText(value, size)];
   return cut(
-    lines.flatMap((line) => line.split("\n")),
+    laid.flatMap((line) => line.split("\n")),
     size,
   ).join("\n");
 }
@@ -42,11 +47,31 @@ function cut(lines: string[], size: Size): string[] {
   );
 }
 
+// The lines of a value's first rows items, as q's .Q.s2 lays them out: a
+// vector's elements as cells, a table under its header, a dictionary's keys
+// beside their values, and a general list a line to an item
+function lines(value: Value, rows: number, size: Size): string[] {
+  switch (value.type) {
+    case 0:
+      return column(value, rows, size);
+    case 98:
+      return table(value, rows, size);
+    case 99:
+    case 127:
+      return dictionary(value, rows, size);
+  }
+  if (value.type > 0 && value.type <= 19) {
+    const vector = value as Vector;
+    const n = Math.min(count(vector) ?? 0, rows);
+    return Array.from({ length: n }, (_, i) => cell(vector, i));
+  }
+  return [qText(value, size)];
+}
+
 // A general list, one item to a line. When every item is a list of the same
 // length, they're the rows of a matrix, its columns lined up.
-function column(list: List, size: Size): string[] {
-  // Only as many as can be shown, and one more for the ..
-  const shown = Math.min(count(list) ?? 0, size.lines + 1);
+function column(list: List, rows: number, size: Size): string[] {
+  const shown = Math.min(count(list) ?? 0, rows);
   if (!("items" in list) || !matrix(list.items)) {
     return Array.from({ length: shown }, (_, i) =>
       qText(itemAt(list, i), size),
@@ -82,20 +107,65 @@ function layout(rows: (Vector | List)[], size: Size): string[] {
       ? layout(row.items.slice(0, columns) as (Vector | List)[], size)
       : undefined,
   );
-  const lines = rows.map(() => "");
-  // Column by column, until the lines are full
-  for (let j = 0; j < columns && lines[0].length <= size.width; j++) {
-    const cells = rows.map((row, i) =>
+  return besides(rows.length, columns, size, (j) =>
+    rows.map((row, i) =>
       row.type !== 0
         ? cell(row, j)
         : (inner[i]?.[j] ?? qText(itemAt(row, j), size)),
-    );
-    const width = Math.max(...cells.map((c) => c.length));
-    cells.forEach((c, i) => {
-      lines[i] += (j ? " " : "") + c.padEnd(width);
+    ),
+  );
+}
+
+// Lines of columns side by side, each padded to its widest and a space
+// apart, until the lines are full
+function besides(
+  height: number,
+  columns: number,
+  size: Size,
+  cells: (j: number) => string[],
+): string[] {
+  const lines = Array.from({ length: height }, () => "");
+  for (let j = 0; j < columns && lines[0].length <= size.width; j++) {
+    const column = cells(j);
+    const width = Math.max(...column.map((c) => c.length));
+    lines.forEach((line, i) => {
+      lines[i] = `${line}${j ? " " : ""}${(column[i] ?? "").padEnd(width)}`;
     });
   }
   return lines;
+}
+
+// A table: its column names, dashes, then a line to a row
+function table(t: Table, rows: number, size: Size): string[] {
+  if ("reference" in t) {
+    // Only the server can read an on-disk table's files
+    return [qText(t, size)];
+  }
+  const n = Math.min(count(t) ?? 0, rows);
+  const body = besides(n + 1, t.columns.length, size, (j) => [
+    t.columns[j],
+    ...lines(t.data[j], n, size),
+  ]);
+  return [body[0], "-".repeat(body[0].length), ...body.slice(1)];
+}
+
+// A dictionary: its keys, padded, beside their values. A table on one side
+// gives that side a header, and the other a blank line and dashes to match.
+function dictionary(d: Dictionary, rows: number, size: Size): string[] {
+  let keys = lines(d.keys, rows, size);
+  let values = lines(d.values, rows, size);
+  if (values.length > keys.length) {
+    keys = headed(keys);
+  } else if (keys.length > values.length) {
+    values = headed(values);
+  }
+  const width = Math.max(0, ...keys.map((k) => k.length));
+  return keys.map((k, i) => `${k.padEnd(width)}| ${values[i] ?? ""}`);
+}
+
+function headed(lines: string[]): string[] {
+  const width = lines[0]?.length ?? 0;
+  return [" ".repeat(width), "-".repeat(width), ...lines];
 }
 
 // A list's ith item, with a list of strings' as a char vector

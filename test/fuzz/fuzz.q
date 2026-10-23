@@ -21,9 +21,7 @@ ordinary:{[c;n] $[
   c="p"; "p"$-3000000000000000000+n?6000000000000000000;
   c="m"; "m"$-20000+n?40000i;
   c="d"; "d"$-700000+n?3600000i;
-  / Before 2^20 days: past it, q's datetimes can show a millisecond less
-  / than ours, as temporal.ts says
-  c="z"; "z"$-700000+n?1748576f;
+  c="z"; "z"$-700000+n?3600000f;
   c="n"; "n"$-1000000000000000+n?2000000000000000;
   c="u"; "u"$-3000+n?6000i;
   c="v"; "v"$-200000+n?400000i;
@@ -46,6 +44,22 @@ vals,:raze {[c] {[c;x] matrix[c;2+rand 3;1+rand 4]}[c] each til 3} each types;
 vals,:{mixed[2+rand 3;1+rand 4]} each til 50;
 vals,:{[c] 2 2 2#vector[c;8]} each types;
 vals,:nested each 200#3;
+
+/ Tables with columns of any type, strings, nested lists and matrices
+col:{[n] $[
+  4>r:rand 7; vector[first 1?types;n];
+  r=4; {[x] "c"$97+(rand 4)?26} each til n;
+  r=5; {[x] vector[first 1?types;rand 3]} each til n;
+  {[c;x] vector[c;2]}[first 1?types] each til n]};
+names:{[k] `$string[k?`3],'string til k};
+tbl:{[k;n] flip (names k)!col each k#n};
+vals,:{tbl[1+rand 4;rand 6]} each til 60;
+/ Keyed tables, and dictionaries of vectors, lists and tables
+vals,:{n:1+rand 5; tbl[1+rand 2;n]!tbl[1+rand 3;n]} each til 40;
+vals,:{n:rand 6; vector[first 1?types;n]!col n} each til 60;
+vals,:{n:1+rand 4; vector["s";n]!tbl[1+rand 2;n]} each til 20;
+vals,:{n:1+rand 4; tbl[1+rand 2;n]!vector[first 1?types;n]} each til 20;
+vals,:{n:1+rand 3; (n?`3)!{nested 1} each til n} each til 20;
 
 b:-8!'vals;
 (hsym `$.z.x 1) 0: enlist .j.j {`bytes`console!(raze string x;.Q.s -9!x)} each b;

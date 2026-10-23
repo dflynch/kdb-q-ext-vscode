@@ -2,7 +2,7 @@ import * as assert from "node:assert";
 import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import { decode } from "../codec/decode";
-import type { Value } from "../codec/types";
+import type { Value, Vector } from "../codec/types";
 import { show } from "../format/console";
 
 const fixtures: {
@@ -23,7 +23,7 @@ function value(name: string): Value {
   return decode(Buffer.from(fixture.bytes, "hex"));
 }
 
-const longs = (n: number): Value => ({
+const longs = (n: number): Vector => ({
   type: 7,
   attribute: 0,
   data: BigInt64Array.from({ length: n }, (_, i) => BigInt(i)),
@@ -33,7 +33,7 @@ suite("console text", () => {
   // The fixtures hold q's text at \c 2000 2000, where .Q.s shows 1998 lines
   // of 1999 characters, so the widest values are cut as q cuts them
   const size = { lines: 1998, width: 1999 };
-  for (const f of fixtures.filter((f) => f.type !== 98 && f.type !== 99)) {
+  for (const f of fixtures) {
     test(`${f.name} as q shows it`, () => {
       // q ends the last line with a newline
       const want = f.console.replace(/\n$/, "");
@@ -117,6 +117,40 @@ suite("console text", () => {
     const text = show(longs(10_000_000));
     assert.strictEqual(text.length, 5000);
     assert.ok(text.endsWith(".."));
+  });
+
+  // A table of columns c0, c1 and so on, each the longs 0 to rows - 1
+  const table = (columns: number, rows: number): Value => {
+    const column = longs(rows);
+    return {
+      type: 98,
+      attribute: 0,
+      columns: Array.from({ length: columns }, (_, i) => `c${i}`),
+      data: Array.from({ length: columns }, () => column),
+    };
+  };
+
+  test("a table's rows past the limit become .., its header counted", () => {
+    assert.deepStrictEqual(
+      show(table(2, 10), { lines: 5, width: 80 }).split("\n"),
+      ["c0 c1", "-----", "0  0 ", "1  1 ", ".."],
+    );
+  });
+
+  test("a table's columns stop at the width", () => {
+    assert.deepStrictEqual(
+      show(table(1000, 2), { lines: 10, width: 12 }).split("\n"),
+      ["c0 c1 c2 c..", "----------..", "0  0  0  0..", "1  1  1  1.."],
+    );
+  });
+
+  test("a large table shows only what fits, quickly", () => {
+    const large = table(10, 10_000_000);
+    const start = performance.now();
+    const lines = show(large).split("\n");
+    assert.strictEqual(lines.length, 5000);
+    assert.strictEqual(lines.at(-1), "..");
+    assert.ok(performance.now() - start < 1000);
   });
 
   test("an error shows as q signals it", () => {

@@ -1,4 +1,4 @@
-{"corpus":"1d61d7f487791ac2804b6cf7262646bb","display":"c1498c247f5ba66fdd33faaeb55c53b4","script":"8520e979a33eb5e318577e9ab1907a8a","q":"5 2026.10.15","values":[
+{"corpus":"1d61d7f487791ac2804b6cf7262646bb","display":"41dc4ac415b04fbdc1bbb68073ad6223","script":"8520e979a33eb5e318577e9ab1907a8a","q":"5 2026.10.15","values":[
 {"name":".corpus.atom.boolean","type":-1,"bytes":"010000000a000000ff01","console":"1b\n"},
 {"name":".corpus.atom.guid","type":-2,"bytes":"0100000019000000fe0a36903775d3b24d67215a1d44d4bed5","console":"0a369037-75d3-b24d-6721-5a1d44d4bed5\n"},
 {"name":".corpus.atom.byte","type":-4,"bytes":"010000000a000000fc2a","console":"0x2a\n"},
@@ -42,6 +42,7 @@
 {"name":".corpus.temporal.datetimeRoundsUp","type":-15,"bytes":"0100000011000000f1e66882bdacd8483e","console":"2000.01.01T00:00:00.001\n"},
 {"name":".corpus.temporal.datetimeTruncates","type":-15,"bytes":"0100000011000000f128a0feffffffef3f","console":"2000.01.01T23:59:59.999\n"},
 {"name":".corpus.temporal.datetimeNegative","type":-15,"bytes":"0100000011000000f1fa24045e377b38be","console":"1999.12.31T23:59:59.999\n"},
+{"name":".corpus.temporal.datetimeFarFuture","type":-15,"bytes":"0100000011000000f120d0b449bf3b4141","console":"8184.06.03T13:49:11.752\n"},
 {"name":".corpus.temporal.datetimeOutOfRange","type":-15,"bytes":"0100000011000000f1d7a3703de8312cc1","console":"0000.00.00T00:00:00.000\n"},
 {"name":".corpus.temporal.allNullDates","type":14,"bytes":"01000000160000000e00020000000000008000000080","console":"0N 0Nd\n"},
 {"name":".corpus.temporal.allInfiniteDatetimes","type":15,"bytes":"010000001e0000000f0002000000000000000000f07f000000000000f07f","console":"0w 0wz\n"},
