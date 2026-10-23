@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import { decode } from "../codec/decode";
 import type { Value, Vector } from "../codec/types";
-import { show } from "../format/console";
+import { columnCells, show } from "../format/console";
+import { cell, typeLetter, typeName } from "../format/text";
 
 const fixtures: {
   name: string;
@@ -155,5 +156,77 @@ suite("console text", () => {
 
   test("an error shows as q signals it", () => {
     assert.strictEqual(show({ type: -128, message: "type" }), "'type");
+  });
+});
+
+suite("cells for the grid", () => {
+  const chars = (text: string): Vector => ({
+    type: 10,
+    attribute: 0,
+    data: new TextEncoder().encode(text),
+  });
+  const floats = (...values: number[]): Vector => ({
+    type: 9,
+    attribute: 0,
+    data: Float64Array.from(values),
+  });
+  const list = (...items: Value[]): Value & { type: 0 } => ({
+    type: 0,
+    attribute: 0,
+    items,
+  });
+
+  // As q shows ([]a:...) for each column
+  test("a column of strings, quoted", () => {
+    assert.deepStrictEqual(columnCells(list(chars("ab"), chars("cd")), 10), [
+      '"ab"',
+      '"cd"',
+    ]);
+  });
+
+  test("a column of lists of one length, as a matrix's rows", () => {
+    assert.deepStrictEqual(columnCells(list(floats(1, 2), floats(3, 4)), 10), [
+      "1 2",
+      "3 4",
+    ]);
+  });
+
+  test("a column of lists of different lengths, in q's form", () => {
+    const nulls: Vector = {
+      type: 7,
+      attribute: 0,
+      data: BigInt64Array.of(-0x8000000000000000n),
+    };
+    assert.deepStrictEqual(columnCells(list(nulls, longs(2)), 10), [
+      ",0N",
+      "0 1",
+    ]);
+  });
+
+  test("only the rows asked for", () => {
+    assert.deepStrictEqual(columnCells(longs(1_000_000), 3), ["0", "1", "2"]);
+  });
+
+  test("a null as blank, or as which null it is", () => {
+    const ints: Vector = {
+      type: 6,
+      attribute: 0,
+      data: Int32Array.of(-2147483648, 1),
+    };
+    assert.strictEqual(cell(ints, 0), "");
+    assert.strictEqual(cell(ints, 0, "typed"), "0Ni");
+    assert.strictEqual(cell(ints, 1, "typed"), "1");
+    assert.strictEqual(cell(floats(Number.NaN), 0, "typed"), "0n");
+  });
+
+  test("a type's letter and name", () => {
+    assert.deepStrictEqual(
+      [7, -12, 0].map((t) => [typeLetter(t), typeName(t)]),
+      [
+        ["j", "long"],
+        ["p", "timestamp"],
+        [" ", ""],
+      ],
+    );
   });
 });

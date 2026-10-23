@@ -47,6 +47,17 @@ function cut(lines: string[], size: Size): string[] {
   );
 }
 
+// A table column's first rows cells, as q shows them in a table: a
+// vector's elements, and a list's items in q's form or, when they're all
+// lists of one length, lined up as a matrix's rows
+export function columnCells(
+  column: Vector | List,
+  rows: number,
+  size: Size = defaultSize,
+): string[] {
+  return lines(column, rows, size);
+}
+
 // The lines of a value's first rows items, as q's .Q.s2 lays them out: a
 // vector's elements as cells, a table under its header, a dictionary's keys
 // beside their values, and a general list a line to an item

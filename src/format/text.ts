@@ -312,14 +312,29 @@ function inVector(a: Atom): string {
 }
 
 // An element as the console shows it in a column: a null is blank, though a
-// null guid shows its zeros, and a char that can't be shown is escaped
-export function cell(vector: Vector, i: number): string {
+// null guid shows its zeros, and a char that can't be shown is escaped.
+// The grid shows which null it is instead, in q's form, as 0Ni or `.
+export function cell(
+  vector: Vector,
+  i: number,
+  nulls: "blank" | "typed" = "blank",
+): string {
   const a = element(vector, i);
   const which = special(a.type, a.value);
-  if (which === "null") {
-    return "";
+  if (which === "null" || (a.type === -11 && a.value === "")) {
+    return nulls === "typed" ? atom(a) : "";
   }
   return which ? infinity(a.type, which) : plain(a);
+}
+
+// A type's letter, as meta shows it, and its name, as a cast takes it: j
+// and long. A general list's are a space and an empty name.
+export function typeLetter(type: number): string {
+  return " bg xhijefcspmdznuvt"[Math.abs(type)] ?? " ";
+}
+
+export function typeName(type: number): string {
+  return names[Math.abs(type)] ?? "";
 }
 
 function attribute(value: { attribute: Attribute }, text: Text): void {
