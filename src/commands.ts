@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
 import * as comments from "./comments";
+import type { Sources } from "./credentials";
+import * as servers from "./servers";
 import * as statements from "./statements";
 
 // Send the selected text, or the current line, to the active terminal one
@@ -139,4 +141,118 @@ export async function toggleBlockComment(editor: vscode.TextEditor) {
         ),
     );
   }
+}
+
+// The servers in the settings, with any problems in them shown
+export function definitions(): servers.Definition[] {
+  const setting = vscode.workspace
+    .getConfiguration("kdb-q-ext-vscode")
+    .get("servers");
+  const { servers: defined, problems } = servers.definitions(setting);
+  if (problems.length > 0) {
+    vscode.window.showWarningMessage(
+      `kdb+/q: Left out of the servers setting: ${problems.join("; ")}.`,
+    );
+  }
+  return defined;
+}
+
+// A server picked from those defined, or from the ones that meet a test
+async function pickServer(
+  placeHolder: string,
+  test: (server: servers.Definition) => boolean = () => true,
+): Promise<servers.Definition | undefined> {
+  const all = definitions();
+  const defined = all.filter(test);
+  if (all.length > 0 && defined.length === 0) {
+    vscode.window.showInformationMessage(
+      "kdb+/q: Every server gets its password from its auth setting.",
+    );
+    return undefined;
+  }
+  if (defined.length === 0) {
+    const open = "Open Settings";
+    const choice = await vscode.window.showInformationMessage(
+      "kdb+/q: No servers are defined in the settings.",
+      open,
+    );
+    if (choice === open) {
+      await vscode.commands.executeCommand(
+        "workbench.action.openSettings",
+        "kdb-q-ext-vscode.servers",
+      );
+    }
+    return undefined;
+  }
+  const picked = await vscode.window.showQuickPick(
+    defined.map((server) => ({
+      label: server.name,
+      description: `${server.user ? `${server.user}@` : ""}${server.host}:${server.port}`,
+      server,
+    })),
+    { placeHolder },
+  );
+  return picked?.server;
+}
+
+// Keep a server's password in VS Code's secure storage, for the servers
+// whose password comes from there
+export async function setPassword(secrets: vscode.SecretStorage) {
+  const server = await pickServer(
+    "The server to set the password for",
+    (server) => server.auth === undefined,
+  );
+  if (!server) {
+    return;
+  }
+  const password = await vscode.window.showInputBox({
+    prompt: `The password for ${server.name}`,
+    password: true,
+    validateInput: servers.passwordProblem,
+  });
+  if (password === undefined) {
+    return;
+  }
+  await secrets.store(servers.secretKey(server), password);
+}
+
+// Any server, so that a password kept before its auth was set can go too
+export async function clearPassword(secrets: vscode.SecretStorage) {
+  const server = await pickServer("The server to clear the password for");
+  if (server) {
+    await secrets.delete(servers.secretKey(server));
+  }
+}
+
+// The connect timeout and the size limit, with any problems in them shown
+export function connectionDefaults(): servers.Defaults {
+  const config = vscode.workspace.getConfiguration("kdb-q-ext-vscode");
+  const { defaults, problems } = servers.settings(
+    config.get("connectTimeout"),
+    config.get("sizeLimit"),
+  );
+  if (problems.length > 0) {
+    vscode.window.showWarningMessage(
+      `kdb+/q: Using the default, as ${problems.join(" and ")}.`,
+    );
+  }
+  return defaults;
+}
+
+// Where credentials come from in VS Code
+export function sources(secrets: vscode.SecretStorage): Sources {
+  return {
+    stored: (key) => secrets.get(key),
+    ask: (server) =>
+      vscode.window.showInputBox({
+        prompt: `The password for ${server.name}, not kept`,
+        password: true,
+        ignoreFocusOut: true,
+        validateInput: servers.passwordProblem,
+      }),
+    extension: async (id) => {
+      const extension = vscode.extensions.getExtension(id);
+      return extension === undefined ? undefined : await extension.activate();
+    },
+  };
 }

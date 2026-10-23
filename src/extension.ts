@@ -18,5 +18,11 @@ export function activate(context: vscode.ExtensionContext) {
         }
       },
     ),
+    vscode.commands.registerCommand("kdb-q-ext-vscode.setPassword", () =>
+      commands.setPassword(context.secrets),
+    ),
+    vscode.commands.registerCommand("kdb-q-ext-vscode.clearPassword", () =>
+      commands.clearPassword(context.secrets),
+    ),
   );
 }
