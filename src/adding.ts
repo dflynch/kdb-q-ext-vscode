@@ -38,9 +38,9 @@ type Asks<Where> = {
 export type Asker = Asks<Placed>;
 type Ask = Asks<Record<never, never>>;
 
-// What the flow needs to know: the names taken, and whether there's a
-// workspace to keep the server in
-export type Context = { taken: string[]; workspace: boolean };
+// What the flow needs to know: the names taken, the default connect timeout
+// and whether there's a workspace to keep the server in
+export type Context = { taken: string[]; timeout: number; workspace: boolean };
 
 // A server to add: its name, its setting as written, what to keep in secure
 // storage, which can be empty, and whether it goes in the workspace's
@@ -216,9 +216,8 @@ const extension: Step = async (ask, state) =>
     (extension) => ({ extension: extension.trim() }),
   );
 
-// The options as first shown: protected evaluation on, as a server has it
-// by default
-const optionsAtFirst = ["protect"];
+// The options as first shown: on, as a server has them by default
+const optionsAtFirst = ["protect", "timeout"];
 
 // Whether an option or a file TLS needs is ticked, the options counting as
 // first shown until answered
@@ -226,22 +225,29 @@ function ticked(state: State, key: "options" | "files", id: string): boolean {
   return (state[key] ?? (key === "options" ? optionsAtFirst : [])).includes(id);
 }
 
-const options: Step = async (ask, state) =>
-  then(
-    await ask.tick({
-      placeholder: "Options",
-      choices: [
-        { id: "tls", label: "TLS" },
-        {
-          id: "protect",
-          label: "Protected evaluation",
-          description: "off for a gateway with its own .z.pg",
-        },
-      ],
-      chosen: state.options ?? optionsAtFirst,
-    }),
-    (options) => ({ options }),
-  );
+function options(timeout: number): Step {
+  return async (ask, state) =>
+    then(
+      await ask.tick({
+        placeholder: "Options",
+        choices: [
+          { id: "tls", label: "TLS" },
+          {
+            id: "protect",
+            label: "Protected evaluation",
+            description: "off for a gateway with its own .z.pg",
+          },
+          {
+            id: "timeout",
+            label: "Connect timeout",
+            description: `${timeout} ms, edit in settings.json`,
+          },
+        ],
+        chosen: state.options ?? optionsAtFirst,
+      }),
+      (options) => ({ options }),
+    );
+}
 
 const files: Step = async (ask, state) =>
   then(
@@ -325,7 +331,7 @@ function plan(state: State, context: Context): Step[] {
     login,
     ...(state.login === "store" ? [password] : []),
     ...(state.login === "extension" ? [extension] : []),
-    options,
+    options(context.timeout),
     ...(tls ? [files] : []),
     ...(tls && ticked(state, "files", "ca")
       ? [file("ca", "CA certificate (PEM)", "Select", pem)]
@@ -417,6 +423,7 @@ function adding(state: State): Adding {
           }
         : {}),
       ...(ticked(state, "options", "protect") ? {} : { protect: false }),
+      ...(ticked(state, "options", "timeout") ? {} : { timeout: 0 }),
     },
     password: state.login === "store" ? (state.password ?? "") : "",
     passphrase: client ? (state.passphrase ?? "") : "",

@@ -84,7 +84,7 @@ suite("servers", () => {
       e: { port: 1 },
       f: { host: "h", port: 1, user: "a:b" },
       g: { host: "h", port: 1, user: "a\0" },
-      h: { host: "h", port: 1, timeout: 0 },
+      h: { host: "h", port: 1, timeout: -1 },
       h2: { host: "h", port: 1, protect: "no" },
       t1: { host: "h", port: 1, tls: "yes" },
       t2: { host: "h", port: 1, tls: { ca: "ca.pem" } },
@@ -189,6 +189,14 @@ suite("servers", () => {
       credentialsProblem({ password: "a\0b" }),
       "a password can't contain a 0 byte",
     );
+  });
+
+  test("a timeout of 0 waits as long as it takes", () => {
+    assert.deepStrictEqual(
+      definitions({ local: { host: "h", port: 1, timeout: 0 } }).servers,
+      [{ name: "local", host: "h", port: 1, timeout: 0 }],
+    );
+    assert.strictEqual(settings(0, undefined).defaults.timeout, 0);
   });
 
   test("the connect timeout and the size limit", () => {

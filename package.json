@@ -144,8 +144,8 @@
               },
               "timeout": {
                 "type": "integer",
-                "minimum": 1,
-                "description": "How long to wait to connect and log in, in milliseconds, overriding the connect timeout."
+                "minimum": 0,
+                "description": "How long to wait to connect and log in, in milliseconds, overriding the connect timeout. 0 waits as long as it takes, as hopen does."
               },
               "protect": {
                 "type": "boolean",
@@ -215,8 +215,8 @@
         "kdb-q-ext-vscode.connectTimeout": {
           "type": "integer",
           "default": 2000,
-          "minimum": 1,
-          "markdownDescription": "How long to wait for a server to connect and log in, in milliseconds, as `hopen` takes."
+          "minimum": 0,
+          "markdownDescription": "How long to wait for a server to connect and log in, in milliseconds, as `hopen` takes. 0 waits as long as it takes, as `hopen` does without one."
         },
         "kdb-q-ext-vscode.sizeLimit": {
           "type": "number",

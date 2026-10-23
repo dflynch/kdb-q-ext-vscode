@@ -8,7 +8,8 @@ export type Definition = {
   host: string;
   port: number;
   user?: string;
-  // Overrides the connect timeout for this server, in milliseconds
+  // Overrides the connect timeout for this server, in milliseconds, or 0 to
+  // wait as long as it takes
   timeout?: number;
   // Whether to evaluate queries protected, so that an error comes back with
   // its backtrace: on unless false, as a gateway whose .z.pg is customised
@@ -66,6 +67,11 @@ export const extensionId = /^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9-]*$/i;
 
 function isCount(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+// A timeout, in milliseconds: 0 waits as long as it takes, as hopen does
+function isTimeout(value: unknown): value is number {
+  return value === 0 || isCount(value);
 }
 
 // The servers in the setting, in the order written. VS Code doesn't hold a
@@ -135,7 +141,7 @@ function check(name: string, value: unknown): string | undefined {
   if (user !== undefined && (typeof user !== "string" || userProblem(user))) {
     return "the user can't contain : or a 0 byte";
   }
-  if (timeout !== undefined && !isCount(timeout)) {
+  if (timeout !== undefined && !isTimeout(timeout)) {
     return "the timeout isn't a whole number of milliseconds";
   }
   if (protect !== undefined && typeof protect !== "boolean") {
@@ -207,7 +213,7 @@ export function settings(
   const problems: string[] = [];
   let result = { ...defaults };
   if (timeout !== undefined) {
-    if (isCount(timeout)) {
+    if (isTimeout(timeout)) {
       result = { ...result, timeout };
     } else {
       problems.push("the connect timeout isn't a whole number of milliseconds");

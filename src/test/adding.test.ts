@@ -49,7 +49,7 @@ function scripted(answers: Answer[]): Asker & { asked: string[] } {
   };
 }
 
-const context: Context = { taken: ["old"], workspace: false };
+const context: Context = { taken: ["old"], timeout: 2000, workspace: false };
 
 suite("adding a server", () => {
   test("asks for each setting, and the password to store", async () => {
@@ -60,7 +60,7 @@ suite("adding a server", () => {
       "dan",
       "store",
       "secret",
-      ["protect"],
+      ["protect", "timeout"],
     ]);
     assert.deepStrictEqual(await add(ask, context), {
       name: "prod",
@@ -76,7 +76,7 @@ suite("adding a server", () => {
       "4/6 User (optional)",
       "5/6 Password",
       "6/7 Password",
-      "7/7 Options [protect]",
+      "7/7 Options [protect,timeout]",
     ]);
   });
 
@@ -95,7 +95,7 @@ suite("adding a server", () => {
       back,
       back,
       "none",
-      ["protect"],
+      ["protect", "timeout"],
     ]);
     const adding = await add(ask, context);
     assert.deepStrictEqual(ask.asked.slice(2, 6), [
@@ -106,10 +106,10 @@ suite("adding a server", () => {
     ]);
     // No password asks for none, so the password given before isn't kept
     assert.deepStrictEqual(ask.asked.slice(10), [
-      "7/7 Options [protect]",
+      "7/7 Options [protect,timeout]",
       "6/7 Password [secret]",
       "5/7 Password [store]",
-      "6/6 Options [protect]",
+      "6/6 Options [protect,timeout]",
     ]);
     assert.deepStrictEqual(adding, {
       name: "uat",
@@ -127,7 +127,14 @@ suite("adding a server", () => {
   });
 
   test("asking each time, or an extension named, its fields left out", async () => {
-    const prompt = scripted(["otp", "kdb1", "1", "", "prompt", ["protect"]]);
+    const prompt = scripted([
+      "otp",
+      "kdb1",
+      "1",
+      "",
+      "prompt",
+      ["protect", "timeout"],
+    ]);
     assert.deepStrictEqual((await add(prompt, context))?.value, {
       host: "kdb1",
       port: 1,
@@ -140,7 +147,7 @@ suite("adding a server", () => {
       "",
       "extension",
       "acme.kdb-auth",
-      ["protect"],
+      ["protect", "timeout"],
     ]);
     assert.deepStrictEqual((await add(sso, context))?.value, {
       host: "kdb2",
@@ -149,7 +156,7 @@ suite("adding a server", () => {
     });
   });
 
-  test("the options: TLS with its files, and protect off", async () => {
+  test("the options: TLS with its files, protect off and no timeout", async () => {
     const ask = scripted([
       "prod",
       "kdb1",
@@ -175,6 +182,7 @@ suite("adding a server", () => {
           key: "~/certs/client.key",
         },
         protect: false,
+        timeout: 0,
       },
       password: "",
       passphrase: "secret",
@@ -190,7 +198,7 @@ suite("adding a server", () => {
       "1",
       "",
       "none",
-      ["tls", "protect"],
+      ["tls", "protect", "timeout"],
       [],
     ]);
     assert.deepStrictEqual((await add(plain, context))?.value.tls, true);
@@ -200,7 +208,7 @@ suite("adding a server", () => {
       "2",
       "",
       "none",
-      ["tls", "protect"],
+      ["tls", "protect", "timeout"],
       ["client"],
       "pfx",
       "/etc/client.p12",
@@ -218,7 +226,7 @@ suite("adding a server", () => {
       "1",
       "",
       "none",
-      ["protect"],
+      ["protect", "timeout"],
       "workspace",
     ]);
     const adding = await add(ask, { ...context, workspace: true });
@@ -243,7 +251,7 @@ suite("adding a server", () => {
       Password: ["", "secret"],
       "CA certificate (PEM)": ["ca.pem", "~/ca.pem"],
     };
-    const picks = ["store", ["tls", "protect"], ["ca"]];
+    const picks = ["store", ["tls", "protect", "timeout"], ["ca"]];
     const ask: Asker = {
       input: async (question) => {
         const texts = tries[question.prompt] ?? [];
@@ -333,7 +341,7 @@ suite("addServer", () => {
         "dan",
         "store",
         "secret",
-        ["protect"],
+        ["protect", "timeout"],
       ]),
     );
     assert.deepStrictEqual(added(), {
@@ -357,7 +365,7 @@ suite("addServer", () => {
         "5010",
         "",
         "prompt",
-        ["tls", "protect"],
+        ["tls", "protect", "timeout"],
         ["client"],
         "pfx",
         "/etc/client.p12",
@@ -378,7 +386,7 @@ suite("addServer", () => {
         "",
         "extension",
         "acme.kdb-auth",
-        ["protect"],
+        ["protect", "timeout"],
       ]),
     );
     assert.match(told[0], /fields its extension takes go in settings.json/);
