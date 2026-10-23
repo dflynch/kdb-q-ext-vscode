@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as comments from "./comments";
+import * as servers from "./servers";
 import * as statements from "./statements";
 
 // Send the selected text, or the current line, to the active terminal one
@@ -139,4 +140,86 @@ export async function toggleBlockComment(editor: vscode.TextEditor) {
         ),
     );
   }
+}
+
+// The servers in the settings, with any problems in them shown
+export function definitions(): servers.Definition[] {
+  const setting = vscode.workspace
+    .getConfiguration("kdb-q-ext-vscode")
+    .get("servers");
+  const { servers: defined, problems } = servers.definitions(setting);
+  if (problems.length > 0) {
+    vscode.window.showWarningMessage(
+      `kdb+/q: Left out of the servers setting: ${problems.join("; ")}.`,
+    );
+  }
+  return defined;
+}
+
+async function pickServer(
+  placeHolder: string,
+): Promise<servers.Definition | undefined> {
+  const defined = definitions();
+  if (defined.length === 0) {
+    const open = "Open Settings";
+    const choice = await vscode.window.showInformationMessage(
+      "kdb+/q: No servers are defined in the settings.",
+      open,
+    );
+    if (choice === open) {
+      await vscode.commands.executeCommand(
+        "workbench.action.openSettings",
+        "kdb-q-ext-vscode.servers",
+      );
+    }
+    return undefined;
+  }
+  const picked = await vscode.window.showQuickPick(
+    defined.map((server) => ({
+      label: server.name,
+      description: `${server.user ? `${server.user}@` : ""}${server.host}:${server.port}`,
+      server,
+    })),
+    { placeHolder },
+  );
+  return picked?.server;
+}
+
+// Keep a server's password in VS Code's secure storage
+export async function setPassword(secrets: vscode.SecretStorage) {
+  const server = await pickServer("The server to set the password for");
+  if (!server) {
+    return;
+  }
+  const password = await vscode.window.showInputBox({
+    prompt: `The password for ${server.name}`,
+    password: true,
+    validateInput: servers.passwordProblem,
+  });
+  if (password === undefined) {
+    return;
+  }
+  await secrets.store(servers.secretKey(server), password);
+}
+
+export async function clearPassword(secrets: vscode.SecretStorage) {
+  const server = await pickServer("The server to clear the password for");
+  if (server) {
+    await secrets.delete(servers.secretKey(server));
+  }
+}
+
+// The connect timeout and the size limit, with any problems in them shown
+export function connectionDefaults(): servers.Defaults {
+  const config = vscode.workspace.getConfiguration("kdb-q-ext-vscode");
+  const { defaults, problems } = servers.settings(
+    config.get("connectTimeout"),
+    config.get("sizeLimit"),
+  );
+  if (problems.length > 0) {
+    vscode.window.showWarningMessage(
+      `kdb+/q: Using the default, as ${problems.join(" and ")}.`,
+    );
+  }
+  return defaults;
 }

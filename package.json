@@ -49,6 +49,16 @@
         "command": "kdb-q-ext-vscode.toggleBlockComment",
         "category": "kdb+/q",
         "title": "Toggle Block Comment"
+      },
+      {
+        "command": "kdb-q-ext-vscode.setPassword",
+        "category": "kdb+/q",
+        "title": "Set Server Password"
+      },
+      {
+        "command": "kdb-q-ext-vscode.clearPassword",
+        "category": "kdb+/q",
+        "title": "Clear Server Password"
       }
     ],
     "menus": {
@@ -75,7 +85,60 @@
         "key": "shift+alt+a",
         "when": "editorTextFocus && !editorReadonly && editorLangId == q"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "kdb+/q",
+      "properties": {
+        "kdb-q-ext-vscode.servers": {
+          "type": "object",
+          "default": {},
+          "markdownDescription": "The kdb+ processes to connect to, by name. Passwords aren't kept here: set one with **kdb+/q: Set Server Password**, which keeps it in VS Code's secure storage for the user, host and port.",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "host",
+              "port"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "host": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The host name or address."
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535,
+                "description": "The port."
+              },
+              "user": {
+                "type": "string",
+                "pattern": "^[^:\\u0000]*$",
+                "description": "The user to log in as."
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "How long to wait to connect and log in, in milliseconds, overriding the connect timeout."
+              }
+            }
+          }
+        },
+        "kdb-q-ext-vscode.connectTimeout": {
+          "type": "integer",
+          "default": 2000,
+          "minimum": 1,
+          "markdownDescription": "How long to wait for a server to connect and log in, in milliseconds, as `hopen` takes."
+        },
+        "kdb-q-ext-vscode.sizeLimit": {
+          "type": "number",
+          "default": 10,
+          "exclusiveMinimum": 0,
+          "markdownDescription": "The largest result to take, in megabytes, uncompressed. A larger one is refused and the connection closed. Results are held in the extension host, whose memory can't be raised, and some decode to up to 60 times their size, so a high limit can crash every extension in the window."
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
