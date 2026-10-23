@@ -54,31 +54,32 @@ export class QError extends Error {
 // ``error`backtrace`elapsed!(::;error;backtrace;ms): named so that more
 // can be added, and the null key's :: keeps the values a general list, as a
 // namespace's does.
+// - value is composed with a flag rather than wrapped in a lambda, so it
+//   adds no frame, and the flag tells a result from an error whatever the
+//   query returns
 // - The time is taken once .Q.trp returns, before a backtrace is formatted,
 //   from .z.p, as .z.n goes back at midnight
-// - The backtrace keeps the frames inside run's, which are the query's,
-//   numbered from the query's as 0. Those outside, the wrapper's and a
-//   customised .z.pg's, go. The frames' layout isn't documented, so if
-//   stripping them fails, the backtrace is shown whole rather than the error
-//   lost
-// - Each function is given what it uses, as q's lambdas see only their own
-//   locals and globals; and the query, evaluated by value, sees only
-//   globals, so the wrapper's locals can't clash with its names
-// - No local is named for a q keyword, such as trim, which can't be assigned
+// - The backtrace keeps the frames inside .Q.trp's, the one inside this
+//   function's (.z.s), which are the query's, numbered from the query's as
+//   0. Those outside, this function's and a customised .z.pg's, go. The
+//   frames' layout isn't documented, so if stripping them fails, the
+//   backtrace is shown whole rather than the error lost
+// - The query, evaluated by value, sees only globals, so these locals can't
+//   clash with its names. None is named for a q keyword, such as trim, which
+//   can't be assigned
 export const wrapper = [
   "{[query]",
-  "  run:{``result!(::;value x)};",
-  "  catch:{``error`backtrace!(::;x;y)};",
-  "  strip:{[run;stack]",
-  "    stack:(last where run~/:stack[;0;0])#stack;",
-  "    {@[x;3;-;y]}[;last stack[;3]] each stack};",
+  "  strip:{[self;stack]",
+  "    stack:(-1+last where self~/:stack[;0;0])#stack;",
+  "    stack[;3]-:last stack[;3];",
+  "    stack};",
   "  start:.z.p;",
-  "  reply:.Q.trp[run;query;catch];",
-  "  reply[`elapsed]:(`long$.z.p-start)div 1000000;",
-  "  if[`backtrace in key reply;",
-  "    stack:reply`backtrace;",
-  "    reply[`backtrace]:.Q.sbt @[strip run;stack;stack]];",
-  "  reply}",
+  "  outcome:.Q.trp['[(1b;);value];query;(0b;;)];",
+  "  elapsed:(`long$.z.p-start)div 1000000;",
+  "  if[first outcome;:``result`elapsed!(::;outcome 1;elapsed)];",
+  "  stack:outcome 2;",
+  "  backtrace:.Q.sbt @[strip .z.s;stack;stack];",
+  "  ``error`backtrace`elapsed!(::;outcome 1;backtrace;elapsed)}",
 ].join("\n");
 
 // What a failure with protected evaluation on says, as a server whose .z.pg
