@@ -19,27 +19,47 @@ export type Server = {
   protect?: boolean;
 };
 
-// An error the server signalled, with q's text as the message, and where
-// protected evaluation caught it, the stack as q shows it
+// How long a query took
+export type Timing = {
+  // From sending the query to the last of its result arriving, in
+  // milliseconds
+  roundtrip: number;
+  // The server's own time evaluating it, in nanoseconds, with protected
+  // evaluation
+  elapsed?: bigint;
+};
+
+// What a query returns
+export type Result = { value: Value; timing: Timing };
+
+// An error the server signalled, with q's text as the message, how long the
+// query took, and where protected evaluation caught it, the stack as q
+// shows it
 export class QError extends Error {
+  readonly backtrace?: string;
   constructor(
     message: string,
-    readonly backtrace?: string,
+    readonly timing: Timing,
+    backtrace?: string,
     options?: ErrorOptions,
   ) {
     super(message, options);
+    if (backtrace !== undefined) {
+      this.backtrace = backtrace;
+    }
   }
 }
 
 // Protected evaluation: q's default .z.pg applies this to the query, which
-// it evaluates under .Q.trp. It returns ``result!(::;result), or
-// ``error`backtrace!(::;error;backtrace): named so that more can be added,
-// and the null key's :: keeps the values a general list, as a namespace's
-// does. The backtrace leaves out this function's own frames, and those
+// it evaluates under .Q.trp. It returns ``result`elapsed!(::;result;time),
+// or ``error`backtrace`elapsed!(::;error;backtrace;time): named so that more
+// can be added, and the null key's :: keeps the values a general list, as a
+// namespace's does. The time is a timespan, from .z.p as .z.n goes back at
+// midnight. The backtrace leaves out this function's own frames, and those
 // outside it, such as a customised .z.pg's, and is numbered from the
 // query's frame as 0.
 export const wrapper =
-  "{f:{(``result)!(::;value x)};.Q.trp[f;x;{[f;e;b]b:(last where f~/:b[;0;0])#b;(``error`backtrace)!(::;e;.Q.sbt{@[x;3;-;y]}[;last b[;3]]each b)}f]}";
+  "{s:.z.p;f:{(``result)!(::;value x)};r:.Q.trp[f;x;{[f;e;b]b:(last where f~/:b[;0;0])#b;(``error`backtrace)!(::;e;.Q.sbt{@[x;3;-;y]}[;last b[;3]]each b)}f];r,(1#`elapsed)!enlist .z.p-s}";
 
 // What a failure with protected evaluation on says, as a server whose .z.pg
 // is customised, or takes only strings, can't evaluate it
@@ -69,17 +89,30 @@ function fields(value: Value): Map<string, Value> | undefined {
 }
 
 // The result inside protected evaluation's dictionary, or the error it
-// caught. Names it doesn't know are left for later.
-function unwrap(value: Value): Value {
+// caught, and the time the server took. Names it doesn't know are left for
+// later.
+function unwrap(
+  value: Value,
+  roundtrip: number,
+): { value: Value; timing: Timing } {
   const named = fields(value);
   const result = named?.get("result");
   const error = named?.get("error");
   const backtrace = named?.get("backtrace");
+  const elapsed = named?.get("elapsed");
+  const timing =
+    elapsed?.type === -16
+      ? { roundtrip, elapsed: elapsed.value }
+      : { roundtrip };
   if (error?.type === 10 && backtrace?.type === 10) {
-    throw new QError(utf8.decode(error.data), utf8.decode(backtrace.data));
+    throw new QError(
+      utf8.decode(error.data),
+      timing,
+      utf8.decode(backtrace.data),
+    );
   }
   if (result && !error) {
-    return result;
+    return { value: result, timing };
   }
   throw new Error("the server didn't evaluate the query protected", {
     cause: unprotected,
@@ -106,8 +139,10 @@ const what = ["async message", "sync call", "response"];
 // unnoticed; and nothing it sends is ever evaluated.
 export class Connection {
   private pending?: {
-    resolve: (value: Value) => void;
+    resolve: (result: Result) => void;
     reject: (error: Error) => void;
+    // When the query was sent, from performance.now()
+    sent: number;
   };
   // Why the connection closed, once it has
   private reason?: Error;
@@ -194,7 +229,7 @@ export class Connection {
     });
   }
 
-  query(text: string): Promise<Value> {
+  query(text: string): Promise<Result> {
     if (this.reason) {
       return Promise.reject(
         new Error("the connection is closed", { cause: this.reason }),
@@ -204,7 +239,7 @@ export class Connection {
       return Promise.reject(new Error("a query is already running"));
     }
     return new Promise((resolve, reject) => {
-      this.pending = { resolve, reject };
+      this.pending = { resolve, reject, sent: performance.now() };
       this.socket.write(this.protect ? encode(text, wrapper) : encode(text));
     });
   }
@@ -297,6 +332,7 @@ export class Connection {
       return;
     }
     this.pending = undefined;
+    const roundtrip = performance.now() - pending.sent;
     let value: Value;
     try {
       value = decode(message);
@@ -310,6 +346,7 @@ export class Connection {
       pending.reject(
         new QError(
           value.message,
+          { roundtrip },
           undefined,
           this.protect ? { cause: unprotected } : undefined,
         ),
@@ -317,7 +354,11 @@ export class Connection {
       return;
     }
     try {
-      pending.resolve(this.protect ? unwrap(value) : value);
+      pending.resolve(
+        this.protect
+          ? unwrap(value, roundtrip)
+          : { value, timing: { roundtrip } },
+      );
     } catch (error) {
       pending.reject(error as Error);
     }

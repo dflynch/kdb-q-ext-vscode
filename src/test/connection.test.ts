@@ -178,15 +178,17 @@ suite("connection", () => {
       port: server.port,
       timeout: 50,
     });
-    assert.strictEqual((await connection.query("x")).type, -7);
+    assert.strictEqual((await connection.query("x")).value.type, -7);
     connection.close();
   });
 
   test("sends the query and resolves with the result", async () => {
     const server = await fake((socket) => socket.write(response("atom.long")));
     const connection = await open(server);
-    const value = await connection.query("42");
+    const { value, timing } = await connection.query("42");
     assert.strictEqual(value.type, -7);
+    assert.ok(timing.roundtrip >= 0);
+    assert.strictEqual(timing.elapsed, undefined);
     assert.deepStrictEqual(server.messages, [Buffer.from(encode("42"))]);
     connection.close();
   });
@@ -198,7 +200,7 @@ suite("connection", () => {
       }
     });
     const connection = await open(server);
-    assert.strictEqual((await connection.query("x")).type, 11);
+    assert.strictEqual((await connection.query("x")).value.type, 11);
     connection.close();
   });
 
@@ -207,7 +209,7 @@ suite("connection", () => {
       socket.write(response("large.longs", true)),
     );
     const connection = await open(server);
-    assert.strictEqual((await connection.query("x")).type, 7);
+    assert.strictEqual((await connection.query("x")).value.type, 7);
     connection.close();
   });
 
@@ -248,7 +250,7 @@ suite("connection", () => {
       setTimeout(() => socket.write(update), 10);
     });
     const connection = await open(server);
-    assert.strictEqual((await connection.query("x")).type, -7);
+    assert.strictEqual((await connection.query("x")).value.type, -7);
     await server.closed;
     await assert.rejects(
       connection.query("x"),
@@ -280,7 +282,7 @@ suite("connection", () => {
     });
     const connection = await open(server);
     await assert.rejects(connection.query("x"), { message: "badmsg" });
-    assert.strictEqual((await connection.query("x")).type, -7);
+    assert.strictEqual((await connection.query("x")).value.type, -7);
     connection.close();
   });
 
@@ -308,32 +310,33 @@ suite("connection", () => {
     });
   }
 
-  test("protected, sends the wrapper and the query, and resolves with the result", async () => {
-    // ``result!(::;42)
+  test("protected, sends the wrapper and the query, and resolves with the result and the server's time", async () => {
+    // ``result`elapsed!(::;42;0D00:00:00.000001234)
     const server = await fake((socket) =>
       socket.write(
         reply(
-          "0100000028000000630b000200000000726573756c74000000020000006500f92a00000000000000",
+          "0100000039000000630b000300000000726573756c7400656c6170736564000000030000006500f92a00000000000000f0d204000000000000",
         ),
       ),
     );
     const connection = await protect(server);
-    assert.deepStrictEqual(await connection.query("42"), {
-      type: -7,
-      value: 42n,
-    });
+    const { value, timing } = await connection.query("42");
+    assert.deepStrictEqual(value, { type: -7, value: 42n });
+    assert.strictEqual(timing.elapsed, 1234n);
+    assert.ok(timing.roundtrip >= 0);
     assert.deepStrictEqual(server.messages, [
       Buffer.from(encode("42", wrapper)),
     ]);
     connection.close();
   });
 
-  test("protected, an error caught rejects with q's text and the backtrace", async () => {
-    // ``error`backtrace!(::;"type";"  [0]  1+`a\n        ^\n")
+  test("protected, an error caught rejects with q's text, the backtrace and the server's time", async () => {
+    // ``error`backtrace`elapsed!(::;"type";"  [0]  1+`a\n        ^\n";
+    // 0D00:00:00.000005678)
     const server = await fake((socket) =>
       socket.write(
         reply(
-          "010000004e000000630b0003000000006572726f72006261636b74726163650000000300000065000a0004000000747970650a001600000020205b305d2020312b60610a20202020202020205e0a",
+          "010000005f000000630b0004000000006572726f72006261636b747261636500656c61707365640000000400000065000a0004000000747970650a001600000020205b305d2020312b60610a20202020202020205e0af02e16000000000000",
         ),
       ),
     );
@@ -343,7 +346,8 @@ suite("connection", () => {
       (error) =>
         error instanceof QError &&
         error.message === "type" &&
-        error.backtrace === "  [0]  1+`a\n        ^\n",
+        error.backtrace === "  [0]  1+`a\n        ^\n" &&
+        error.timing.elapsed === 5678n,
     );
     connection.close();
   });
@@ -370,9 +374,9 @@ suite("connection", () => {
       reply(
         "0100000036000000630b0003000000006572726f72006261636b7472616365000000030000006500f574797065000a00020000006274",
       ),
-      // ``result`elapsed!(::;42;0D00:00:01), a name it doesn't know yet
+      // ``result`later!(::;42;1b), a name it doesn't know yet
       reply(
-        "0100000039000000630b000300000000726573756c7400656c6170736564000000030000006500f92a00000000000000f000ca9a3b00000000",
+        "0100000030000000630b000300000000726573756c74006c61746572000000030000006500f92a00000000000000ff01",
       ),
     ];
     const server = await fake((socket) => socket.write(answers.shift() ?? ""));
@@ -386,7 +390,23 @@ suite("connection", () => {
           /turn off protect/.test(String(error.cause)),
       );
     }
-    assert.strictEqual((await connection.query("x")).type, -7);
+    assert.strictEqual((await connection.query("x")).value.type, -7);
+    connection.close();
+  });
+
+  test("protected, a time that isn't a timespan is left out", async () => {
+    // ``result`elapsed!(::;42;`oops)
+    const server = await fake((socket) =>
+      socket.write(
+        reply(
+          "0100000036000000630b000300000000726573756c7400656c6170736564000000030000006500f92a00000000000000f56f6f707300",
+        ),
+      ),
+    );
+    const connection = await protect(server);
+    const { value, timing } = await connection.query("x");
+    assert.strictEqual(value.type, -7);
+    assert.strictEqual(timing.elapsed, undefined);
     connection.close();
   });
 
@@ -410,7 +430,7 @@ suite("connection", () => {
   test("a result exactly at the limit is accepted", async () => {
     const server = await fake((socket) => socket.write(response("atom.long")));
     const connection = await limited(server, 17);
-    assert.strictEqual((await connection.query("x")).type, -7);
+    assert.strictEqual((await connection.query("x")).value.type, -7);
     connection.close();
   });
 
@@ -437,7 +457,7 @@ suite("connection", () => {
     const message = response("large.longs", true);
     const server = await fake((socket) => socket.write(message));
     const connection = await limited(server, message.readUInt32LE(8));
-    assert.strictEqual((await connection.query("x")).type, 7);
+    assert.strictEqual((await connection.query("x")).value.type, 7);
     connection.close();
   });
 
