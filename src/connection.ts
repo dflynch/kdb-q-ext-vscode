@@ -69,9 +69,9 @@ export class QError extends Error {
 //   can't be assigned
 export const wrapper = [
   "{[query]",
-  "  start:.z.p;",
+  "  started:.z.p;",
   "  outcome:.Q.trp['[(1b;);value];query;(0b;;)];",
-  "  elapsed:(`long$.z.p-start)div 1000000;",
+  "  elapsed:(`long$.z.p-started)div 1000000;",
   "  if[outcome 0;:``result`elapsed!(::;outcome 1;elapsed)];",
   "  strip:{[self;stack]",
   "    stack:(-1+last where self~/:stack[;0;0])#stack;",
