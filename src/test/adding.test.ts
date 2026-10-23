@@ -49,7 +49,7 @@ function scripted(answers: Answer[]): Asker & { asked: string[] } {
   };
 }
 
-const context: Context = { taken: ["old"], timeout: 2000, workspace: false };
+const context: Context = { taken: ["old"], workspace: false };
 
 suite("adding a server", () => {
   test("asks for each setting, and the password to store", async () => {
@@ -60,8 +60,7 @@ suite("adding a server", () => {
       "dan",
       "store",
       "secret",
-      ["protect", "timeout"],
-      "2000",
+      ["protect"],
     ]);
     assert.deepStrictEqual(await add(ask, context), {
       name: "prod",
@@ -71,14 +70,13 @@ suite("adding a server", () => {
       workspace: false,
     } satisfies Adding);
     assert.deepStrictEqual(ask.asked, [
-      "1/7 The server's name",
-      "2/7 The server's host",
-      "3/7 The port on kdb1",
-      "4/7 The user to log in as, or none",
-      "5/7 Where the password comes from",
-      "6/8 The password for prod",
-      "7/8 Options [protect,timeout]",
-      "8/8 How long to wait to connect and log in, in milliseconds [2000]",
+      "1/6 Name",
+      "2/6 Host",
+      "3/6 Port on kdb1",
+      "4/6 User (optional)",
+      "5/6 Password",
+      "6/7 Password",
+      "7/7 Options [protect]",
     ]);
   });
 
@@ -101,17 +99,17 @@ suite("adding a server", () => {
     ]);
     const adding = await add(ask, context);
     assert.deepStrictEqual(ask.asked.slice(2, 6), [
-      "3/7 The port on kdb1",
-      "2/7 The server's host [kdb1]",
-      "1/7 The server's name [prod]",
-      "2/7 The server's host [kdb1]",
+      "3/6 Port on kdb1",
+      "2/6 Host [kdb1]",
+      "1/6 Name [prod]",
+      "2/6 Host [kdb1]",
     ]);
     // No password asks for none, so the password given before isn't kept
     assert.deepStrictEqual(ask.asked.slice(10), [
-      "7/8 Options [protect,timeout]",
-      "6/8 The password for uat [secret]",
-      "5/8 Where the password comes from [store]",
-      "6/7 Options [protect,timeout]",
+      "7/7 Options [protect]",
+      "6/7 Password [secret]",
+      "5/7 Password [store]",
+      "6/6 Options [protect]",
     ]);
     assert.deepStrictEqual(adding, {
       name: "uat",
@@ -125,11 +123,7 @@ suite("adding a server", () => {
   test("going back from the first question stays there", async () => {
     const ask = scripted([back, "prod", undefined]);
     assert.strictEqual(await add(ask, context), undefined);
-    assert.deepStrictEqual(ask.asked, [
-      "1/7 The server's name",
-      "1/7 The server's name",
-      "2/7 The server's host",
-    ]);
+    assert.deepStrictEqual(ask.asked, ["1/6 Name", "1/6 Name", "2/6 Host"]);
   });
 
   test("asking each time, or an extension named, its fields left out", async () => {
@@ -155,21 +149,20 @@ suite("adding a server", () => {
     });
   });
 
-  test("the options: TLS with its files, protect off and a timeout", async () => {
+  test("the options: TLS with its files, and protect off", async () => {
     const ask = scripted([
       "prod",
       "kdb1",
       "5010",
       "",
       "none",
-      ["tls", "timeout"],
+      ["tls"],
       ["ca", "client"],
       "~/certs/ca.pem",
       "pem",
       "~/certs/client.pem",
       "~/certs/client.key",
       "secret",
-      "500",
     ]);
     assert.deepStrictEqual(await add(ask, context), {
       name: "prod",
@@ -182,42 +175,12 @@ suite("adding a server", () => {
           key: "~/certs/client.key",
         },
         protect: false,
-        timeout: 500,
       },
       password: "",
       passphrase: "secret",
       workspace: false,
     });
-    assert.strictEqual(
-      ask.asked.at(-1),
-      "13/13 How long to wait to connect and log in, in milliseconds [2000]",
-    );
-  });
-
-  test("a timeout left at the default isn't written", async () => {
-    const left = scripted([
-      "a",
-      "kdb1",
-      "1",
-      "",
-      "none",
-      ["protect", "timeout"],
-      "2000",
-    ]);
-    assert.deepStrictEqual((await add(left, context))?.value, {
-      host: "kdb1",
-      port: 1,
-    });
-    const set = scripted([
-      "b",
-      "kdb1",
-      "1",
-      "",
-      "none",
-      ["protect", "timeout"],
-      "2500",
-    ]);
-    assert.strictEqual((await add(set, context))?.value.timeout, 2500);
+    assert.strictEqual(ask.asked.at(-1), "12/12 Passphrase (optional)");
   });
 
   test("TLS needing no files is true, and a PKCS#12 file is a pfx", async () => {
@@ -260,7 +223,7 @@ suite("adding a server", () => {
     ]);
     const adding = await add(ask, { ...context, workspace: true });
     assert.strictEqual(adding?.workspace, true);
-    assert.strictEqual(ask.asked.at(-1), "7/7 Where to keep the server");
+    assert.strictEqual(ask.asked.at(-1), "7/7 Save to");
   });
 
   test("a cancel adds nothing", async () => {
@@ -273,12 +236,12 @@ suite("adding a server", () => {
   test("the checks: name, host, port, user, password and file", async () => {
     const problems: (string | undefined)[] = [];
     const tries: Record<string, string[]> = {
-      "The server's name": ["old", " ", "prod"],
-      "The server's host": [" ", "kdb1:5000", "kdb1"],
-      "The port on kdb1": ["0", "65536", "5.5", "5000"],
-      "The user to log in as, or none": ["a:b", ""],
-      "The password for prod": ["", "secret"],
-      "The CA's certificate, in PEM": ["ca.pem", "~/ca.pem"],
+      Name: ["old", " ", "prod"],
+      Host: [" ", "kdb1:5000", "kdb1"],
+      "Port on kdb1": ["0", "65536", "5.5", "5000"],
+      "User (optional)": ["a:b", ""],
+      Password: ["", "secret"],
+      "CA certificate (PEM)": ["ca.pem", "~/ca.pem"],
     };
     const picks = ["store", ["tls", "protect"], ["ca"]];
     const ask: Asker = {
@@ -292,21 +255,21 @@ suite("adding a server", () => {
     };
     await add(ask, context);
     assert.deepStrictEqual(problems, [
-      "There's a server named old already",
-      "A server needs a name",
+      "old already exists",
+      "Required",
       undefined,
-      "A host",
-      "The port goes in the next step",
+      "Required",
+      "Port comes next",
       undefined,
-      "A port, from 1 to 65535",
-      "A port, from 1 to 65535",
-      "A port, from 1 to 65535",
+      "From 1 to 65535",
+      "From 1 to 65535",
+      "From 1 to 65535",
       undefined,
-      "The user can't contain : or a 0 byte",
+      "Can't contain : or a 0 byte",
       undefined,
-      "A password",
+      "Required",
       undefined,
-      "An absolute path, or one starting with ~/",
+      "An absolute path, or one from ~/",
       undefined,
     ]);
   });

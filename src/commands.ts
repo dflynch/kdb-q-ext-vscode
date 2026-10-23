@@ -214,7 +214,6 @@ export async function addServer(
       typeof setting === "object" && setting !== null
         ? Object.keys(setting)
         : [],
-    timeout: connectionDefaults().timeout,
     workspace: vscode.workspace.workspaceFolders !== undefined,
   });
   if (adding === undefined) {

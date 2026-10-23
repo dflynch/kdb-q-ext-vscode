@@ -38,9 +38,9 @@ type Asks<Where> = {
 export type Asker = Asks<Placed>;
 type Ask = Asks<Record<never, never>>;
 
-// What the flow needs to know: the names taken, the default connect timeout
-// and whether there's a workspace to keep the server in
-export type Context = { taken: string[]; timeout: number; workspace: boolean };
+// What the flow needs to know: the names taken, and whether there's a
+// workspace to keep the server in
+export type Context = { taken: string[]; workspace: boolean };
 
 // A server to add: its name, its setting as written, what to keep in secure
 // storage, which can be empty, and whether it goes in the workspace's
@@ -70,7 +70,6 @@ type State = {
   key?: string;
   pfx?: string;
   passphrase?: string;
-  timeout?: string;
   scope?: string;
 };
 
@@ -102,7 +101,7 @@ function file(
         validate: (text) =>
           filePath.test(text.trim())
             ? undefined
-            : "An absolute path, or one starting with ~/",
+            : "An absolute path, or one from ~/",
         browse: { label, filters },
       }),
       (path) => ({ [key]: path.trim() }),
@@ -113,13 +112,13 @@ function name(taken: string[]): Step {
   return async (ask, state) =>
     then(
       await ask.input({
-        prompt: "The server's name",
+        prompt: "Name",
         value: state.name,
         validate: (text) =>
           text.trim() === ""
-            ? "A server needs a name"
+            ? "Required"
             : taken.includes(text.trim())
-              ? `There's a server named ${text.trim()} already`
+              ? `${text.trim()} already exists`
               : undefined,
       }),
       (name) => ({ name: name.trim() }),
@@ -129,14 +128,14 @@ function name(taken: string[]): Step {
 const host: Step = async (ask, state) =>
   then(
     await ask.input({
-      prompt: "The server's host",
+      prompt: "Host",
       placeholder: "localhost",
       value: state.host,
       validate: (text) =>
         text.trim() === ""
-          ? "A host"
+          ? "Required"
           : /:\d+$/.test(text.trim())
-            ? "The port goes in the next step"
+            ? "Port comes next"
             : undefined,
     }),
     (host) => ({ host: host.trim() }),
@@ -145,11 +144,10 @@ const host: Step = async (ask, state) =>
 const port: Step = async (ask, state) =>
   then(
     await ask.input({
-      prompt: `The port on ${state.host}`,
+      prompt: `Port on ${state.host}`,
       placeholder: "5000",
       value: state.port,
-      validate: (text) =>
-        servers.port(text) ? undefined : "A port, from 1 to 65535",
+      validate: (text) => (servers.port(text) ? undefined : "From 1 to 65535"),
     }),
     (port) => ({ port: port.trim() }),
   );
@@ -157,11 +155,11 @@ const port: Step = async (ask, state) =>
 const user: Step = async (ask, state) =>
   then(
     await ask.input({
-      prompt: "The user to log in as, or none",
+      prompt: "User (optional)",
       value: state.user,
       validate: (text) =>
         servers.userProblem(text.trim())
-          ? "The user can't contain : or a 0 byte"
+          ? "Can't contain : or a 0 byte"
           : undefined,
     }),
     (user) => ({ user: user.trim() }),
@@ -170,23 +168,23 @@ const user: Step = async (ask, state) =>
 const login: Step = async (ask, state) =>
   then(
     await ask.pick({
-      placeholder: "Where the password comes from",
+      placeholder: "Password",
       choices: [
         { id: "none", label: "No password" },
         {
           id: "store",
-          label: "Store a password",
+          label: "Store password",
           description: "in VS Code's secure storage",
         },
         {
           id: "prompt",
           label: "Ask each time",
-          description: "and never keep it",
+          description: "never stored",
         },
         {
           id: "extension",
-          label: "Use an extension",
-          description: "that gives the login, for a firm's own sign-on",
+          label: "Use extension",
+          description: "for a firm's own sign-on",
         },
       ],
       chosen: state.login === undefined ? undefined : [state.login],
@@ -197,11 +195,11 @@ const login: Step = async (ask, state) =>
 const password: Step = async (ask, state) =>
   then(
     await ask.input({
-      prompt: `The password for ${state.name}`,
+      prompt: "Password",
       value: state.password,
       password: true,
       validate: (text) =>
-        text === "" ? "A password" : servers.passwordProblem(text),
+        text === "" ? "Required" : servers.passwordProblem(text),
     }),
     (password) => ({ password }),
   );
@@ -209,20 +207,18 @@ const password: Step = async (ask, state) =>
 const extension: Step = async (ask, state) =>
   then(
     await ask.input({
-      prompt: "The ID of the extension that gives the login",
+      prompt: "Extension ID",
       placeholder: "publisher.name",
       value: state.extension,
       validate: (text) =>
-        servers.extensionId.test(text.trim())
-          ? undefined
-          : "An extension ID, publisher.name",
+        servers.extensionId.test(text.trim()) ? undefined : "publisher.name",
     }),
     (extension) => ({ extension: extension.trim() }),
   );
 
 // The options as first shown: protected evaluation on, as a server has it
-// by default, and the timeout, to be shown with its default
-const optionsAtFirst = ["protect", "timeout"];
+// by default
+const optionsAtFirst = ["protect"];
 
 // Whether an option or a file TLS needs is ticked, the options counting as
 // first shown until answered
@@ -235,13 +231,12 @@ const options: Step = async (ask, state) =>
     await ask.tick({
       placeholder: "Options",
       choices: [
-        { id: "tls", label: "Connect with TLS" },
+        { id: "tls", label: "TLS" },
         {
           id: "protect",
           label: "Protected evaluation",
-          description: "off for a gateway whose .z.pg is its own",
+          description: "off for a gateway with its own .z.pg",
         },
-        { id: "timeout", label: "Set a connect timeout" },
       ],
       chosen: state.options ?? optionsAtFirst,
     }),
@@ -251,16 +246,16 @@ const options: Step = async (ask, state) =>
 const files: Step = async (ask, state) =>
   then(
     await ask.tick({
-      placeholder: "The files TLS needs, if any (Enter for none)",
+      placeholder: "TLS files (optional)",
       choices: [
         {
           id: "ca",
-          label: "A CA",
-          description: "to trust besides the system's, such as a firm's own",
+          label: "CA",
+          description: "trusted besides the system's",
         },
         {
           id: "client",
-          label: "A client certificate",
+          label: "Client certificate",
           description: "for a server that requires one",
         },
       ],
@@ -272,14 +267,14 @@ const files: Step = async (ask, state) =>
 const form: Step = async (ask, state) =>
   then(
     await ask.pick({
-      placeholder: "The client certificate's form",
+      placeholder: "Client certificate format",
       choices: [
         {
           id: "pem",
-          label: "A certificate and its key",
+          label: "Certificate and key",
           description: "in PEM",
         },
-        { id: "pfx", label: "One PKCS#12 file", description: ".p12 or .pfx" },
+        { id: "pfx", label: "PKCS#12", description: ".p12 or .pfx" },
       ],
       chosen: state.form === undefined ? undefined : [state.form],
     }),
@@ -289,42 +284,27 @@ const form: Step = async (ask, state) =>
 const passphrase: Step = async (ask, state) =>
   then(
     await ask.input({
-      prompt: "The client certificate's passphrase, or none",
+      prompt: "Passphrase (optional)",
       value: state.passphrase,
       password: true,
     }),
     (passphrase) => ({ passphrase }),
   );
 
-function timeout(otherwise: number): Step {
-  return async (ask, state) =>
-    then(
-      await ask.input({
-        prompt: "How long to wait to connect and log in, in milliseconds",
-        value: state.timeout ?? `${otherwise}`,
-        validate: (text) =>
-          /^\d+$/.test(text.trim()) && Number(text) > 0
-            ? undefined
-            : "A whole number of milliseconds",
-      }),
-      (timeout) => ({ timeout: timeout.trim() }),
-    );
-}
-
 const scope: Step = async (ask, state) =>
   then(
     await ask.pick({
-      placeholder: "Where to keep the server",
+      placeholder: "Save to",
       choices: [
         {
           id: "user",
           label: "User settings",
-          description: "for every workspace",
+          description: "all workspaces",
         },
         {
           id: "workspace",
           label: "Workspace settings",
-          description: "for this workspace, and anyone who opens it",
+          description: "this workspace, and anyone who opens it",
         },
       ],
       chosen: state.scope === undefined ? undefined : [state.scope],
@@ -348,24 +328,23 @@ function plan(state: State, context: Context): Step[] {
     options,
     ...(tls ? [files] : []),
     ...(tls && ticked(state, "files", "ca")
-      ? [file("ca", "The CA's certificate, in PEM", "Trust this CA", pem)]
+      ? [file("ca", "CA certificate (PEM)", "Select", pem)]
       : []),
     ...(client ? [form] : []),
     ...(client && state.form === "pfx"
       ? [
-          file("pfx", "The PKCS#12 file", "Use this certificate", {
+          file("pfx", "PKCS#12 file", "Select", {
             "PKCS#12": ["p12", "pfx"],
           }),
         ]
       : []),
     ...(client && state.form !== "pfx"
       ? [
-          file("cert", "The certificate, in PEM", "Use this certificate", pem),
-          file("key", "The certificate's key, in PEM", "Use this key", pem),
+          file("cert", "Certificate (PEM)", "Select", pem),
+          file("key", "Key (PEM)", "Select", pem),
         ]
       : []),
     ...(client ? [passphrase] : []),
-    ...(ticked(state, "options", "timeout") ? [timeout(context.timeout)] : []),
     ...(context.workspace ? [scope] : []),
   ];
 }
@@ -381,7 +360,7 @@ export async function add(
   for (;;) {
     const steps = plan(state, context);
     if (at === steps.length) {
-      return adding(state, context);
+      return adding(state);
     }
     const placed = { step: at + 1, total: steps.length };
     const asking: Ask = {
@@ -403,10 +382,8 @@ export async function add(
 }
 
 // The server the answers make, using only the answers their choices lead
-// to: one given before going back and choosing otherwise is dropped. A
-// timeout left at the default isn't written, so that the server follows the
-// default.
-function adding(state: State, context: Context): Adding {
+// to: one given before going back and choosing otherwise is dropped
+function adding(state: State): Adding {
   const tls = ticked(state, "options", "tls");
   const ca = tls && ticked(state, "files", "ca");
   const client = tls && ticked(state, "files", "client");
@@ -416,7 +393,6 @@ function adding(state: State, context: Context): Adding {
       : state.login === "extension"
         ? { extension: state.extension }
         : undefined;
-  const timeout = Number(state.timeout);
   return {
     name: state.name ?? "",
     value: {
@@ -441,9 +417,6 @@ function adding(state: State, context: Context): Adding {
           }
         : {}),
       ...(ticked(state, "options", "protect") ? {} : { protect: false }),
-      ...(ticked(state, "options", "timeout") && timeout !== context.timeout
-        ? { timeout }
-        : {}),
     },
     password: state.login === "store" ? (state.password ?? "") : "",
     passphrase: client ? (state.passphrase ?? "") : "",
