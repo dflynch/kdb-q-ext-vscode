@@ -21,20 +21,26 @@ import * as temporal from "./temporal";
 // vector costs only as much as the part that's shown. Loops also stop when
 // it's full, so as not to format what would be dropped.
 
-// How much text to take: lines past the limit, and the end of a line
-// wider than width, are cut
-export type Size = { lines: number; width: number };
+// How much text to show: as many lines, each as wide as width, and in all
+// no more than characters, where it's given. Our own measure, not q's \c,
+// which leaves room for the prompt: \c 25 80 shows 23 lines of 79.
+export type Size = { lines: number; width: number; characters?: number };
 
 class Text {
   private parts: string[] = [];
   private lines = 1;
-  // The length of the last line
+  // The length of the last line, and of all of it
   private line = 0;
+  private length = 0;
 
   constructor(private size: Size) {}
 
   get full(): boolean {
-    return this.line > this.size.width || this.lines > this.size.lines;
+    return (
+      this.line > this.size.width ||
+      this.lines > this.size.lines ||
+      this.length > (this.size.characters ?? Number.POSITIVE_INFINITY)
+    );
   }
 
   // Once full, what's there is cut anyway
@@ -43,6 +49,7 @@ class Text {
       return;
     }
     this.parts.push(text);
+    this.length += text.length;
     const end = text.lastIndexOf("\n");
     if (end < 0) {
       this.line += text.length;

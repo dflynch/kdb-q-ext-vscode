@@ -16,8 +16,14 @@ export type { Size };
 
 // How much of a value to show: far more than q's \c, as the panel scrolls.
 // A value with more lines shows the first 4999 and then .., and a wider
-// line shows its first 4998 characters and then ..
-export const defaultSize: Size = { lines: 5000, width: 5000 };
+// line shows its first 4998 characters and then ... Lines past a million
+// characters in all become .. too, so that what reaches the panel stays
+// small even when many lines are wide.
+export const defaultSize: Size = {
+  lines: 5000,
+  width: 5000,
+  characters: 1_000_000,
+};
 
 // A value as the q console shows it
 export function show(value: Value, size: Size = defaultSize): string {
@@ -38,13 +44,24 @@ export function show(value: Value, size: Size = defaultSize): string {
 }
 
 function cut(lines: string[], size: Size): string[] {
-  const shown =
+  const shown = (
     lines.length > size.lines
       ? [...lines.slice(0, size.lines - 1), ".."]
-      : lines;
-  return shown.map((line) =>
+      : lines
+  ).map((line) =>
     line.length > size.width ? `${line.slice(0, size.width - 2)}..` : line,
   );
+  // Then the line that takes it past the characters, with the newlines
+  // between, becomes .., and any after it go
+  const characters = size.characters ?? Number.POSITIVE_INFINITY;
+  let total = -1;
+  for (let i = 0; i < shown.length; i++) {
+    total += shown[i].length + 1;
+    if (total > characters) {
+      return [...shown.slice(0, i), ".."];
+    }
+  }
+  return shown;
 }
 
 // A table column's first rows cells, as q shows them in a table: a

@@ -154,6 +154,33 @@ suite("console text", () => {
     assert.ok(performance.now() - start < 1000);
   });
 
+  test("lines past the characters in all become ..", () => {
+    const rows: Value = {
+      type: 0,
+      attribute: 0,
+      items: [1, 2, 3, 4].map((n) => longs(n)),
+    };
+    // ,0 and 0 1 with their newlines are 7
+    assert.strictEqual(
+      show(rows, { lines: 10, width: 80, characters: 8 }),
+      ",0\n0 1\n..",
+    );
+  });
+
+  test("a large matrix stops at a million characters", () => {
+    const row = longs(5000);
+    const rows: Value = {
+      type: 0,
+      attribute: 0,
+      items: Array.from({ length: 6000 }, () => row),
+    };
+    const start = performance.now();
+    const text = show(rows);
+    assert.ok(text.length <= 1_000_002);
+    assert.ok(text.endsWith("\n.."));
+    assert.ok(performance.now() - start < 2000);
+  });
+
   test("an error shows as q signals it", () => {
     assert.strictEqual(show({ type: -128, message: "type" }), "'type");
   });
