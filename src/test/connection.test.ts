@@ -169,6 +169,28 @@ suite("connection", () => {
     );
   });
 
+  test("a timeout of 0 waits as long as the login takes", async function () {
+    // Past the default's 2 seconds
+    this.timeout(5000);
+    const server = net.createServer((socket) => {
+      socket.once("data", () =>
+        setTimeout(() => socket.write(Buffer.of(3)), 2100),
+      );
+    });
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    try {
+      const connection = await Connection.open({
+        host: "127.0.0.1",
+        port: (server.address() as net.AddressInfo).port,
+        timeout: 0,
+      });
+      connection.close();
+    } finally {
+      server.close();
+    }
+  });
+
   test("a connection outlasts the login's timeout", async () => {
     const server = await fake((socket) => {
       setTimeout(() => socket.write(response("atom.long")), 100);
@@ -460,6 +482,19 @@ suite("connection", () => {
     await assert.rejects(connection.query("y"), /a query is already running/);
     connection.close();
     await assert.rejects(first);
+  });
+
+  test("closed resolves with why, however it closed", async () => {
+    const server = await fake();
+    const connection = await open(server);
+    connection.close();
+    assert.strictEqual(
+      (await connection.closed).message,
+      "the query was cancelled",
+    );
+    const other = await open(server);
+    server.stop();
+    assert.strictEqual((await other.closed).message, "the connection closed");
   });
 
   test("closing cancels the query and closes the socket", async () => {

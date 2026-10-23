@@ -12,7 +12,8 @@ export type Server = {
   port: number;
   user?: string;
   password?: string;
-  // How long to wait for the server to connect and log in, in milliseconds
+  // How long to wait for the server to connect and log in, in milliseconds,
+  // or 0 to wait as long as it takes, as hopen does
   timeout?: number;
   // The largest result to take, in bytes, uncompressed
   limit?: number;
@@ -189,6 +190,11 @@ export class Connection {
   };
   // Why the connection closed, once it has
   private reason?: Error;
+  private ended: (reason: Error) => void = () => {};
+  // Resolves with why the connection closed, once it has, however it did
+  readonly closed = new Promise<Error>((resolve) => {
+    this.ended = resolve;
+  });
   // A message's header, then the message, as they arrive
   private header = Buffer.alloc(8);
   private headerLength = 0;
@@ -229,10 +235,11 @@ export class Connection {
       socket.setNoDelay(true);
       // A deadline for connecting and logging in together; the socket's own
       // timeout would restart with every write and read
-      const timer = setTimeout(
-        () => fail(new Error("timeout")),
-        server.timeout ?? 2000,
-      );
+      const timeout = server.timeout ?? 2000;
+      const timer =
+        timeout === 0
+          ? undefined
+          : setTimeout(() => fail(new Error("timeout")), timeout);
       const login = () => {
         phase = "login";
         // Version 3: compression, timestamps, timespans and GUIDs
@@ -329,6 +336,7 @@ export class Connection {
       return;
     }
     this.reason = reason;
+    this.ended(reason);
     this.socket.destroy();
     this.pending?.reject(reason);
     this.pending = undefined;

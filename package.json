@@ -51,6 +51,21 @@
         "title": "Toggle Block Comment"
       },
       {
+        "command": "kdb-q-ext-vscode.addServer",
+        "category": "kdb+/q",
+        "title": "Add Server"
+      },
+      {
+        "command": "kdb-q-ext-vscode.connect",
+        "category": "kdb+/q",
+        "title": "Connect to Server"
+      },
+      {
+        "command": "kdb-q-ext-vscode.disconnect",
+        "category": "kdb+/q",
+        "title": "Disconnect from Server"
+      },
+      {
         "command": "kdb-q-ext-vscode.setPassword",
         "category": "kdb+/q",
         "title": "Set Server Password"
@@ -102,7 +117,7 @@
         "kdb-q-ext-vscode.servers": {
           "type": "object",
           "default": {},
-          "markdownDescription": "The kdb+ processes to connect to, by name. Passwords aren't kept here: set one with **kdb+/q: Set Server Password**, which keeps it in VS Code's secure storage for the user, host and port, or have it come from elsewhere with `auth`.",
+          "markdownDescription": "The kdb+ processes to connect to, by name: add one with **kdb+/q: Add Server**. Passwords aren't kept here: set one with **kdb+/q: Set Server Password**, which keeps it in VS Code's secure storage for the user, host and port, or have it come from elsewhere with `auth`.",
           "additionalProperties": {
             "type": "object",
             "required": [
@@ -129,8 +144,8 @@
               },
               "timeout": {
                 "type": "integer",
-                "minimum": 1,
-                "description": "How long to wait to connect and log in, in milliseconds, overriding the connect timeout."
+                "minimum": 0,
+                "description": "How long to wait to connect and log in, in milliseconds, overriding the connect timeout. 0 waits as long as it takes, as hopen does."
               },
               "protect": {
                 "type": "boolean",
@@ -172,7 +187,7 @@
                 ]
               },
               "auth": {
-                "markdownDescription": "Where the password comes from, when it isn't the one kept by **kdb+/q: Set Server Password**: `\"prompt\"` asks for it at every connect and doesn't keep it, for a one-time code; `{ \"extension\": \"publisher.name\", … }` asks that extension at every connect, for a firm's own sign-on. The rest of the object goes to the extension.",
+                "markdownDescription": "Where the password comes from, when it isn't the one kept by **kdb+/q: Set Server Password**: `\"prompt\"` asks for it at every connect and doesn't keep it, where a password can't be stored or changes too often to keep; `{ \"extension\": \"publisher.name\", … }` asks that extension at every connect, for a firm's own sign-on. The rest of the object goes to the extension.",
                 "oneOf": [
                   {
                     "const": "prompt",
@@ -200,8 +215,8 @@
         "kdb-q-ext-vscode.connectTimeout": {
           "type": "integer",
           "default": 2000,
-          "minimum": 1,
-          "markdownDescription": "How long to wait for a server to connect and log in, in milliseconds, as `hopen` takes."
+          "minimum": 0,
+          "markdownDescription": "How long to wait for a server to connect and log in, in milliseconds, as `hopen` takes. 0 waits as long as it takes, as `hopen` does without one."
         },
         "kdb-q-ext-vscode.sizeLimit": {
           "type": "number",

@@ -20,10 +20,21 @@ export function resolve(file: string): string {
   return /^~[\\/]/.test(file) ? path.join(os.homedir(), file.slice(2)) : file;
 }
 
+// A file's path as written in the settings: from ~ if it's in the home
+// directory, so that a workspace's settings serve whoever opens it
+export function home(file: string): string {
+  const relative = path.relative(os.homedir(), file);
+  return relative !== "" &&
+    relative.split(path.sep)[0] !== ".." &&
+    !path.isAbsolute(relative)
+    ? `~${path.sep}${relative}`
+    : file;
+}
+
 // Where a client certificate's passphrase is kept: under its file, since
 // one certificate can serve several servers. None without a certificate.
-export function passphraseKey(settings: Tls): string | undefined {
-  const file = settings.pfx ?? settings.key;
+export function passphraseKey(settings?: Tls): string | undefined {
+  const file = settings?.pfx ?? settings?.key;
   return file === undefined ? undefined : `passphrase:${resolve(file)}`;
 }
 

@@ -8,7 +8,8 @@ export type Definition = {
   host: string;
   port: number;
   user?: string;
-  // Overrides the connect timeout for this server, in milliseconds
+  // Overrides the connect timeout for this server, in milliseconds, or 0 to
+  // wait as long as it takes
   timeout?: number;
   // Whether to evaluate queries protected, so that an error comes back with
   // its backtrace: on unless false, as a gateway whose .z.pg is customised
@@ -21,8 +22,9 @@ export type Definition = {
   auth?: Auth;
 };
 
-// A password asked for at every connect and never kept, for a one-time code;
-// or one an extension gives, for a firm's own sign-on: a Kerberos ticket or
+// A password asked for at every connect and never kept, where a firm doesn't
+// allow one to be stored or it changes too often to keep; or one an extension
+// gives, for a firm's own sign-on: a Kerberos ticket or
 // an access token, say, which the server checks in .z.pw. The setting names
 // the extension, so no other extension is given the server's login by
 // taking a name agreed in advance. The rest of the setting goes to it as it
@@ -61,10 +63,15 @@ const fields = new Set([
 const tlsFields = new Set(["ca", "cert", "key", "pfx"]);
 
 // A Marketplace extension ID, publisher.name
-const extensionId = /^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9-]*$/i;
+export const extensionId = /^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9-]*$/i;
 
 function isCount(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+// A timeout, in milliseconds: 0 waits as long as it takes, as hopen does
+function isTimeout(value: unknown): value is number {
+  return value === 0 || isCount(value);
 }
 
 // The servers in the setting, in the order written. VS Code doesn't hold a
@@ -134,7 +141,7 @@ function check(name: string, value: unknown): string | undefined {
   if (user !== undefined && (typeof user !== "string" || userProblem(user))) {
     return "the user can't contain : or a 0 byte";
   }
-  if (timeout !== undefined && !isCount(timeout)) {
+  if (timeout !== undefined && !isTimeout(timeout)) {
     return "the timeout isn't a whole number of milliseconds";
   }
   if (protect !== undefined && typeof protect !== "boolean") {
@@ -206,7 +213,7 @@ export function settings(
   const problems: string[] = [];
   let result = { ...defaults };
   if (timeout !== undefined) {
-    if (isCount(timeout)) {
+    if (isTimeout(timeout)) {
       result = { ...result, timeout };
     } else {
       problems.push("the connect timeout isn't a whole number of milliseconds");
@@ -230,7 +237,7 @@ export function secretKey(server: Definition): string {
 }
 
 // A user q can take: the login is user:password, ending at a 0 byte
-function userProblem(user: string): boolean {
+export function userProblem(user: string): boolean {
   return /[:\0]/.test(user);
 }
 
