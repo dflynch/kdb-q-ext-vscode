@@ -50,35 +50,35 @@ export class QError extends Error {
 }
 
 // Protected evaluation: q's .z.pg applies this to the query, which it runs
-// under .Q.trp. It returns ``result`execution!(::;result;ms), or
-// ``error`backtrace`execution!(::;error;backtrace;ms): named so that more
+// under .Q.trp. It returns ``result`elapsed!(::;result;ms), or
+// ``error`backtrace`elapsed!(::;error;backtrace;ms): named so that more
 // can be added, and the null key's :: keeps the values a general list, as a
 // namespace's does.
-// - The time is from .z.p, as .z.n goes back at midnight, taken as an error
-//   is caught, before its backtrace is formatted
+// - The time is taken once .Q.trp returns, before a backtrace is formatted,
+//   from .z.p, as .z.n goes back at midnight
 // - The backtrace keeps the frames inside run's, which are the query's,
 //   numbered from the query's as 0. Those outside, the wrapper's and a
 //   customised .z.pg's, go. The frames' layout isn't documented, so if
-//   picking them out fails, the backtrace is shown whole rather than the
-//   error lost
+//   stripping them fails, the backtrace is shown whole rather than the error
+//   lost
 // - Each function is given what it uses, as q's lambdas see only their own
 //   locals and globals; and the query, evaluated by value, sees only
 //   globals, so the wrapper's locals can't clash with its names
 // - No local is named for a q keyword, such as trim, which can't be assigned
 export const wrapper = [
   "{[query]",
-  "  run:{[start;query]",
-  "    result:value query;",
-  "    (``result`execution)!(::;result;(`long$.z.p-start)div 1000000)};",
-  "  frames:{[run;stack]",
+  "  run:{``result!(::;value x)};",
+  "  catch:{``error`backtrace!(::;x;y)};",
+  "  strip:{[run;stack]",
   "    stack:(last where run~/:stack[;0;0])#stack;",
   "    {@[x;3;-;y]}[;last stack[;3]] each stack};",
-  "  caught:{[run;frames;start;error;stack]",
-  "    execution:(`long$.z.p-start)div 1000000;",
-  "    backtrace:.Q.sbt @[frames run;stack;stack];",
-  "    (``error`backtrace`execution)!(::;error;backtrace;execution)};",
   "  start:.z.p;",
-  "  .Q.trp[run start;query;caught[run;frames;start]]}",
+  "  reply:.Q.trp[run;query;catch];",
+  "  reply[`elapsed]:(`long$.z.p-start)div 1000000;",
+  "  if[`backtrace in key reply;",
+  "    stack:reply`backtrace;",
+  "    reply[`backtrace]:.Q.sbt @[strip run;stack;stack]];",
+  "  reply}",
 ].join("\n");
 
 // What a failure with protected evaluation on says, as a server whose .z.pg
@@ -115,9 +115,9 @@ function unwrap(value: Value, roundtrip: number): Result {
   const result = named?.get("result");
   const error = named?.get("error");
   const backtrace = named?.get("backtrace");
-  const execution = named?.get("execution");
-  if (execution?.type === -7) {
-    const timing = { roundtrip, execution: Number(execution.value) };
+  const elapsed = named?.get("elapsed");
+  if (elapsed?.type === -7) {
+    const timing = { roundtrip, execution: Number(elapsed.value) };
     if (result) {
       return { value: result, timing };
     }
