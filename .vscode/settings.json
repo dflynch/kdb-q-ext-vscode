@@ -7,5 +7,9 @@
     "out": true // set this to false to include "out" folder in search results
   },
   // Turn off tsc task auto detection since we have the necessary tasks as npm scripts
-  "typescript.tsc.autoDetect": "off"
+  "typescript.tsc.autoDetect": "off",
+  // The debugger's network view inspects the extension host's web requests,
+  // and Node aborts the host on one from a built-in extension, such as
+  // Copilot Chat, which runs even with the others disabled
+  "debug.javascript.enableNetworkView": false
 }
