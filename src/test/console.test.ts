@@ -30,16 +30,14 @@ const longs = (n: number): Value => ({
 });
 
 suite("console text", () => {
-  // Tables and dictionaries go to the grid, and q cuts the widest values at
-  // its own limit of 2000 characters, below ours
-  const cut = (text: string) => text.split("\n").some((l) => l.length >= 1999);
-  for (const f of fixtures.filter(
-    (f) => f.type !== 98 && f.type !== 99 && !cut(f.console),
-  )) {
+  // The fixtures hold q's text at \c 2000 2000, where .Q.s shows 1998 lines
+  // of 1999 characters, so the widest values are cut as q cuts them
+  const size = { lines: 1998, width: 1999 };
+  for (const f of fixtures.filter((f) => f.type !== 98 && f.type !== 99)) {
     test(`${f.name} as q shows it`, () => {
       // q ends the last line with a newline
       const want = f.console.replace(/\n$/, "");
-      assert.strictEqual(show(decode(Buffer.from(f.bytes, "hex"))), want);
+      assert.strictEqual(show(decode(Buffer.from(f.bytes, "hex")), size), want);
     });
   }
 

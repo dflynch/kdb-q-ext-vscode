@@ -85,7 +85,10 @@ export function timespan(ns: bigint): string {
 }
 
 // Days since 2000.01.01 as a float, with T between the date and the time.
-// q rounds to the microsecond, then drops the microseconds.
+// q rounds to the microsecond, then drops the microseconds. Past 2^20 days,
+// about the year 4870, a double holds the time to only about 0.02 ms, and
+// about 1 in 200 of q's show a millisecond less than this: no rule tried,
+// exact arithmetic included, matches q's there.
 export function datetime(days: number): string {
   const us = Math.round(days * 86_400_000_000);
   const ms = Math.floor(us / 1000);

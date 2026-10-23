@@ -318,6 +318,33 @@ suite("decode", () => {
     });
   }
 
+  test("primitives q sends as lambdas in .Q", () => {
+    const [unaries, operators] = [
+      "primitive.unaries",
+      "primitive.operators",
+    ].map((name) => decode(bytes(name)));
+    assert.ok("items" in unaries && "items" in operators);
+    assert.deepStrictEqual(unaries.items.slice(42, 45), [
+      { type: 101, code: 42 },
+      { type: 101, code: 43 },
+      { type: 101, code: 44 },
+    ]);
+    assert.deepStrictEqual(operators.items.slice(35), [
+      { type: 102, code: 35 },
+      { type: 102, code: 36 },
+    ]);
+  });
+
+  test("the same text outside .Q stays a lambda", () => {
+    // {var x}, as q sends it from the root namespace
+    const value = decode(message("64000a00070000007b76617220787d"));
+    assert.deepStrictEqual(value, {
+      type: 100,
+      context: "",
+      source: "{var x}",
+    });
+  });
+
   test("counts rows, entries and elements", () => {
     const counted = (name: string) => count(decode(bytes(name)));
     assert.strictEqual(counted("table.trades"), 3);

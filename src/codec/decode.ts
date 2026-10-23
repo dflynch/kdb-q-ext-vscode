@@ -12,6 +12,15 @@ import {
 } from "./types";
 
 // Keeping a leading byte-order mark, which q would show as part of the symbol
+// The primitives q sends as lambdas in .Q, by source
+const sentAsLambdas = new Map<string, QFunction>([
+  ["{var x}", { type: 101, code: 42 }],
+  ["{dev x}", { type: 101, code: 43 }],
+  ["{hopen x}", { type: 101, code: 44 }],
+  ["{cov[x;y]}", { type: 102, code: 35 }],
+  ["{cor[x;y]}", { type: 102, code: 36 }],
+]);
+
 const utf8 = new TextDecoder("utf-8", { ignoreBOM: true });
 
 // Decode a q IPC message, as a server sends it or -8! or -18! writes it.
@@ -215,14 +224,22 @@ class Reader {
     return { type: 98, attribute, columns, data };
   }
 
-  // A lambda is the namespace it was defined in, then its source
+  // A lambda is the namespace it was defined in, then its source. q sends
+  // five primitives as lambdas in .Q, and reads them back as the primitives.
   private lambda(): QFunction {
     const context = utf8.decode(this.symbol());
     const source = this.value();
     if (source.type !== 10) {
       throw badmsg("a lambda's source isn't a string");
     }
-    return { type: 100, context, source: utf8.decode(source.data) };
+    const text = utf8.decode(source.data);
+    return (
+      (context === "Q" && sentAsLambdas.get(text)) || {
+        type: 100,
+        context,
+        source: text,
+      }
+    );
   }
 
   private atom(type: number): Atom {
