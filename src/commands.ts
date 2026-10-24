@@ -6,10 +6,10 @@ import type { Connections, State } from "./connections";
 import { credentials, type Sources } from "./credentials";
 import type { Size } from "./format/console";
 import { quickInput } from "./quickInput";
+import { consoleText, sizeSetting } from "./result";
 import * as servers from "./servers";
 import * as statements from "./statements";
 import { passphraseKey, secure } from "./tls";
-import * as transcript from "./transcript";
 
 // Send the selected text, or the current line, to the active terminal one
 // statement at a time. With several selections, each is sent in turn from the
@@ -45,7 +45,7 @@ export function runSelectedText(editor: vscode.TextEditor) {
 
 // The console size, with any problem in it shown
 function consoleSize(): Size {
-  const { size, problems } = transcript.consoleSize(
+  const { size, problems } = sizeSetting(
     vscode.workspace.getConfiguration("kdb-q-ext-vscode").get("consoleSize"),
   );
   if (problems.length > 0) {
@@ -57,9 +57,9 @@ function consoleSize(): Size {
 }
 
 // Run the selected text, or the current line, on the active connection as
-// one query, as written, showing it with its result as the q console does,
-// and how long it took in the status bar. With several selections, the
-// primary one.
+// one query, as written, showing its result as the q console does in place
+// of the last, and how long it took in the status bar. With several
+// selections, the primary one.
 export async function runOnServer(
   editor: vscode.TextEditor,
   connections: Connections<Connection>,
@@ -89,7 +89,7 @@ export async function runOnServer(
     (result) => ({ result }),
     (error: Error) => ({ error }),
   );
-  output.appendLine(transcript.entry(query, outcome, size));
+  output.replace(consoleText(outcome, size));
   status.timed(
     name,
     "result" in outcome

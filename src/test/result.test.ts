@@ -10,8 +10,8 @@ import {
 } from "../connection";
 import { Connections } from "../connections";
 import { defaultSize } from "../format/console";
+import { consoleText, sizeSetting } from "../result";
 import type { Definition } from "../servers";
-import { consoleSize, entry } from "../transcript";
 
 const long = (n: number): Value => ({ type: -7, value: BigInt(n) });
 const generic: Value = { type: 101, code: 0 };
@@ -22,26 +22,24 @@ const til = (n: number): Value => ({
   data: BigInt64Array.from({ length: n }, (_, i) => BigInt(i)),
 });
 
-suite("transcript", () => {
-  test("a result under its query", () => {
+suite("result", () => {
+  test("a result as the q console shows it", () => {
     assert.strictEqual(
-      entry(
-        "til 3",
+      consoleText(
         { result: { value: til(3), timing: { roundtrip: 0 } } },
         defaultSize,
       ),
-      "q)til 3\n0 1 2",
+      "0 1 2",
     );
   });
 
   test(":: shows nothing, as an assignment's result", () => {
     assert.strictEqual(
-      entry(
-        "a:1",
+      consoleText(
         { result: { value: generic, timing: { roundtrip: 0 } } },
         defaultSize,
       ),
-      "q)a:1",
+      "",
     );
   });
 
@@ -52,45 +50,40 @@ suite("transcript", () => {
       "  [0]  1+`a\n        ^\n",
     );
     assert.strictEqual(
-      entry("1+`a", { error }, defaultSize),
-      "q)1+`a\n'type\n  [0]  1+`a\n        ^",
+      consoleText({ error }, defaultSize),
+      "'type\n  [0]  1+`a\n        ^",
     );
   });
 
   test("an error of ours, the same way", () => {
     assert.strictEqual(
-      entry(
-        "til 100000000",
-        { error: new Error("the result is too big") },
-        defaultSize,
-      ),
-      "q)til 100000000\n'the result is too big",
+      consoleText({ error: new Error("the result is too big") }, defaultSize),
+      "'the result is too big",
     );
   });
 
   test("the result cut at the console size", () => {
     assert.strictEqual(
-      entry(
-        "til 100",
+      consoleText(
         { result: { value: til(100), timing: { roundtrip: 0 } } },
         { lines: 10, width: 10 },
       ),
-      "q)til 100\n0 1 2 3 ..",
+      "0 1 2 3 ..",
     );
   });
 
   test("the console size is lines then width, each from 10 to 2000", () => {
-    assert.deepStrictEqual(consoleSize(undefined), {
+    assert.deepStrictEqual(sizeSetting(undefined), {
       size: defaultSize,
       problems: [],
     });
-    assert.deepStrictEqual(consoleSize([25, 80]), {
+    assert.deepStrictEqual(sizeSetting([25, 80]), {
       size: { ...defaultSize, lines: 25, width: 80 },
       problems: [],
     });
     for (const wrong of [[9, 80], [25, 2001], [25], [25, 80.5], "25 80"]) {
       assert.deepStrictEqual(
-        consoleSize(wrong),
+        sizeSetting(wrong),
         {
           size: defaultSize,
           problems: [
@@ -121,8 +114,8 @@ function scripted(answers: (Result | Error)[]) {
   return { link: link as unknown as Connection, sent };
 }
 
-// An output channel keeping what's written, and a status bar keeping what
-// it's told: a query running, then its timing
+// An output channel keeping what it shows, which is replaced each time, and
+// a status bar keeping what it's told: a query running, then its timing
 function shown() {
   const lines: string[] = [];
   const timed: [string, Timing | "running" | undefined][] = [];
@@ -130,7 +123,7 @@ function shown() {
     lines,
     timed,
     output: {
-      appendLine: (line: string) => lines.push(line),
+      replace: (text: string) => lines.splice(0, lines.length, text),
       show: () => {},
     } as unknown as vscode.OutputChannel,
     status: {
@@ -172,7 +165,7 @@ suite("runOnServer", () => {
       status,
     );
     assert.deepStrictEqual(sent, ["f:{\n  x+1} / add one\nf 1"]);
-    assert.deepStrictEqual(lines, ["q)f:{\n  x+1} / add one\nf 1\n2"]);
+    assert.deepStrictEqual(lines, ["2"]);
     assert.deepStrictEqual(timed, [
       ["prod", "running"],
       ["prod", timing],
@@ -189,11 +182,27 @@ suite("runOnServer", () => {
     editor.selection = new vscode.Selection(1, 2, 1, 2);
     await runOnServer(editor, connections, output, status);
     assert.deepStrictEqual(sent, ["1+`a"]);
-    assert.deepStrictEqual(lines, ["q)1+`a\n'type"]);
+    assert.deepStrictEqual(lines, ["'type"]);
     assert.deepStrictEqual(timed, [
       ["prod", "running"],
       ["prod", timing],
     ]);
+  });
+
+  test("each result replaces the last", async () => {
+    const { link } = scripted([
+      { value: long(1), timing: { roundtrip: 0 } },
+      { value: long(2), timing: { roundtrip: 0 } },
+    ]);
+    const connections = new Connections<Connection>(async () => link);
+    await connections.connect(prod);
+    const { lines, output, status } = shown();
+    await runOnServer(await selecting("1"), connections, output, status);
+    await vscode.commands.executeCommand(
+      "workbench.action.revertAndCloseActiveEditor",
+    );
+    await runOnServer(await selecting("2"), connections, output, status);
+    assert.deepStrictEqual(lines, ["2"]);
   });
 
   test("an error of ours has no timing", async () => {
@@ -202,7 +211,7 @@ suite("runOnServer", () => {
     await connections.connect(prod);
     const { lines, timed, output, status } = shown();
     await runOnServer(await selecting("1"), connections, output, status);
-    assert.deepStrictEqual(lines, ["q)1\n'the connection closed"]);
+    assert.deepStrictEqual(lines, ["'the connection closed"]);
     assert.deepStrictEqual(timed, [
       ["prod", "running"],
       ["prod", undefined],

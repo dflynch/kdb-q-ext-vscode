@@ -4,7 +4,7 @@ import { defaultSize, type Size, show } from "./format/console";
 // The console size, as q's \c takes it: lines, then width, each from 10 to
 // 2000, as q allows. The problem is said for one that's wrong, and the
 // default used.
-export function consoleSize(setting: unknown): {
+export function sizeSetting(setting: unknown): {
   size: Size;
   problems: string[];
 } {
@@ -27,21 +27,19 @@ export function consoleSize(setting: unknown): {
   };
 }
 
-// A query run, as the q console shows it: after q)'s prompt, then its
-// result, or its error after a ' and with any backtrace. A result of ::
-// shows nothing, as in q.
-export function entry(
-  query: string,
+// A query's result as the q console shows it, or its error after a ' and
+// with any backtrace. A result of :: shows nothing, as in q.
+export function consoleText(
   outcome: { result: Result } | { error: Error },
   size: Size,
 ): string {
-  const q =
-    "error" in outcome && outcome.error instanceof QError
-      ? outcome.error
-      : undefined;
-  const shown =
-    "result" in outcome
-      ? show(outcome.result.value, size)
-      : `'${outcome.error.message}${q?.backtrace ? `\n${q.backtrace.trimEnd()}` : ""}`;
-  return shown === "" ? `q)${query}` : `q)${query}\n${shown}`;
+  if ("result" in outcome) {
+    return show(outcome.result.value, size);
+  }
+  const error = outcome.error;
+  const backtrace =
+    error instanceof QError && error.backtrace
+      ? `\n${error.backtrace.trimEnd()}`
+      : "";
+  return `'${error.message}${backtrace}`;
 }
