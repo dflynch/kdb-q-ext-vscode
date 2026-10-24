@@ -13,12 +13,18 @@ suite("servers", () => {
   test("reads servers in the order written", () => {
     assert.deepStrictEqual(
       definitions({
-        prod: { host: "kdb1", port: 5010, user: "dan", timeout: 500 },
+        prod: { host: "kdb1", port: 5010, user: "admin", timeout: 500 },
         local: { host: "localhost", port: 5000 },
       }),
       {
         servers: [
-          { name: "prod", host: "kdb1", port: 5010, user: "dan", timeout: 500 },
+          {
+            name: "prod",
+            host: "kdb1",
+            port: 5010,
+            user: "admin",
+            timeout: 500,
+          },
           { name: "local", host: "localhost", port: 5000 },
         ],
         problems: [],
@@ -94,7 +100,7 @@ suite("servers", () => {
         tls: { pfx: "/c.p12", cert: "/c.pem", key: "/k.pem" },
       },
       t5: { host: "h", port: 1, tls: { crt: "/c.pem" } },
-      i: { host: "h", port: 1, usr: "dan" },
+      i: { host: "h", port: 1, usr: "admin" },
       j: "h:1",
       "": { host: "h", port: 1 },
       ok: { host: "h", port: 1 },
@@ -164,8 +170,8 @@ suite("servers", () => {
   });
 
   test("an extension's user replaces the server's", () => {
-    const prod = { name: "prod", host: "h", port: 1, user: "dan" };
-    assert.strictEqual(server(prod, {}, defaults).user, "dan");
+    const prod = { name: "prod", host: "h", port: 1, user: "admin" };
+    assert.strictEqual(server(prod, {}, defaults).user, "admin");
     assert.strictEqual(
       server(prod, { user: "token", password: "jwt" }, defaults).user,
       "token",
@@ -179,7 +185,7 @@ suite("servers", () => {
       undefined,
     );
     assert.strictEqual(credentialsProblem("user:p"), "not an object");
-    assert.strictEqual(credentialsProblem({ user: "dan" }), "no password");
+    assert.strictEqual(credentialsProblem({ user: "admin" }), "no password");
     assert.strictEqual(
       credentialsProblem({ user: "a:b", password: "p" }),
       "the user can't contain : or a 0 byte",
@@ -227,8 +233,8 @@ suite("servers", () => {
   });
 
   test("a password is kept for where it's sent, not the server's name", () => {
-    const prod = { name: "prod", host: "KDB1", port: 5010, user: "dan" };
-    assert.strictEqual(secretKey(prod), "password:dan@kdb1:5010");
+    const prod = { name: "prod", host: "KDB1", port: 5010, user: "admin" };
+    assert.strictEqual(secretKey(prod), "password:admin@kdb1:5010");
     assert.strictEqual(
       secretKey({ ...prod, name: "renamed" }),
       secretKey(prod),
@@ -264,14 +270,14 @@ suite("servers", () => {
     });
     assert.deepStrictEqual(
       server(
-        { ...local, user: "dan", timeout: 500 },
+        { ...local, user: "admin", timeout: 500 },
         { password: "pw" },
         defaults,
       ),
       {
         host: "localhost",
         port: 5000,
-        user: "dan",
+        user: "admin",
         password: "pw",
         timeout: 500,
         limit: 10e6,

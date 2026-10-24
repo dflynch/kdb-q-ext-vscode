@@ -10,7 +10,7 @@ const prod: Definition = {
   name: "prod",
   host: "kdb1",
   port: 5010,
-  user: "dan",
+  user: "admin",
 };
 
 // Sources that fail the test if one is used that shouldn't be
@@ -41,7 +41,7 @@ suite("credentials", () => {
     assert.deepStrictEqual(await credentials(prod, sources({ stored })), {
       password: "pw",
     });
-    assert.deepStrictEqual(keys, ["password:dan@kdb1:5010"]);
+    assert.deepStrictEqual(keys, ["password:admin@kdb1:5010"]);
   });
 
   test("with no password kept, none", async () => {
@@ -87,7 +87,7 @@ suite("credentials", () => {
         name: "prod",
         host: "kdb1",
         port: 5010,
-        user: "dan",
+        user: "admin",
         fields: { realm: "EXAMPLE.COM" },
       },
     ]);
@@ -139,7 +139,7 @@ suite("credentials", () => {
     await rejects(
       credentials(
         sso,
-        sources({ extension: async () => ({ credentials: () => "dan:pw" }) }),
+        sources({ extension: async () => ({ credentials: () => "admin:pw" }) }),
       ),
       "malformed credentials from auth extension",
       "a.b: not an object",
