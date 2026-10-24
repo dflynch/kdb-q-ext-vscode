@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as commands from "./commands";
 import { Connections } from "./connections";
+import { registerResultView } from "./resultView";
 import { showStatus } from "./status";
 
 export function activate(context: vscode.ExtensionContext) {
@@ -11,6 +12,7 @@ export function activate(context: vscode.ExtensionContext) {
     output,
     status,
     connections,
+    registerResultView(context.extensionUri),
     vscode.commands.registerCommand("kdb-q-ext-vscode.connect", () =>
       commands.connect(connections),
     ),

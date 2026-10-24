@@ -39,6 +39,24 @@
         "path": "./syntaxes/q.tmGrammar.json"
       }
     ],
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "kdb-q-ext-vscode",
+          "title": "kdb+/q",
+          "icon": "icons/q-dark.svg"
+        }
+      ]
+    },
+    "views": {
+      "kdb-q-ext-vscode": [
+        {
+          "type": "webview",
+          "id": "kdb-q-ext-vscode.result",
+          "name": "Result"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "kdb-q-ext-vscode.runFileOnServer",

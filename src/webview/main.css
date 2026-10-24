@@ -1,0 +1,10 @@
+/* Bundled into dist/webview.css. Colours and fonts come only from VS Code's
+   own variables, so every theme, high contrast included, styles the view */
+
+body {
+  padding: 0 20px;
+}
+
+.empty {
+  color: var(--vscode-descriptionForeground);
+}

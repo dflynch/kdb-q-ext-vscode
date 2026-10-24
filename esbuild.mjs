@@ -51,8 +51,12 @@ const contexts = await Promise.all([
   }),
   esbuild.context({
     ...shared,
-    entryPoints: ["src/webview/main.ts"],
-    outfile: "dist/webview.js",
+    // dist/webview.js and dist/webview.css
+    entryPoints: [
+      { in: "src/webview/main.ts", out: "webview" },
+      { in: "src/webview/main.css", out: "webview" },
+    ],
+    outdir: "dist",
     platform: "browser",
     format: "iife",
   }),
