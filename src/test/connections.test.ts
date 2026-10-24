@@ -11,12 +11,12 @@ class Fake implements Link {
   });
   close(): void {
     this.closedBy ??= "us";
-    this.end(new Error("the query was cancelled"));
+    this.end(new Error("query cancelled"));
   }
   // The server closing it
   lose(): void {
     this.closedBy = "server";
-    this.end(new Error("the connection closed"));
+    this.end(new Error("connection closed unexpectedly"));
   }
 }
 
@@ -141,7 +141,7 @@ suite("connections", () => {
     await tick();
     assert.deepStrictEqual(all.active?.state, {
       kind: "closed",
-      reason: new Error("the connection closed"),
+      reason: new Error("connection closed unexpectedly"),
     });
     assert.strictEqual(changes.at(-1)?.lost?.name, "prod");
   });

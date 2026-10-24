@@ -504,10 +504,7 @@ suite("decode", () => {
       assert.throws(() => decode(message(strings)), badmsg(/ends early/));
     });
     test("types it can't decode", () => {
-      assert.throws(
-        () => decode(message("70")),
-        /foreign objects aren't supported/,
-      );
+      assert.throws(() => decode(message("70")), /foreign objects unsupported/);
       assert.throws(() => decode(message("1400")), badmsg(/unknown type 20/));
     });
   });

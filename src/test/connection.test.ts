@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import * as net from "node:net";
 import * as path from "node:path";
 import { encode } from "../codec/encode";
-import { Connection, QError, wrapper } from "../connection";
+import { Connection, type Hinted, QError, wrapper } from "../connection";
 
 const fixtures: { name: string; bytes: string; compressed?: string }[] =
   JSON.parse(
@@ -244,12 +244,12 @@ suite("connection", () => {
     const connection = await open(server);
     await assert.rejects(
       connection.query("x"),
-      /^Error: unexpected async message from the server$/,
+      /^Error: unexpected async message$/,
     );
     await server.closed;
   });
 
-  test("a sync call closes the connection", async () => {
+  test("a sync message closes the connection", async () => {
     const server = await fake((socket) => {
       const sync = response("atom.symbol");
       sync[1] = 1;
@@ -258,7 +258,7 @@ suite("connection", () => {
     const connection = await open(server);
     await assert.rejects(
       connection.query("x"),
-      /^Error: unexpected sync call from the server$/,
+      /^Error: unexpected sync message$/,
     );
     await server.closed;
   });
@@ -276,10 +276,7 @@ suite("connection", () => {
     await server.closed;
     await assert.rejects(
       connection.query("x"),
-      (error) =>
-        error instanceof Error &&
-        error.message === "the connection is closed" &&
-        /unexpected async message from the server/.test(String(error.cause)),
+      /^Error: unexpected async message$/,
     );
   });
 
@@ -314,7 +311,7 @@ suite("connection", () => {
     );
     const connection = await open(server);
     await assert.rejects(connection.query("x"), { message: "badmsg" });
-    await assert.rejects(connection.query("x"), /the connection is closed/);
+    await assert.rejects(connection.query("x"), { message: "badmsg" });
   });
 
   // Each reply is q's -8! of what protected evaluation returns, as a
@@ -382,7 +379,7 @@ suite("connection", () => {
         error instanceof QError &&
         error.message === "type" &&
         error.backtrace === undefined &&
-        /turn off protect/.test(String(error.cause)),
+        /turn off protect/.test(String(error.hint)),
     );
     connection.close();
   });
@@ -416,8 +413,8 @@ suite("connection", () => {
         connection.query("x"),
         (error) =>
           error instanceof Error &&
-          error.message === "the server didn't evaluate the query protected" &&
-          /turn off protect/.test(String(error.cause)),
+          error.message === "unrecognised response" &&
+          /turn off protect/.test(String((error as Hinted).hint)),
       );
     }
     assert.strictEqual((await connection.query("x")).value.type, -7);
@@ -435,7 +432,7 @@ suite("connection", () => {
       connection.query("x"),
       (error) =>
         error instanceof Error &&
-        error.message === "the result is too big" &&
+        error.message === "result too big" &&
         error.cause === "17 bytes, over the limit of 16",
     );
     await server.closed;
@@ -460,7 +457,7 @@ suite("connection", () => {
       connection.query("x"),
       (error) =>
         error instanceof Error &&
-        error.message === "the result is too big" &&
+        error.message === "result too big" &&
         error.cause ===
           `${uncompressed} bytes, over the limit of ${uncompressed - 1}`,
     );
@@ -479,7 +476,7 @@ suite("connection", () => {
     const server = await fake();
     const connection = await open(server);
     const first = connection.query("x");
-    await assert.rejects(connection.query("y"), /a query is already running/);
+    await assert.rejects(connection.query("y"), /query already running/);
     connection.close();
     await assert.rejects(first);
   });
@@ -488,13 +485,13 @@ suite("connection", () => {
     const server = await fake();
     const connection = await open(server);
     connection.close();
-    assert.strictEqual(
-      (await connection.closed).message,
-      "the query was cancelled",
-    );
+    assert.strictEqual((await connection.closed).message, "query cancelled");
     const other = await open(server);
     server.stop();
-    assert.strictEqual((await other.closed).message, "the connection closed");
+    assert.strictEqual(
+      (await other.closed).message,
+      "connection closed unexpectedly",
+    );
   });
 
   test("closing cancels the query and closes the socket", async () => {
@@ -502,14 +499,29 @@ suite("connection", () => {
     const connection = await open(server);
     const query = connection.query("x");
     connection.close();
-    await assert.rejects(query, /the query was cancelled/);
+    await assert.rejects(query, /query cancelled/);
     await server.closed;
   });
 
   test("the server closing mid-query", async () => {
     const server = await fake((socket) => socket.destroy());
     const connection = await open(server);
-    await assert.rejects(connection.query("x"), /the connection closed/);
-    await assert.rejects(connection.query("x"), /the connection is closed/);
+    await assert.rejects(
+      connection.query("x"),
+      /connection closed unexpectedly/,
+    );
+    await assert.rejects(
+      connection.query("x"),
+      /connection closed unexpectedly/,
+    );
+  });
+
+  test("the server resetting mid-query, with the OS's reason", async () => {
+    const server = await fake((socket) => socket.resetAndDestroy());
+    const connection = await open(server);
+    await assert.rejects(
+      connection.query("x"),
+      /^Error: connection closed unexpectedly\. OS reports: Connection reset by peer$/,
+    );
   });
 });

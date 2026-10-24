@@ -1,4 +1,4 @@
-import { QError, type Result, type Timing } from "./connection";
+import { type Hinted, QError, type Result, type Timing } from "./connection";
 import { defaultSize, type Size, show } from "./format/console";
 
 // What a query came to: its result, or the error it failed with
@@ -29,7 +29,7 @@ export function sizeSetting(setting: unknown): {
 }
 
 // A query's result as the q console shows it, or its error after a ' and
-// with any backtrace. A result of :: shows nothing, as in q.
+// with any backtrace, then any hint. A result of :: shows nothing, as in q.
 export function consoleText(outcome: Outcome, size: Size): string {
   if ("result" in outcome) {
     return show(outcome.result.value, size);
@@ -39,7 +39,8 @@ export function consoleText(outcome: Outcome, size: Size): string {
     error instanceof QError && error.backtrace
       ? `\n${error.backtrace.trimEnd()}`
       : "";
-  return `'${error.message}${backtrace}`;
+  const hint = (error as Hinted).hint;
+  return `'${error.message}${backtrace}${hint ? `\n${hint}` : ""}`;
 }
 
 // How long a query took: as a result, or an error the server signalled, but

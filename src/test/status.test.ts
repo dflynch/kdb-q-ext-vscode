@@ -1,5 +1,5 @@
 import * as assert from "node:assert";
-import { details, took } from "../status";
+import { describe, details, took } from "../status";
 
 suite("status", () => {
   test("a query's time: the server's and the roundtrip, or the roundtrip", () => {
@@ -8,6 +8,16 @@ suite("status", () => {
       "2 ms (3 ms roundtrip)",
     );
     assert.strictEqual(took({ roundtrip: 3 }), "3 ms roundtrip");
+  });
+
+  test("a closed connection as its reason, which says it closed", () => {
+    assert.strictEqual(
+      describe({
+        kind: "closed",
+        reason: new Error("connection closed unexpectedly"),
+      }),
+      "connection closed unexpectedly",
+    );
   });
 
   test("a server's settings, a line each", () => {

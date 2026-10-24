@@ -44,10 +44,15 @@ suite("result", () => {
     );
   });
 
+  test("an error's hint on the line after it", () => {
+    const error = new QError("type", { roundtrip: 1 }, undefined, "a hint");
+    assert.strictEqual(consoleText({ error }, defaultSize), "'type\na hint");
+  });
+
   test("an error of ours, the same way", () => {
     assert.strictEqual(
-      consoleText({ error: new Error("the result is too big") }, defaultSize),
-      "'the result is too big",
+      consoleText({ error: new Error("result too big") }, defaultSize),
+      "'result too big",
     );
   });
 
@@ -69,7 +74,7 @@ suite("result", () => {
     );
     assert.strictEqual(timing({ error: new QError("type", took) }), took);
     assert.strictEqual(
-      timing({ error: new Error("the connection closed") }),
+      timing({ error: new Error("connection closed unexpectedly") }),
       undefined,
     );
   });

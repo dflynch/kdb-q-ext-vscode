@@ -11,7 +11,7 @@ export type Status = {
   running(name: string): (timing: Timing | undefined) => void;
 };
 
-// A state as a few words
+// A state as a few words: a closed one's reason, which says how it closed
 export function describe(state: State): string {
   switch (state.kind) {
     case "connecting":
@@ -19,7 +19,7 @@ export function describe(state: State): string {
     case "open":
       return "connected";
     case "closed":
-      return `closed: ${state.reason.message}`;
+      return state.reason.message;
   }
 }
 

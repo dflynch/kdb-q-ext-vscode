@@ -195,12 +195,12 @@ suite("tls", () => {
     const key = file("client.encrypted.key");
     for (const passphrase of [undefined, "nope"]) {
       await assert.rejects(query(port, { ca, cert, key }, { passphrase }), {
-        message: "the client certificate can't be used",
+        message: "invalid client certificate",
       });
     }
     await assert.rejects(
       query(port, { ca, pfx: file("client.p12") }, { passphrase: "nope" }),
-      { message: "the client certificate can't be used" },
+      { message: "invalid client certificate" },
     );
   });
 
@@ -210,11 +210,11 @@ suite("tls", () => {
     writeFileSync(big, Buffer.alloc(1e6 + 1));
     for (const name of [file("nope.pem"), dir, big]) {
       await assert.rejects(readTls(name), {
-        message: "a tls file can't be read",
+        message: "TLS file unreadable",
       });
     }
     await assert.rejects(secure({ ca: file("nope.pem") }), {
-      message: "a tls file can't be read",
+      message: "TLS file unreadable",
     });
   });
 
@@ -227,7 +227,7 @@ suite("tls", () => {
     );
     for (const name of [file("server.key"), der]) {
       await assert.rejects(secure({ ca: name }), {
-        message: "the tls ca can't be used",
+        message: "invalid TLS CA",
       });
     }
   });
