@@ -108,7 +108,7 @@ token.
 
 Both commands, and their keybindings, apply in q files.
 
-| Command                                | Keybinding       |
-| -------------------------------------- | ---------------- |
-| kdb+/q: Run Selected Text in Terminal  | Ctrl/Cmd + Enter |
-| kdb+/q: Toggle Block Comment           | Shift + Alt + A  |
+| Command                               | Keybinding       |
+| ------------------------------------- | ---------------- |
+| kdb+/q: Run Selected Text in Terminal | Ctrl/Cmd + Enter |
+| kdb+/q: Toggle Block Comment          | Shift + Alt + A  |
