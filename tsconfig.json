@@ -14,5 +14,7 @@
     "noFallthroughCasesInSwitch": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true
-  }
+  },
+  // The webview's script has the DOM and no Node: tsconfig.web.json checks it
+  "exclude": ["src/webview"]
 }
