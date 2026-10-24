@@ -65,7 +65,7 @@ saves it to your user or workspace settings, or write it in `settings.json`:
   "gateway": {
     "host": "gw.example.com",
     "port": 6000,
-    "user": "dan",
+    "user": "admin",
     "auth": "prompt",
     "tls": true,
     "protect": false
