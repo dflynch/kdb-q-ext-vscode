@@ -63,11 +63,12 @@ export function details(server: Definition): string[] {
   ];
 }
 
-// The active connection in the status bar, which picks one when clicked,
-// with how long its last query took, and a warning when a connection closes
-// without being disconnected. The icon says the connection's state, a plug
-// joined or pulled apart, spinning while it connects or runs a query, and
-// the tooltip gives the server's settings as it was connected to.
+// The active connection in the status bar, which opens the server menu when
+// clicked, with how long its last query took, and a warning when a
+// connection closes without being disconnected. The icon says the
+// connection's state, a plug joined or pulled apart, spinning while it
+// connects or runs a query, and the tooltip gives the server's settings as
+// it was connected to.
 export function showStatus(
   connections: Connections<Connection>,
 ): Status & vscode.Disposable {
@@ -76,7 +77,7 @@ export function showStatus(
     vscode.StatusBarAlignment.Left,
   );
   item.name = "kdb+/q Connection";
-  item.command = "kdb-q-ext-vscode.connect";
+  item.command = "kdb-q-ext-vscode.showServerMenu";
   // The last query's timing, kept while its connection is open, and how
   // many queries are running on each server: another can be tried while one
   // runs, though the connection refuses it
@@ -104,7 +105,7 @@ export function showStatus(
     };
     item.tooltip = server
       ? details(server).join("\n")
-      : "kdb+/q: Connect to a server";
+      : "kdb+/q: Not connected";
     item.backgroundColor =
       active?.state.kind === "closed"
         ? new vscode.ThemeColor("statusBarItem.warningBackground")
