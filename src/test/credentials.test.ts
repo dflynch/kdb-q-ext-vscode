@@ -123,17 +123,17 @@ suite("credentials", () => {
     const sso: Definition = { ...prod, auth: { extension: "a.b", fields: {} } };
     await rejects(
       credentials(sso, sources({ extension: async () => undefined })),
-      "the auth extension isn't installed",
+      "auth extension not installed",
       "a.b",
     );
     await rejects(
       credentials(sso, sources({ extension: async () => ({}) })),
-      "the auth extension doesn't give credentials",
+      "auth extension gives no credentials",
       "a.b exports no credentials function",
     );
     await rejects(
       credentials(sso, sources({ extension: async () => null })),
-      "the auth extension doesn't give credentials",
+      "auth extension gives no credentials",
       "a.b exports no credentials function",
     );
     await rejects(
@@ -141,7 +141,7 @@ suite("credentials", () => {
         sso,
         sources({ extension: async () => ({ credentials: () => "dan:pw" }) }),
       ),
-      "the auth extension's credentials are wrong",
+      "malformed credentials from auth extension",
       "a.b: not an object",
     );
   });
@@ -156,7 +156,7 @@ suite("credentials", () => {
     });
     await rejects(
       credentials(sso, sources({ extension })),
-      "the auth extension failed",
+      "auth extension failed",
       ticket,
     );
   });

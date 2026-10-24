@@ -52,7 +52,7 @@ export async function read(file: string): Promise<Buffer> {
     }
     return await readFile(file);
   } catch (cause) {
-    throw new Error("a tls file can't be read", { cause: { file, cause } });
+    throw new Error("TLS file unreadable", { cause: { file, cause } });
   }
 }
 
@@ -72,7 +72,7 @@ function certificates(pem: Buffer): string[] {
       new X509Certificate(certificate);
     }
   } catch (cause) {
-    throw new Error("the tls ca can't be used", { cause });
+    throw new Error("invalid TLS CA", { cause });
   }
   return found;
 }
@@ -118,7 +118,7 @@ export async function secure(
   } catch (cause) {
     // A key that can't be decrypted with the passphrase, or doesn't go with
     // its certificate
-    throw new Error("the client certificate can't be used", { cause });
+    throw new Error("invalid client certificate", { cause });
   }
   return {
     secureContext,

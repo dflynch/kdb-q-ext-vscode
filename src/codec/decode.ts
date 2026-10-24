@@ -33,7 +33,7 @@ export function decode(message: Uint8Array): Value {
   // Every machine VS Code runs on is little-endian, and q writes in its own
   // byte order, so a big-endian message would come from a rare server
   if (message[0] === 0) {
-    throw new Error("big-endian messages aren't supported");
+    throw new Error("big-endian messages unsupported");
   }
   if (message[0] !== 1) {
     throw badmsg(`first byte ${message[0]} isn't 0 or 1`);
@@ -110,7 +110,7 @@ class Reader {
         return { type, message: utf8.decode(this.symbol()) };
     }
     if (type === 112) {
-      throw new Error("foreign objects aren't supported");
+      throw new Error("foreign objects unsupported");
     }
     throw badmsg(`unknown type ${type}`);
   }
@@ -271,7 +271,7 @@ class Reader {
       case -11:
         return { type, value: utf8.decode(this.symbol()) };
     }
-    throw new Error(`type ${type} isn't an atom`);
+    throw badmsg(`unknown type ${type}`);
   }
 
   private vector(type: number): Vector {
@@ -325,7 +325,7 @@ class Reader {
       case 11:
         return { type, attribute, data: this.symbols(count) };
     }
-    throw new Error(`type ${type} isn't a vector`);
+    throw badmsg(`unknown type ${type}`);
   }
 
   // Symbols end to end without their 0 bytes, and n + 1 offsets

@@ -59,20 +59,28 @@ function oserror(
   return new Error(`${word}. OS reports: ${text}`, { cause });
 }
 
+// An error with advice to show under it, where what went wrong suggests
+// what to do
+export type Hinted = Error & { hint?: string };
+
 // An error the server signalled, with q's text as the message, how long the
-// query took, and where protected evaluation caught it, the stack as q
-// shows it
+// query took, where protected evaluation caught it, the stack as q shows it,
+// and any hint
 export class QError extends Error {
   readonly backtrace?: string;
+  readonly hint?: string;
   constructor(
     message: string,
     readonly timing: Timing,
     backtrace?: string,
-    options?: ErrorOptions,
+    hint?: string,
   ) {
-    super(message, options);
+    super(message);
     if (backtrace !== undefined) {
       this.backtrace = backtrace;
+    }
+    if (hint !== undefined) {
+      this.hint = hint;
     }
   }
 }
@@ -110,10 +118,11 @@ export const wrapper = [
   "  ``error`backtrace`elapsed!(::;outcome 1;backtrace;elapsed)}",
 ].join("\n");
 
-// What a failure with protected evaluation on says, as a server whose .z.pg
-// is customised, or takes only strings, can't evaluate it
+// The hint under an error that protected evaluation would have caught, or a
+// response it didn't give: the server likely refused to evaluate it, as one
+// whose .z.pg is customised, or takes only strings, does
 const unprotected =
-  "if the server's .z.pg is customised, turn off protect for it in the servers setting";
+  "protected evaluation may have been refused: turn off protect for a server whose .z.pg is customised";
 
 const utf8 = new TextDecoder("utf-8", { ignoreBOM: true });
 
@@ -158,8 +167,8 @@ function unwrap(value: Value, roundtrip: number): Result {
       );
     }
   }
-  throw new Error("the server didn't evaluate the query protected", {
-    cause: unprotected,
+  throw Object.assign(new Error("unrecognised response"), {
+    hint: unprotected,
   });
 }
 
@@ -168,12 +177,14 @@ function unwrap(value: Value, roundtrip: number): Result {
 // list decodes to up to about 60 times its size. Refusing closes the
 // connection, which stops the server sending the rest.
 function tooBig(size: number, limit: number): Error {
-  return new Error("the result is too big", {
+  return new Error("result too big", {
     cause: `${size} bytes, over the limit of ${limit}`,
   });
 }
 
-const what = ["async message", "sync call", "response"];
+const what = ["async message", "sync message", "response"];
+
+const lost = "connection closed unexpectedly";
 
 // A connection to a q process, running one query at a time. Cancelling a
 // query means closing the connection: the server can't be interrupted, and
@@ -208,10 +219,12 @@ export class Connection {
     rest: Buffer,
   ) {
     socket.on("data", (chunk) => this.receive(chunk));
-    socket.on("error", (cause) =>
-      this.end(new Error("the connection failed", { cause })),
+    // However it closes, unless closed here, the connection closed
+    // unexpectedly, with the OS's reason where there is one
+    socket.on("error", (cause: NodeJS.ErrnoException) =>
+      this.end(oserror(lost, cause.errno, cause, cause.message)),
     );
-    socket.on("close", () => this.end(new Error("the connection closed")));
+    socket.on("close", () => this.end(new Error(lost)));
     this.receive(rest);
   }
 
@@ -313,12 +326,10 @@ export class Connection {
 
   query(text: string): Promise<Result> {
     if (this.reason) {
-      return Promise.reject(
-        new Error("the connection is closed", { cause: this.reason }),
-      );
+      return Promise.reject(this.reason);
     }
     if (this.pending) {
-      return Promise.reject(new Error("a query is already running"));
+      return Promise.reject(new Error("query already running"));
     }
     return new Promise((resolve, reject) => {
       this.pending = { resolve, reject, sent: performance.now() };
@@ -328,7 +339,7 @@ export class Connection {
 
   // Close the connection, cancelling the query if one is running
   close(): void {
-    this.end(new Error("the query was cancelled"));
+    this.end(new Error("query cancelled"));
   }
 
   private end(reason: Error): void {
@@ -365,9 +376,7 @@ export class Connection {
             throw badmsg("a message header that isn't q's");
           }
           if (this.header[1] !== 2 || !this.pending) {
-            throw new Error(
-              `unexpected ${what[this.header[1]]} from the server`,
-            );
+            throw new Error(`unexpected ${what[this.header[1]]}`);
           }
           if (length > this.limit) {
             throw tooBig(length, this.limit);
@@ -431,7 +440,7 @@ export class Connection {
           value.message,
           { roundtrip },
           undefined,
-          this.protect ? { cause: unprotected } : undefined,
+          this.protect ? unprotected : undefined,
         ),
       );
       return;

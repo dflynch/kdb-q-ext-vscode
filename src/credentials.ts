@@ -46,13 +46,13 @@ export async function credentials(
   }
   const exports = await sources.extension(auth.extension);
   if (exports === undefined) {
-    throw new Error("the auth extension isn't installed", {
+    throw new Error("auth extension not installed", {
       cause: auth.extension,
     });
   }
   const provide = (exports as { credentials?: unknown } | null)?.credentials;
   if (typeof provide !== "function") {
-    throw new Error("the auth extension doesn't give credentials", {
+    throw new Error("auth extension gives no credentials", {
       cause: `${auth.extension} exports no credentials function`,
     });
   }
@@ -67,11 +67,11 @@ export async function credentials(
   try {
     given = await provide(request);
   } catch (cause) {
-    throw new Error("the auth extension failed", { cause });
+    throw new Error("auth extension failed", { cause });
   }
   const problem = credentialsProblem(given);
   if (problem) {
-    throw new Error("the auth extension's credentials are wrong", {
+    throw new Error("malformed credentials from auth extension", {
       cause: `${auth.extension}: ${problem}`,
     });
   }

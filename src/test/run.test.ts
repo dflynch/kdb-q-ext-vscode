@@ -145,10 +145,10 @@ suite("runOnServer", () => {
   });
 
   test("an error of ours, with no timing", async () => {
-    const { link } = scripted([new Error("the connection closed")]);
+    const { link } = scripted([new Error("connection closed unexpectedly")]);
     const { replaced, told, output, status } = shown();
     await runOnServer(await selecting("1"), await opened(link), output, status);
-    assert.deepStrictEqual(replaced, ["'the connection closed"]);
+    assert.deepStrictEqual(replaced, ["'connection closed unexpectedly"]);
     assert.deepStrictEqual(told.at(-1), ["ended", "prod", undefined]);
   });
 
