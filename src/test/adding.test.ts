@@ -62,14 +62,14 @@ suite("adding a server", () => {
       "prod",
       "kdb1",
       "5010",
-      "dan",
+      "admin",
       "store",
       "secret",
       ["protect", "timeout"],
     ]);
     assert.deepStrictEqual(await add(ask, context), {
       name: "prod",
-      value: { host: "kdb1", port: 5010, user: "dan", timeout: 2000 },
+      value: { host: "kdb1", port: 5010, user: "admin", timeout: 2000 },
       password: "secret",
       target: "user",
     } satisfies Adding);
@@ -368,7 +368,7 @@ suite("addServer", () => {
         " prod ",
         "kdb1.example.com",
         "5010",
-        "dan",
+        "admin",
         "store",
         "secret",
         ["protect", "timeout"],
@@ -379,12 +379,12 @@ suite("addServer", () => {
       prod: {
         host: "kdb1.example.com",
         port: 5010,
-        user: "dan",
+        user: "admin",
         timeout: 2000,
       },
     });
     assert.deepStrictEqual(kept, {
-      "password:dan@kdb1.example.com:5010": "secret",
+      "password:admin@kdb1.example.com:5010": "secret",
     });
     assert.deepStrictEqual(told, ["kdb+/q: Added prod."]);
   });

@@ -57,13 +57,13 @@ suite("opener", () => {
       name: "local",
       host: "127.0.0.1",
       port: fake.port,
-      user: "dan",
+      user: "admin",
     };
     const open = opener(
-      secrets({ [`password:dan@127.0.0.1:${fake.port}`]: "pw" }),
+      secrets({ [`password:admin@127.0.0.1:${fake.port}`]: "pw" }),
     );
     const connection = await open(server);
-    assert.strictEqual(await fake.login, "dan:pw");
+    assert.strictEqual(await fake.login, "admin:pw");
     connection?.close();
     fake.stop();
   });
