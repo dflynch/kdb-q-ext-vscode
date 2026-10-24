@@ -27,12 +27,15 @@ export function activate(context: vscode.ExtensionContext) {
         `@ext:${context.extension.id}`,
       ),
     ),
-    vscode.commands.registerCommand("kdb-q-ext-vscode.runSelectedText", () => {
-      const editor = vscode.window.activeTextEditor;
-      if (editor) {
-        commands.runSelectedText(editor);
-      }
-    }),
+    vscode.commands.registerCommand(
+      "kdb-q-ext-vscode.runFileOnServer",
+      async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (editor) {
+          await commands.runFileOnServer(editor, connections, output, status);
+        }
+      },
+    ),
     vscode.commands.registerCommand(
       "kdb-q-ext-vscode.runOnServer",
       async () => {
@@ -42,6 +45,12 @@ export function activate(context: vscode.ExtensionContext) {
         }
       },
     ),
+    vscode.commands.registerCommand("kdb-q-ext-vscode.runSelectedText", () => {
+      const editor = vscode.window.activeTextEditor;
+      if (editor) {
+        commands.runSelectedText(editor);
+      }
+    }),
     vscode.commands.registerCommand(
       "kdb-q-ext-vscode.toggleBlockComment",
       async () => {

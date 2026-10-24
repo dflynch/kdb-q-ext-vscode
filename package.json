@@ -41,14 +41,20 @@
     ],
     "commands": [
       {
-        "command": "kdb-q-ext-vscode.runSelectedText",
+        "command": "kdb-q-ext-vscode.runFileOnServer",
         "category": "kdb+/q",
-        "title": "Run Selected Text in Terminal"
+        "title": "Run File on Server",
+        "icon": "$(play)"
       },
       {
         "command": "kdb-q-ext-vscode.runOnServer",
         "category": "kdb+/q",
         "title": "Run Selected Text on Server"
+      },
+      {
+        "command": "kdb-q-ext-vscode.runSelectedText",
+        "category": "kdb+/q",
+        "title": "Run Selected Text in Terminal"
       },
       {
         "command": "kdb-q-ext-vscode.toggleBlockComment",
@@ -104,11 +110,15 @@
     "menus": {
       "commandPalette": [
         {
-          "command": "kdb-q-ext-vscode.runSelectedText",
+          "command": "kdb-q-ext-vscode.runFileOnServer",
           "when": "editorLangId == q"
         },
         {
           "command": "kdb-q-ext-vscode.runOnServer",
+          "when": "editorLangId == q"
+        },
+        {
+          "command": "kdb-q-ext-vscode.runSelectedText",
           "when": "editorLangId == q"
         },
         {
@@ -120,16 +130,27 @@
           "when": "false"
         }
       ],
+      "editor/title/run": [
+        {
+          "command": "kdb-q-ext-vscode.runFileOnServer",
+          "when": "editorLangId == q"
+        }
+      ],
       "editor/context": [
         {
-          "command": "kdb-q-ext-vscode.runOnServer",
+          "command": "kdb-q-ext-vscode.runFileOnServer",
           "when": "editorLangId == q",
           "group": "kdb-q@1"
         },
         {
-          "command": "kdb-q-ext-vscode.runSelectedText",
+          "command": "kdb-q-ext-vscode.runOnServer",
           "when": "editorLangId == q",
           "group": "kdb-q@2"
+        },
+        {
+          "command": "kdb-q-ext-vscode.runSelectedText",
+          "when": "editorLangId == q",
+          "group": "kdb-q@3"
         }
       ]
     },
@@ -271,7 +292,7 @@
             "minimum": 10,
             "maximum": 2000
           },
-          "markdownDescription": "How much of a result **Run Selected Text on Server** shows, as lines then width, as q's `\\c` takes them. A result with more lines shows the first of them and then `..`, and a wider line is cut, ending in `..`."
+          "markdownDescription": "How much of a result **Run File on Server** and **Run Selected Text on Server** show, as lines then width, as q's `\\c` takes them. A result with more lines shows the first of them and then `..`, and a wider line is cut, ending in `..`."
         },
         "kdb-q-ext-vscode.sizeLimit": {
           "type": "number",

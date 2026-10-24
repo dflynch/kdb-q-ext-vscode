@@ -1,7 +1,7 @@
 import * as assert from "node:assert";
 import * as vscode from "vscode";
 import type { Value } from "../codec/types";
-import { runOnServer } from "../commands";
+import { runFileOnServer, runOnServer } from "../commands";
 import {
   type Connection,
   QError,
@@ -183,5 +183,45 @@ suite("runOnServer", () => {
     await Promise.all([connecting, run]);
     assert.deepStrictEqual(sent, ["1"]);
     assert.deepStrictEqual(replaced, ["1"]);
+  });
+});
+
+suite("runFileOnServer", () => {
+  teardown(close);
+
+  test("sends the whole file as one query, whatever is selected", async () => {
+    const { link, sent } = scripted([
+      { value: long(2), timing: { roundtrip: 0 } },
+    ]);
+    const editor = await selecting("a:1;\nb:1;\na+b");
+    editor.selection = new vscode.Selection(1, 0, 1, 0);
+    const { replaced, output, status } = shown();
+    await runFileOnServer(editor, await opened(link), output, status);
+    assert.deepStrictEqual(sent, ["a:1;\nb:1;\na+b"]);
+    assert.deepStrictEqual(replaced, ["2"]);
+  });
+
+  test("including edits not yet saved", async () => {
+    const { link, sent } = scripted([
+      { value: long(1), timing: { roundtrip: 0 } },
+    ]);
+    const editor = await selecting("1");
+    await editor.edit((edit) => edit.insert(new vscode.Position(0, 0), "0+"));
+    const { output, status } = shown();
+    await runFileOnServer(editor, await opened(link), output, status);
+    assert.deepStrictEqual(sent, ["0+1"]);
+  });
+
+  test("a blank file sends nothing", async () => {
+    const { link, sent } = scripted([]);
+    const { replaced, output, status } = shown();
+    await runFileOnServer(
+      await selecting("\n  \n"),
+      await opened(link),
+      output,
+      status,
+    );
+    assert.deepStrictEqual(sent, []);
+    assert.deepStrictEqual(replaced, []);
   });
 });
