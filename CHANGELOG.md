@@ -20,6 +20,8 @@ All notable changes to the extension are documented in this file.
 
 - Run Selected Text is now Run Selected Text in Terminal, beside Run
   Selected Text on Server
+- Ctrl/Cmd + Enter runs on the server while a connection is active, and in
+  the terminal otherwise
 - New icons: a rounded q tile in the Marketplace, and a file icon with
   separate light and dark versions, so it stays clear in dark themes
 

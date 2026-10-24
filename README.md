@@ -194,20 +194,27 @@ token.
 ## Commands
 
 The Run and Toggle Block Comment commands, and their keybindings, apply in
-q files.
+q files. Ctrl/Cmd + Enter runs on the server while a connection is active,
+even one that closed, so that code meant for a server never goes to a
+terminal, and in the terminal otherwise.
 
-| Command                               | Keybinding       |
-| ------------------------------------- | ---------------- |
-| kdb+/q: Run Selected Text on Server   |                  |
-| kdb+/q: Run Selected Text in Terminal | Ctrl/Cmd + Enter |
-| kdb+/q: Toggle Block Comment          | Shift + Alt + A  |
-| kdb+/q: Connect to Server             |                  |
-| kdb+/q: Disconnect from Server        |                  |
-| kdb+/q: Add Server                    |                  |
-| kdb+/q: Set Server Password           |                  |
-| kdb+/q: Clear Server Password         |                  |
-| kdb+/q: Set Certificate Passphrase    |                  |
-| kdb+/q: Clear Certificate Passphrase  |                  |
+| Command                               | Keybinding                       |
+| ------------------------------------- | -------------------------------- |
+| kdb+/q: Run Selected Text on Server   | Ctrl/Cmd + Enter, when connected |
+| kdb+/q: Run Selected Text in Terminal | Ctrl/Cmd + Enter, otherwise      |
+| kdb+/q: Toggle Block Comment          | Shift + Alt + A                  |
+| kdb+/q: Connect to Server             |                                  |
+| kdb+/q: Disconnect from Server        |                                  |
+| kdb+/q: Add Server                    |                                  |
+| kdb+/q: Set Server Password           |                                  |
+| kdb+/q: Clear Server Password         |                                  |
+| kdb+/q: Set Certificate Passphrase    |                                  |
+| kdb+/q: Clear Certificate Passphrase  |                                  |
+
+Ctrl/Cmd + Enter replaces VS Code's Insert Line Below in q files. Other
+extensions can bind it too, such as GitHub Copilot, to open its completions
+panel; if one does, choose which runs in **Preferences: Open Keyboard
+Shortcuts**.
 
 ## Settings
 

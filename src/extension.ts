@@ -7,10 +7,21 @@ export function activate(context: vscode.ExtensionContext) {
   const connections = new Connections(commands.opener(context.secrets));
   const output = vscode.window.createOutputChannel("kdb+/q");
   const status = showStatus(connections);
+  // Cmd/Ctrl+Enter runs on the server while a connection is active, even one
+  // that closed, so that code meant for it never goes to a terminal, and in
+  // the terminal otherwise
+  const stop = connections.onChange(() =>
+    vscode.commands.executeCommand(
+      "setContext",
+      "kdb-q-ext-vscode.connected",
+      connections.active !== undefined,
+    ),
+  );
   context.subscriptions.push(
     output,
     status,
     connections,
+    { dispose: stop },
     vscode.commands.registerCommand("kdb-q-ext-vscode.connect", () =>
       commands.connect(connections),
     ),
