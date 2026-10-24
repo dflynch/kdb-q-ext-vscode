@@ -196,9 +196,9 @@ token.
 
 The Run and Toggle Block Comment commands, and their keybindings, apply in
 q files. Both Run commands are on the editor's right-click menu, and the
-server commands on the status bar's. Ctrl/Cmd + Enter runs on the server while a connection is active,
-even one that closed, so that code meant for a server never goes to a
-terminal, and in the terminal otherwise.
+server commands on the status bar's. Ctrl/Cmd + Enter runs on the server
+while a connection is active, even one that closed, so that code meant for
+a server never goes to a terminal, and in the terminal otherwise.
 
 | Command                               | Keybinding                       |
 | ------------------------------------- | -------------------------------- |

@@ -138,13 +138,13 @@
         "command": "kdb-q-ext-vscode.runOnServer",
         "key": "ctrl+enter",
         "mac": "cmd+enter",
-        "when": "editorTextFocus && editorLangId == q && kdb-q-ext-vscode.connected"
+        "when": "editorTextFocus && editorLangId == q && kdb-q-ext-vscode.activeConnection"
       },
       {
         "command": "kdb-q-ext-vscode.runSelectedText",
         "key": "ctrl+enter",
         "mac": "cmd+enter",
-        "when": "editorTextFocus && editorLangId == q && !kdb-q-ext-vscode.connected"
+        "when": "editorTextFocus && editorLangId == q && !kdb-q-ext-vscode.activeConnection"
       },
       {
         "command": "kdb-q-ext-vscode.toggleBlockComment",

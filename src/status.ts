@@ -64,9 +64,8 @@ export function details(server: Definition): string[] {
 }
 
 // The active connection in the status bar, which opens the server menu when
-// clicked,
-// with how long its last query took, and a warning when a connection closes
-// without being disconnected. The icon says the connection's state, a plug
+// clicked, with how long its last query took, and a warning when a
+// connection closes without being disconnected. The icon says the connection's state, a plug
 // joined or pulled apart, spinning while it connects or runs a query, and
 // the tooltip gives the server's settings as it was connected to.
 export function showStatus(
@@ -105,7 +104,7 @@ export function showStatus(
     };
     item.tooltip = server
       ? details(server).join("\n")
-      : "kdb+/q: Connect to a server";
+      : "kdb+/q: Not connected";
     item.backgroundColor =
       active?.state.kind === "closed"
         ? new vscode.ThemeColor("statusBarItem.warningBackground")
