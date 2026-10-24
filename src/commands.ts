@@ -57,6 +57,17 @@ function consoleSize(): Size {
   return size;
 }
 
+// Run the whole file, saved or not, on the active connection, as selecting
+// all of it and running the selection would
+export async function runFileOnServer(
+  editor: vscode.TextEditor,
+  connections: Connections<Connection>,
+  output: vscode.OutputChannel,
+  status: Status,
+) {
+  await run(editor.document.getText(), connections, output, status);
+}
+
 // Run the selected text, or the current line, on the active connection. With
 // several selections, the primary one.
 export async function runOnServer(
@@ -70,17 +81,6 @@ export async function runOnServer(
     ? editor.document.lineAt(selection.active.line).text
     : editor.document.getText(selection);
   await run(query, connections, output, status);
-}
-
-// Run the whole file, saved or not, on the active connection, as selecting
-// all of it would
-export async function runFileOnServer(
-  editor: vscode.TextEditor,
-  connections: Connections<Connection>,
-  output: vscode.OutputChannel,
-  status: Status,
-) {
-  await run(editor.document.getText(), connections, output, status);
 }
 
 // Run a query on the active connection as written, showing its result as the

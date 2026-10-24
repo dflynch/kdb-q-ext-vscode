@@ -46,8 +46,8 @@ Row limits only change what the grid shows. A result over the size limit,
   `.Q`/`.z`/`.h`/`.j` namespaces
 - Connect to kdb+ processes, over TLS if need be, with passwords kept in
   VS Code's secure storage, asked for, or given by another extension
-- Run the selected text, or the current line, on the connected server, and
-  see the result as q's console shows it, with how long it took
+- Run the file, the selected text or the current line on the connected
+  server, and see the result as q's console shows it, with how long it took
 - Run the selected text, or the current line, in the active terminal (e.g. a
   q session). With several selections, each runs in turn
 - Editing that keeps q's layout valid: pressing Enter between brackets keeps
@@ -120,14 +120,14 @@ commands when clicked:
 
 ### Running on a server
 
-**kdb+/q: Run Selected Text on Server** sends the selection, or the current
-line, as one query, exactly as written, as a q client such as kdb Studio
-does. Unlike the terminal, nothing is split or removed: a server reads line
-breaks as spaces. With several selections, only the first is sent. With no
+**kdb+/q: Run File on Server**, also the ▶ in the editor's title bar, sends
+the whole file, including edits not yet saved, as one query, exactly as
+written, as a q client such as kdb Studio does. Unlike the terminal, nothing
+is split or removed: a server reads line breaks as spaces. With no
 connection open, it asks for a server, and with one opening, it waits.
 
-**kdb+/q: Run File on Server**, also the ▶ in the editor's title bar, sends
-the whole file the same way, including edits not yet saved.
+**kdb+/q: Run Selected Text on Server** sends the selection, or the current
+line, the same way. With several selections, only the first is sent.
 
 The result shows in the **kdb+/q** output channel as q's console prints it,
 replacing the last: an assignment shows nothing, and an error shows as
@@ -203,8 +203,8 @@ server commands on the status bar's.
 
 | Command                               | Keybinding       |
 | ------------------------------------- | ---------------- |
-| kdb+/q: Run Selected Text on Server   | Ctrl/Cmd + Enter |
 | kdb+/q: Run File on Server            |                  |
+| kdb+/q: Run Selected Text on Server   | Ctrl/Cmd + Enter |
 | kdb+/q: Run Selected Text in Terminal | Shift + Enter    |
 | kdb+/q: Toggle Block Comment          | Shift + Alt + A  |
 | kdb+/q: Connect to Server             |                  |
