@@ -1,11 +1,12 @@
 import * as vscode from "vscode";
 import * as commands from "./commands";
 import { Connections } from "./connections";
+import { showStatus } from "./status";
 
 export function activate(context: vscode.ExtensionContext) {
   const connections = new Connections(commands.opener(context.secrets));
   const output = vscode.window.createOutputChannel("kdb+/q");
-  const status = commands.showStatus(connections);
+  const status = showStatus(connections);
   context.subscriptions.push(
     output,
     status,

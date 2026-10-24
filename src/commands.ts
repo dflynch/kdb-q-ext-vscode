@@ -1,14 +1,15 @@
 import * as vscode from "vscode";
 import { type Asker, add } from "./adding";
 import * as comments from "./comments";
-import { Connection, QError, type Timing } from "./connection";
-import type { Connections, State } from "./connections";
+import { Connection } from "./connection";
+import type { Connections } from "./connections";
 import { credentials, type Sources } from "./credentials";
 import type { Size } from "./format/console";
 import { quickInput } from "./quickInput";
-import { consoleText, sizeSetting } from "./result";
+import { consoleText, type Outcome, sizeSetting, timing } from "./result";
 import * as servers from "./servers";
 import * as statements from "./statements";
+import { describe, type Status } from "./status";
 import { passphraseKey, secure } from "./tls";
 
 // Send the selected text, or the current line, to the active terminal one
@@ -45,12 +46,12 @@ export function runSelectedText(editor: vscode.TextEditor) {
 
 // The console size, with any problem in it shown
 function consoleSize(): Size {
-  const { size, problems } = sizeSetting(
+  const { size, problem } = sizeSetting(
     vscode.workspace.getConfiguration("kdb-q-ext-vscode").get("consoleSize"),
   );
-  if (problems.length > 0) {
+  if (problem) {
     vscode.window.showWarningMessage(
-      `kdb+/q: Using the default, as ${problems.join(" and ")}.`,
+      `kdb+/q: Using the default, as ${problem}.`,
     );
   }
   return size;
@@ -64,7 +65,7 @@ export async function runOnServer(
   editor: vscode.TextEditor,
   connections: Connections<Connection>,
   output: vscode.OutputChannel,
-  status: Pick<Status, "running" | "timed">,
+  status: Status,
 ) {
   const selection = editor.selection;
   const query = selection.isEmpty
@@ -73,8 +74,14 @@ export async function runOnServer(
   if (query.trim() === "") {
     return;
   }
-  // With no open connection active, pick one, as Connect does
-  if (connections.active?.state.kind !== "open") {
+  // Wait for the active connection if it's opening, and with none open,
+  // pick one, as Connect does. Whatever opens it says if that fails.
+  const active = connections.active;
+  const opening =
+    active?.state.kind === "connecting" && connections.server(active.name);
+  if (opening) {
+    await connections.connect(opening).catch(() => undefined);
+  } else if (active?.state.kind !== "open") {
     await connect(connections);
   }
   const name = connections.active?.name;
@@ -84,20 +91,17 @@ export async function runOnServer(
   }
   const size = consoleSize();
   output.show(true);
-  status.running(name);
-  const outcome = await link.query(query).then(
-    (result) => ({ result }),
-    (error: Error) => ({ error }),
-  );
-  output.replace(consoleText(outcome, size));
-  status.timed(
-    name,
-    "result" in outcome
-      ? outcome.result.timing
-      : outcome.error instanceof QError
-        ? outcome.error.timing
-        : undefined,
-  );
+  const ended = status.running(name);
+  let outcome: Outcome | undefined;
+  try {
+    outcome = await link.query(query).then(
+      (result) => ({ result }),
+      (error: Error) => ({ error }),
+    );
+    output.replace(consoleText(outcome, size));
+  } finally {
+    ended(outcome && timing(outcome));
+  }
 }
 
 // Comment out the selected lines with "/" and "\" marker lines, or remove the
@@ -460,18 +464,6 @@ export function opener(secrets: vscode.SecretStorage) {
   };
 }
 
-// A state as a few words
-function describe(state: State): string {
-  switch (state.kind) {
-    case "connecting":
-      return "connecting";
-    case "open":
-      return "connected";
-    case "closed":
-      return `closed: ${state.reason.message}`;
-  }
-}
-
 // Connect to a server picked, or make its connection active if it's open
 export async function connect(connections: Connections<Connection>) {
   const server = await pickServer("kdb+/q: Connect to Server", {
@@ -516,128 +508,4 @@ export async function disconnect(connections: Connections<Connection>) {
   if (name) {
     connections.disconnect(name);
   }
-}
-
-// The status bar, which is told when a query starts on a server, and when
-// it ends, with how long it took if that's known
-export type Status = vscode.Disposable & {
-  running(name: string): void;
-  timed(name: string, timing: Timing | undefined): void;
-};
-
-// How long a query took: the server's time, as \t gives, with protected
-// evaluation, and the roundtrip
-function took(timing: Timing): string {
-  return timing.execution === undefined
-    ? `${timing.roundtrip} ms roundtrip`
-    : `${timing.execution} ms (${timing.roundtrip} ms roundtrip)`;
-}
-
-// A server's settings, all but secrets: where the password comes from, not
-// what it is, and an extension's name, not the fields it's given
-function details(server: servers.Definition, timeout: number): string[] {
-  const auth =
-    server.auth === undefined
-      ? "Stored password"
-      : server.auth === "prompt"
-        ? "Ask each time"
-        : `Extension ${server.auth.extension}`;
-  const tls =
-    server.tls === undefined
-      ? "Off"
-      : server.tls.pfx || server.tls.cert
-        ? "On, with a client certificate"
-        : "On";
-  const wait = server.timeout ?? timeout;
-  return [
-    `Host: ${server.host}:${server.port}`,
-    ...(server.user ? [`User: ${server.user}`] : []),
-    `Authentication: ${auth}`,
-    `TLS: ${tls}`,
-    `Protected evaluation: ${server.protect === false ? "Off" : "On"}`,
-    `Connection timeout: ${wait === 0 ? "None" : `${wait} ms`}`,
-  ];
-}
-
-// The active connection in the status bar, which picks one when clicked,
-// with how long its last query took, and a warning when a connection closes
-// without being disconnected. The icon says the connection's state, a plug
-// joined or pulled apart, spinning while it connects or runs a query, and
-// the tooltip gives the server's settings.
-export function showStatus(connections: Connections<Connection>): Status {
-  const item = vscode.window.createStatusBarItem(
-    "kdb-q-ext-vscode.connection",
-    vscode.StatusBarAlignment.Left,
-  );
-  item.name = "kdb+/q Connection";
-  item.command = "kdb-q-ext-vscode.connect";
-  // The last query's timing, kept while its connection is open, and how
-  // many queries are running on each server: another can be tried while one
-  // runs, though the connection refuses it
-  let last: { name: string; timing: Timing } | undefined;
-  const running = new Map<string, number>();
-  const update = () => {
-    const active = connections.active;
-    const server = active && connections.server(active.name);
-    const busy =
-      active?.state.kind === "open" && (running.get(active.name) ?? 0) > 0;
-    const icon =
-      active?.state.kind === "connecting" || busy
-        ? "loading~spin"
-        : active?.state.kind === "open"
-          ? "debug-connected"
-          : "debug-disconnect";
-    const timing =
-      !busy && last?.name === active?.name ? last?.timing : undefined;
-    item.text = `$(${icon}) ${active?.name ?? "kdb+/q"}${timing ? `  $(watch) ${took(timing)}` : ""}`;
-    // The icon says the state, so screen readers are told it in words
-    item.accessibilityInformation = {
-      label: active
-        ? `kdb+/q: ${active.name}, ${busy ? "running a query" : describe(active.state)}${timing ? `, last query ${took(timing)}` : ""}`
-        : "kdb+/q: not connected",
-    };
-    item.tooltip = server
-      ? details(
-          server,
-          servers.settings(
-            vscode.workspace
-              .getConfiguration("kdb-q-ext-vscode")
-              .get("connectTimeout"),
-            undefined,
-          ).defaults.timeout,
-        ).join("\n")
-      : "kdb+/q: Connect to a server";
-    item.backgroundColor =
-      active?.state.kind === "closed"
-        ? new vscode.ThemeColor("statusBarItem.warningBackground")
-        : undefined;
-  };
-  update();
-  item.show();
-  const stop = connections.onChange(({ lost }) => {
-    if (last && connections.state(last.name)?.kind !== "open") {
-      last = undefined;
-    }
-    update();
-    if (lost) {
-      vscode.window.showWarningMessage(
-        `kdb+/q: ${lost.name}: ${lost.reason.message}`,
-      );
-    }
-  });
-  return {
-    running: (name) => {
-      running.set(name, (running.get(name) ?? 0) + 1);
-      update();
-    },
-    timed: (name, timing) => {
-      running.set(name, (running.get(name) ?? 1) - 1);
-      last = timing && { name, timing };
-      update();
-    },
-    dispose: () => {
-      stop();
-      item.dispose();
-    },
-  };
 }

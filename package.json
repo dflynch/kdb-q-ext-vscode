@@ -240,7 +240,7 @@
             "minimum": 10,
             "maximum": 2000
           },
-          "markdownDescription": "How much of a result **Run Selected Text on Server** shows, as lines then width, as q's `\\c` takes them. More lines show the first and then `..`, and a wider line is cut at the width, ending in `..`."
+          "markdownDescription": "How much of a result **Run Selected Text on Server** shows, as lines then width, as q's `\\c` takes them. A result with more lines shows the first of them and then `..`, and a wider line is cut, ending in `..`."
         },
         "kdb-q-ext-vscode.sizeLimit": {
           "type": "number",

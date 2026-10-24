@@ -1,38 +1,36 @@
-import { QError, type Result } from "./connection";
+import { QError, type Result, type Timing } from "./connection";
 import { defaultSize, type Size, show } from "./format/console";
+
+// What a query came to: its result, or the error it failed with
+export type Outcome = { result: Result } | { error: Error };
 
 // The console size, as q's \c takes it: lines, then width, each from 10 to
 // 2000, as q allows. The problem is said for one that's wrong, and the
 // default used.
 export function sizeSetting(setting: unknown): {
   size: Size;
-  problems: string[];
+  problem?: string;
 } {
   if (setting === undefined) {
-    return { size: defaultSize, problems: [] };
+    return { size: defaultSize };
   }
-  const inRange = (n: unknown) =>
-    Number.isInteger(n) && (n as number) >= 10 && (n as number) <= 2000;
   if (
     Array.isArray(setting) &&
     setting.length === 2 &&
-    setting.every(inRange)
+    setting.every((n) => Number.isInteger(n) && n >= 10 && n <= 2000)
   ) {
-    const [lines, width] = setting as number[];
-    return { size: { ...defaultSize, lines, width }, problems: [] };
+    const [lines, width] = setting;
+    return { size: { ...defaultSize, lines, width } };
   }
   return {
     size: defaultSize,
-    problems: ["the console size isn't two whole numbers from 10 to 2000"],
+    problem: "the console size isn't two whole numbers from 10 to 2000",
   };
 }
 
 // A query's result as the q console shows it, or its error after a ' and
 // with any backtrace. A result of :: shows nothing, as in q.
-export function consoleText(
-  outcome: { result: Result } | { error: Error },
-  size: Size,
-): string {
+export function consoleText(outcome: Outcome, size: Size): string {
   if ("result" in outcome) {
     return show(outcome.result.value, size);
   }
@@ -42,4 +40,14 @@ export function consoleText(
       ? `\n${error.backtrace.trimEnd()}`
       : "";
   return `'${error.message}${backtrace}`;
+}
+
+// How long a query took: as a result, or an error the server signalled, but
+// not one of ours, which has no time
+export function timing(outcome: Outcome): Timing | undefined {
+  return "result" in outcome
+    ? outcome.result.timing
+    : outcome.error instanceof QError
+      ? outcome.error.timing
+      : undefined;
 }
