@@ -20,8 +20,8 @@ All notable changes to the extension are documented in this file.
 
 - Run Selected Text is now Run Selected Text in Terminal, beside Run
   Selected Text on Server
-- Ctrl/Cmd + Enter runs on the server while a connection is active, and in
-  the terminal otherwise
+- Ctrl/Cmd + Enter runs on the server, asking which one when none is
+  connected, and Shift + Enter runs in the terminal
 - Both Run commands are on the editor's right-click menu, and clicking the
   status bar opens a menu of the server commands, with **kdb+/q: Open
   Settings**
