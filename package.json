@@ -51,6 +51,12 @@
         "title": "Run Selected Text on Server"
       },
       {
+        "command": "kdb-q-ext-vscode.runFileOnServer",
+        "category": "kdb+/q",
+        "title": "Run File on Server",
+        "icon": "$(play)"
+      },
+      {
         "command": "kdb-q-ext-vscode.toggleBlockComment",
         "category": "kdb+/q",
         "title": "Toggle Block Comment"
@@ -112,12 +118,22 @@
           "when": "editorLangId == q"
         },
         {
+          "command": "kdb-q-ext-vscode.runFileOnServer",
+          "when": "editorLangId == q"
+        },
+        {
           "command": "kdb-q-ext-vscode.toggleBlockComment",
           "when": "!editorReadonly && editorLangId == q"
         },
         {
           "command": "kdb-q-ext-vscode.showServerMenu",
           "when": "false"
+        }
+      ],
+      "editor/title/run": [
+        {
+          "command": "kdb-q-ext-vscode.runFileOnServer",
+          "when": "editorLangId == q"
         }
       ],
       "editor/context": [

@@ -43,6 +43,15 @@ export function activate(context: vscode.ExtensionContext) {
       },
     ),
     vscode.commands.registerCommand(
+      "kdb-q-ext-vscode.runFileOnServer",
+      async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (editor) {
+          await commands.runFileOnServer(editor, connections, output, status);
+        }
+      },
+    ),
+    vscode.commands.registerCommand(
       "kdb-q-ext-vscode.toggleBlockComment",
       async () => {
         const editor = vscode.window.activeTextEditor;
