@@ -28,6 +28,16 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("kdb-q-ext-vscode.disconnect", () =>
       commands.disconnect(connections),
     ),
+    vscode.commands.registerCommand(
+      "kdb-q-ext-vscode.showServerMenu",
+      commands.showServerMenu,
+    ),
+    vscode.commands.registerCommand("kdb-q-ext-vscode.openSettings", () =>
+      vscode.commands.executeCommand(
+        "workbench.action.openSettings",
+        `@ext:${context.extension.id}`,
+      ),
+    ),
     vscode.commands.registerCommand("kdb-q-ext-vscode.runSelectedText", () => {
       const editor = vscode.window.activeTextEditor;
       if (editor) {

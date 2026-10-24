@@ -71,6 +71,16 @@
         "title": "Disconnect from Server"
       },
       {
+        "command": "kdb-q-ext-vscode.showServerMenu",
+        "category": "kdb+/q",
+        "title": "Show Server Menu"
+      },
+      {
+        "command": "kdb-q-ext-vscode.openSettings",
+        "category": "kdb+/q",
+        "title": "Open Settings"
+      },
+      {
         "command": "kdb-q-ext-vscode.setPassword",
         "category": "kdb+/q",
         "title": "Set Server Password"
@@ -104,6 +114,22 @@
         {
           "command": "kdb-q-ext-vscode.toggleBlockComment",
           "when": "!editorReadonly && editorLangId == q"
+        },
+        {
+          "command": "kdb-q-ext-vscode.showServerMenu",
+          "when": "false"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "kdb-q-ext-vscode.runOnServer",
+          "when": "editorLangId == q",
+          "group": "kdb-q@1"
+        },
+        {
+          "command": "kdb-q-ext-vscode.runSelectedText",
+          "when": "editorLangId == q",
+          "group": "kdb-q@2"
         }
       ]
     },

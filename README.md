@@ -108,7 +108,8 @@ rest of the `auth` object.
 active one, opening it if it isn't open. Several can be open at once.
 **Disconnect from Server** closes one.
 
-The status bar shows the active connection, and picks another when clicked:
+The status bar shows the active connection, and opens a menu of the server
+commands when clicked:
 - A plug, joined when connected and pulled apart when not, spinning while
   it connects or runs a query, and a warning color when the connection
   closed without being disconnected
@@ -194,7 +195,8 @@ token.
 ## Commands
 
 The Run and Toggle Block Comment commands, and their keybindings, apply in
-q files. Ctrl/Cmd + Enter runs on the server while a connection is active,
+q files. Both Run commands are on the editor's right-click menu, and the
+server commands on the status bar's. Ctrl/Cmd + Enter runs on the server while a connection is active,
 even one that closed, so that code meant for a server never goes to a
 terminal, and in the terminal otherwise.
 
@@ -206,6 +208,7 @@ terminal, and in the terminal otherwise.
 | kdb+/q: Connect to Server             |                                  |
 | kdb+/q: Disconnect from Server        |                                  |
 | kdb+/q: Add Server                    |                                  |
+| kdb+/q: Open Settings                 |                                  |
 | kdb+/q: Set Server Password           |                                  |
 | kdb+/q: Clear Server Password         |                                  |
 | kdb+/q: Set Certificate Passphrase    |                                  |

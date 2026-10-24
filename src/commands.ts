@@ -491,6 +491,47 @@ async function connectTo(
   }
 }
 
+// What the status bar's menu offers, in groups, by command
+export const serverMenu: { group: string; commands: [string, string][] }[] = [
+  {
+    group: "Connection",
+    commands: [
+      ["kdb-q-ext-vscode.connect", "Connect to Server"],
+      ["kdb-q-ext-vscode.disconnect", "Disconnect from Server"],
+    ],
+  },
+  {
+    group: "Servers",
+    commands: [
+      ["kdb-q-ext-vscode.addServer", "Add Server"],
+      ["kdb-q-ext-vscode.openSettings", "Open Settings"],
+    ],
+  },
+  {
+    group: "Secrets",
+    commands: [
+      ["kdb-q-ext-vscode.setPassword", "Set Server Password"],
+      ["kdb-q-ext-vscode.clearPassword", "Clear Server Password"],
+      ["kdb-q-ext-vscode.setPassphrase", "Set Certificate Passphrase"],
+      ["kdb-q-ext-vscode.clearPassphrase", "Clear Certificate Passphrase"],
+    ],
+  },
+];
+
+// The status bar's menu, running the command picked
+export async function showServerMenu() {
+  const picked = await vscode.window.showQuickPick(
+    serverMenu.flatMap(({ group, commands }) => [
+      { label: group, kind: vscode.QuickPickItemKind.Separator },
+      ...commands.map(([command, label]) => ({ label, command })),
+    ]),
+    { title: "kdb+/q" },
+  );
+  if (picked && "command" in picked) {
+    await vscode.commands.executeCommand(picked.command);
+  }
+}
+
 // Close a connection: the only one, or one picked
 export async function disconnect(connections: Connections<Connection>) {
   const names = connections.names;
