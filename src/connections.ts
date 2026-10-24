@@ -16,7 +16,12 @@ export type State =
 // that closed without being disconnected says why.
 export type Change = { lost?: { name: string; reason: Error } };
 
-type Entry<L> = { state: State; link?: L; opening?: Promise<L | undefined> };
+type Entry<L> = {
+  server: Definition;
+  state: State;
+  link?: L;
+  opening?: Promise<L | undefined>;
+};
 
 // The connections open, by their server's name, and the one that's active,
 // which queries go to. A connection that closes, however it does, stays
@@ -51,6 +56,11 @@ export class Connections<L extends Link> {
     return [...this.entries.keys()];
   }
 
+  // The server as its settings defined it when it was connected to
+  server(name: string): Definition | undefined {
+    return this.entries.get(name)?.server;
+  }
+
   link(name: string): L | undefined {
     const entry = this.entries.get(name);
     return entry?.state.kind === "open" ? entry.link : undefined;
@@ -70,7 +80,7 @@ export class Connections<L extends Link> {
       return existing.opening;
     }
     const before = this.current;
-    const entry: Entry<L> = { state: { kind: "connecting" } };
+    const entry: Entry<L> = { server, state: { kind: "connecting" } };
     this.entries.set(server.name, entry);
     this.current = server.name;
     entry.opening = this.open(server);

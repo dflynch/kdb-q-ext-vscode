@@ -44,8 +44,8 @@ with a message saying how big it was and how to raise the limit.
 - Rename, formatting, diagnostics and `.k` files
 - Names built from strings at runtime, such as `value "f",string x`: q can't
   resolve them until the code runs, so navigation won't either
-- Starting or bundling q: Run Selected Text sends your code to a q session
-  you started, which remains the right tool for anything stateful
+- Starting or bundling q: Run Selected Text in Terminal sends your code to a
+  q session you started, which remains the right tool for anything stateful
 
 ## Features
 
@@ -108,7 +108,7 @@ token.
 
 Both commands, and their keybindings, apply in q files.
 
-| Command                      | Keybinding       |
-| ---------------------------- | ---------------- |
-| kdb+/q: Run Selected Text    | Ctrl/Cmd + Enter |
-| kdb+/q: Toggle Block Comment | Shift + Alt + A  |
+| Command                               | Keybinding       |
+| ------------------------------------- | ---------------- |
+| kdb+/q: Run Selected Text in Terminal | Ctrl/Cmd + Enter |
+| kdb+/q: Toggle Block Comment          | Shift + Alt + A  |

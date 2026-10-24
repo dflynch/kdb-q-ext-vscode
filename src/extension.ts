@@ -1,11 +1,15 @@
 import * as vscode from "vscode";
 import * as commands from "./commands";
 import { Connections } from "./connections";
+import { showStatus } from "./status";
 
 export function activate(context: vscode.ExtensionContext) {
   const connections = new Connections(commands.opener(context.secrets));
+  const output = vscode.window.createOutputChannel("kdb+/q");
+  const status = showStatus(connections);
   context.subscriptions.push(
-    commands.showStatus(connections),
+    output,
+    status,
     connections,
     vscode.commands.registerCommand("kdb-q-ext-vscode.connect", () =>
       commands.connect(connections),
@@ -19,6 +23,15 @@ export function activate(context: vscode.ExtensionContext) {
         commands.runSelectedText(editor);
       }
     }),
+    vscode.commands.registerCommand(
+      "kdb-q-ext-vscode.runOnServer",
+      async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (editor) {
+          await commands.runOnServer(editor, connections, output, status);
+        }
+      },
+    ),
     vscode.commands.registerCommand(
       "kdb-q-ext-vscode.toggleBlockComment",
       async () => {

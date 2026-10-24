@@ -43,7 +43,12 @@
       {
         "command": "kdb-q-ext-vscode.runSelectedText",
         "category": "kdb+/q",
-        "title": "Run Selected Text"
+        "title": "Run Selected Text in Terminal"
+      },
+      {
+        "command": "kdb-q-ext-vscode.runOnServer",
+        "category": "kdb+/q",
+        "title": "Run Selected Text on Server"
       },
       {
         "command": "kdb-q-ext-vscode.toggleBlockComment",
@@ -90,6 +95,10 @@
       "commandPalette": [
         {
           "command": "kdb-q-ext-vscode.runSelectedText",
+          "when": "editorLangId == q"
+        },
+        {
+          "command": "kdb-q-ext-vscode.runOnServer",
           "when": "editorLangId == q"
         },
         {
@@ -217,6 +226,21 @@
           "default": 2000,
           "minimum": 0,
           "markdownDescription": "How long to wait for a server to connect and log in, in milliseconds, as `hopen` takes. 0 waits as long as it takes, as `hopen` does without one."
+        },
+        "kdb-q-ext-vscode.consoleSize": {
+          "type": "array",
+          "default": [
+            1000,
+            1000
+          ],
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 2000
+          },
+          "markdownDescription": "How much of a result **Run Selected Text on Server** shows, as lines then width, as q's `\\c` takes them. A result with more lines shows the first of them and then `..`, and a wider line is cut, ending in `..`."
         },
         "kdb-q-ext-vscode.sizeLimit": {
           "type": "number",

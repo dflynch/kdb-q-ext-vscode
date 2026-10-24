@@ -9,8 +9,7 @@
       "name": "Run Extension",
       "type": "extensionHost",
       "request": "launch",
-      // Without other extensions, which can only get in the way: their web
-      // requests abort the extension host under the debugger
+      // Without other extensions, which can only get in the way
       "args": [
         "--disable-extensions",
         "--extensionDevelopmentPath=${workspaceFolder}"

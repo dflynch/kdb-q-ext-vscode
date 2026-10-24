@@ -2,11 +2,14 @@ import * as vscode from "vscode";
 import { type Asker, add } from "./adding";
 import * as comments from "./comments";
 import { Connection } from "./connection";
-import type { Connections, State } from "./connections";
+import type { Connections } from "./connections";
 import { credentials, type Sources } from "./credentials";
+import type { Size } from "./format/console";
 import { quickInput } from "./quickInput";
+import { consoleText, type Outcome, sizeSetting, timing } from "./result";
 import * as servers from "./servers";
 import * as statements from "./statements";
+import { describe, type Status } from "./status";
 import { passphraseKey, secure } from "./tls";
 
 // Send the selected text, or the current line, to the active terminal one
@@ -38,6 +41,66 @@ export function runSelectedText(editor: vscode.TextEditor) {
     for (const statement of statements.flatten(text)) {
       terminal.sendText(statement);
     }
+  }
+}
+
+// The console size, with any problem in it shown
+function consoleSize(): Size {
+  const { size, problem } = sizeSetting(
+    vscode.workspace.getConfiguration("kdb-q-ext-vscode").get("consoleSize"),
+  );
+  if (problem) {
+    vscode.window.showWarningMessage(
+      `kdb+/q: Using the default, as ${problem}.`,
+    );
+  }
+  return size;
+}
+
+// Run the selected text, or the current line, on the active connection as
+// one query, as written, showing its result as the q console does in place
+// of the last, and how long it took in the status bar. With several
+// selections, the primary one.
+export async function runOnServer(
+  editor: vscode.TextEditor,
+  connections: Connections<Connection>,
+  output: vscode.OutputChannel,
+  status: Status,
+) {
+  const selection = editor.selection;
+  const query = selection.isEmpty
+    ? editor.document.lineAt(selection.active.line).text
+    : editor.document.getText(selection);
+  if (query.trim() === "") {
+    return;
+  }
+  // Wait for the active connection if it's opening, and with none open,
+  // pick one, as Connect does. Whatever opens it says if that fails.
+  const active = connections.active;
+  const opening =
+    active?.state.kind === "connecting" && connections.server(active.name);
+  if (opening) {
+    await connections.connect(opening).catch(() => undefined);
+  } else if (active?.state.kind !== "open") {
+    await connect(connections);
+  }
+  const name = connections.active?.name;
+  const link = name && connections.link(name);
+  if (!name || !link) {
+    return;
+  }
+  const size = consoleSize();
+  output.show(true);
+  const ended = status.running(name);
+  let outcome: Outcome | undefined;
+  try {
+    outcome = await link.query(query).then(
+      (result) => ({ result }),
+      (error: Error) => ({ error }),
+    );
+    output.replace(consoleText(outcome, size));
+  } finally {
+    ended(outcome && timing(outcome));
   }
 }
 
@@ -401,18 +464,6 @@ export function opener(secrets: vscode.SecretStorage) {
   };
 }
 
-// A state as a few words
-function describe(state: State): string {
-  switch (state.kind) {
-    case "connecting":
-      return "connecting";
-    case "open":
-      return "connected";
-    case "closed":
-      return `closed: ${state.reason.message}`;
-  }
-}
-
 // Connect to a server picked, or make its connection active if it's open
 export async function connect(connections: Connections<Connection>) {
   const server = await pickServer("kdb+/q: Connect to Server", {
@@ -457,51 +508,4 @@ export async function disconnect(connections: Connections<Connection>) {
   if (name) {
     connections.disconnect(name);
   }
-}
-
-// The active connection in the status bar, which picks one when clicked,
-// and a warning when a connection closes without being disconnected
-export function showStatus(
-  connections: Connections<Connection>,
-): vscode.Disposable {
-  const item = vscode.window.createStatusBarItem(
-    "kdb-q-ext-vscode.connection",
-    vscode.StatusBarAlignment.Left,
-  );
-  item.name = "kdb+/q Connection";
-  item.command = "kdb-q-ext-vscode.connect";
-  const update = () => {
-    const active = connections.active;
-    const icon = !active
-      ? "plug"
-      : active.state.kind === "connecting"
-        ? "loading~spin"
-        : active.state.kind === "open"
-          ? "database"
-          : "debug-disconnect";
-    item.text = `$(${icon}) ${active?.name ?? "kdb+/q"}`;
-    item.tooltip = active
-      ? `kdb+/q: ${active.name}, ${describe(active.state)}`
-      : "kdb+/q: Connect to a server";
-    item.backgroundColor =
-      active?.state.kind === "closed"
-        ? new vscode.ThemeColor("statusBarItem.warningBackground")
-        : undefined;
-  };
-  update();
-  item.show();
-  const stop = connections.onChange(({ lost }) => {
-    update();
-    if (lost) {
-      vscode.window.showWarningMessage(
-        `kdb+/q: ${lost.name}: ${lost.reason.message}`,
-      );
-    }
-  });
-  return {
-    dispose: () => {
-      stop();
-      item.dispose();
-    },
-  };
 }

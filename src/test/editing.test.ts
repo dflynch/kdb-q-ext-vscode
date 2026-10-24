@@ -176,7 +176,7 @@ suite("q editing", () => {
   });
 });
 
-suite("q Run Selected Text", () => {
+suite("q Run Selected Text in Terminal", () => {
   // What the terminal receives, one statement per line
   let received = "";
   let terminal: vscode.Terminal;

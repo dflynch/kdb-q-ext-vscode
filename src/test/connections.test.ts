@@ -60,6 +60,17 @@ suite("connections", () => {
     assert.strictEqual(all.link("prod"), link);
   });
 
+  test("a connection keeps the server it was made to", async () => {
+    const { all, opening } = connections();
+    const connected = all.connect(prod);
+    assert.strictEqual(all.server("prod"), prod);
+    opening[0].resolve(new Fake());
+    await connected;
+    assert.strictEqual(all.server("prod"), prod);
+    all.disconnect("prod");
+    assert.strictEqual(all.server("prod"), undefined);
+  });
+
   test("connecting to one that's open only makes it active", async () => {
     const { all, opening } = connections();
     const first = all.connect(prod);
