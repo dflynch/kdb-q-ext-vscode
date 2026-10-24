@@ -29,8 +29,8 @@ Quirk never edits a query: it won't wrap it to fetch extra metadata, or add
 a row limit to it. With [protected evaluation](#protected-evaluation) on, the
 text is sent beside the function that traps its errors, unchanged; turn it
 off and a gateway that only allows listed calls sees exactly what you typed.
-Row limits only change what the grid shows. A result over the size limit is refused,
-with a message saying how big it was and how to raise the limit.
+Row limits only change what the grid shows. A result over the size limit,
+`sizeLimit`, is refused, and the connection closed.
 
 ### Out of scope
 
