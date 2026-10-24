@@ -3,11 +3,12 @@
 .vscode-test/**
 src/**
 .gitignore
-**/tsconfig.json
+**/tsconfig*.json
 **/*.map
 **/*.ts
 **/.vscode-test.*
-out/test/**
+out/**
+esbuild.mjs
 biome.json
 icons/quirk.svg
 test/**
