@@ -4,6 +4,18 @@ All notable changes to the extension are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Servers, defined in settings or by **kdb+/q: Add Server**, with TLS,
+  passwords kept in VS Code's secure storage, asked for at every connect,
+  or given by another extension, and protected evaluation
+- **kdb+/q: Connect to Server** and **Disconnect from Server**, with the
+  active connection, and how long its last query took, in the status bar
+- **kdb+/q: Run Selected Text on Server**, which sends the selection, or
+  the current line, as one query, and shows the result in the output
+  channel as q's console prints it
+- Settings: `servers`, `connectTimeout`, `consoleSize` and `sizeLimit`
+
 ### Changed
 
 - Run Selected Text is now Run Selected Text in Terminal, beside Run
