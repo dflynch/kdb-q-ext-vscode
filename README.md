@@ -198,8 +198,8 @@ token.
 ## Commands
 
 The Run and Toggle Block Comment commands, and their keybindings, apply in
-q files. Both Run Selected Text commands are on the editor's right-click
-menu, and the server commands on the status bar's.
+q files. The Run commands are on the editor's right-click menu, and the
+server commands on the status bar's.
 
 | Command                               | Keybinding       |
 | ------------------------------------- | ---------------- |

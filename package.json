@@ -143,9 +143,14 @@
           "group": "kdb-q@1"
         },
         {
-          "command": "kdb-q-ext-vscode.runSelectedText",
+          "command": "kdb-q-ext-vscode.runFileOnServer",
           "when": "editorLangId == q",
           "group": "kdb-q@2"
+        },
+        {
+          "command": "kdb-q-ext-vscode.runSelectedText",
+          "when": "editorLangId == q",
+          "group": "kdb-q@3"
         }
       ]
     },
