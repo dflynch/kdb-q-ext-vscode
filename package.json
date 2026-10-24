@@ -43,7 +43,7 @@
       {
         "command": "kdb-q-ext-vscode.runSelectedText",
         "category": "kdb+/q",
-        "title": "Run Selected Text"
+        "title": "Run Selected Text in Terminal"
       },
       {
         "command": "kdb-q-ext-vscode.runOnServer",
