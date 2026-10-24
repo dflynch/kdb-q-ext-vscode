@@ -1,7 +1,4 @@
 import * as assert from "node:assert";
-import { readFileSync } from "node:fs";
-import * as path from "node:path";
-import { serverMenu } from "../commands";
 import { describe, details, took } from "../status";
 
 suite("status", () => {
@@ -71,19 +68,5 @@ suite("status", () => {
     assert.ok(lines.includes("Authentication: Extension acme.kdb-auth"));
     assert.ok(!lines.join("\n").includes("secret"));
     assert.ok(lines.includes("Connection timeout: Default"));
-  });
-
-  test("the server menu names each command as the palette does", () => {
-    const manifest = JSON.parse(
-      readFileSync(path.join(__dirname, "../../package.json"), "utf8"),
-    );
-    const titles = new Map<string, string>(
-      manifest.contributes.commands.map(
-        (c: { command: string; title: string }) => [c.command, c.title],
-      ),
-    );
-    for (const [command, label] of serverMenu.flatMap((g) => g.commands)) {
-      assert.strictEqual(titles.get(command), label, command);
-    }
   });
 });

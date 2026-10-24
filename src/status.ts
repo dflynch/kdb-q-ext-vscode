@@ -65,9 +65,10 @@ export function details(server: Definition): string[] {
 
 // The active connection in the status bar, which opens the server menu when
 // clicked, with how long its last query took, and a warning when a
-// connection closes without being disconnected. The icon says the connection's state, a plug
-// joined or pulled apart, spinning while it connects or runs a query, and
-// the tooltip gives the server's settings as it was connected to.
+// connection closes without being disconnected. The icon says the
+// connection's state, a plug joined or pulled apart, spinning while it
+// connects or runs a query, and the tooltip gives the server's settings as
+// it was connected to.
 export function showStatus(
   connections: Connections<Connection>,
 ): Status & vscode.Disposable {
