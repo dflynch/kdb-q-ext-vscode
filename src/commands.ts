@@ -491,23 +491,39 @@ async function connectTo(
   }
 }
 
-// What the status bar's menu offers, in groups
-const serverMenu = {
-  Connection: ["connect", "disconnect"],
-  Servers: ["addServer", "openSettings"],
-  Secrets: ["setPassword", "clearPassword", "setPassphrase", "clearPassphrase"],
-};
+// What the status bar's menu offers, in groups, by command
+export const serverMenu: { group: string; commands: [string, string][] }[] = [
+  {
+    group: "Connection",
+    commands: [
+      ["kdb-q-ext-vscode.connect", "Connect to Server"],
+      ["kdb-q-ext-vscode.disconnect", "Disconnect from Server"],
+    ],
+  },
+  {
+    group: "Servers",
+    commands: [
+      ["kdb-q-ext-vscode.addServer", "Add Server"],
+      ["kdb-q-ext-vscode.openSettings", "Open Settings"],
+    ],
+  },
+  {
+    group: "Secrets",
+    commands: [
+      ["kdb-q-ext-vscode.setPassword", "Set Server Password"],
+      ["kdb-q-ext-vscode.clearPassword", "Clear Server Password"],
+      ["kdb-q-ext-vscode.setPassphrase", "Set Certificate Passphrase"],
+      ["kdb-q-ext-vscode.clearPassphrase", "Clear Certificate Passphrase"],
+    ],
+  },
+];
 
-// The status bar's menu, each command titled as in the palette, running the
-// one picked
-export async function showServerMenu(titles: Map<string, string>) {
+// The status bar's menu, running the command picked
+export async function showServerMenu() {
   const picked = await vscode.window.showQuickPick(
-    Object.entries(serverMenu).flatMap(([group, names]) => [
+    serverMenu.flatMap(({ group, commands }) => [
       { label: group, kind: vscode.QuickPickItemKind.Separator },
-      ...names.map((name) => {
-        const command = `kdb-q-ext-vscode.${name}`;
-        return { label: titles.get(command) ?? command, command };
-      }),
+      ...commands.map(([command, label]) => ({ label, command })),
     ]),
     { title: "kdb+/q" },
   );
