@@ -12,14 +12,13 @@ connects to kdb+ to run queries and show their results as q's console does
 
 ### Planned
 
-- A results panel holding the latest result, in two views: Console, the
-  text the output channel shows today, and Grid, shown as the q console
-  shows values, using q's default display settings: a long keeps every
-  digit and a timestamp keeps its nanoseconds. One deliberate difference:
-  where the console leaves a null blank in a table, the grid shows which
-  type of null it is. Copying a selection copies the text you see. The aim
-  is a faithful view of the result, not text that's promised to read back
-  into q
+- A grid in the **kdb+/q** tab, as a second view of the result beside the
+  console text, shown as the q console shows values, using q's default
+  display settings: a long keeps every digit and a timestamp keeps its
+  nanoseconds. One deliberate difference: where the console leaves a null
+  blank in a table, the grid shows which type of null it is. Copying a
+  selection copies the text you see. The aim is a faithful view of the
+  result, not text that's promised to read back into q
 - Go to definition, references, outline and workspace symbol search that
   follow q's namespaces and know which names are local to a lambda
 
@@ -129,10 +128,11 @@ connection open, it asks for a server, and with one opening, it waits.
 **kdb+/q: Run Selected Text on Server** sends the selection, or the current
 line, the same way. With several selections, only the first is sent.
 
-The result shows in the **kdb+/q** output channel as q's console prints it,
-replacing the last: an assignment shows nothing, and an error shows as
-`'type` with its backtrace. Until the results panel arrives, the output
-channel stands in for its Console view.
+The result shows in the **kdb+/q** tab of the bottom panel, beside Output and
+Terminal, as q's console prints it, replacing the last: an assignment shows
+nothing, and an error shows as `'type` with its backtrace. Running a query
+brings the tab into view and leaves the cursor in the editor. Switching away
+and back keeps the result as it was.
 
 There's more of it than q's console shows: 1000 lines of 1000 characters by
 default, set by `consoleSize` as `\c` takes them, with `..` where it's cut,
@@ -231,7 +231,7 @@ Open Keyboard Shortcuts**.
 | `kdb-q-ext-vscode.consoleSize`    | `[1000, 1000]` | How much of a result to show, as lines then width            |
 | `kdb-q-ext-vscode.sizeLimit`      | `10`           | The largest result to take, in MB, uncompressed              |
 
-A result over `sizeLimit` is refused and the connection closed. Results are
-held in the extension host, whose memory can't be raised, and some decode to
-up to 60 times their size, so a high limit can crash every extension in the
-window.
+A result over `sizeLimit` is refused and the connection closed. The extension
+holds the latest result as it arrived, and decodes it in the **kdb+/q** tab,
+where some results take up to 60 times their size: a tab that runs out of
+memory goes blank, while VS Code and other extensions carry on.

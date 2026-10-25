@@ -1,0 +1,18 @@
+/* Bundled into dist/webview.css. Colours and fonts come only from VS Code's
+   own variables, so every theme, high contrast included, styles the view */
+
+body {
+  padding: 0 20px;
+}
+
+.empty {
+  color: var(--vscode-descriptionForeground);
+}
+
+/* q's console text, in the editor's font */
+.console {
+  margin: 8px 0;
+  font-family: var(--vscode-editor-font-family);
+  font-size: var(--vscode-editor-font-size);
+  font-weight: var(--vscode-editor-font-weight);
+}

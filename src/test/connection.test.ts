@@ -3,8 +3,10 @@ import { once } from "node:events";
 import { readFileSync } from "node:fs";
 import * as net from "node:net";
 import * as path from "node:path";
+import { decode } from "../codec/decode";
 import { encode } from "../codec/encode";
-import { Connection, type Hinted, QError, wrapper } from "../connection";
+import { Connection } from "../connection";
+import { wrapper } from "../protection";
 
 const fixtures: { name: string; bytes: string; compressed?: string }[] =
   JSON.parse(
@@ -200,17 +202,17 @@ suite("connection", () => {
       port: server.port,
       timeout: 50,
     });
-    assert.strictEqual((await connection.query("x")).value.type, -7);
+    assert.strictEqual(decode((await connection.query("x")).message).type, -7);
     connection.close();
   });
 
   test("sends the query and resolves with the result", async () => {
     const server = await fake((socket) => socket.write(response("atom.long")));
     const connection = await open(server);
-    const { value, timing } = await connection.query("42");
-    assert.strictEqual(value.type, -7);
-    assert.ok(timing.roundtrip >= 0);
-    assert.strictEqual(timing.execution, undefined);
+    const { message, wrapped, roundtrip } = await connection.query("42");
+    assert.strictEqual(decode(message).type, -7);
+    assert.strictEqual(wrapped, false);
+    assert.ok(roundtrip >= 0);
     assert.deepStrictEqual(server.messages, [Buffer.from(encode("42"))]);
     connection.close();
   });
@@ -222,7 +224,7 @@ suite("connection", () => {
       }
     });
     const connection = await open(server);
-    assert.strictEqual((await connection.query("x")).value.type, 11);
+    assert.strictEqual(decode((await connection.query("x")).message).type, 11);
     connection.close();
   });
 
@@ -231,7 +233,7 @@ suite("connection", () => {
       socket.write(response("large.longs", true)),
     );
     const connection = await open(server);
-    assert.strictEqual((await connection.query("x")).value.type, 7);
+    assert.strictEqual(decode((await connection.query("x")).message).type, 7);
     connection.close();
   });
 
@@ -272,7 +274,7 @@ suite("connection", () => {
       setTimeout(() => socket.write(update), 10);
     });
     const connection = await open(server);
-    assert.strictEqual((await connection.query("x")).value.type, -7);
+    assert.strictEqual(decode((await connection.query("x")).message).type, -7);
     await server.closed;
     await assert.rejects(
       connection.query("x"),
@@ -280,28 +282,36 @@ suite("connection", () => {
     );
   });
 
-  test("a q error rejects with q's text", async () => {
-    const server = await fake((socket) => socket.write(qError("type")));
+  test("a q error is passed on as it arrived, for the Result view to read", async () => {
+    const message = qError("type");
+    const server = await fake((socket) => socket.write(message));
     const connection = await open(server);
-    await assert.rejects(
-      connection.query("1+`a"),
-      (error) => error instanceof QError && error.message === "type",
+    assert.deepStrictEqual(
+      (await connection.query("1+`a")).message,
+      new Uint8Array(message),
     );
     connection.close();
   });
 
-  test("a result it can't decode rejects, leaving the connection open", async () => {
-    let first = true;
-    const server = await fake((socket) => {
-      // A type that doesn't exist
-      socket.write(
-        first ? Buffer.of(1, 2, 0, 0, 9, 0, 0, 0, 20) : response("atom.long"),
-      );
-      first = false;
-    });
+  test("a result is passed on undecoded, even one that can't be decoded", async () => {
+    // A type that doesn't exist
+    const message = Buffer.of(1, 2, 0, 0, 9, 0, 0, 0, 20);
+    const server = await fake((socket) => socket.write(message));
     const connection = await open(server);
-    await assert.rejects(connection.query("x"), { message: "badmsg" });
-    assert.strictEqual((await connection.query("x")).value.type, -7);
+    assert.deepStrictEqual(
+      (await connection.query("x")).message,
+      new Uint8Array(message),
+    );
+    connection.close();
+  });
+
+  test("a message is a Uint8Array with a buffer of its own, as VS Code passes to a webview", async () => {
+    const server = await fake((socket) => socket.write(response("atom.long")));
+    const connection = await open(server);
+    const { message } = await connection.query("x");
+    assert.strictEqual(message.constructor, Uint8Array);
+    assert.strictEqual(message.byteOffset, 0);
+    assert.strictEqual(message.buffer.byteLength, message.length);
     connection.close();
   });
 
@@ -314,110 +324,20 @@ suite("connection", () => {
     await assert.rejects(connection.query("x"), { message: "badmsg" });
   });
 
-  // Each reply is q's -8! of what protected evaluation returns, as a
-  // response
-  function reply(hex: string): Buffer {
-    const message = Buffer.from(hex, "hex");
-    message[1] = 2;
-    return message;
-  }
-  function protect(server: Fake): Promise<Connection> {
-    return Connection.open({
+  test("protected, sends the wrapper and the query, and passes on the reply as it arrived", async () => {
+    const message = response("atom.long");
+    const server = await fake((socket) => socket.write(message));
+    const connection = await Connection.open({
       host: "127.0.0.1",
       port: server.port,
       protect: true,
     });
-  }
-
-  test("protected, sends the wrapper and the query, and resolves with the result and the execution time", async () => {
-    // ``result`elapsed!(::;42;7)
-    const server = await fake((socket) =>
-      socket.write(
-        reply(
-          "0100000039000000630b000300000000726573756c7400656c6170736564000000030000006500f92a00000000000000f90700000000000000",
-        ),
-      ),
-    );
-    const connection = await protect(server);
-    const { value, timing } = await connection.query("42");
-    assert.deepStrictEqual(value, { type: -7, value: 42n });
-    assert.strictEqual(timing.execution, 7);
-    assert.ok(timing.roundtrip >= 0);
+    const result = await connection.query("42");
+    assert.deepStrictEqual(result.message, new Uint8Array(message));
+    assert.strictEqual(result.wrapped, true);
     assert.deepStrictEqual(server.messages, [
       Buffer.from(encode("42", wrapper)),
     ]);
-    connection.close();
-  });
-
-  test("protected, an error caught rejects with q's text, the backtrace and the execution time", async () => {
-    // ``error`backtrace`elapsed!(::;"type";"  [0]  1+`a\n        ^\n";3)
-    const server = await fake((socket) =>
-      socket.write(
-        reply(
-          "010000005f000000630b0004000000006572726f72006261636b747261636500656c61707365640000000400000065000a0004000000747970650a001600000020205b305d2020312b60610a20202020202020205e0af90300000000000000",
-        ),
-      ),
-    );
-    const connection = await protect(server);
-    await assert.rejects(
-      connection.query("1+`a"),
-      (error) =>
-        error instanceof QError &&
-        error.message === "type" &&
-        error.backtrace === "  [0]  1+`a\n        ^\n" &&
-        error.timing.execution === 3,
-    );
-    connection.close();
-  });
-
-  test("protected, an error signalled says how to turn it off", async () => {
-    const server = await fake((socket) => socket.write(qError("type")));
-    const connection = await protect(server);
-    await assert.rejects(
-      connection.query("1+`a"),
-      (error) =>
-        error instanceof QError &&
-        error.message === "type" &&
-        error.backtrace === undefined &&
-        /turn off protect/.test(String(error.hint)),
-    );
-    connection.close();
-  });
-
-  test("protected, a result not wrapped says how to turn it off, leaving the connection open; a name it doesn't know is ignored", async () => {
-    const answers = [
-      response("atom.long"),
-      // ``error`backtrace`elapsed!(::;`type;"bt";3), where the error
-      // should be a string
-      reply(
-        "0100000047000000630b0004000000006572726f72006261636b747261636500656c6170736564000000040000006500f574797065000a00020000006274f90300000000000000",
-      ),
-      // ``result!(::;42), with no elapsed time
-      reply(
-        "0100000028000000630b000200000000726573756c74000000020000006500f92a00000000000000",
-      ),
-      // ``result`elapsed!(::;42;0D00:00:01), where the time should be a
-      // long
-      reply(
-        "0100000039000000630b000300000000726573756c7400656c6170736564000000030000006500f92a00000000000000f000ca9a3b00000000",
-      ),
-      // ``result`elapsed`later!(::;42;7;1b), a name it doesn't know yet
-      reply(
-        "0100000041000000630b000400000000726573756c7400656c6170736564006c61746572000000040000006500f92a00000000000000f90700000000000000ff01",
-      ),
-    ];
-    const server = await fake((socket) => socket.write(answers.shift() ?? ""));
-    const connection = await protect(server);
-    for (const _ of [1, 2, 3, 4]) {
-      await assert.rejects(
-        connection.query("x"),
-        (error) =>
-          error instanceof Error &&
-          error.message === "unrecognised response" &&
-          /turn off protect/.test(String((error as Hinted).hint)),
-      );
-    }
-    assert.strictEqual((await connection.query("x")).value.type, -7);
     connection.close();
   });
 
@@ -441,7 +361,7 @@ suite("connection", () => {
   test("a result exactly at the limit is accepted", async () => {
     const server = await fake((socket) => socket.write(response("atom.long")));
     const connection = await limited(server, 17);
-    assert.strictEqual((await connection.query("x")).value.type, -7);
+    assert.strictEqual(decode((await connection.query("x")).message).type, -7);
     connection.close();
   });
 
@@ -468,7 +388,7 @@ suite("connection", () => {
     const message = response("large.longs", true);
     const server = await fake((socket) => socket.write(message));
     const connection = await limited(server, message.readUInt32LE(8));
-    assert.strictEqual((await connection.query("x")).value.type, 7);
+    assert.strictEqual(decode((await connection.query("x")).message).type, 7);
     connection.close();
   });
 

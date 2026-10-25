@@ -1,14 +1,27 @@
 import * as vscode from "vscode";
-import type { Connection, Timing } from "./connection";
+import type { Connection } from "./connection";
 import type { Connections, State } from "./connections";
 import type { Definition } from "./servers";
 import { passphraseKey } from "./tls";
 
-// What a query tells the status bar: that it's running on a server, and,
-// with the function that gives back, that it ended, taking the time given if
-// that's known
+// How long a query took, in whole milliseconds, as \t gives
+export type Timing = {
+  // From sending the query to the last of its response arriving
+  roundtrip: number;
+  // The server's time running it, with protected evaluation: not
+  // serialising the result, nor formatting a backtrace
+  execution?: number;
+};
+
+// What a query tells the status bar: that it's running on a server; with the
+// function that gives back, that it ended, after the roundtrip given if a
+// response came; and with the function that gives back, how long the server
+// took, once the Result view has read it from the response. That's dropped
+// if another query's timing has replaced this one's.
 export type Status = {
-  running(name: string): (timing: Timing | undefined) => void;
+  running(
+    name: string,
+  ): (roundtrip: number | undefined) => (execution: number) => void;
 };
 
 // A state as a few words: a closed one's reason, which says how it closed
@@ -29,6 +42,33 @@ export function took(timing: Timing): string {
   return timing.execution === undefined
     ? `${timing.roundtrip} ms roundtrip`
     : `${timing.execution} ms (${timing.roundtrip} ms roundtrip)`;
+}
+
+// The last query's timing, and the server it ran on. A query that ended
+// without a response leaves none. Its server time comes after it ends, once
+// the Result view has read the response, and is dropped if another query has
+// ended since, or the timing was cleared. changed is called when a timing
+// arrives.
+export function lastTiming(changed: () => void) {
+  let last: { name: string; timing: Timing } | undefined;
+  return {
+    get: () => last,
+    clear: () => {
+      last = undefined;
+    },
+    ended: (name: string, roundtrip: number | undefined) => {
+      const ended: typeof last =
+        roundtrip === undefined ? undefined : { name, timing: { roundtrip } };
+      last = ended;
+      changed();
+      return (execution: number) => {
+        if (ended && last === ended) {
+          ended.timing = { roundtrip: ended.timing.roundtrip, execution };
+          changed();
+        }
+      };
+    },
+  };
 }
 
 // A server's settings, a line each, all but secrets: where the password
@@ -81,7 +121,7 @@ export function showStatus(
   // The last query's timing, kept while its connection is open, and how
   // many queries are running on each server: another can be tried while one
   // runs, though the connection refuses it
-  let last: { name: string; timing: Timing } | undefined;
+  const last = lastTiming(() => update());
   const running = new Map<string, number>();
   const update = () => {
     const active = connections.active;
@@ -94,8 +134,9 @@ export function showStatus(
         : active?.state.kind === "open"
           ? "debug-connected"
           : "debug-disconnect";
+    const ended = last.get();
     const timing =
-      !busy && last?.name === active?.name ? last?.timing : undefined;
+      !busy && ended?.name === active?.name ? ended?.timing : undefined;
     item.text = `$(${icon}) ${active?.name ?? "kdb+/q"}${timing ? `  $(watch) ${took(timing)}` : ""}`;
     // The icon says the state, so screen readers are told it in words
     item.accessibilityInformation = {
@@ -114,8 +155,9 @@ export function showStatus(
   update();
   item.show();
   const stop = connections.onChange(({ lost }) => {
-    if (last && connections.state(last.name)?.kind !== "open") {
-      last = undefined;
+    const ended = last.get();
+    if (ended && connections.state(ended.name)?.kind !== "open") {
+      last.clear();
     }
     update();
     if (lost) {
@@ -128,10 +170,9 @@ export function showStatus(
     running: (name) => {
       running.set(name, (running.get(name) ?? 0) + 1);
       update();
-      return (timing) => {
+      return (roundtrip) => {
         running.set(name, (running.get(name) ?? 0) - 1);
-        last = timing && { name, timing };
-        update();
+        return last.ended(name, roundtrip);
       };
     },
     dispose: () => {

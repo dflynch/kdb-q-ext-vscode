@@ -2,7 +2,7 @@ import * as assert from "node:assert";
 import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import { serverMenu } from "../commands";
-import { describe, details, took } from "../status";
+import { describe, details, lastTiming, took } from "../status";
 
 suite("status", () => {
   test("a query's time: the server's and the roundtrip, or the roundtrip", () => {
@@ -11,6 +11,51 @@ suite("status", () => {
       "2 ms (3 ms roundtrip)",
     );
     assert.strictEqual(took({ roundtrip: 3 }), "3 ms roundtrip");
+  });
+
+  test("the last query's timing, then the server's time once it's read", () => {
+    let changes = 0;
+    const last = lastTiming(() => changes++);
+    const executed = last.ended("prod", 5);
+    assert.deepStrictEqual(last.get(), {
+      name: "prod",
+      timing: { roundtrip: 5 },
+    });
+    executed(3);
+    assert.deepStrictEqual(last.get(), {
+      name: "prod",
+      timing: { roundtrip: 5, execution: 3 },
+    });
+    assert.strictEqual(changes, 2);
+  });
+
+  test("a query's server time is dropped once another has ended", () => {
+    let changes = 0;
+    const last = lastTiming(() => changes++);
+    const first = last.ended("prod", 5);
+    last.ended("dev", 6);
+    first(3);
+    assert.deepStrictEqual(last.get(), {
+      name: "dev",
+      timing: { roundtrip: 6 },
+    });
+    assert.strictEqual(changes, 2);
+  });
+
+  test("a query's server time is dropped once the timing is cleared", () => {
+    const last = lastTiming(() => {});
+    const executed = last.ended("prod", 5);
+    last.clear();
+    executed(3);
+    assert.strictEqual(last.get(), undefined);
+  });
+
+  test("a query with no response leaves no timing, nor takes a server time", () => {
+    const last = lastTiming(() => {});
+    last.ended("prod", 5);
+    const executed = last.ended("prod", undefined);
+    executed(3);
+    assert.strictEqual(last.get(), undefined);
   });
 
   test("a closed connection as its reason, which says it closed", () => {

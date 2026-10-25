@@ -1,10 +1,9 @@
 import * as net from "node:net";
 import * as tls from "node:tls";
 import { getSystemErrorMap, getSystemErrorMessage } from "node:util";
-import { decode } from "./codec/decode";
 import { encode } from "./codec/encode";
 import { badmsg } from "./codec/errors";
-import type { Value } from "./codec/types";
+import { wrapper } from "./protection";
 import type { Secure } from "./tls";
 
 export type Server = {
@@ -24,17 +23,15 @@ export type Server = {
   tls?: Secure;
 };
 
-// How long a query took, in whole milliseconds, as \t gives
-export type Timing = {
-  // From sending the query to the last of its result arriving
+// What a query returns: the response as it arrived, a q IPC message, to be
+// decoded where it's shown, not in the extension host, whose heap every
+// extension in the window shares; whether it's protected evaluation's
+// reply; and the roundtrip, in whole milliseconds
+export type Result = {
+  message: Uint8Array;
+  wrapped: boolean;
   roundtrip: number;
-  // The server's time running it, with protected evaluation: not
-  // serialising the result, nor formatting a backtrace
-  execution?: number;
 };
-
-// What a query returns
-export type Result = { value: Value; timing: Timing };
 
 // A system error's number, as Node has it on every system
 function errno(name: string): number | undefined {
@@ -59,122 +56,9 @@ function oserror(
   return new Error(`${word}. OS reports: ${text}`, { cause });
 }
 
-// An error with advice to show under it, where what went wrong suggests
-// what to do
-export type Hinted = Error & { hint?: string };
-
-// An error the server signalled, with q's text as the message, how long the
-// query took, where protected evaluation caught it, the stack as q shows it,
-// and any hint
-export class QError extends Error {
-  readonly backtrace?: string;
-  readonly hint?: string;
-  constructor(
-    message: string,
-    readonly timing: Timing,
-    backtrace?: string,
-    hint?: string,
-  ) {
-    super(message);
-    if (backtrace !== undefined) {
-      this.backtrace = backtrace;
-    }
-    if (hint !== undefined) {
-      this.hint = hint;
-    }
-  }
-}
-
-// Protected evaluation: q's .z.pg applies this to the query, which it runs
-// under .Q.trp. It returns ``result`elapsed!(::;result;ms), or
-// ``error`backtrace`elapsed!(::;error;backtrace;ms): named so that more
-// can be added, and the null key's :: keeps the values a general list, as a
-// namespace's does.
-// - value is composed with a flag rather than wrapped in a lambda, so it
-//   adds no frame, and the flag tells a result from an error whatever the
-//   query returns
-// - The time is taken once .Q.trp returns, before a backtrace is formatted,
-//   from .z.p, as .z.n goes back at midnight
-// - The backtrace keeps the frames inside .Q.trp's, the one inside this
-//   function's (.z.s), which are the query's, numbered from the query's as
-//   0. Those outside, this function's and a customised .z.pg's, go. The
-//   frames' layout isn't documented, so if stripping them fails, the
-//   backtrace is shown whole rather than the error lost
-// - The wrapper's frame is found with ~/:, not ?, which misses when the
-//   list starts with (), as a frame for the query's own text holds
-// - The query, evaluated by value, sees only globals, so these locals can't
-//   clash with its names. None is named for a q keyword, such as trim, which
-//   can't be assigned
-export const wrapper = [
-  "{[query]",
-  "  started:.z.p;",
-  "  outcome:.Q.trp['[(1b;);value];query;(0b;;)];",
-  "  elapsed:(`long$.z.p-started)div 1000000;",
-  "  if[outcome 0;:``result`elapsed!(::;outcome 1;elapsed)];",
-  "  strip:{[self;stack]",
-  "    stack:(-1+last where self~/:stack[;0;0])#stack;",
-  "    .[stack;(::;3);-;last stack[;3]]};",
-  "  backtrace:.Q.sbt @[strip .z.s;outcome 2;outcome 2];",
-  "  ``error`backtrace`elapsed!(::;outcome 1;backtrace;elapsed)}",
-].join("\n");
-
-// The hint under an error that protected evaluation would have caught, or a
-// response it didn't give: the server likely refused to evaluate it, as one
-// whose .z.pg is customised, or takes only strings, does
-const unprotected =
-  "protected evaluation may have been refused: turn off protect for a server whose .z.pg is customised";
-
-const utf8 = new TextDecoder("utf-8", { ignoreBOM: true });
-
-// Protected evaluation's dictionary by name, or undefined if it isn't one
-function fields(value: Value): Map<string, Value> | undefined {
-  if (value.type !== 99) {
-    return undefined;
-  }
-  const { keys, values } = value;
-  if (keys.type !== 11 || values.type !== 0 || !("items" in values)) {
-    return undefined;
-  }
-  const { bytes, offsets } = keys.data;
-  const names = Array.from(offsets.subarray(1), (end, i) =>
-    utf8.decode(bytes.subarray(offsets[i], end)),
-  );
-  const [head] = values.items;
-  if (names[0] !== "" || head?.type !== 101 || head.code !== 0) {
-    return undefined;
-  }
-  return new Map(names.map((name, i) => [name, values.items[i]]));
-}
-
-// The result inside protected evaluation's dictionary, or the error it
-// caught. Names it doesn't know are left for later.
-function unwrap(value: Value, roundtrip: number): Result {
-  const named = fields(value);
-  const result = named?.get("result");
-  const error = named?.get("error");
-  const backtrace = named?.get("backtrace");
-  const elapsed = named?.get("elapsed");
-  if (elapsed?.type === -7) {
-    const timing = { roundtrip, execution: Number(elapsed.value) };
-    if (result) {
-      return { value: result, timing };
-    }
-    if (error?.type === 10 && backtrace?.type === 10) {
-      throw new QError(
-        utf8.decode(error.data),
-        timing,
-        utf8.decode(backtrace.data),
-      );
-    }
-  }
-  throw Object.assign(new Error("unrecognised response"), {
-    hint: unprotected,
-  });
-}
-
-// A result over the limit. The extension host's heap is capped, and going
-// over it kills the host, so results are refused well before: a general
-// list decodes to up to about 60 times its size. Refusing closes the
+// A result over the limit. The Result view's webview decodes results, and
+// its heap, about 4 GB, is capped: a general list decodes to up to about 60
+// times its size, so results are refused well before. Refusing closes the
 // connection, which stops the server sending the rest.
 function tooBig(size: number, limit: number): Error {
   return new Error("result too big", {
@@ -381,7 +265,9 @@ export class Connection {
           if (length > this.limit) {
             throw tooBig(length, this.limit);
           }
-          this.message = Buffer.allocUnsafe(length);
+          // Outside Node's pool of small buffers, which other code shares,
+          // so that the message has a buffer of its own to pass on
+          this.message = Buffer.allocUnsafeSlow(length);
           this.header.copy(this.message);
           this.received = 8;
         }
@@ -424,35 +310,16 @@ export class Connection {
       return;
     }
     this.pending = undefined;
-    const roundtrip = Math.floor(performance.now() - pending.sent);
-    let value: Value;
-    try {
-      value = decode(message);
-    } catch (error) {
-      pending.reject(error instanceof Error ? error : new Error(String(error)));
-      return;
-    }
-    if (value.type === -128) {
-      // With protected evaluation on, a signalled error means the query
-      // wasn't run under it
-      pending.reject(
-        new QError(
-          value.message,
-          { roundtrip },
-          undefined,
-          this.protect ? unprotected : undefined,
-        ),
-      );
-      return;
-    }
-    try {
-      pending.resolve(
-        this.protect
-          ? unwrap(value, roundtrip)
-          : { value, timing: { roundtrip } },
-      );
-    } catch (error) {
-      pending.reject(error as Error);
-    }
+    // As a Uint8Array: VS Code passes typed arrays to a webview by their
+    // constructor's name, and sends a Buffer as JSON
+    pending.resolve({
+      message: new Uint8Array(
+        message.buffer,
+        message.byteOffset,
+        message.length,
+      ),
+      wrapped: this.protect,
+      roundtrip: Math.floor(performance.now() - pending.sent),
+    });
   }
 }

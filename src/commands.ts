@@ -6,7 +6,8 @@ import type { Connections } from "./connections";
 import { credentials, type Sources } from "./credentials";
 import type { Size } from "./format/console";
 import { quickInput } from "./quickInput";
-import { consoleText, type Outcome, sizeSetting, timing } from "./result";
+import { type Outcome, sizeSetting, toView } from "./result";
+import type { Results } from "./resultView";
 import * as servers from "./servers";
 import * as statements from "./statements";
 import { describe, type Status } from "./status";
@@ -62,10 +63,10 @@ function consoleSize(): Size {
 export async function runFileOnServer(
   editor: vscode.TextEditor,
   connections: Connections<Connection>,
-  output: vscode.OutputChannel,
+  results: Results,
   status: Status,
 ) {
-  await run(editor.document.getText(), connections, output, status);
+  await run(editor.document.getText(), connections, results, status);
 }
 
 // Run the selected text, or the current line, on the active connection. With
@@ -73,22 +74,22 @@ export async function runFileOnServer(
 export async function runOnServer(
   editor: vscode.TextEditor,
   connections: Connections<Connection>,
-  output: vscode.OutputChannel,
+  results: Results,
   status: Status,
 ) {
   const selection = editor.selection;
   const query = selection.isEmpty
     ? editor.document.lineAt(selection.active.line).text
     : editor.document.getText(selection);
-  await run(query, connections, output, status);
+  await run(query, connections, results, status);
 }
 
-// Run a query on the active connection as written, showing its result as the
-// q console does in place of the last, and how long it took in the status bar
+// Run a query on the active connection as written, showing its result in the
+// Result view in place of the last, and how long it took in the status bar
 async function run(
   query: string,
   connections: Connections<Connection>,
-  output: vscode.OutputChannel,
+  results: Results,
   status: Status,
 ) {
   if (query.trim() === "") {
@@ -110,18 +111,21 @@ async function run(
     return;
   }
   const size = consoleSize();
-  output.show(true);
+  await results.reveal();
   const ended = status.running(name);
-  let outcome: Outcome | undefined;
-  try {
-    outcome = await link.query(query).then(
-      (result) => ({ result }),
-      (error: Error) => ({ error }),
-    );
-    output.replace(consoleText(outcome, size));
-  } finally {
-    ended(outcome && timing(outcome));
-  }
+  const outcome: Outcome = await link.query(query).then(
+    (result) => ({ result }),
+    (error: Error) => ({ error }),
+  );
+  const executed = ended(
+    "result" in outcome ? outcome.result.roundtrip : undefined,
+  );
+  // The server's time is known once the webview has decoded the response
+  results.show(toView(outcome, size)).then((execution) => {
+    if (execution !== undefined) {
+      executed(execution);
+    }
+  });
 }
 
 // Comment out the selected lines with "/" and "\" marker lines, or remove the
