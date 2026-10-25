@@ -27,6 +27,39 @@ const utf8 = new TextDecoder("utf-8", { ignoreBOM: true });
 // A message it can't read throws badmsg, as q does; big-endian messages and
 // foreign objects, which q can read, throw errors of their own.
 export function decode(message: Uint8Array): Value {
+  const data = uncompressed(message);
+  const reader = new Reader(data);
+  const value = reader.value();
+  if (reader.offset !== data.length) {
+    throw badmsg(`${data.length - reader.offset} bytes left after the value`);
+  }
+  return value;
+}
+
+// Decode a message holding a dictionary of symbols to a general list, all but
+// its last value, which is left as a message of its own to decode elsewhere;
+// or undefined if the message holds something else. Protected evaluation's
+// reply puts the result last, so the extension can pass it on to the webview
+// without making objects of it.
+export function decodeAllButLast(
+  message: Uint8Array,
+): { names: string[]; values: Value[]; last: Uint8Array } | undefined {
+  const data = uncompressed(message);
+  const reader = new Reader(data);
+  const head = reader.allButLast();
+  if (!head) {
+    return undefined;
+  }
+  const last = new Uint8Array(8 + data.length - reader.offset);
+  last.set(data.subarray(0, 4));
+  new DataView(last.buffer).setUint32(4, last.length, true);
+  last.set(data.subarray(reader.offset), 8);
+  return { ...head, last };
+}
+
+// The message, checked as far as its header goes, and decompressed if it's
+// compressed
+export function uncompressed(message: Uint8Array): Uint8Array {
   if (message.length < 8) {
     throw badmsg("the message ends early");
   }
@@ -51,13 +84,7 @@ export function decode(message: Uint8Array): Value {
   if (message[2] > 1) {
     throw badmsg(`compression flag ${message[2]} isn't one of q's`);
   }
-  const data = message[2] ? decompress(message) : message;
-  const reader = new Reader(data);
-  const value = reader.value();
-  if (reader.offset !== data.length) {
-    throw badmsg(`${data.length - reader.offset} bytes left after the value`);
-  }
-  return value;
+  return message[2] ? decompress(message) : message;
 }
 
 class Reader {
@@ -113,6 +140,31 @@ class Reader {
       throw new Error("foreign objects unsupported");
     }
     throw badmsg(`unknown type ${type}`);
+  }
+
+  // A dictionary of symbols to a general list, read as far as its last
+  // value, or undefined if the value is something else or the list is empty
+  allButLast(): { names: string[]; values: Value[] } | undefined {
+    if (this.message[this.take(1)] !== 99) {
+      return undefined;
+    }
+    const keys = this.value();
+    if (keys.type !== 11 || this.message[this.take(1)] !== 0) {
+      return undefined;
+    }
+    this.attribute();
+    const length = this.uint32(this.take(4));
+    const { bytes, offsets } = keys.data;
+    if (length !== offsets.length - 1) {
+      throw badmsg("a dictionary's keys and values don't match in length");
+    }
+    if (length === 0) {
+      return undefined;
+    }
+    const names = Array.from(offsets.subarray(1), (end, i) =>
+      utf8.decode(bytes.subarray(offsets[i], end)),
+    );
+    return { names, values: this.values(length - 1) };
   }
 
   private values(count: number): Value[] {

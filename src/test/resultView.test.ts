@@ -1,23 +1,54 @@
 import * as assert from "node:assert";
 import * as vscode from "vscode";
+import { defaultSize } from "../format/console";
+import type { FromView, ToView } from "../messages";
 import { page, ResultView, viewId } from "../resultView";
 
 const extension = vscode.Uri.file("/extension");
 
-// A stand-in view keeping what it's given
-function resolved() {
+// A stand-in view, resolved by the given ResultView, keeping what it's
+// given and posted, and saying ready or closing when asked
+function resolved(results = new ResultView(extension)) {
+  const posted: ToView[] = [];
+  let say: (message: FromView) => void = () => {};
+  let close = () => {};
   const webview = {
     cspSource: "https://source.example",
     options: {} as vscode.WebviewOptions,
     html: "",
     asWebviewUri: (uri: vscode.Uri) =>
       uri.with({ scheme: "https", authority: "source.example" }),
+    onDidReceiveMessage: (listener: (message: FromView) => void) => {
+      say = listener;
+    },
+    postMessage: async (message: ToView) => posted.push(message),
   };
-  new ResultView(extension).resolveWebviewView({
+  results.resolveWebviewView({
     webview,
+    onDidDispose: (listener: () => void) => {
+      close = listener;
+    },
   } as unknown as vscode.WebviewView);
-  return webview;
+  return {
+    ...webview,
+    get options() {
+      return webview.options;
+    },
+    get html() {
+      return webview.html;
+    },
+    posted,
+    ready: () => say({ type: "ready" }),
+    close: () => close(),
+  };
 }
+
+const one: ToView = { type: "error", text: "'one" };
+const two: ToView = {
+  type: "result",
+  message: Uint8Array.of(1, 0, 0, 0, 10, 0, 0, 0, 101, 0),
+  size: defaultSize,
+};
 
 const policy = (html: string) =>
   html.match(/http-equiv="Content-Security-Policy" content="([^"]*)"/)?.[1];
@@ -62,6 +93,32 @@ suite("the Result view", () => {
     const first = nonce(resolved().html);
     const second = nonce(resolved().html);
     assert.ok(first && second && first !== second);
+  });
+
+  test("posts nothing until the webview is ready, then the latest", () => {
+    const results = new ResultView(extension);
+    const view = resolved(results);
+    results.show(one);
+    results.show(two);
+    assert.deepStrictEqual(view.posted, []);
+    view.ready();
+    assert.deepStrictEqual(view.posted, [two]);
+    results.show(one);
+    assert.deepStrictEqual(view.posted, [two, one]);
+  });
+
+  test("closed and opened again, shows the latest once ready", () => {
+    const results = new ResultView(extension);
+    const first = resolved(results);
+    first.ready();
+    results.show(one);
+    first.close();
+    results.show(two);
+    const second = resolved(results);
+    assert.deepStrictEqual(second.posted, []);
+    second.ready();
+    assert.deepStrictEqual(first.posted, [one]);
+    assert.deepStrictEqual(second.posted, [two]);
   });
 
   test("is contributed, and opens", async () => {

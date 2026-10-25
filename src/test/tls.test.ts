@@ -5,6 +5,7 @@ import * as net from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as tls from "node:tls";
+import { decode } from "../codec/decode";
 import { Connection } from "../connection";
 import {
   authorities,
@@ -90,7 +91,7 @@ suite("tls", () => {
       tls: await secure(settings, options.passphrase),
     });
     try {
-      return (await connection.query("1+1")).value;
+      return decode((await connection.query("1+1")).message);
     } finally {
       connection.close();
     }

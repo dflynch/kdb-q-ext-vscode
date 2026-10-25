@@ -1,13 +1,35 @@
 import { randomBytes } from "node:crypto";
 import * as vscode from "vscode";
+import type { FromView, ToView } from "./messages";
 
 // The Result view in the bottom panel: the latest result, shown in a webview
 export const viewId = "kdb-q-ext-vscode.result";
 
+// It shows the latest result only. The webview is kept alive when hidden,
+// but VS Code makes it anew if the view is closed and opened, so the latest
+// is kept here too, and posted once the webview says it's ready: anything
+// posted before then is lost.
 export class ResultView implements vscode.WebviewViewProvider {
+  private view?: vscode.WebviewView;
+  private ready = false;
+  private latest?: ToView;
+
   constructor(private readonly extensionUri: vscode.Uri) {}
 
   resolveWebviewView(view: vscode.WebviewView) {
+    this.view = view;
+    this.ready = false;
+    view.onDidDispose(() => {
+      if (this.view === view) {
+        this.view = undefined;
+      }
+    });
+    view.webview.onDidReceiveMessage((message: FromView) => {
+      if (message.type === "ready") {
+        this.ready = true;
+        this.post();
+      }
+    });
     const dist = vscode.Uri.joinPath(this.extensionUri, "dist");
     const webview = view.webview;
     webview.options = { enableScripts: true, localResourceRoots: [dist] };
@@ -18,16 +40,36 @@ export class ResultView implements vscode.WebviewViewProvider {
       webview.asWebviewUri(vscode.Uri.joinPath(dist, "webview.css")),
     );
   }
+
+  // Bring the view into sight, leaving the focus where it is
+  async reveal() {
+    await vscode.commands.executeCommand(`${viewId}.focus`, {
+      preserveFocus: true,
+    });
+  }
+
+  // Show a result or an error in place of the last
+  show(message: ToView) {
+    this.latest = message;
+    this.post();
+  }
+
+  private post() {
+    if (this.view && this.ready && this.latest) {
+      this.view.webview.postMessage(this.latest);
+    }
+  }
 }
+
+// Where a query's result is shown
+export type Results = Pick<ResultView, "reveal" | "show">;
 
 // Registers the view, kept alive when hidden: a result can take long to
 // compute, and its scroll, sort and filter should be there on coming back
-export function registerResultView(extensionUri: vscode.Uri) {
-  return vscode.window.registerWebviewViewProvider(
-    viewId,
-    new ResultView(extensionUri),
-    { webviewOptions: { retainContextWhenHidden: true } },
-  );
+export function registerResultView(view: ResultView) {
+  return vscode.window.registerWebviewViewProvider(viewId, view, {
+    webviewOptions: { retainContextWhenHidden: true },
+  });
 }
 
 // The webview's page. It loads nothing but our script, by its nonce, and our

@@ -1,18 +1,17 @@
 import * as vscode from "vscode";
 import * as commands from "./commands";
 import { Connections } from "./connections";
-import { registerResultView } from "./resultView";
+import { ResultView, registerResultView } from "./resultView";
 import { showStatus } from "./status";
 
 export function activate(context: vscode.ExtensionContext) {
   const connections = new Connections(commands.opener(context.secrets));
-  const output = vscode.window.createOutputChannel("kdb+/q");
+  const results = new ResultView(context.extensionUri);
   const status = showStatus(connections);
   context.subscriptions.push(
-    output,
     status,
     connections,
-    registerResultView(context.extensionUri),
+    registerResultView(results),
     vscode.commands.registerCommand("kdb-q-ext-vscode.connect", () =>
       commands.connect(connections),
     ),
@@ -34,7 +33,7 @@ export function activate(context: vscode.ExtensionContext) {
       async () => {
         const editor = vscode.window.activeTextEditor;
         if (editor) {
-          await commands.runFileOnServer(editor, connections, output, status);
+          await commands.runFileOnServer(editor, connections, results, status);
         }
       },
     ),
@@ -43,7 +42,7 @@ export function activate(context: vscode.ExtensionContext) {
       async () => {
         const editor = vscode.window.activeTextEditor;
         if (editor) {
-          await commands.runOnServer(editor, connections, output, status);
+          await commands.runOnServer(editor, connections, results, status);
         }
       },
     ),

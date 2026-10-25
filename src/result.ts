@@ -1,5 +1,6 @@
 import { type Hinted, QError, type Result, type Timing } from "./connection";
-import { defaultSize, type Size, show } from "./format/console";
+import { defaultSize, type Size } from "./format/console";
+import type { ToView } from "./messages";
 
 // What a query came to: its result, or the error it failed with
 export type Outcome = { result: Result } | { error: Error };
@@ -28,11 +29,12 @@ export function sizeSetting(setting: unknown): {
   };
 }
 
-// A query's result as the q console shows it, or its error after a ' and
-// with any backtrace, then any hint. A result of :: shows nothing, as in q.
-export function consoleText(outcome: Outcome, size: Size): string {
+// What to show for a query in the Result view: its result, for the webview
+// to decode and show at the console size, or its error as the q console
+// shows it, after a ' and with any backtrace, then any hint
+export function toView(outcome: Outcome, size: Size): ToView {
   if ("result" in outcome) {
-    return show(outcome.result.value, size);
+    return { type: "result", message: outcome.result.message, size };
   }
   const error = outcome.error;
   const backtrace =
@@ -40,7 +42,10 @@ export function consoleText(outcome: Outcome, size: Size): string {
       ? `\n${error.backtrace.trimEnd()}`
       : "";
   const hint = (error as Hinted).hint;
-  return `'${error.message}${backtrace}${hint ? `\n${hint}` : ""}`;
+  return {
+    type: "error",
+    text: `'${error.message}${backtrace}${hint ? `\n${hint}` : ""}`,
+  };
 }
 
 // How long a query took: as a result, or an error the server signalled, but

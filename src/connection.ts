@@ -1,10 +1,9 @@
 import * as net from "node:net";
 import * as tls from "node:tls";
 import { getSystemErrorMap, getSystemErrorMessage } from "node:util";
-import { decode } from "./codec/decode";
+import { decode, decodeAllButLast, uncompressed } from "./codec/decode";
 import { encode } from "./codec/encode";
 import { badmsg } from "./codec/errors";
-import type { Value } from "./codec/types";
 import type { Secure } from "./tls";
 
 export type Server = {
@@ -33,8 +32,10 @@ export type Timing = {
   execution?: number;
 };
 
-// What a query returns
-export type Result = { value: Value; timing: Timing };
+// What a query returns: its result as a q IPC message, uncompressed, to be
+// decoded where it's shown, not in the extension host, whose heap is shared
+// by every extension in the window
+export type Result = { message: Uint8Array; timing: Timing };
 
 // A system error's number, as Node has it on every system
 function errno(name: string): number | undefined {
@@ -86,10 +87,11 @@ export class QError extends Error {
 }
 
 // Protected evaluation: q's .z.pg applies this to the query, which it runs
-// under .Q.trp. It returns ``result`elapsed!(::;result;ms), or
+// under .Q.trp. It returns ``elapsed`result!(::;ms;result), or
 // ``error`backtrace`elapsed!(::;error;backtrace;ms): named so that more
 // can be added, and the null key's :: keeps the values a general list, as a
-// namespace's does.
+// namespace's does. The result comes last, so that the extension can pass it
+// on without decoding it.
 // - value is composed with a flag rather than wrapped in a lambda, so it
 //   adds no frame, and the flag tells a result from an error whatever the
 //   query returns
@@ -110,7 +112,7 @@ export const wrapper = [
   "  started:.z.p;",
   "  outcome:.Q.trp['[(1b;);value];query;(0b;;)];",
   "  elapsed:(`long$.z.p-started)div 1000000;",
-  "  if[outcome 0;:``result`elapsed!(::;outcome 1;elapsed)];",
+  "  if[outcome 0;:``elapsed`result!(::;elapsed;outcome 1)];",
   "  strip:{[self;stack]",
   "    stack:(-1+last where self~/:stack[;0;0])#stack;",
   "    .[stack;(::;3);-;last stack[;3]]};",
@@ -126,45 +128,34 @@ const unprotected =
 
 const utf8 = new TextDecoder("utf-8", { ignoreBOM: true });
 
-// Protected evaluation's dictionary by name, or undefined if it isn't one
-function fields(value: Value): Map<string, Value> | undefined {
-  if (value.type !== 99) {
-    return undefined;
-  }
-  const { keys, values } = value;
-  if (keys.type !== 11 || values.type !== 0 || !("items" in values)) {
-    return undefined;
-  }
-  const { bytes, offsets } = keys.data;
-  const names = Array.from(offsets.subarray(1), (end, i) =>
-    utf8.decode(bytes.subarray(offsets[i], end)),
-  );
-  const [head] = values.items;
-  if (names[0] !== "" || head?.type !== 101 || head.code !== 0) {
-    return undefined;
-  }
-  return new Map(names.map((name, i) => [name, values.items[i]]));
-}
-
-// The result inside protected evaluation's dictionary, or the error it
-// caught. Names it doesn't know are left for later.
-function unwrap(value: Value, roundtrip: number): Result {
-  const named = fields(value);
-  const result = named?.get("result");
-  const error = named?.get("error");
-  const backtrace = named?.get("backtrace");
-  const elapsed = named?.get("elapsed");
-  if (elapsed?.type === -7) {
-    const timing = { roundtrip, execution: Number(elapsed.value) };
-    if (result) {
-      return { value: result, timing };
+// The result inside protected evaluation's reply, left undecoded, or the
+// error it caught. Names it doesn't know are left for later, but the result
+// must come last.
+function unwrap(message: Uint8Array, roundtrip: number): Result {
+  const head = decodeAllButLast(message);
+  const [nil] = head?.values ?? [];
+  if (head && head.names[0] === "" && nil?.type === 101 && nil.code === 0) {
+    const { names, values, last } = head;
+    const named = new Map(values.map((value, i) => [names[i], value]));
+    const final = names[names.length - 1];
+    if (final !== "result") {
+      named.set(final, decode(last));
     }
-    if (error?.type === 10 && backtrace?.type === 10) {
-      throw new QError(
-        utf8.decode(error.data),
-        timing,
-        utf8.decode(backtrace.data),
-      );
+    const elapsed = named.get("elapsed");
+    const error = named.get("error");
+    const backtrace = named.get("backtrace");
+    if (elapsed?.type === -7) {
+      const timing = { roundtrip, execution: Number(elapsed.value) };
+      if (final === "result") {
+        return { message: last, timing };
+      }
+      if (error?.type === 10 && backtrace?.type === 10) {
+        throw new QError(
+          utf8.decode(error.data),
+          timing,
+          utf8.decode(backtrace.data),
+        );
+      }
     }
   }
   throw Object.assign(new Error("unrecognised response"), {
@@ -425,34 +416,27 @@ export class Connection {
     }
     this.pending = undefined;
     const roundtrip = Math.floor(performance.now() - pending.sent);
-    let value: Value;
     try {
-      value = decode(message);
-    } catch (error) {
-      pending.reject(error instanceof Error ? error : new Error(String(error)));
-      return;
-    }
-    if (value.type === -128) {
-      // With protected evaluation on, a signalled error means the query
-      // wasn't run under it
-      pending.reject(
-        new QError(
-          value.message,
+      const data = uncompressed(message);
+      // An error, type -128, is decoded here; anything else is passed on
+      const error = data[8] === 128 ? decode(data) : undefined;
+      if (error?.type === -128) {
+        // With protected evaluation on, a signalled error means the query
+        // wasn't run under it
+        throw new QError(
+          error.message,
           { roundtrip },
           undefined,
           this.protect ? unprotected : undefined,
-        ),
-      );
-      return;
-    }
-    try {
+        );
+      }
       pending.resolve(
         this.protect
-          ? unwrap(value, roundtrip)
-          : { value, timing: { roundtrip } },
+          ? unwrap(data, roundtrip)
+          : { message: data, timing: { roundtrip } },
       );
     } catch (error) {
-      pending.reject(error as Error);
+      pending.reject(error instanceof Error ? error : new Error(String(error)));
     }
   }
 }

@@ -1,34 +1,16 @@
 import * as assert from "node:assert";
-import type { Value } from "../codec/types";
 import { QError } from "../connection";
 import { defaultSize } from "../format/console";
-import { consoleText, sizeSetting, timing } from "../result";
+import { sizeSetting, timing, toView } from "../result";
 
-const generic: Value = { type: 101, code: 0 };
-const til = (n: number): Value => ({
-  type: 7,
-  attribute: 0,
-  data: BigInt64Array.from({ length: n }, (_, i) => BigInt(i)),
-});
+const message = Uint8Array.of(1, 2, 0, 0, 10, 0, 0, 0, 101, 0);
 
 suite("result", () => {
-  test("a result as the q console shows it", () => {
-    assert.strictEqual(
-      consoleText(
-        { result: { value: til(3), timing: { roundtrip: 0 } } },
-        defaultSize,
-      ),
-      "0 1 2",
-    );
-  });
-
-  test(":: shows nothing, as an assignment's result", () => {
-    assert.strictEqual(
-      consoleText(
-        { result: { value: generic, timing: { roundtrip: 0 } } },
-        defaultSize,
-      ),
-      "",
+  test("a result goes to the view undecoded, with the console size", () => {
+    const size = { ...defaultSize, lines: 25, width: 80 };
+    assert.deepStrictEqual(
+      toView({ result: { message, timing: { roundtrip: 0 } } }, size),
+      { type: "result", message, size },
     );
   });
 
@@ -38,40 +20,30 @@ suite("result", () => {
       { roundtrip: 1, execution: 0 },
       "  [0]  1+`a\n        ^\n",
     );
-    assert.strictEqual(
-      consoleText({ error }, defaultSize),
-      "'type\n  [0]  1+`a\n        ^",
-    );
+    assert.deepStrictEqual(toView({ error }, defaultSize), {
+      type: "error",
+      text: "'type\n  [0]  1+`a\n        ^",
+    });
   });
 
   test("an error's hint on the line after it", () => {
     const error = new QError("type", { roundtrip: 1 }, undefined, "a hint");
-    assert.strictEqual(consoleText({ error }, defaultSize), "'type\na hint");
+    assert.deepStrictEqual(toView({ error }, defaultSize), {
+      type: "error",
+      text: "'type\na hint",
+    });
   });
 
   test("an error of ours, the same way", () => {
-    assert.strictEqual(
-      consoleText({ error: new Error("result too big") }, defaultSize),
-      "'result too big",
-    );
-  });
-
-  test("the result cut at the console size", () => {
-    assert.strictEqual(
-      consoleText(
-        { result: { value: til(100), timing: { roundtrip: 0 } } },
-        { lines: 10, width: 10 },
-      ),
-      "0 1 2 3 ..",
+    assert.deepStrictEqual(
+      toView({ error: new Error("result too big") }, defaultSize),
+      { type: "error", text: "'result too big" },
     );
   });
 
   test("a result and a q error have a timing, and an error of ours none", () => {
     const took = { roundtrip: 3, execution: 2 };
-    assert.strictEqual(
-      timing({ result: { value: generic, timing: took } }),
-      took,
-    );
+    assert.strictEqual(timing({ result: { message, timing: took } }), took);
     assert.strictEqual(timing({ error: new QError("type", took) }), took);
     assert.strictEqual(
       timing({ error: new Error("connection closed unexpectedly") }),
