@@ -14,7 +14,9 @@ const vscode = acquireVsCodeApi();
 
 const empty = document.createElement("p");
 empty.className = "empty";
-empty.textContent = "No result yet";
+// Until the first result, how to get one: Run Selected Text on Server's key
+const key = navigator.userAgent.includes("Mac") ? "Cmd+Enter" : "Ctrl+Enter";
+empty.textContent = `Run a query with ${key} to see its result here`;
 
 // Two views of the latest result, Console and Grid, switched between by tabs
 type View = "console" | "grid";
