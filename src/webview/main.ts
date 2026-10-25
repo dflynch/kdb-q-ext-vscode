@@ -20,14 +20,10 @@ document.body.append(empty);
 // Each result replaces the last, and the extension is told how long the
 // server took, for the status bar
 window.addEventListener("message", ({ data }: MessageEvent<Posted>) => {
-  const { text: shown, execution } = consoleView(data);
+  const { text: shown, ...timing } = consoleView(data);
   text.textContent = shown;
   empty.replaceWith(text);
-  vscode.postMessage(
-    execution === undefined
-      ? { type: "shown", id: data.id }
-      : { type: "shown", id: data.id, execution },
-  );
+  vscode.postMessage({ type: "shown", id: data.id, ...timing });
 });
 
 vscode.postMessage({ type: "ready" });

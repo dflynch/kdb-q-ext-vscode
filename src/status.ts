@@ -44,6 +44,33 @@ export function took(timing: Timing): string {
     : `${timing.execution} ms (${timing.roundtrip} ms roundtrip)`;
 }
 
+// The last query's timing, and the server it ran on. A query that ended
+// without a response leaves none. Its server time comes after it ends, once
+// the Result view has read the response, and is dropped if another query has
+// ended since, or the timing was cleared. changed is called when a timing
+// arrives.
+export function lastTiming(changed: () => void) {
+  let last: { name: string; timing: Timing } | undefined;
+  return {
+    get: () => last,
+    clear: () => {
+      last = undefined;
+    },
+    ended: (name: string, roundtrip: number | undefined) => {
+      const ended: typeof last =
+        roundtrip === undefined ? undefined : { name, timing: { roundtrip } };
+      last = ended;
+      changed();
+      return (execution: number) => {
+        if (ended && last === ended) {
+          ended.timing = { roundtrip: ended.timing.roundtrip, execution };
+          changed();
+        }
+      };
+    },
+  };
+}
+
 // A server's settings, a line each, all but secrets: where the password
 // comes from, not what it is, and an extension's name, not the fields it's
 // given
@@ -94,7 +121,7 @@ export function showStatus(
   // The last query's timing, kept while its connection is open, and how
   // many queries are running on each server: another can be tried while one
   // runs, though the connection refuses it
-  let last: { name: string; timing: Timing } | undefined;
+  const last = lastTiming(() => update());
   const running = new Map<string, number>();
   const update = () => {
     const active = connections.active;
@@ -107,8 +134,9 @@ export function showStatus(
         : active?.state.kind === "open"
           ? "debug-connected"
           : "debug-disconnect";
+    const ended = last.get();
     const timing =
-      !busy && last?.name === active?.name ? last?.timing : undefined;
+      !busy && ended?.name === active?.name ? ended?.timing : undefined;
     item.text = `$(${icon}) ${active?.name ?? "kdb+/q"}${timing ? `  $(watch) ${took(timing)}` : ""}`;
     // The icon says the state, so screen readers are told it in words
     item.accessibilityInformation = {
@@ -127,8 +155,9 @@ export function showStatus(
   update();
   item.show();
   const stop = connections.onChange(({ lost }) => {
-    if (last && connections.state(last.name)?.kind !== "open") {
-      last = undefined;
+    const ended = last.get();
+    if (ended && connections.state(ended.name)?.kind !== "open") {
+      last.clear();
     }
     update();
     if (lost) {
@@ -143,16 +172,7 @@ export function showStatus(
       update();
       return (roundtrip) => {
         running.set(name, (running.get(name) ?? 0) - 1);
-        const ended: typeof last =
-          roundtrip === undefined ? undefined : { name, timing: { roundtrip } };
-        last = ended;
-        update();
-        return (execution) => {
-          if (ended && last === ended) {
-            ended.timing = { roundtrip: ended.timing.roundtrip, execution };
-            update();
-          }
-        };
+        return last.ended(name, roundtrip);
       };
     },
     dispose: () => {

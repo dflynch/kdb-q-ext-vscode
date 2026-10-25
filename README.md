@@ -231,7 +231,7 @@ Open Keyboard Shortcuts**.
 | `kdb-q-ext-vscode.consoleSize`    | `[1000, 1000]` | How much of a result to show, as lines then width            |
 | `kdb-q-ext-vscode.sizeLimit`      | `10`           | The largest result to take, in MB, uncompressed              |
 
-A result over `sizeLimit` is refused and the connection closed. Results are
-decoded in the **kdb+/q** tab, and some decode to up to 60 times their size:
-a tab that runs out of memory goes blank, while VS Code and other extensions
-carry on.
+A result over `sizeLimit` is refused and the connection closed. The extension
+holds the latest result as it arrived, and decodes it in the **kdb+/q** tab,
+where some results take up to 60 times their size: a tab that runs out of
+memory goes blank, while VS Code and other extensions carry on.

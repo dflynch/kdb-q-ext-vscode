@@ -126,6 +126,16 @@ suite("the Result view", () => {
     assert.deepStrictEqual(second.posted, [{ ...two, id: 2 }]);
   });
 
+  test("a webview it has replaced is not listened to", () => {
+    const results = new ResultView(extension);
+    const first = resolved(results);
+    const second = resolved(results);
+    results.show(one);
+    first.ready();
+    assert.deepStrictEqual(second.posted, []);
+    assert.deepStrictEqual(first.posted, []);
+  });
+
   test("gives back the server's time once the webview has shown it", async () => {
     const results = new ResultView(extension);
     const view = resolved(results);
@@ -145,6 +155,39 @@ suite("the Result view", () => {
     view.say({ type: "shown", id: 1, execution: 7 });
     view.say({ type: "shown", id: 2, execution: 9 });
     assert.strictEqual(await second, 9);
+  });
+
+  test("its bundled script loads, decodes a result, and answers", async function () {
+    this.timeout(10000);
+    const extension = vscode.extensions.getExtension(
+      "dflynch3.kdb-q-ext-vscode",
+    );
+    assert.ok(extension);
+    // A webview in an editor tab stands in for the panel's: the page, its
+    // policy and the script are the same
+    const panel = vscode.window.createWebviewPanel(
+      "kdb-q-ext-vscode.test",
+      "Result",
+      vscode.ViewColumn.One,
+    );
+    try {
+      // ``result`elapsed!(::;42;7), protected evaluation's reply
+      const message = Buffer.from(
+        "0100000039000000630b000300000000726573756c7400656c6170736564000000030000006500f92a00000000000000f90700000000000000",
+        "hex",
+      );
+      const results = new ResultView(extension.extensionUri);
+      results.resolveWebviewView(panel as unknown as vscode.WebviewView);
+      const execution = await results.show({
+        type: "result",
+        message: new Uint8Array(message),
+        wrapped: true,
+        size: defaultSize,
+      });
+      assert.strictEqual(execution, 7);
+    } finally {
+      panel.dispose();
+    }
   });
 
   test("is contributed, and opens", async () => {

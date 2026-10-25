@@ -1,4 +1,4 @@
-// Bundles the extension for VS Code's Node host and the results panel's
+// Bundles the extension for VS Code's Node host and the Result view's
 // script for its webview, which can't load from node_modules. tsc checks the
 // types and builds the tests; this only bundles.
 //   node esbuild.mjs               a development build, with source maps

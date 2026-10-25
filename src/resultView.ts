@@ -27,6 +27,9 @@ export class ResultView implements vscode.WebviewViewProvider {
       }
     });
     view.webview.onDidReceiveMessage((message: FromView) => {
+      if (this.view !== view) {
+        return;
+      }
       if (message.type === "ready") {
         this.ready = true;
         this.post();
@@ -78,7 +81,7 @@ export class ResultView implements vscode.WebviewViewProvider {
 export type Results = Pick<ResultView, "reveal" | "show">;
 
 // Registers the view, kept alive when hidden: a result can take long to
-// compute, and its scroll, sort and filter should be there on coming back
+// compute, and should be there as it was left on coming back
 export function registerResultView(view: ResultView) {
   return vscode.window.registerWebviewViewProvider(viewId, view, {
     webviewOptions: { retainContextWhenHidden: true },

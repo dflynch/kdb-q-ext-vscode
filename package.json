@@ -316,7 +316,7 @@
           "type": "number",
           "default": 10,
           "exclusiveMinimum": 0,
-          "markdownDescription": "The largest result to take, in megabytes, uncompressed. A larger one is refused and the connection closed. Results are decoded in the **kdb+/q** tab, and some decode to up to 60 times their size: a tab that runs out of memory goes blank, while VS Code and other extensions carry on."
+          "markdownDescription": "The largest result to take, in megabytes, uncompressed. A larger one is refused and the connection closed. The extension holds the latest result as it arrived, and decodes it in the **kdb+/q** tab, where some results take up to 60 times their size: a tab that runs out of memory goes blank, while VS Code and other extensions carry on."
         }
       }
     }

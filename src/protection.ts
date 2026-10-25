@@ -36,10 +36,6 @@ export const wrapper = [
   "  ``error`backtrace`elapsed!(::;outcome 1;backtrace;elapsed)}",
 ].join("\n");
 
-// An error with advice to show under it, where what went wrong suggests
-// what to do
-export type Hinted = Error & { hint?: string };
-
 // An error the server signalled, with q's text as the message, and, where
 // protected evaluation caught it, how long the server took, in whole
 // milliseconds, and the stack as q shows it; and any hint

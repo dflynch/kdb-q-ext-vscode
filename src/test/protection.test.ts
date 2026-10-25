@@ -1,5 +1,5 @@
 import * as assert from "node:assert";
-import { type Hinted, QError, reply } from "../protection";
+import { QError, reply } from "../protection";
 
 // q's -8! of each value, as a hex string
 const bytes = (hex: string) => Buffer.from(hex, "hex");
@@ -11,7 +11,7 @@ const signalled = bytes("010000000e000000807479706500");
 const unrecognised = (error: unknown) =>
   error instanceof Error &&
   error.message === "unrecognised response" &&
-  /turn off protect/.test(String((error as Hinted).hint));
+  /turn off protect/.test(String((error as { hint?: string }).hint));
 
 suite("protected evaluation", () => {
   test("not protected, the value, with no server time", () => {
