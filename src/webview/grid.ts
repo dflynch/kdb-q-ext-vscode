@@ -15,7 +15,7 @@ import type { Sheet } from "./table";
 // The Grid view: a sheet in ag-grid. Only this file knows ag-grid.
 
 ModuleRegistry.registerModules([
-  // For right-aligned columns
+  // For right-aligned cells
   CellStyleModule,
   ClientSideRowModelModule,
   ColumnAutoSizeModule,
@@ -82,8 +82,11 @@ export class Grid {
         colId: String(j),
         headerName: column.name,
         pinned: j < sheet.keys ? "left" : undefined,
-        // Numbers line up by their digits
-        type: numbers.includes(column.type) ? "rightAligned" : undefined,
+        // Numbers line up by their digits, under a header like any other:
+        // the cell half of ag-grid's rightAligned type
+        cellClass: numbers.includes(column.type)
+          ? "ag-right-aligned-cell"
+          : undefined,
         valueGetter: ({ data }) => data?.row,
         valueFormatter: ({ value }) =>
           value === null || value === undefined ? "" : column.text(value),
