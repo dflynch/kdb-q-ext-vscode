@@ -6,7 +6,7 @@ import type { Connections } from "./connections";
 import { credentials, type Sources } from "./credentials";
 import type { Size } from "./format/console";
 import { quickInput } from "./quickInput";
-import { type Outcome, sizeSetting, timing, toView } from "./result";
+import { type Outcome, sizeSetting, toView } from "./result";
 import type { Results } from "./resultView";
 import * as servers from "./servers";
 import * as statements from "./statements";
@@ -113,16 +113,19 @@ async function run(
   const size = consoleSize();
   await results.reveal();
   const ended = status.running(name);
-  let outcome: Outcome | undefined;
-  try {
-    outcome = await link.query(query).then(
-      (result) => ({ result }),
-      (error: Error) => ({ error }),
-    );
-    results.show(toView(outcome, size));
-  } finally {
-    ended(outcome && timing(outcome));
-  }
+  const outcome: Outcome = await link.query(query).then(
+    (result) => ({ result }),
+    (error: Error) => ({ error }),
+  );
+  const executed = ended(
+    "result" in outcome ? outcome.result.roundtrip : undefined,
+  );
+  // The server's time is known once the webview has decoded the response
+  results.show(toView(outcome, size)).then((execution) => {
+    if (execution !== undefined) {
+      executed(execution);
+    }
+  });
 }
 
 // Comment out the selected lines with "/" and "\" marker lines, or remove the

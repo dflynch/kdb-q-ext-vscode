@@ -1,6 +1,6 @@
 import * as assert from "node:assert";
-import { defaultSize } from "../format/console";
-import { consoleText } from "../webview/console";
+import { defaultSize, type Size } from "../format/console";
+import { consoleView } from "../webview/console";
 
 // q's -8! of til n
 function til(n: number): Uint8Array {
@@ -15,6 +15,16 @@ function til(n: number): Uint8Array {
   return message;
 }
 
+const bytes = (hex: string) => Buffer.from(hex, "hex");
+
+// A response as the extension posts it
+const result = (message: Uint8Array, wrapped = false, size = defaultSize) => ({
+  type: "result" as const,
+  message,
+  wrapped,
+  size: size as Size,
+});
+
 suite("the Console view", () => {
   test("til makes what q's -8! does", () => {
     assert.strictEqual(
@@ -24,43 +34,60 @@ suite("the Console view", () => {
   });
 
   test("a result as the q console shows it", () => {
-    assert.strictEqual(
-      consoleText({ type: "result", message: til(3), size: defaultSize }),
-      "0 1 2",
-    );
+    assert.deepStrictEqual(consoleView(result(til(3))), { text: "0 1 2" });
   });
 
   test(":: shows nothing, as an assignment's result", () => {
     const message = Uint8Array.of(1, 0, 0, 0, 10, 0, 0, 0, 101, 0);
-    assert.strictEqual(
-      consoleText({ type: "result", message, size: defaultSize }),
-      "",
-    );
+    assert.deepStrictEqual(consoleView(result(message)), { text: "" });
   });
 
   test("the result cut at the console size", () => {
-    assert.strictEqual(
-      consoleText({
-        type: "result",
-        message: til(100),
-        size: { lines: 10, width: 10 },
-      }),
-      "0 1 2 3 ..",
+    assert.deepStrictEqual(
+      consoleView(result(til(100), false, { lines: 10, width: 10 })),
+      { text: "0 1 2 3 .." },
     );
+  });
+
+  test("protected, the result and how long the server took", () => {
+    // ``result`elapsed!(::;42;7)
+    const message = bytes(
+      "0100000039000000630b000300000000726573756c7400656c6170736564000000030000006500f92a00000000000000f90700000000000000",
+    );
+    assert.deepStrictEqual(consoleView(result(message, true)), {
+      text: "42",
+      execution: 7,
+    });
+  });
+
+  test("protected, an error after a ', with its backtrace and the server's time", () => {
+    // ``error`backtrace`elapsed!(::;"type";"  [0]  1+`a\n        ^\n";3)
+    const message = bytes(
+      "010000005f000000630b0004000000006572726f72006261636b747261636500656c61707365640000000400000065000a0004000000747970650a001600000020205b305d2020312b60610a20202020202020205e0af90300000000000000",
+    );
+    assert.deepStrictEqual(consoleView(result(message, true)), {
+      text: "'type\n  [0]  1+`a\n        ^",
+      execution: 3,
+    });
+  });
+
+  test("an error signalled under protection, with its hint on the line after", () => {
+    const signalled = bytes("010000000e000000807479706500");
+    assert.deepStrictEqual(consoleView(result(signalled, true)), {
+      text: "'type\nprotected evaluation may have been refused: turn off protect for a server whose .z.pg is customised",
+    });
   });
 
   test("a result that can't be decoded shows the decoder's error", () => {
-    const message = til(3).subarray(0, 20);
-    assert.strictEqual(
-      consoleText({ type: "result", message, size: defaultSize }),
-      "'badmsg",
-    );
+    assert.deepStrictEqual(consoleView(result(til(3).subarray(0, 20))), {
+      text: "'badmsg",
+    });
   });
 
-  test("an error as the extension gave it", () => {
-    assert.strictEqual(
-      consoleText({ type: "error", text: "'type\na hint" }),
-      "'type\na hint",
+  test("an error of the extension's, as it gave it", () => {
+    assert.deepStrictEqual(
+      consoleView({ type: "error", text: "'result too big" }),
+      { text: "'result too big" },
     );
   });
 });

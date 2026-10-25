@@ -232,6 +232,6 @@ Open Keyboard Shortcuts**.
 | `kdb-q-ext-vscode.sizeLimit`      | `10`           | The largest result to take, in MB, uncompressed              |
 
 A result over `sizeLimit` is refused and the connection closed. Results are
-held in the extension host, whose memory can't be raised, and some decode to
-up to 60 times their size, so a high limit can crash every extension in the
-window.
+decoded in the **kdb+/q** tab, and some decode to up to 60 times their size:
+a tab that runs out of memory goes blank, while VS Code and other extensions
+carry on.

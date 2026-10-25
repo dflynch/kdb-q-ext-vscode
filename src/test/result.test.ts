@@ -1,54 +1,29 @@
 import * as assert from "node:assert";
-import { QError } from "../connection";
 import { defaultSize } from "../format/console";
-import { sizeSetting, timing, toView } from "../result";
+import { QError } from "../protection";
+import { sizeSetting, toView } from "../result";
 
 const message = Uint8Array.of(1, 2, 0, 0, 10, 0, 0, 0, 101, 0);
 
 suite("result", () => {
-  test("a result goes to the view undecoded, with the console size", () => {
+  test("a response goes to the view as it arrived, with the console size", () => {
     const size = { ...defaultSize, lines: 25, width: 80 };
     assert.deepStrictEqual(
-      toView({ result: { message, timing: { roundtrip: 0 } } }, size),
-      { type: "result", message, size },
+      toView({ result: { message, wrapped: true, roundtrip: 0 } }, size),
+      { type: "result", message, wrapped: true, size },
     );
   });
 
-  test("an error after a ', with its backtrace", () => {
-    const error = new QError(
-      "type",
-      { roundtrip: 1, execution: 0 },
-      "  [0]  1+`a\n        ^\n",
-    );
-    assert.deepStrictEqual(toView({ error }, defaultSize), {
-      type: "error",
-      text: "'type\n  [0]  1+`a\n        ^",
-    });
-  });
-
-  test("an error's hint on the line after it", () => {
-    const error = new QError("type", { roundtrip: 1 }, undefined, "a hint");
-    assert.deepStrictEqual(toView({ error }, defaultSize), {
-      type: "error",
-      text: "'type\na hint",
-    });
-  });
-
-  test("an error of ours, the same way", () => {
+  test("an error of ours after a ', with any hint on the line after it", () => {
     assert.deepStrictEqual(
       toView({ error: new Error("result too big") }, defaultSize),
       { type: "error", text: "'result too big" },
     );
-  });
-
-  test("a result and a q error have a timing, and an error of ours none", () => {
-    const took = { roundtrip: 3, execution: 2 };
-    assert.strictEqual(timing({ result: { message, timing: took } }), took);
-    assert.strictEqual(timing({ error: new QError("type", took) }), took);
-    assert.strictEqual(
-      timing({ error: new Error("connection closed unexpectedly") }),
-      undefined,
-    );
+    const hinted = new QError("access", { hint: "a hint" });
+    assert.deepStrictEqual(toView({ error: hinted }, defaultSize), {
+      type: "error",
+      text: "'access\na hint",
+    });
   });
 
   test("the console size is lines then width, each from 10 to 2000", () => {

@@ -195,3 +195,12 @@ function itemAt(list: List, i: number): Value {
     data: bytes.subarray(offsets[i], offsets[i + 1]),
   };
 }
+
+// An error as the q console shows it: after a ', then any backtrace, then
+// any hint on the line after
+export function errorText(
+  error: Error & { backtrace?: string; hint?: string },
+): string {
+  const backtrace = error.backtrace ? `\n${error.backtrace.trimEnd()}` : "";
+  return `'${error.message}${backtrace}${error.hint ? `\n${error.hint}` : ""}`;
+}

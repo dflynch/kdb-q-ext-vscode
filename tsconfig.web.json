@@ -1,13 +1,19 @@
 {
-  // The webview's script, and the codec, the formatter and the messages it
-  // shares with the extension, mustn't use Node: this checks them without
-  // Node's types
+  // The webview's script, and the codec, the formatter, the messages and
+  // protected evaluation it shares with the extension, mustn't use Node:
+  // this checks them without Node's types
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "types": [],
     "lib": ["ES2024", "DOM"],
     "noEmit": true
   },
-  "include": ["src/codec", "src/format", "src/messages.ts", "src/webview"],
+  "include": [
+    "src/codec",
+    "src/format",
+    "src/messages.ts",
+    "src/protection.ts",
+    "src/webview"
+  ],
   "exclude": []
 }

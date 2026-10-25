@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import * as vscode from "vscode";
-import type { FromView, ToView } from "./messages";
+import type { FromView, Posted, ToView } from "./messages";
 
 // The Result view in the bottom panel: the latest result, shown in a webview
 export const viewId = "kdb-q-ext-vscode.result";
@@ -12,7 +12,9 @@ export const viewId = "kdb-q-ext-vscode.result";
 export class ResultView implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private ready = false;
-  private latest?: ToView;
+  private latest?: Posted;
+  // Gives the latest's answer to whoever showed it
+  private answer?: (execution: number | undefined) => void;
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
@@ -28,6 +30,9 @@ export class ResultView implements vscode.WebviewViewProvider {
       if (message.type === "ready") {
         this.ready = true;
         this.post();
+      } else if (message.id === this.latest?.id) {
+        this.answer?.(message.execution);
+        this.answer = undefined;
       }
     });
     const dist = vscode.Uri.joinPath(this.extensionUri, "dist");
@@ -48,10 +53,18 @@ export class ResultView implements vscode.WebviewViewProvider {
     });
   }
 
-  // Show a result or an error in place of the last
-  show(message: ToView) {
-    this.latest = message;
+  // Show a result or an error in place of the last. It resolves with how
+  // long the server took, where protected evaluation said, once the webview
+  // has shown it, or with nothing if another is shown first. A webview that
+  // never answers, as one that has crashed, leaves it waiting.
+  show(message: ToView): Promise<number | undefined> {
+    this.answer?.(undefined);
+    this.latest = { ...message, id: (this.latest?.id ?? 0) + 1 };
+    const answered = new Promise<number | undefined>((resolve) => {
+      this.answer = resolve;
+    });
     this.post();
+    return answered;
   }
 
   private post() {

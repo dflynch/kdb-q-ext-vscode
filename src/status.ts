@@ -1,14 +1,27 @@
 import * as vscode from "vscode";
-import type { Connection, Timing } from "./connection";
+import type { Connection } from "./connection";
 import type { Connections, State } from "./connections";
 import type { Definition } from "./servers";
 import { passphraseKey } from "./tls";
 
-// What a query tells the status bar: that it's running on a server, and,
-// with the function that gives back, that it ended, taking the time given if
-// that's known
+// How long a query took, in whole milliseconds, as \t gives
+export type Timing = {
+  // From sending the query to the last of its response arriving
+  roundtrip: number;
+  // The server's time running it, with protected evaluation: not
+  // serialising the result, nor formatting a backtrace
+  execution?: number;
+};
+
+// What a query tells the status bar: that it's running on a server; with the
+// function that gives back, that it ended, after the roundtrip given if a
+// response came; and with the function that gives back, how long the server
+// took, once the Result view has read it from the response. That's dropped
+// if another query's timing has replaced this one's.
 export type Status = {
-  running(name: string): (timing: Timing | undefined) => void;
+  running(
+    name: string,
+  ): (roundtrip: number | undefined) => (execution: number) => void;
 };
 
 // A state as a few words: a closed one's reason, which says how it closed
@@ -128,10 +141,18 @@ export function showStatus(
     running: (name) => {
       running.set(name, (running.get(name) ?? 0) + 1);
       update();
-      return (timing) => {
+      return (roundtrip) => {
         running.set(name, (running.get(name) ?? 0) - 1);
-        last = timing && { name, timing };
+        const ended: typeof last =
+          roundtrip === undefined ? undefined : { name, timing: { roundtrip } };
+        last = ended;
         update();
+        return (execution) => {
+          if (ended && last === ended) {
+            ended.timing = { roundtrip: ended.timing.roundtrip, execution };
+            update();
+          }
+        };
       };
     },
     dispose: () => {
