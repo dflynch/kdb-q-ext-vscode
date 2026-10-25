@@ -66,8 +66,9 @@ suite("the Result view", () => {
     assert.deepStrictEqual(policy(html)?.split("; "), [
       "default-src 'none'",
       "script-src 'nonce-abc123'",
-      "style-src https://source.example",
+      "style-src https://source.example 'nonce-abc123'",
       "font-src https://source.example",
+      "img-src data:",
     ]);
     assert.match(
       html,

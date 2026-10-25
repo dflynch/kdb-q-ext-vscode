@@ -1,18 +1,87 @@
 /* Bundled into dist/webview.css. Colours and fonts come only from VS Code's
    own variables, so every theme, high contrast included, styles the view */
 
+html,
 body {
-  padding: 0 20px;
+  height: 100%;
+}
+
+/* The tabs above, and whichever view is shown filling the rest */
+body {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 20px 8px;
+}
+
+/* The view not shown */
+.console[hidden],
+.grid[hidden] {
+  display: none;
 }
 
 .empty {
   color: var(--vscode-descriptionForeground);
 }
 
+/* As the panel's own titles: the chosen one underlined */
+.tabs {
+  display: flex;
+  gap: 16px;
+  flex: none;
+}
+
+.tabs button {
+  padding: 6px 0 4px;
+  border: none;
+  border-bottom: 1px solid transparent;
+  background: none;
+  color: var(--vscode-panelTitle-inactiveForeground);
+  font: inherit;
+  font-size: 11px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.tabs button:hover:enabled,
+.tabs button[aria-selected="true"] {
+  color: var(--vscode-panelTitle-activeForeground);
+}
+
+.tabs button[aria-selected="true"] {
+  border-bottom-color: var(--vscode-panelTitle-activeBorder);
+}
+
+.tabs button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.tabs button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+}
+
+/* The result's size, pushed to the right */
+.size {
+  margin-left: auto;
+  align-self: center;
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+}
+
 /* q's console text, in the editor's font */
 .console {
-  margin: 8px 0;
+  flex: 1;
+  margin: 8px 0 0;
+  overflow: auto;
   font-family: var(--vscode-editor-font-family);
   font-size: var(--vscode-editor-font-size);
   font-weight: var(--vscode-editor-font-weight);
+}
+
+.grid {
+  flex: 1;
+  min-height: 0;
+  margin-top: 8px;
 }
