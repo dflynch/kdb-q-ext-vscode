@@ -13,7 +13,8 @@ All notable changes to the extension are documented in this file.
   active connection, and how long its last query took, in the status bar
 - **kdb+/q: Run File on Server**, also the ▶ in the editor's title bar,
   which sends the whole file as one query, and shows the result in the
-  **kdb+/q** tab of the bottom panel as q's console prints it
+  **kdb+/q** tab of the bottom panel as q's console prints it, and a
+  table, keyed table or dictionary in a grid too, with sorting and filters
 - **kdb+/q: Run Selected Text on Server**, which sends the selection, or
   the current line, the same way
 - Settings: `servers`, `connectTimeout`, `consoleSize` and `sizeLimit`

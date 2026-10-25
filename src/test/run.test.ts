@@ -6,7 +6,7 @@ import { Connections } from "../connections";
 import type { Results } from "../resultView";
 import type { Definition } from "../servers";
 import type { Status } from "../status";
-import { consoleView } from "../webview/console";
+import { present } from "../webview/present";
 
 // q's -8! of a long, as a response that took no time
 function long(n: number): Result {
@@ -63,7 +63,7 @@ function shown() {
   const results: Results = {
     reveal: async () => {},
     show: async (message) => {
-      const { text, execution } = consoleView(message);
+      const { text, execution } = present(message);
       replaced.push(text);
       return execution;
     },

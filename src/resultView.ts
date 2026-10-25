@@ -99,8 +99,10 @@ export function page(
   const policy = [
     "default-src 'none'",
     `script-src 'nonce-${nonce}'`,
-    `style-src ${source}`,
+    `style-src ${source} 'nonce-${nonce}'`,
     `font-src ${source}`,
+    // ag-grid's icons
+    "img-src data:",
   ].join("; ");
   return `<!DOCTYPE html>
 <html lang="en">

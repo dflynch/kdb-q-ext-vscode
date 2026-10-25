@@ -15,6 +15,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },
-  // The webview's script has the DOM and no Node: tsconfig.web.json checks it
-  "exclude": ["src/webview/main.ts"]
+  // The webview's script and its grid have the DOM and no Node:
+  // tsconfig.web.json checks them
+  "exclude": ["src/webview/main.ts", "src/webview/grid.ts"]
 }

@@ -7,18 +7,14 @@ A lightweight extension for kdb+/q programming.
 Quirk is for writing q, and in time for querying kdb+ and reading what comes
 back, without leaving VS Code. It's one extension with nothing to install
 alongside it. Today it highlights q, edits it, runs it in a terminal, and
-connects to kdb+ to run queries and show their results as q's console does
-(see [Features](#features)).
+connects to kdb+ to run queries and show their results as q's console does,
+and tables in a grid (see [Features](#features)).
 
 ### Planned
 
-- A grid in the **kdb+/q** tab, as a second view of the result beside the
-  console text, shown as the q console shows values, using q's default
-  display settings: a long keeps every digit and a timestamp keeps its
-  nanoseconds. One deliberate difference: where the console leaves a null
-  blank in a table, the grid shows which type of null it is. Copying a
-  selection copies the text you see. The aim is a faithful view of the
-  result, not text that's promised to read back into q
+- In the grid: double-clicking a cell to see its whole value, or a table
+  inside it as a result of its own, and copying a selection as the text you
+  see
 - Go to definition, references, outline and workspace symbol search that
   follow q's namespaces and know which names are local to a lambda
 
@@ -132,7 +128,18 @@ The result shows in the **kdb+/q** tab of the bottom panel, beside Output and
 Terminal, as q's console prints it, replacing the last: an assignment shows
 nothing, and an error shows as `'type` with its backtrace. Running a query
 brings the tab into view and leaves the cursor in the editor. Switching away
-and back keeps the result as it was.
+and back keeps the result, its sort, filter and scroll, as it was.
+
+A table, a keyed table or a dictionary also shows in a grid. The tab has two
+views of the result, **Console** and **Grid**, and the one you chose last is
+kept for the next result; anything else, or an error, shows in the Console.
+Cells read as q's console shows them in a column: symbols bare, strings in
+quotes, nulls blank, and numbers lined up on the right. A keyed table's keys
+stay pinned on the left as it scrolls, and a dictionary is a `key` and a
+`value` column. A table inside a cell shows as `table, 3 rows`. Click a
+header to sort, by q's order, with nulls first; its filter matches the text
+shown. Beside the tabs is the result's size, such as `312 of 1000000 rows,
+5 columns` while filtered.
 
 There's more of it than q's console shows: 1000 lines of 1000 characters by
 default, set by `consoleSize` as `\c` takes them, with `..` where it's cut,
