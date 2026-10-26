@@ -87,6 +87,19 @@ export class Grid {
   ) {}
 
   show(sheet: Sheet) {
+    // Each row's index in the result, at the left as a spreadsheet's row
+    // headers: not a column of the sheet, so not a cell to drill into
+    const index: ColDef<Row, number> = {
+      colId: "index",
+      headerName: "",
+      pinned: "left",
+      lockPosition: "left",
+      suppressMovable: true,
+      suppressNavigable: true,
+      cellClass: ["index", "ag-right-aligned-cell"],
+      valueGetter: ({ data }) => data?.row,
+      comparator: (a, b) => (a ?? 0) - (b ?? 0),
+    };
     const columnDefs = sheet.columns.map(
       (column, j): ColDef<Row, number> => ({
         colId: String(j),
@@ -111,7 +124,7 @@ export class Grid {
     this.api = createGrid<Row>(this.place, {
       theme,
       styleNonce: this.nonce,
-      columnDefs,
+      columnDefs: [index, ...columnDefs],
       rowData: Array.from({ length: sheet.rows }, (_, row) => ({ row })),
       getRowId: ({ data }) => String(data.row),
       autoSizeStrategy: { type: "fitCellContents" },
@@ -124,7 +137,7 @@ export class Grid {
         }
       },
       onCellDoubleClicked: ({ data, column }) => {
-        if (data) {
+        if (data && column.getColId() !== "index") {
           this.drill(data.row, Number(column.getColId()));
         }
       },
@@ -132,6 +145,7 @@ export class Grid {
         const { data, event } = cell;
         if (
           "column" in cell &&
+          cell.column.getColId() !== "index" &&
           data &&
           event instanceof KeyboardEvent &&
           event.key === "Enter"

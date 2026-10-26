@@ -6,8 +6,8 @@ import { type Sheet, sheet } from "./table";
 
 // What the Result view shows for what the extension posts: the Console
 // view's text, a result as the q console shows it, with :: as nothing, or an
-// error, after a ' as q's; a table, a keyed table or a dictionary as a sheet
-// for the Grid view too; and how long the server took, where protected
+// error, after a ' as q's; a table, a keyed table, a dictionary or a list
+// but a string as a sheet for the Grid view too; and how long the server took, where protected
 // evaluation said
 export function present(message: ToView): {
   text: string;
@@ -37,8 +37,7 @@ export function present(message: ToView): {
 }
 
 // A value as the Console view shows it, and as a sheet for the Grid view if
-// it's a table, a keyed table or a dictionary: a result, or a cell's value
-// drilled into
+// it has one: a result, or a cell's value drilled into
 export function presented(
   value: Value,
   size: Size,

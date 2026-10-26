@@ -32,10 +32,18 @@ export interface Sheet {
   keys: number;
 }
 
-// A table, a keyed table, or a dictionary as key and value columns, as a
-// sheet; anything else, or an on-disk table, which only the server can
-// read, is shown only in the Console view
+// A table, a keyed table, a dictionary as key and value columns, or a list
+// as a value column, as a sheet. An atom, a string, which q reads as text
+// rather than as characters, anything else, or an on-disk table, which only
+// the server can read, is shown only in the Console view.
 export function sheet(value: Value): Sheet | undefined {
+  if (listed(value) && value.type !== 10) {
+    return {
+      rows: count(value) ?? 0,
+      columns: [column("value", value)],
+      keys: 0,
+    };
+  }
   if (value.type === 98) {
     if (!("data" in value)) {
       return undefined;

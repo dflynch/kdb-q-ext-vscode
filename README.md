@@ -128,23 +128,25 @@ nothing, and an error shows as `'type` with its backtrace. Running a query
 brings the tab into view and leaves the cursor in the editor. Switching away
 and back keeps the result, its sort, filter and scroll, as it was.
 
-A table, a keyed table or a dictionary also shows in a grid. The tab has two
-views of the result, **Console** and **Grid**, and the one you chose last is
-kept for the next result; anything else, or an error, shows in the Console.
-Cells read as q's console shows them in a column: symbols bare, strings in
-quotes, nulls blank, and numbers lined up on the right. A keyed table's keys
-stay pinned on the left as it scrolls, and a dictionary is a `key` and a
-`value` column. A table inside a cell shows as `table, 3 rows`. Click a
-header to sort, by q's order, with nulls first; its filter matches the text
-shown. Beside the tabs is the result's size, such as `312 of 1000000 rows,
+A table, a keyed table, a dictionary or a list also shows in a grid. The
+tab has two views of the result, **Console** and **Grid**, and the one you
+chose last is kept for the next result; anything else, an atom, a string or
+an error, shows in the Console. Cells read as q's console shows them in a
+column: symbols bare, strings in quotes, nulls blank, and numbers lined up
+on the right. A keyed table's keys stay pinned on the left as it scrolls, a
+dictionary is a `key` and a `value` column, and a list a `value` column, an
+item to a row. A table inside a cell shows as `table, 3 rows`. At the left,
+each row's index in the result, from 0. Click a header to sort, by q's
+order, with nulls first, or the index's to put the rows back as they came;
+a column's filter matches the text shown. Beside the tabs is the result's size, such as `312 of 1000000 rows,
 5 columns` while filtered.
 
 Double-click a cell, or press Enter on it, to see its value as a result of
-its own: a table in a cell in the Grid, a long string in full in the
-Console. A trail above the tabs, such as `⌂ › [427, 1] › [0, 2]`, says where
+its own: a table or a list in a cell in the Grid, a long string in full in
+the Console. A trail above the tabs, such as `⌂ › [427, 1] › [0, 2]`, says where
 it came from: `⌂` is the result, and each step a cell's row and column,
-counted from 0, the row as the result came, however it's sorted or
-filtered, and the column as the result has it, keys first. Click a step,
+counted from 0, the row its index, however it's sorted or filtered, and
+the column as the result has it, keys first. Click a step,
 or press Alt+Left, to go back, to find it as you left it.
 
 **kdb+/q: Keep Result**, also the pin in the tab's title bar, opens the

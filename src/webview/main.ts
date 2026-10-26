@@ -132,7 +132,7 @@ function switchTo() {
   gridTab.disabled = !sheet;
   gridTab.title = sheet
     ? ""
-    : "Only a table, a keyed table or a dictionary shows in the Grid";
+    : "Only a table, a dictionary or a list, but a string, shows in the Grid";
   size.textContent = sheet
     ? sized(sheet, view === "grid" ? level.filtered : undefined)
     : "";

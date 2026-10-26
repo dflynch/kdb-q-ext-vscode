@@ -175,3 +175,8 @@ body {
   min-height: 0;
   margin-top: 8px;
 }
+
+/* Row indexes, muted as headers are, not data */
+.grid .index {
+  color: var(--vscode-descriptionForeground);
+}

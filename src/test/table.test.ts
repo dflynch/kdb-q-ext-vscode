@@ -2,7 +2,7 @@ import * as assert from "node:assert";
 import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import { decode } from "../codec/decode";
-import type { Value, Vector } from "../codec/types";
+import { count, type Value, type Vector } from "../codec/types";
 import { type Sheet, sheet } from "../webview/table";
 
 const { values: fixtures } = JSON.parse(
@@ -167,11 +167,30 @@ suite("the Grid view's sheet", () => {
     assert.strictEqual(s?.columns[0].value(0), nested);
   });
 
-  test("what isn't a table, a keyed table or a dictionary has none", () => {
-    for (const name of ["list.mixed", "display.matrix"]) {
-      assert.strictEqual(sheet(value(name)), undefined, name);
-    }
+  test("a list is a value column, an item to a row", () => {
+    const mixed = sheetOf("list.mixed");
+    assert.strictEqual(mixed.rows, count(value("list.mixed")));
+    assert.deepStrictEqual(
+      mixed.columns.map((c) => c.name),
+      ["value"],
+    );
+    assert.strictEqual(mixed.keys, 0);
+    const matrix = value("display.matrix");
+    assert.ok(matrix.type === 0 && "items" in matrix);
+    assert.deepStrictEqual(
+      sheetOf("display.matrix").columns[0].value(1),
+      matrix.items[1],
+    );
+    const longs = sheet(vector({ type: 7, data: BigInt64Array.of(3n, 4n) }));
+    assert.deepStrictEqual(longs && cells(longs), [["value"], ["3"], ["4"]]);
+  });
+
+  test("what has no rows to show has none: an atom, a string", () => {
     assert.strictEqual(sheet({ type: -7, value: 42n }), undefined);
+    assert.strictEqual(
+      sheet({ type: 10, attribute: 0, data: new TextEncoder().encode("ab") }),
+      undefined,
+    );
     assert.strictEqual(
       sheet({ type: 98, attribute: 0, columns: ["a"], reference: ":db/t" }),
       undefined,
