@@ -52,7 +52,10 @@ export class ResultView implements vscode.WebviewViewProvider {
       } else if (message.type === "chose") {
         this.chosen = message.view;
       } else if (message.type === "drilled") {
-        this.path = message.path;
+        // Not about an earlier one, drilled into before the latest arrived
+        if (message.id === this.latest?.id) {
+          this.path = message.path;
+        }
       } else if (message.id === this.latest?.id) {
         this.answer?.(message.execution);
         this.answer = undefined;
@@ -86,8 +89,9 @@ export class ResultView implements vscode.WebviewViewProvider {
   }
 
   // Keep the latest in an editor tab of its own, in the view it's shown in
-  // and on the cell drilled into, where the next result doesn't replace it. The tab is kept alive when
-  // hidden, as the Result view is, and closes with VS Code: nothing is saved.
+  // and on the cell drilled into, where the next result doesn't replace it.
+  // The tab is kept alive when hidden, as the Result view is, and closes
+  // with VS Code: nothing is saved.
   keep() {
     if (!this.latest || !this.about) {
       return;

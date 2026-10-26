@@ -206,6 +206,7 @@ suite("the Result view", () => {
     results.show(two, asked);
     first.say({
       type: "drilled",
+      id: 1,
       path: [
         [3, 1],
         [0, 2],
@@ -233,12 +234,25 @@ suite("the Result view", () => {
     });
   });
 
+  test("cells drilled into in an earlier result are ignored", () => {
+    const results = new ResultView(extension);
+    const first = resolved(results);
+    first.ready();
+    results.show(two, asked);
+    results.show(one, asked);
+    // Drilled into the first before the second arrived
+    first.say({ type: "drilled", id: 1, path: [[3, 1]] });
+    const second = resolved(results);
+    second.ready();
+    assert.deepStrictEqual(second.posted[0].path, []);
+  });
+
   test("keeps the cell drilled into", () => {
     const { made, panels } = tabs();
     const results = new ResultView(extension, panels);
     const view = resolved(results);
     results.show(two, asked);
-    view.say({ type: "drilled", path: [[3, 1]] });
+    view.say({ type: "drilled", id: 1, path: [[3, 1]] });
     results.keep();
     made[0].view.ready();
     assert.deepStrictEqual(made[0].view.posted[0].path, [[3, 1]]);

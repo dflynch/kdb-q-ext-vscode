@@ -37,6 +37,12 @@ body {
   visibility: hidden;
 }
 
+/* ag-grid shows its scrollbars while they scroll, whatever's around them */
+.level[hidden] * {
+  /* biome-ignore lint/complexity/noImportantStyles: ag-grid's own rule, of a specificity its theme decides, makes them visible */
+  visibility: hidden !important;
+}
+
 /* The view not shown */
 .console[hidden],
 .grid[hidden],

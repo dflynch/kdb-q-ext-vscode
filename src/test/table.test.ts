@@ -141,6 +141,17 @@ suite("the Grid view's sheet", () => {
       attribute: 0,
       data: new TextEncoder().encode("c"),
     });
+    // A dictionary's key and value
+    const mixed = sheetOf("dict.mixed");
+    assert.deepStrictEqual(mixed.columns[0].value(1), {
+      type: -11,
+      value: "b",
+    });
+    assert.deepStrictEqual(mixed.columns[1].value(1), {
+      type: 10,
+      attribute: 0,
+      data: new TextEncoder().encode("two"),
+    });
     // A nested item, or a table in a cell, as it is
     assert.deepStrictEqual(
       sheetOf("table.nestedColumn").columns[0].value(1),

@@ -4,7 +4,7 @@
 import type { Size } from "../format/console";
 import type { About, FromView, Posted, Step, View } from "../messages";
 import { Grid } from "./grid";
-import { present, shown } from "./present";
+import { present, presented } from "./present";
 import type { Sheet } from "./table";
 
 declare function acquireVsCodeApi(): {
@@ -116,8 +116,10 @@ class Level {
 let chosen: View = "grid";
 // The result first, then each value drilled into from the one before
 let levels: Level[] = [];
-// The console size the result came with, for the values drilled into
+// The console size the result came with, for the values drilled into, and
+// its number, for the extension to match the cells drilled into to it
 let consoleSize: Size | undefined;
+let shownId = 0;
 
 const shownLevel = () => levels[levels.length - 1];
 
@@ -134,8 +136,10 @@ function switchTo() {
   size.textContent = sheet
     ? sized(sheet, view === "grid" ? level.filtered : undefined)
     : "";
+  // Inert, as well as hidden, so no key or click reaches one drilled from
   for (const each of levels) {
     each.element.hidden = each !== level;
+    each.element.inert = each !== level;
   }
   level.text.hidden = view !== "console";
   level.place.hidden = view !== "grid";
@@ -163,7 +167,10 @@ function showTrail() {
   levels.forEach((level, i) => {
     const name = level.step ? `[${level.step.join(", ")}]` : "Result";
     if (i > 0) {
-      trail.append(" › ");
+      const between = document.createElement("span");
+      between.ariaHidden = "true";
+      between.textContent = " › ";
+      trail.append(between);
     }
     if (i === levels.length - 1) {
       const here = document.createElement("span");
@@ -187,7 +194,7 @@ function drill(step: Step, told = true) {
   if (!sheet || !consoleSize) {
     throw new Error("drilled into a value with no grid");
   }
-  const { text, sheet: table } = shown(
+  const { text, sheet: table } = presented(
     sheet.columns[column].value(row),
     consoleSize,
   );
@@ -220,12 +227,22 @@ function back(i: number) {
 // view made anew, opens on the same value
 function tellPath() {
   const path = levels.slice(1).map((level) => level.step as Step);
-  vscode.postMessage({ type: "drilled", path });
+  vscode.postMessage({ type: "drilled", id: shownId, path });
 }
 
-// Alt+Left goes back a step, as a browser's Back
+// Alt+Left goes back a step, as a browser's Back, but not while typing, as
+// in a filter, where it moves a word left
 document.addEventListener("keydown", (event) => {
-  if (event.altKey && event.key === "ArrowLeft" && levels.length > 1) {
+  const typing =
+    event.target instanceof HTMLElement &&
+    event.target.matches("input, textarea, [contenteditable]");
+  if (
+    event.altKey &&
+    event.key === "ArrowLeft" &&
+    !typing &&
+    !event.defaultPrevented &&
+    levels.length > 1
+  ) {
     event.preventDefault();
     back(levels.length - 2);
   }
@@ -251,6 +268,7 @@ window.addEventListener("message", ({ data }: MessageEvent<Posted>) => {
     level.element.remove();
   }
   consoleSize = data.type === "result" ? data.size : undefined;
+  shownId = data.id;
   levels = [new Level(undefined, text, sheet, chosen)];
   stack.append(levels[0].element);
   switchTo();

@@ -39,4 +39,4 @@ export type FromView =
   | { type: "ready" }
   | { type: "shown"; id: number; execution?: number }
   | { type: "chose"; view: View }
-  | { type: "drilled"; path: Step[] };
+  | { type: "drilled"; id: number; path: Step[] };

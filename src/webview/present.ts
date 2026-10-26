@@ -22,7 +22,7 @@ export function present(message: ToView): {
   let execution: number | undefined;
   try {
     const replied = reply(message.message, message.wrapped);
-    ({ text, sheet: table } = shown(replied.value, message.size));
+    ({ text, sheet: table } = presented(replied.value, message.size));
     execution = replied.execution;
   } catch (error) {
     const thrown = error instanceof Error ? error : new Error(String(error));
@@ -39,7 +39,7 @@ export function present(message: ToView): {
 // A value as the Console view shows it, and as a sheet for the Grid view if
 // it's a table, a keyed table or a dictionary: a result, or a cell's value
 // drilled into
-export function shown(
+export function presented(
   value: Value,
   size: Size,
 ): { text: string; sheet?: Sheet } {
