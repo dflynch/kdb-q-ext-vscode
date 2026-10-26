@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import * as vscode from "vscode";
-import type { About, FromView, Posted, ToView, View } from "./messages";
+import type { About, FromView, Posted, Step, ToView, View } from "./messages";
 
 // The Result view in the bottom panel: the latest result, shown in a webview
 export const viewId = "kdb-q-ext-vscode.result";
@@ -22,8 +22,10 @@ export class ResultView implements vscode.WebviewViewProvider {
   private ready = false;
   private latest?: Posted;
   private about?: About;
-  // The view chosen last, kept here too so a new webview opens on it
+  // The view chosen last, and the cells drilled into in the latest, kept
+  // here too so a new webview opens on them
   private chosen: View = "grid";
+  private path: Step[] = [];
   // Gives the latest's answer to whoever showed it
   private answer?: (execution: number | undefined) => void;
 
@@ -49,6 +51,11 @@ export class ResultView implements vscode.WebviewViewProvider {
         this.post();
       } else if (message.type === "chose") {
         this.chosen = message.view;
+      } else if (message.type === "drilled") {
+        // Not about an earlier one, drilled into before the latest arrived
+        if (message.id === this.latest?.id) {
+          this.path = message.path;
+        }
       } else if (message.id === this.latest?.id) {
         this.answer?.(message.execution);
         this.answer = undefined;
@@ -72,6 +79,7 @@ export class ResultView implements vscode.WebviewViewProvider {
     this.answer?.(undefined);
     this.latest = { ...message, id: (this.latest?.id ?? 0) + 1 };
     this.about = { ...about, at: Date.now() };
+    this.path = [];
     vscode.commands.executeCommand("setContext", hasResult, true);
     const answered = new Promise<number | undefined>((resolve) => {
       this.answer = resolve;
@@ -80,9 +88,10 @@ export class ResultView implements vscode.WebviewViewProvider {
     return answered;
   }
 
-  // Keep the latest in an editor tab of its own, in the view it's shown in,
-  // where the next result doesn't replace it. The tab is kept alive when
-  // hidden, as the Result view is, and closes with VS Code: nothing is saved.
+  // Keep the latest in an editor tab of its own, in the view it's shown in
+  // and on the cell drilled into, where the next result doesn't replace it.
+  // The tab is kept alive when hidden, as the Result view is, and closes
+  // with VS Code: nothing is saved.
   keep() {
     if (!this.latest || !this.about) {
       return;
@@ -91,6 +100,7 @@ export class ResultView implements vscode.WebviewViewProvider {
       ...this.latest,
       about: this.about,
       view: this.chosen,
+      path: this.path,
     };
     const panel = this.panels(
       keptType,
@@ -113,7 +123,11 @@ export class ResultView implements vscode.WebviewViewProvider {
 
   private post() {
     if (this.view && this.ready && this.latest) {
-      this.view.webview.postMessage({ ...this.latest, view: this.chosen });
+      this.view.webview.postMessage({
+        ...this.latest,
+        view: this.chosen,
+        path: this.path,
+      });
     }
   }
 }

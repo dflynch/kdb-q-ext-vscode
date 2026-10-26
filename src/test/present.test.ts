@@ -34,7 +34,10 @@ suite("the Console view", () => {
   });
 
   test("a result as the q console shows it", () => {
-    assert.deepStrictEqual(present(result(til(3))), { text: "0 1 2" });
+    const { text, sheet } = present(result(til(3)));
+    assert.strictEqual(text, "0 1 2");
+    // A list shows in the Grid too, an item to a row
+    assert.strictEqual(sheet?.rows, 3);
   });
 
   test(":: shows nothing, as an assignment's result", () => {
@@ -43,9 +46,9 @@ suite("the Console view", () => {
   });
 
   test("the result cut at the console size", () => {
-    assert.deepStrictEqual(
-      present(result(til(100), false, { lines: 10, width: 10 })),
-      { text: "0 1 2 3 .." },
+    assert.strictEqual(
+      present(result(til(100), false, { lines: 10, width: 10 })).text,
+      "0 1 2 3 ..",
     );
   });
 

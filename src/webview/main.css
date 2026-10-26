@@ -15,10 +15,77 @@ body {
   padding: 0 20px 8px;
 }
 
+/* The values shown, filling the rest: the result, and the cells drilled
+   into, one over another */
+.stack {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.level {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* A value drilled from stays laid out, unseen, so that its grid and console
+   keep where they're scrolled to: taken out of the layout, they'd lose it */
+.level[hidden] {
+  display: flex;
+  visibility: hidden;
+}
+
+/* ag-grid shows its scrollbars while they scroll, whatever's around them */
+.level[hidden] * {
+  /* biome-ignore lint/complexity/noImportantStyles: ag-grid's own rule, of a specificity its theme decides, makes them visible */
+  visibility: hidden !important;
+}
+
 /* The view not shown */
 .console[hidden],
-.grid[hidden] {
+.grid[hidden],
+.trail[hidden] {
   display: none;
+}
+
+/* The cells drilled into, as VS Code's breadcrumbs: every step but the
+   last a link back */
+.trail {
+  flex: none;
+  margin: 8px 0 0;
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  font-family: var(--vscode-editor-font-family);
+}
+
+.trail button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--vscode-textLink-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+
+/* ⌂ is small in most editor fonts, so larger to see and to click */
+.trail .home {
+  font-size: 15px;
+  line-height: 11px;
+}
+
+.trail button:hover {
+  color: var(--vscode-textLink-activeForeground);
+  text-decoration: underline;
+}
+
+.trail button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+}
+
+.trail [aria-current] {
+  color: var(--vscode-foreground);
 }
 
 .empty {
@@ -107,4 +174,9 @@ body {
   flex: 1;
   min-height: 0;
   margin-top: 8px;
+}
+
+/* Row indexes, muted as headers are, not data */
+.grid .index {
+  color: var(--vscode-descriptionForeground);
 }

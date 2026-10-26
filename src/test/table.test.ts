@@ -2,7 +2,7 @@ import * as assert from "node:assert";
 import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import { decode } from "../codec/decode";
-import type { Value, Vector } from "../codec/types";
+import { count, type Value, type Vector } from "../codec/types";
 import { type Sheet, sheet } from "../webview/table";
 
 const { values: fixtures } = JSON.parse(
@@ -73,12 +73,49 @@ suite("the Grid view's sheet", () => {
     assert.strictEqual(s.keys, 2);
   });
 
-  test("a dictionary is a key column and a value column", () => {
-    assert.deepStrictEqual(cells(sheetOf("dict.mixed")), [
+  test("a dictionary is a key column, pinned, and a value column", () => {
+    const s = sheetOf("dict.mixed");
+    assert.deepStrictEqual(cells(s), [
       ["key", "value"],
       ["a", "1"],
       ["b", '"two"'],
     ]);
+    assert.strictEqual(s.keys, 1);
+  });
+
+  test("a dictionary of a list and a table is laid out as q's console", () => {
+    // -8!`a`b!([]x:1 2)
+    const rows = sheet(
+      decode(
+        Buffer.from(
+          "010000003a000000630b0002000000610062006200630b0001000000780000000100000007000200000001000000000000000200000000000000",
+          "hex",
+        ),
+      ),
+    );
+    assert.ok(rows);
+    assert.deepStrictEqual(cells(rows), [
+      ["key", "x"],
+      ["a", "1"],
+      ["b", "2"],
+    ]);
+    assert.strictEqual(rows.keys, 1);
+    // -8!([]x:1 2)!`a`b
+    const keyed = sheet(
+      decode(
+        Buffer.from(
+          "010000003a000000636200630b00010000007800000001000000070002000000010000000000000002000000000000000b000200000061006200",
+          "hex",
+        ),
+      ),
+    );
+    assert.ok(keyed);
+    assert.deepStrictEqual(cells(keyed), [
+      ["x", "value"],
+      ["1", "a"],
+      ["2", "b"],
+    ]);
+    assert.strictEqual(keyed.keys, 1);
   });
 
   test("strings and nested items are in q's form", () => {
@@ -108,6 +145,13 @@ suite("the Grid view's sheet", () => {
             value("table.trades"),
             value("table.keyed"),
             value("dict.simple"),
+            // ([]x:1 2)!`a`b: keyed by a table, but not a keyed table
+            decode(
+              Buffer.from(
+                "010000003a000000636200630b00010000007800000001000000070002000000010000000000000002000000000000000b000200000061006200",
+                "hex",
+              ),
+            ),
           ],
         },
       ],
@@ -118,14 +162,80 @@ suite("the Grid view's sheet", () => {
       ["table, 3 rows"],
       ["keyed table, 2 rows"],
       ["`a`b`c!1 2 3"],
+      ["(+(,`x)!,1 2)!`a`b"],
     ]);
   });
 
-  test("what isn't a table, a keyed table or a dictionary has none", () => {
-    for (const name of ["list.mixed", "display.matrix"]) {
-      assert.strictEqual(sheet(value(name)), undefined, name);
-    }
+  test("a cell's value, to drill into, whatever its column holds", () => {
+    const trades = sheetOf("table.trades");
+    assert.deepStrictEqual(trades.columns[0].value(1), {
+      type: -11,
+      value: "b",
+    });
+    assert.deepStrictEqual(trades.columns[1].value(2), {
+      type: -9,
+      value: 3.5,
+    });
+    assert.deepStrictEqual(sheetOf("table.multiKeyed").columns[1].value(0), {
+      type: -11,
+      value: "n",
+    });
+    // A string column's string, as a char vector
+    assert.deepStrictEqual(sheetOf("table.stringColumn").columns[0].value(1), {
+      type: 10,
+      attribute: 0,
+      data: new TextEncoder().encode("c"),
+    });
+    // A dictionary's key and value
+    const mixed = sheetOf("dict.mixed");
+    assert.deepStrictEqual(mixed.columns[0].value(1), {
+      type: -11,
+      value: "b",
+    });
+    assert.deepStrictEqual(mixed.columns[1].value(1), {
+      type: 10,
+      attribute: 0,
+      data: new TextEncoder().encode("two"),
+    });
+    // A nested item, or a table in a cell, as it is
+    assert.deepStrictEqual(
+      sheetOf("table.nestedColumn").columns[0].value(1),
+      vector({ type: 7, data: BigInt64Array.of(3n, 4n, 5n) }),
+    );
+    const nested = value("table.trades");
+    const s = sheet({
+      type: 98,
+      attribute: 0,
+      columns: ["t"],
+      data: [{ type: 0, attribute: 0, items: [nested] }],
+    });
+    assert.strictEqual(s?.columns[0].value(0), nested);
+  });
+
+  test("a list is a value column, an item to a row", () => {
+    const mixed = sheetOf("list.mixed");
+    assert.strictEqual(mixed.rows, count(value("list.mixed")));
+    assert.deepStrictEqual(
+      mixed.columns.map((c) => c.name),
+      ["value"],
+    );
+    assert.strictEqual(mixed.keys, 0);
+    const matrix = value("display.matrix");
+    assert.ok(matrix.type === 0 && "items" in matrix);
+    assert.deepStrictEqual(
+      sheetOf("display.matrix").columns[0].value(1),
+      matrix.items[1],
+    );
+    const longs = sheet(vector({ type: 7, data: BigInt64Array.of(3n, 4n) }));
+    assert.deepStrictEqual(longs && cells(longs), [["value"], ["3"], ["4"]]);
+  });
+
+  test("what has no rows to show has none: an atom, a string", () => {
     assert.strictEqual(sheet({ type: -7, value: 42n }), undefined);
+    assert.strictEqual(
+      sheet({ type: 10, attribute: 0, data: new TextEncoder().encode("ab") }),
+      undefined,
+    );
     assert.strictEqual(
       sheet({ type: 98, attribute: 0, columns: ["a"], reference: ":db/t" }),
       undefined,
