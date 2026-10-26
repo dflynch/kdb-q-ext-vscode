@@ -60,7 +60,7 @@ function answers({ server, at, query: written }: About) {
 }
 
 // The cells drilled into, above the tabs, each a step back to where it was
-// drilled from: Result › [3, 1] › [0, 2]
+// drilled from: ⌂ › [3, 1] › [0, 2], ⌂ being the result
 const trail = document.createElement("nav");
 trail.className = "trail";
 trail.ariaLabel = "Cells drilled into";
@@ -160,12 +160,17 @@ function sized({ rows, columns }: Sheet, shown?: number): string {
 }
 
 // The trail, shown only once a cell is drilled into: every step but the
-// last goes back to it
+// last goes back to it. Hovering a step names its column, which the
+// coordinates don't; hovering ⌂ says it's the result.
 function showTrail() {
   trail.hidden = levels.length < 2;
   trail.replaceChildren();
   levels.forEach((level, i) => {
-    const name = level.step ? `[${level.step.join(", ")}]` : "Result";
+    const { step } = level;
+    const name = step ? `[${step.join(", ")}]` : "⌂";
+    const title = step
+      ? `Row ${step[0]}, column ${levels[i - 1].sheet?.columns[step[1]].name}`
+      : "Result";
     if (i > 0) {
       const between = document.createElement("span");
       between.ariaHidden = "true";
@@ -176,10 +181,14 @@ function showTrail() {
       const here = document.createElement("span");
       here.ariaCurrent = "location";
       here.textContent = name;
+      here.title = title;
       trail.append(here);
     } else {
       const button = document.createElement("button");
       button.textContent = name;
+      button.title = title;
+      button.ariaLabel = title;
+      button.classList.toggle("home", !step);
       button.addEventListener("click", () => back(i));
       trail.append(button);
     }

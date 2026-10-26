@@ -69,6 +69,12 @@ body {
   cursor: pointer;
 }
 
+/* ⌂ is small in most editor fonts, so larger to see and to click */
+.trail .home {
+  font-size: 15px;
+  line-height: 11px;
+}
+
 .trail button:hover {
   color: var(--vscode-textLink-activeForeground);
   text-decoration: underline;
