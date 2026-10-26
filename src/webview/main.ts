@@ -188,7 +188,7 @@ function showTrail() {
 
 // Show a cell's value of the value shown, as a value of its own. It
 // can't fail for a cell the grid shows, so a step that does is a bug.
-function drill(step: Step, told = true) {
+function drill(step: Step, told = true, view = chosen) {
   const [row, column] = step;
   const sheet = shownLevel().sheet;
   if (!sheet || !consoleSize) {
@@ -198,7 +198,7 @@ function drill(step: Step, told = true) {
     sheet.columns[column].value(row),
     consoleSize,
   );
-  const level = new Level(step, text, table, chosen);
+  const level = new Level(step, text, table, view);
   levels.push(level);
   stack.append(level.element);
   switchTo();
@@ -271,14 +271,15 @@ window.addEventListener("message", ({ data }: MessageEvent<Posted>) => {
   }
   consoleSize = data.type === "result" ? data.size : undefined;
   shownId = data.id;
-  levels = [new Level(undefined, text, sheet, chosen)];
+  // Each value a cell was drilled into from was in the Grid; the last
+  // drilled into opens on the view chosen
+  const path = first ? (data.path ?? []) : [];
+  levels = [new Level(undefined, text, sheet, path.length ? "grid" : chosen)];
   stack.append(levels[0].element);
   switchTo();
-  if (first) {
-    for (const step of data.path ?? []) {
-      drill(step, false);
-    }
-  }
+  path.forEach((step, i) => {
+    drill(step, false, i < path.length - 1 ? "grid" : chosen);
+  });
   vscode.postMessage({ type: "shown", id: data.id, ...timing });
 });
 

@@ -66,12 +66,12 @@ const numbers = [5, 6, 7, 8, 9];
 // A row is its index in the result: the sheet reads the cells
 type Row = { row: number };
 
-// Shows one sheet at a time in a place, each replacing the last, so that
-// nothing of an old result's sort, filter or scroll is left on a new one
+// Shows a sheet in a place: a level's, the result or a value drilled into
 export class Grid {
   private api?: GridApi<Row>;
-  // Whether its rows are drawn, and so can take the focus; if not, the cell
-  // to focus once they are
+  // Whether its rows are drawn, and so can take the focus; if not, the focus
+  // to take once they are, as focus() was asked: none pending, or a cell or
+  // the first
   private rendered = false;
   private focusWhenRendered?: { cell?: Step };
 
@@ -87,8 +87,6 @@ export class Grid {
   ) {}
 
   show(sheet: Sheet) {
-    this.clear();
-    this.rendered = false;
     const columnDefs = sheet.columns.map(
       (column, j): ColDef<Row, number> => ({
         colId: String(j),
@@ -104,6 +102,9 @@ export class Grid {
           value === null || value === undefined ? "" : column.text(value),
         comparator: (a, b) => column.compare(a ?? 0, b ?? 0),
         filter: "agTextColumnFilter",
+        // Alt+Left goes back a step: ag-grid would take it as Left
+        suppressKeyboardEvent: ({ event }) =>
+          event.altKey && event.key === "ArrowLeft",
         filterValueGetter: ({ data }) => (data ? column.text(data.row) : ""),
       }),
     );
