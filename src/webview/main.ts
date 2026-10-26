@@ -1,5 +1,5 @@
-// The Result view's script, bundled into dist/webview.js. It runs in the
-// webview, with the DOM but no Node and no VS Code API, and talks to the
+// The script of the Result view and of each kept result's tab, bundled into
+// dist/webview.js. It runs in the webview, with the DOM but no Node and no VS Code API, and talks to the
 // extension only by messages
 import type { About, FromView, Posted, View } from "../messages";
 import { Grid } from "./grid";
@@ -14,11 +14,12 @@ const vscode = acquireVsCodeApi();
 
 const empty = document.createElement("p");
 empty.className = "empty";
-// Until the first result, how to get one: Run Selected Text on Server's key
+// Until the first result, how to get one: Run Selected Text on Server's key.
+// A kept tab is posted its result as soon as it's ready.
 const key = navigator.userAgent.includes("Mac") ? "Cmd+Enter" : "Ctrl+Enter";
 empty.textContent = `Run a query with ${key} to see its result here`;
 
-// Two views of the latest result, Console and Grid, switched between by tabs
+// Two views of the result, Console and Grid, switched between by tabs
 const tabs = document.createElement("div");
 tabs.className = "tabs";
 tabs.role = "tablist";

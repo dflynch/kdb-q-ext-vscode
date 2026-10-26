@@ -55,8 +55,8 @@ async function opened(link: Connection) {
 }
 
 // A Result view keeping each text it shows, as the Console view shows it,
-// and what each answers, and answering with the server's time; and a status bar keeping each
-// query's start, end and the server's time
+// and what each answers, and answering with the server's time; and a status
+// bar keeping each query's start, end and the server's time
 function shown() {
   const replaced: string[] = [];
   const answers: { query: string; server: string }[] = [];

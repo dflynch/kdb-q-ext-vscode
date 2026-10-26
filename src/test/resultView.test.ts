@@ -253,6 +253,14 @@ suite("the Result view", () => {
       title({ query: "x".repeat(30), server: "dev" }),
       `${"x".repeat(30)} · dev`,
     );
+    assert.strictEqual(
+      title({ query: `${"x".repeat(28)}🙂🙂`, server: "dev" }),
+      `${"x".repeat(28)}🙂🙂 · dev`,
+    );
+    assert.strictEqual(
+      title({ query: `${"x".repeat(28)}🙂🙂🙂`, server: "dev" }),
+      `${"x".repeat(28)}🙂… · dev`,
+    );
   });
 
   test("its bundled script loads, decodes a result, and answers", async function () {
@@ -291,29 +299,73 @@ suite("the Result view", () => {
     }
   });
 
-  test("Keep Result opens a kept result in an editor tab", async () => {
+  test("a kept result opens in an editor tab, where its webview shows it", async function () {
+    this.timeout(10000);
     const extension = vscode.extensions.getExtension(
       "dflynch3.kdb-q-ext-vscode",
     );
     assert.ok(extension);
-    const results = new ResultView(extension.extensionUri);
-    results.show(one, asked);
-    const opened = new Promise((resolve) => {
-      const listening = vscode.window.tabGroups.onDidChangeTabs((change) => {
-        if (change.opened.length > 0) {
-          listening.dispose();
-          resolve(undefined);
-        }
-      });
+    // The real tab, kept hold of to hear its webview, which answers
+    // whoever listens though the extension doesn't
+    let panel: vscode.WebviewPanel | undefined;
+    const results = new ResultView(extension.extensionUri, (...made) => {
+      panel = vscode.window.createWebviewPanel(...made);
+      return panel;
     });
-    results.keep();
-    await opened;
-    const kept = vscode.window.tabGroups.all
-      .flatMap((group) => group.tabs)
-      .find((tab) => tab.label === "select from trade · prod");
-    assert.ok(kept?.input instanceof vscode.TabInputWebview);
-    assert.match(kept.input.viewType, /kdb-q-ext-vscode\.kept$/);
-    await vscode.window.tabGroups.close(kept);
+    try {
+      // ``result`elapsed!(::;42;7), protected evaluation's reply
+      const message = Buffer.from(
+        "0100000039000000630b000300000000726573756c7400656c6170736564000000030000006500f92a00000000000000f90700000000000000",
+        "hex",
+      );
+      results.show(
+        {
+          type: "result",
+          message: new Uint8Array(message),
+          wrapped: true,
+          size: defaultSize,
+        },
+        asked,
+      );
+      results.keep();
+      assert.ok(panel);
+      const kept = panel;
+      const answer = await new Promise<FromView>((resolve) => {
+        kept.webview.onDidReceiveMessage((message: FromView) => {
+          if (message.type === "shown") {
+            resolve(message);
+          }
+        });
+      });
+      assert.deepStrictEqual(answer, { type: "shown", id: 1, execution: 7 });
+      const tab = vscode.window.tabGroups.all
+        .flatMap((group) => group.tabs)
+        .find((tab) => tab.label === "select from trade · prod");
+      assert.ok(tab?.input instanceof vscode.TabInputWebview);
+      assert.match(tab.input.viewType, /kdb-q-ext-vscode\.kept$/);
+    } finally {
+      panel?.dispose();
+    }
+  });
+
+  test("Keep Result is a command, pinned to the Result view", async () => {
+    assert.ok(
+      (await vscode.commands.getCommands(true)).includes(
+        "kdb-q-ext-vscode.keepResult",
+      ),
+    );
+    const manifest = vscode.extensions.getExtension(
+      "dflynch3.kdb-q-ext-vscode",
+    )?.packageJSON;
+    assert.deepStrictEqual(
+      manifest.contributes.menus["view/title"].map(
+        ({ command, when }: { command: string; when: string }) => [
+          command,
+          when,
+        ],
+      ),
+      [["kdb-q-ext-vscode.keepResult", `view == ${viewId}`]],
+    );
   });
 
   test("is contributed, and opens", async () => {

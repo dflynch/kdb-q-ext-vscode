@@ -125,7 +125,10 @@ export type Results = Pick<ResultView, "reveal" | "show">;
 // server. The tab has no tooltip; the page says the rest.
 export function title({ query, server }: Omit<About, "at">): string {
   const line = query.replace(/\s+/g, " ").trim();
-  const short = line.length > 30 ? `${line.slice(0, 29)}…` : line;
+  // By characters, so as not to split one in two UTF-16 units
+  const characters = [...line];
+  const short =
+    characters.length > 30 ? `${characters.slice(0, 29).join("")}…` : line;
   return `${short} · ${server}`;
 }
 
