@@ -283,13 +283,15 @@ function exported(request: number): FromView {
   if (!level?.sheet || !order) {
     return { type: "exported", request };
   }
-  const text = csv(level.sheet, order.rows, order.columns);
-  return {
-    type: "exported",
-    request,
-    csv: new TextEncoder().encode(text),
-    rows: order.rows.length,
-  };
+  const written = csv(level.sheet, order.rows, order.columns);
+  return "mixed" in written
+    ? { type: "exported", request, mixed: written.mixed }
+    : {
+        type: "exported",
+        request,
+        csv: new TextEncoder().encode(written.text),
+        rows: order.rows.length,
+      };
 }
 
 // What the extension posts: a result to show, or asking for it as CSV

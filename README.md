@@ -162,13 +162,15 @@ VS Code.
 bar, saves the Grid, of the result or a cell's value drilled into, where you
 choose: its rows as shown, sorted and filtered, and its columns in the order
 shown, under a line of their names, without the index. It's for the Grid
-only: with the Console shown, there's nothing to export. Values are written as q's `csv
-0:` writes them: symbols and strings bare, nulls blank, dates as
-`2026-10-26`, timestamps as `2026-10-26D12:00:00.000000001`, the rest as the
-Grid shows them; a value q won't write, such as a list in a cell, is
-written as the Grid shows it. A value with a comma, a quote or a line break
-is put in quotes, a quote in it doubled, as other programs read CSV, where q
-quotes only for a comma. A kept tab has its own button, and **kdb+/q:
+only: with the Console shown, there's nothing to export. Values are written
+as q's `csv 0:` writes them: symbols and strings bare and whole, nulls
+blank, dates as `2026-10-26`, timestamps as `2026-10-26D12:00:00.000000001`,
+the rest as the Grid shows them. A value with a comma, a quote or a line
+break is put in quotes, a quote in it doubled, as other programs read CSV,
+where q quotes only for a comma. A mixed list, such as a column of lists or
+tables, isn't written, as q won't write it either and no text would hold it
+whole: nothing is exported, and the message names the column. Hide it, or
+make it a column of strings in q, to export the rest. A kept tab has its own button, and **kdb+/q:
 Export Kept Result to CSV**.
 
 There's more of it than q's console shows: 1000 lines of 1000 characters by

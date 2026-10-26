@@ -25,7 +25,7 @@ All notable changes to the extension are documented in this file.
 - **kdb+/q: Export Result to CSV**, also a button in the **kdb+/q** tab's
   title bar and a kept tab's, which saves the Grid shown, its rows as
   sorted and filtered, as q's `csv 0:` writes them, quoted as RFC 4180 has
-  it
+  it; like q's, it won't write a column of lists or tables
 - Settings: `servers`, `connectTimeout`, `consoleSize` and `sizeLimit`
 
 ### Changed

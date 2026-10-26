@@ -39,12 +39,19 @@ export type Export = { type: "export"; request: number };
 // what was posted, and how long the server took, where protected evaluation
 // said; the view chosen; the cells drilled into, after a drill or a step
 // back; whether the Grid view is shown, and so can be exported, each time
-// it changes; or the Grid view as CSV, in UTF-8, and its rows, or nothing
-// with another view shown
+// it changes; or the Grid view as CSV, in UTF-8, and its rows, or the
+// shown columns that are mixed lists, which CSV can't hold, or nothing with
+// another view shown
 export type FromView =
   | { type: "ready" }
   | { type: "shown"; id: number; execution?: number }
   | { type: "chose"; view: View }
   | { type: "drilled"; id: number; path: Step[] }
   | { type: "exportable"; exportable: boolean }
-  | { type: "exported"; request: number; csv?: Uint8Array; rows?: number };
+  | {
+      type: "exported";
+      request: number;
+      csv?: Uint8Array;
+      rows?: number;
+      mixed?: string[];
+    };

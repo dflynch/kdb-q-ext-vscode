@@ -21,9 +21,10 @@ export const hasResult = "kdb-q-ext-vscode.hasResult";
 export const exportable = "kdb-q-ext-vscode.exportable";
 export const keptExportable = "kdb-q-ext-vscode.keptExportable";
 
-// A Grid view, exported as CSV in UTF-8, and its rows; or nothing with
-// another view shown
-export type Exported = { csv?: Uint8Array; rows?: number };
+// A Grid view, exported as CSV in UTF-8, and its rows; or its shown columns
+// that are mixed lists, which CSV can't hold; or nothing with another view
+// shown
+export type Exported = { csv?: Uint8Array; rows?: number; mixed?: string[] };
 
 // A kept tab, and whether it shows the Grid view
 type Kept = { panel: vscode.WebviewPanel; exportable: boolean };
@@ -215,11 +216,11 @@ export class ResultView implements vscode.WebviewViewProvider {
   }
 
   private exported({
+    type,
     request,
-    csv,
-    rows,
+    ...answer
   }: Extract<FromView, { type: "exported" }>) {
-    this.exports.get(request)?.resolve({ csv, rows });
+    this.exports.get(request)?.resolve(answer);
     this.exports.delete(request);
   }
 
