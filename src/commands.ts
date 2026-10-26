@@ -121,11 +121,13 @@ async function run(
     "result" in outcome ? outcome.result.roundtrip : undefined,
   );
   // The server's time is known once the webview has decoded the response
-  results.show(toView(outcome, size)).then((execution) => {
-    if (execution !== undefined) {
-      executed(execution);
-    }
-  });
+  results
+    .show(toView(outcome, size), { query, server: name })
+    .then((execution) => {
+      if (execution !== undefined) {
+        executed(execution);
+      }
+    });
 }
 
 // Comment out the selected lines with "/" and "\" marker lines, or remove the

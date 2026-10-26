@@ -2,16 +2,15 @@ import * as assert from "node:assert";
 import * as vscode from "vscode";
 import { defaultSize } from "../format/console";
 import type { FromView, Posted, ToView } from "../messages";
-import { page, ResultView, viewId } from "../resultView";
+import { type Panels, page, ResultView, title, viewId } from "../resultView";
 
 const extension = vscode.Uri.file("/extension");
 
-// A stand-in view, resolved by the given ResultView, keeping what it's
-// given and posted, and saying ready or closing when asked
-function resolved(results = new ResultView(extension)) {
+// A stand-in webview, keeping what it's given and posted, and saying what
+// it's asked to
+function standIn() {
   const posted: Posted[] = [];
   let say: (message: FromView) => void = () => {};
-  let close = () => {};
   const webview = {
     cspSource: "https://source.example",
     options: {} as vscode.WebviewOptions,
@@ -23,13 +22,8 @@ function resolved(results = new ResultView(extension)) {
     },
     postMessage: async (message: Posted) => posted.push(message),
   };
-  results.resolveWebviewView({
-    webview,
-    onDidDispose: (listener: () => void) => {
-      close = listener;
-    },
-  } as unknown as vscode.WebviewView);
   return {
+    webview,
     ...webview,
     get options() {
       return webview.options;
@@ -40,9 +34,38 @@ function resolved(results = new ResultView(extension)) {
     posted,
     ready: () => say({ type: "ready" }),
     say: (message: FromView) => say(message),
-    close: () => close(),
   };
 }
+
+// A stand-in view, resolved by the given ResultView, that can also be closed
+function resolved(results = new ResultView(extension)) {
+  const view = standIn();
+  let close = () => {};
+  results.resolveWebviewView({
+    webview: view.webview,
+    onDidDispose: (listener: () => void) => {
+      close = listener;
+    },
+  } as unknown as vscode.WebviewView);
+  return Object.assign(view, { close: () => close() });
+}
+
+// Stand-in editor tabs, keeping how each was made
+function tabs() {
+  const made: {
+    title: string;
+    options: unknown;
+    view: ReturnType<typeof standIn>;
+  }[] = [];
+  const panels = ((_type, title, _column, options) => {
+    const view = standIn();
+    made.push({ title, options, view });
+    return { webview: view.webview } as unknown as vscode.WebviewPanel;
+  }) as Panels;
+  return { made, panels };
+}
+
+const asked = { query: "select from trade", server: "prod" };
 
 const one: ToView = { type: "error", text: "'one" };
 const two: ToView = {
@@ -101,15 +124,15 @@ suite("the Result view", () => {
   test("posts nothing until the webview is ready, then the latest", () => {
     const results = new ResultView(extension);
     const view = resolved(results);
-    results.show(one);
-    results.show(two);
+    results.show(one, asked);
+    results.show(two, asked);
     assert.deepStrictEqual(view.posted, []);
     view.ready();
-    assert.deepStrictEqual(view.posted, [{ ...two, id: 2 }]);
-    results.show(one);
+    assert.deepStrictEqual(view.posted, [{ ...two, id: 2, view: "grid" }]);
+    results.show(one, asked);
     assert.deepStrictEqual(view.posted, [
-      { ...two, id: 2 },
-      { ...one, id: 3 },
+      { ...two, id: 2, view: "grid" },
+      { ...one, id: 3, view: "grid" },
     ]);
   });
 
@@ -117,21 +140,21 @@ suite("the Result view", () => {
     const results = new ResultView(extension);
     const first = resolved(results);
     first.ready();
-    results.show(one);
+    results.show(one, asked);
     first.close();
-    results.show(two);
+    results.show(two, asked);
     const second = resolved(results);
     assert.deepStrictEqual(second.posted, []);
     second.ready();
-    assert.deepStrictEqual(first.posted, [{ ...one, id: 1 }]);
-    assert.deepStrictEqual(second.posted, [{ ...two, id: 2 }]);
+    assert.deepStrictEqual(first.posted, [{ ...one, id: 1, view: "grid" }]);
+    assert.deepStrictEqual(second.posted, [{ ...two, id: 2, view: "grid" }]);
   });
 
   test("a webview it has replaced is not listened to", () => {
     const results = new ResultView(extension);
     const first = resolved(results);
     const second = resolved(results);
-    results.show(one);
+    results.show(one, asked);
     first.ready();
     assert.deepStrictEqual(second.posted, []);
     assert.deepStrictEqual(first.posted, []);
@@ -141,7 +164,7 @@ suite("the Result view", () => {
     const results = new ResultView(extension);
     const view = resolved(results);
     view.ready();
-    const shown = results.show(two);
+    const shown = results.show(two, asked);
     view.say({ type: "shown", id: 1, execution: 7 });
     assert.strictEqual(await shown, 7);
   });
@@ -150,12 +173,86 @@ suite("the Result view", () => {
     const results = new ResultView(extension);
     const view = resolved(results);
     view.ready();
-    const first = results.show(two);
-    const second = results.show(two);
+    const first = results.show(two, asked);
+    const second = results.show(two, asked);
     assert.strictEqual(await first, undefined);
     view.say({ type: "shown", id: 1, execution: 7 });
     view.say({ type: "shown", id: 2, execution: 9 });
     assert.strictEqual(await second, 9);
+  });
+
+  test("a view chosen is the one a new webview opens on", () => {
+    const results = new ResultView(extension);
+    const first = resolved(results);
+    first.say({ type: "chose", view: "console" });
+    results.show(one, asked);
+    const second = resolved(results);
+    second.ready();
+    assert.deepStrictEqual(second.posted, [{ ...one, id: 1, view: "console" }]);
+  });
+
+  test("keeps the latest in an editor tab, with what it answers, in the view chosen", () => {
+    const { made, panels } = tabs();
+    const results = new ResultView(extension, panels);
+    const view = resolved(results);
+    view.say({ type: "chose", view: "console" });
+    const before = Date.now();
+    results.show(two, asked);
+    results.keep();
+    assert.strictEqual(made.length, 1);
+    const [{ title: named, options, view: kept }] = made;
+    assert.strictEqual(named, "select from trade · prod");
+    assert.deepStrictEqual(options, { retainContextWhenHidden: true });
+    assert.strictEqual(kept.options.enableScripts, true);
+    assert.strictEqual(kept.posted.length, 0);
+    kept.ready();
+    const [posted] = kept.posted;
+    const at = posted.about?.at ?? 0;
+    assert.ok(at >= before && at <= Date.now());
+    assert.deepStrictEqual(posted, {
+      ...two,
+      id: 1,
+      view: "console",
+      about: { ...asked, at },
+    });
+  });
+
+  test("a kept result stays as it was when the next is shown", () => {
+    const { made, panels } = tabs();
+    const results = new ResultView(extension, panels);
+    results.show(two, asked);
+    results.keep();
+    results.show(one, { query: "1+", server: "dev" });
+    const [{ view: kept }] = made;
+    kept.ready();
+    // Should its webview be made anew
+    kept.ready();
+    assert.strictEqual(kept.posted.length, 2);
+    for (const posted of kept.posted) {
+      assert.strictEqual(posted.id, 1);
+      assert.strictEqual(posted.about?.query, "select from trade");
+    }
+  });
+
+  test("keeps nothing before the first result", () => {
+    const { made, panels } = tabs();
+    new ResultView(extension, panels).keep();
+    assert.deepStrictEqual(made, []);
+  });
+
+  test("a kept tab's title is its query on one line, shortened, and the server", () => {
+    assert.strictEqual(title({ query: " 1+1\n", server: "dev" }), "1+1 · dev");
+    assert.strictEqual(
+      title({
+        query: "select last price\n  by sym\tfrom trade",
+        server: "prod",
+      }),
+      "select last price by sym from… · prod",
+    );
+    assert.strictEqual(
+      title({ query: "x".repeat(30), server: "dev" }),
+      `${"x".repeat(30)} · dev`,
+    );
   });
 
   test("its bundled script loads, decodes a result, and answers", async function () {
@@ -179,16 +276,44 @@ suite("the Result view", () => {
       );
       const results = new ResultView(extension.extensionUri);
       results.resolveWebviewView(panel as unknown as vscode.WebviewView);
-      const execution = await results.show({
-        type: "result",
-        message: new Uint8Array(message),
-        wrapped: true,
-        size: defaultSize,
-      });
+      const execution = await results.show(
+        {
+          type: "result",
+          message: new Uint8Array(message),
+          wrapped: true,
+          size: defaultSize,
+        },
+        asked,
+      );
       assert.strictEqual(execution, 7);
     } finally {
       panel.dispose();
     }
+  });
+
+  test("Keep Result opens a kept result in an editor tab", async () => {
+    const extension = vscode.extensions.getExtension(
+      "dflynch3.kdb-q-ext-vscode",
+    );
+    assert.ok(extension);
+    const results = new ResultView(extension.extensionUri);
+    results.show(one, asked);
+    const opened = new Promise((resolve) => {
+      const listening = vscode.window.tabGroups.onDidChangeTabs((change) => {
+        if (change.opened.length > 0) {
+          listening.dispose();
+          resolve(undefined);
+        }
+      });
+    });
+    results.keep();
+    await opened;
+    const kept = vscode.window.tabGroups.all
+      .flatMap((group) => group.tabs)
+      .find((tab) => tab.label === "select from trade · prod");
+    assert.ok(kept?.input instanceof vscode.TabInputWebview);
+    assert.match(kept.input.viewType, /kdb-q-ext-vscode\.kept$/);
+    await vscode.window.tabGroups.close(kept);
   });
 
   test("is contributed, and opens", async () => {

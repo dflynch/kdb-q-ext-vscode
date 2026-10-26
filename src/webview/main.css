@@ -25,6 +25,29 @@ body {
   color: var(--vscode-descriptionForeground);
 }
 
+/* What a kept result answers: where and when, then the query in the
+   editor's font, cut short to one line */
+.about {
+  display: flex;
+  gap: 12px;
+  flex: none;
+  margin: 8px 0 0;
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.about span {
+  flex: none;
+}
+
+.about code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--vscode-foreground);
+  font-family: var(--vscode-editor-font-family);
+}
+
 /* As the panel's own titles: the chosen one underlined */
 .tabs {
   display: flex;

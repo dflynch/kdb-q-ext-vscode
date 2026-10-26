@@ -85,6 +85,13 @@
         "title": "Add Server"
       },
       {
+        "command": "kdb-q-ext-vscode.keepResult",
+        "category": "kdb+/q",
+        "title": "Keep Result",
+        "icon": "$(pin)",
+        "enablement": "kdb-q-ext-vscode.hasResult"
+      },
+      {
         "command": "kdb-q-ext-vscode.connect",
         "category": "kdb+/q",
         "title": "Connect to Server"
@@ -146,6 +153,13 @@
         {
           "command": "kdb-q-ext-vscode.showServerMenu",
           "when": "false"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "kdb-q-ext-vscode.keepResult",
+          "when": "view == kdb-q-ext-vscode.result",
+          "group": "navigation"
         }
       ],
       "editor/title/run": [
