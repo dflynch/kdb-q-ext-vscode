@@ -160,8 +160,8 @@ function sized({ rows, columns }: Sheet, shown?: number): string {
 }
 
 // The trail, shown only once a cell is drilled into: every step but the
-// last goes back to it. ⌂ is named the result, for hovering and for a
-// screen reader.
+// last goes back to it. ⌂ is named the result for a screen reader, which
+// would otherwise read it as a house.
 function showTrail() {
   trail.hidden = levels.length < 2;
   trail.replaceChildren();
@@ -183,7 +183,6 @@ function showTrail() {
       const button = document.createElement("button");
       button.textContent = name;
       if (!step) {
-        button.title = "Result";
         button.ariaLabel = "Result";
         button.classList.add("home");
       }
