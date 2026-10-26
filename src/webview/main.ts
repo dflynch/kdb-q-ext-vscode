@@ -192,7 +192,7 @@ function drill(step: Step, told = true) {
   const [row, column] = step;
   const sheet = shownLevel().sheet;
   if (!sheet || !consoleSize) {
-    throw new Error("drilled into a value with no grid");
+    throw new Error("type", { cause: "drilled into value with no grid" });
   }
   const { text, sheet: table } = presented(
     sheet.columns[column].value(row),

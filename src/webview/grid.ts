@@ -162,7 +162,9 @@ export class Grid {
       }
       const index = api.getRowNode(String(cell[0]))?.rowIndex;
       if (typeof index !== "number") {
-        throw new Error("drilled-from row not shown");
+        throw new Error("index", {
+          cause: `drilled-from row ${cell[0]} not shown`,
+        });
       }
       api.ensureIndexVisible(index);
       api.setFocusedCell(index, String(cell[1]));
