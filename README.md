@@ -141,6 +141,13 @@ header to sort, by q's order, with nulls first; its filter matches the text
 shown. Beside the tabs is the result's size, such as `312 of 1000000 rows,
 5 columns` while filtered.
 
+**kdb+/q: Keep Result**, also the pin in the tab's title bar, opens the
+latest result in an editor tab of its own, where the next query doesn't
+replace it, in the view it's shown in. Above it are the server, the time
+and the query, all of it on hovering. Split the editor, or drag the tab to
+a window of its own, to compare results side by side. Kept tabs close with
+VS Code.
+
 There's more of it than q's console shows: 1000 lines of 1000 characters by
 default, set by `consoleSize` as `\c` takes them, with `..` where it's cut,
 as q has. Nulls are left blank as q leaves them. Where the text differs from
@@ -213,6 +220,7 @@ server commands on the status bar's.
 | kdb+/q: Run File on Server            |                  |
 | kdb+/q: Run Selected Text on Server   | Ctrl/Cmd + Enter |
 | kdb+/q: Run Selected Text in Terminal | Shift + Enter    |
+| kdb+/q: Keep Result                   |                  |
 | kdb+/q: Toggle Block Comment          | Shift + Alt + A  |
 | kdb+/q: Connect to Server             |                  |
 | kdb+/q: Disconnect from Server        |                  |
@@ -240,5 +248,9 @@ Open Keyboard Shortcuts**.
 
 A result over `sizeLimit` is refused and the connection closed. The extension
 holds the latest result as it arrived, and decodes it in the **kdb+/q** tab,
-where some results take up to 60 times their size: a tab that runs out of
-memory goes blank, while VS Code and other extensions carry on.
+where some results take up to 60 times their size, and in each kept tab.
+One that runs out of memory, or crashes, turns grey, while VS Code and other
+extensions carry on. VS Code doesn't tell extensions when that happens, or
+let them restart it: **Developer: Reload Window** brings it back, but loses
+the latest result and closes kept tabs. A grey kept tab can only be closed.
+Kept tabs share one process, so when one turns grey, so do the rest.
