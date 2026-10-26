@@ -115,9 +115,6 @@ export class Grid {
           value === null || value === undefined ? "" : column.text(value),
         comparator: (a, b) => column.compare(a ?? 0, b ?? 0),
         filter: "agTextColumnFilter",
-        // Alt+Left goes back a step: ag-grid would take it as Left
-        suppressKeyboardEvent: ({ event }) =>
-          event.altKey && event.key === "ArrowLeft",
         filterValueGetter: ({ data }) => (data ? column.text(data.row) : ""),
       }),
     );

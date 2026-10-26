@@ -145,6 +145,13 @@ suite("the Grid view's sheet", () => {
             value("table.trades"),
             value("table.keyed"),
             value("dict.simple"),
+            // ([]x:1 2)!`a`b: keyed by a table, but not a keyed table
+            decode(
+              Buffer.from(
+                "010000003a000000636200630b00010000007800000001000000070002000000010000000000000002000000000000000b000200000061006200",
+                "hex",
+              ),
+            ),
           ],
         },
       ],
@@ -155,6 +162,7 @@ suite("the Grid view's sheet", () => {
       ["table, 3 rows"],
       ["keyed table, 2 rows"],
       ["`a`b`c!1 2 3"],
+      ["(+(,`x)!,1 2)!`a`b"],
     ]);
   });
 

@@ -133,7 +133,11 @@ function nested(item: Value): string {
   if (item.type === 98 && "data" in item) {
     return `table, ${rows} ${plural}`;
   }
-  if ((item.type === 99 || item.type === 127) && item.keys.type === 98) {
+  if (
+    (item.type === 99 || item.type === 127) &&
+    item.keys.type === 98 &&
+    item.values.type === 98
+  ) {
     return `keyed table, ${rows} ${plural}`;
   }
   return qText(item, unbounded);

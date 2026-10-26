@@ -217,7 +217,9 @@ function drill(step: Step, told = true, view = chosen) {
 }
 
 // Go back to the level at i, as it was left, dropping those after it, with
-// the focus on the cell drilled into from it: the trail's next step
+// the focus on the cell drilled into from it: the trail's next step. Its
+// view, the Grid, drilled from, is the one chosen now, for the next result
+// and for Keep Result.
 function back(i: number) {
   const from = levels[i + 1].step as Step;
   for (const level of levels.splice(i + 1)) {
@@ -226,6 +228,10 @@ function back(i: number) {
   }
   switchTo();
   tellPath();
+  if (chosen !== shownLevel().chosen) {
+    chosen = shownLevel().chosen;
+    vscode.postMessage({ type: "chose", view: chosen });
+  }
   if (shownLevel().drawn) {
     shownLevel().grid.focus(from);
   }
@@ -239,22 +245,27 @@ function tellPath() {
 }
 
 // Alt+Left goes back a step, as a browser's Back, but not while typing, as
-// in a filter, where it moves a word left
-document.addEventListener("keydown", (event) => {
-  const typing =
-    event.target instanceof HTMLElement &&
-    event.target.matches("input, textarea, [contenteditable]");
-  if (
-    event.altKey &&
-    event.key === "ArrowLeft" &&
-    !typing &&
-    !event.defaultPrevented &&
-    levels.length > 1
-  ) {
-    event.preventDefault();
-    back(levels.length - 2);
-  }
-});
+// in a filter, where it moves a word left. Caught on its way down, before
+// the grid, which would take it as Left, from a cell or a header.
+document.addEventListener(
+  "keydown",
+  (event) => {
+    const typing =
+      event.target instanceof HTMLElement &&
+      event.target.matches("input, textarea, [contenteditable]");
+    if (
+      event.altKey &&
+      event.key === "ArrowLeft" &&
+      !typing &&
+      levels.length > 1
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      back(levels.length - 2);
+    }
+  },
+  { capture: true },
+);
 
 // Each result replaces the last, drilled-into values and all, and the
 // extension is told how long the server took, for the status bar
