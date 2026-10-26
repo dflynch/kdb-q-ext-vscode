@@ -49,8 +49,12 @@ export class ResultView implements vscode.WebviewViewProvider {
   private answer?: (execution: number | undefined) => void;
   // The kept tab that's active, if one is
   private active?: Kept;
-  // The exports asked for and not yet answered, by number
-  private exports = new Map<number, (exported: Exported) => void>();
+  // The exports asked for and not yet answered, by number, and the webview
+  // asked
+  private exports = new Map<
+    number,
+    { webview: vscode.Webview; resolve: (exported: Exported) => void }
+  >();
   private request = 0;
 
   constructor(
@@ -63,8 +67,10 @@ export class ResultView implements vscode.WebviewViewProvider {
     this.ready = false;
     vscode.commands.executeCommand("setContext", exportable, false);
     view.onDidDispose(() => {
+      this.unanswered(view.webview);
       if (this.view === view) {
         this.view = undefined;
+        vscode.commands.executeCommand("setContext", exportable, false);
       }
     });
     view.webview.onDidReceiveMessage((message: FromView) => {
@@ -72,7 +78,11 @@ export class ResultView implements vscode.WebviewViewProvider {
         return;
       }
       if (message.type === "ready") {
+        // A page loaded anew, which shows no grid until it's posted the
+        // latest, and won't answer what was asked of the one before
         this.ready = true;
+        vscode.commands.executeCommand("setContext", exportable, false);
+        this.unanswered(view.webview);
         this.post();
       } else if (message.type === "chose") {
         this.chosen = message.view;
@@ -154,6 +164,7 @@ export class ResultView implements vscode.WebviewViewProvider {
       }
     });
     panel.onDidDispose(() => {
+      this.unanswered(panel.webview);
       if (this.active === tab) {
         this.active = undefined;
       }
@@ -161,6 +172,11 @@ export class ResultView implements vscode.WebviewViewProvider {
     // Posted on each ready, should the webview be made anew
     panel.webview.onDidReceiveMessage((message: FromView) => {
       if (message.type === "ready") {
+        tab.exportable = false;
+        if (this.active === tab) {
+          this.activate(tab);
+        }
+        this.unanswered(panel.webview);
         panel.webview.postMessage(kept);
       } else if (message.type === "exportable") {
         tab.exportable = message.exportable;
@@ -184,15 +200,14 @@ export class ResultView implements vscode.WebviewViewProvider {
     return this.export(this.active?.panel.webview);
   }
 
-  // A webview that never answers, as one closed while it's asked, leaves it
-  // waiting
+  // Answered with nothing if the webview closes or loads anew first
   private export(webview?: vscode.Webview): Promise<Exported> {
     if (!webview) {
       return Promise.resolve({});
     }
     const request = ++this.request;
     const exported = new Promise<Exported>((resolve) => {
-      this.exports.set(request, resolve);
+      this.exports.set(request, { webview, resolve });
     });
     const ask: Export = { type: "export", request };
     webview.postMessage(ask);
@@ -204,8 +219,18 @@ export class ResultView implements vscode.WebviewViewProvider {
     csv,
     rows,
   }: Extract<FromView, { type: "exported" }>) {
-    this.exports.get(request)?.({ csv, rows });
+    this.exports.get(request)?.resolve({ csv, rows });
     this.exports.delete(request);
+  }
+
+  // Answers with nothing what was asked of a webview that won't answer
+  private unanswered(webview: vscode.Webview) {
+    for (const [request, asked] of this.exports) {
+      if (asked.webview === webview) {
+        asked.resolve({});
+        this.exports.delete(request);
+      }
+    }
   }
 
   private activate(tab: Kept) {

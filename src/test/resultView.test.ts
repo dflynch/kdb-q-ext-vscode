@@ -68,18 +68,28 @@ function tabs() {
     options: unknown;
     view: ReturnType<typeof standIn>;
     activate: () => void;
+    close: () => void;
   }[] = [];
   const panels = ((_type, title, _column, options) => {
     const view = standIn();
     let changed = () => {};
-    made.push({ title, options, view, activate: () => changed() });
+    let closed = () => {};
+    made.push({
+      title,
+      options,
+      view,
+      activate: () => changed(),
+      close: () => closed(),
+    });
     return {
       webview: view.webview,
       active: true,
       onDidChangeViewState: (listener: () => void) => {
         changed = listener;
       },
-      onDidDispose: () => {},
+      onDidDispose: (listener: () => void) => {
+        closed = listener;
+      },
     } as unknown as vscode.WebviewPanel;
   }) as Panels;
   return { made, panels };
@@ -455,6 +465,26 @@ suite("the Result view", () => {
     view.say({ type: "exported", request: 1 });
     assert.deepStrictEqual(await first, { csv: undefined, rows: undefined });
     assert.deepStrictEqual(await second, { csv: undefined, rows: 2 });
+  });
+
+  test("an export asked of a webview that closes, or loads anew, is answered with nothing", async () => {
+    const results = new ResultView(extension);
+    const view = resolved(results);
+    const closing = results.exportShown();
+    view.close();
+    assert.deepStrictEqual(await closing, {});
+    const again = resolved(results);
+    const reloading = results.exportShown();
+    again.ready();
+    assert.deepStrictEqual(await reloading, {});
+
+    const { made, panels } = tabs();
+    const keeping = new ResultView(extension, panels);
+    keeping.show(two, asked);
+    keeping.keep();
+    const kept = keeping.exportKept();
+    made[0].close();
+    assert.deepStrictEqual(await kept, {});
   });
 
   test("exports nothing with no Result view", async () => {
