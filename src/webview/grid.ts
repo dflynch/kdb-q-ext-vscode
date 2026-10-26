@@ -155,8 +155,10 @@ export class Grid {
 
   // Focus a cell, by its row in the result and its column, brought into
   // sight wherever sorting has put it; or, with none, the first cell shown.
-  // So the keys work on coming to the grid. A cell drilled from is always
-  // shown: its grid can't be filtered while hidden.
+  // So the keys work on coming to the grid. A cell drilled from is shown,
+  // but for a filter typed half a second or less before drilling, which
+  // ag-grid applies after its pause, while the grid is hidden: a risk taken,
+  // as filtering at every key takes up to 0.8 s a million rows.
   focus(cell?: Step) {
     if (!this.rendered) {
       this.focusWhenRendered = { cell };
