@@ -18,9 +18,17 @@ export function exporting(exported: Promise<Exported>): Promise<Exported> {
 }
 
 // Saves a grid exported as CSV where the user says, then offers to open it
-// or show it in its folder. Nothing with another view shown, as when the
-// view changed, or the webview closed, as it was asked for.
-export async function saveCsv({ csv, rows }: Exported) {
+// or show it in its folder. Nothing with a mixed list shown, which CSV
+// can't hold, as q's csv 0: won't write one; or with another view shown, as
+// when the view changed, or the webview closed, as it was asked for.
+export async function saveCsv({ csv, rows, mixed }: Exported) {
+  if (mixed) {
+    const columns = mixed.length === 1 ? "column" : "columns";
+    vscode.window.showErrorMessage(
+      `kdb+/q: failed to export mixed ${columns}: ${mixed.join(", ")}`,
+    );
+    return;
+  }
   if (!csv) {
     vscode.window.showInformationMessage(
       "kdb+/q: The Grid isn't shown, so there's nothing to export.",

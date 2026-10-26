@@ -456,6 +456,14 @@ suite("the Result view", () => {
     assert.deepStrictEqual(await exported, { csv, rows: 1 });
   });
 
+  test("an answer of mixed columns is given back as it came", async () => {
+    const results = new ResultView(extension);
+    const view = resolved(results);
+    const exported = results.exportShown();
+    view.say({ type: "exported", request: 1, mixed: ["t", "v"] });
+    assert.deepStrictEqual(await exported, { mixed: ["t", "v"] });
+  });
+
   test("an answer is matched to its asking", async () => {
     const results = new ResultView(extension);
     const view = resolved(results);
@@ -463,8 +471,8 @@ suite("the Result view", () => {
     const second = results.exportShown();
     view.say({ type: "exported", request: 2, rows: 2 });
     view.say({ type: "exported", request: 1 });
-    assert.deepStrictEqual(await first, { csv: undefined, rows: undefined });
-    assert.deepStrictEqual(await second, { csv: undefined, rows: 2 });
+    assert.deepStrictEqual(await first, {});
+    assert.deepStrictEqual(await second, { rows: 2 });
   });
 
   test("an export asked of a webview that closes, or loads anew, is answered with nothing", async () => {
@@ -505,7 +513,7 @@ suite("the Result view", () => {
       { type: "export", request: 1 },
     ]);
     made[0].view.say({ type: "exported", request: 1, rows: 3 });
-    assert.deepStrictEqual(await exported, { csv: undefined, rows: 3 });
+    assert.deepStrictEqual(await exported, { rows: 3 });
   });
 
   test("Keep Result is a command, pinned to the Result view", async () => {

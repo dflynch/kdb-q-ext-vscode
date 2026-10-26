@@ -19,9 +19,9 @@ export interface Column {
   type: number;
   // A row's cell as the q console shows it in a column
   text(row: number): string;
-  // A row's cell as q's csv 0: writes it, or, nested, which q won't write,
-  // as the grid shows it
-  csv(row: number): string;
+  // A row's cell as q's csv 0: writes it; none for a mixed list, which q
+  // won't write, but a string column
+  csv?: (row: number) => string;
   // A row's cell as a value of its own, to drill into
   value(row: number): Value;
   // How two rows' cells order, as q's asc orders them: nulls first
@@ -125,7 +125,6 @@ function column(name: string, data: Vector | List): Column {
     name,
     type: 0,
     text,
-    csv: text,
     value: (row) => items[row],
     compare: (a, b) => compared(text(a), text(b)),
   };
