@@ -142,8 +142,9 @@ export class Grid {
   }
 
   // Focus a cell, by its row in the result and its column, brought into
-  // sight wherever sorting has put it; or, with none or one filtered out,
-  // the first cell shown. So the keys work on coming to the grid.
+  // sight wherever sorting has put it; or, with none, the first cell shown.
+  // So the keys work on coming to the grid. A cell drilled from is always
+  // shown: its grid can't be filtered while hidden.
   focus(cell?: Step) {
     if (!this.rendered) {
       this.focusWhenRendered = { cell };
@@ -152,13 +153,19 @@ export class Grid {
     // Once its cells are in the page
     requestAnimationFrame(() => {
       const api = this.api;
-      const index = cell && api?.getRowNode(String(cell[0]))?.rowIndex;
-      if (cell && typeof index === "number") {
-        api?.ensureIndexVisible(index);
-        api?.setFocusedCell(index, String(cell[1]));
-      } else {
-        api?.setFocusedCell(0, "0");
+      if (!api) {
+        return;
       }
+      if (!cell) {
+        api.setFocusedCell(0, "0");
+        return;
+      }
+      const index = api.getRowNode(String(cell[0]))?.rowIndex;
+      if (typeof index !== "number") {
+        throw new Error("drilled-from row not shown");
+      }
+      api.ensureIndexVisible(index);
+      api.setFocusedCell(index, String(cell[1]));
     });
   }
 
