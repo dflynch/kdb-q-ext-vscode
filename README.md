@@ -128,18 +128,19 @@ nothing, and an error shows as `'type` with its backtrace. Running a query
 brings the tab into view and leaves the cursor in the editor. Switching away
 and back keeps the result, its sort, filter and scroll, as it was.
 
-A table, a keyed table, a dictionary or a list also shows in a grid. The
-tab has two views of the result, **Console** and **Grid**, and the one you
-chose last is kept for the next result; anything else, an atom, a string or
-an error, shows in the Console. Cells read as q's console shows them in a
+A table, a keyed table, a dictionary or a list also shows in a grid. The tab
+has two views of the result, **Console** and **Grid**, and the one you chose
+last is kept for the next result; anything else, an atom, a string or an
+error, shows in the Console. Cells read as q's console shows them in a
 column: symbols bare, strings in quotes, nulls blank, and numbers lined up
-on the right. A keyed table's keys stay pinned on the left as it scrolls, a
-dictionary is a `key` and a `value` column, and a list a `value` column, an
-item to a row. A table inside a cell shows as `table, 3 rows`. At the left,
-each row's index in the result, from 0. Click a header to sort, by q's
-order, with nulls first, or the index's to put the rows back as they came;
-a column's filter matches the text shown. Beside the tabs is the result's size, such as `312 of 1000000 rows,
-5 columns` while filtered.
+on the right. A dictionary, a keyed table among them, is its keys, pinned on
+the left as it scrolls, then its values, as q's console lays it out: a
+table's columns, or a list as a `key` or a `value` column. A list is a
+`value` column, an item to a row. A table inside a cell shows as `table, 3
+rows`. At the left is each row's index in the result, from 0. Click a header
+to sort, by q's order, with nulls first, or the index's to put the rows back
+as they came; a column's filter matches the text shown. Beside the tabs is
+the result's size, such as `312 of 1000000 rows, 5 columns` while filtered.
 
 Double-click a cell, or press Enter on it, to see its value as a result of
 its own: a table or a list in a cell in the Grid, a long string in full in

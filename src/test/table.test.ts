@@ -73,12 +73,49 @@ suite("the Grid view's sheet", () => {
     assert.strictEqual(s.keys, 2);
   });
 
-  test("a dictionary is a key column and a value column", () => {
-    assert.deepStrictEqual(cells(sheetOf("dict.mixed")), [
+  test("a dictionary is a key column, pinned, and a value column", () => {
+    const s = sheetOf("dict.mixed");
+    assert.deepStrictEqual(cells(s), [
       ["key", "value"],
       ["a", "1"],
       ["b", '"two"'],
     ]);
+    assert.strictEqual(s.keys, 1);
+  });
+
+  test("a dictionary of a list and a table is laid out as q's console", () => {
+    // -8!`a`b!([]x:1 2)
+    const rows = sheet(
+      decode(
+        Buffer.from(
+          "010000003a000000630b0002000000610062006200630b0001000000780000000100000007000200000001000000000000000200000000000000",
+          "hex",
+        ),
+      ),
+    );
+    assert.ok(rows);
+    assert.deepStrictEqual(cells(rows), [
+      ["key", "x"],
+      ["a", "1"],
+      ["b", "2"],
+    ]);
+    assert.strictEqual(rows.keys, 1);
+    // -8!([]x:1 2)!`a`b
+    const keyed = sheet(
+      decode(
+        Buffer.from(
+          "010000003a000000636200630b00010000007800000001000000070002000000010000000000000002000000000000000b000200000061006200",
+          "hex",
+        ),
+      ),
+    );
+    assert.ok(keyed);
+    assert.deepStrictEqual(cells(keyed), [
+      ["x", "value"],
+      ["1", "a"],
+      ["2", "b"],
+    ]);
+    assert.strictEqual(keyed.keys, 1);
   });
 
   test("strings and nested items are in q's form", () => {

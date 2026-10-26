@@ -32,10 +32,12 @@ export interface Sheet {
   keys: number;
 }
 
-// A table, a keyed table, a dictionary as key and value columns, or a list
-// as a value column, as a sheet. An atom, a string, which q reads as text
-// rather than as characters, anything else, or an on-disk table, which only
-// the server can read, is shown only in the Console view.
+// What the Grid shows, as a sheet: a table; a list as a value column, but a
+// string, which q reads as text; or a dictionary, a keyed table among them,
+// as its keys, pinned, then its values, as q's console lays it out, each
+// side a table's columns or a list as a key or a value column. An atom,
+// anything else, or an on-disk table, which only the server can read, is
+// shown only in the Console view.
 export function sheet(value: Value): Sheet | undefined {
   if (listed(value) && value.type !== 10) {
     return {
@@ -57,26 +59,26 @@ export function sheet(value: Value): Sheet | undefined {
   if (value.type !== 99 && value.type !== 127) {
     return undefined;
   }
-  const { keys, values } = value;
-  if (keys.type === 98 && values.type === 98) {
-    const k = sheet(keys);
-    const v = sheet(values);
-    return k && v
-      ? {
-          rows: k.rows,
-          columns: [...k.columns, ...v.columns],
-          keys: k.columns.length,
-        }
-      : undefined;
+  const k = side(value.keys, "key");
+  const v = side(value.values, "value");
+  return k && v
+    ? {
+        rows: k.rows,
+        columns: [...k.columns, ...v.columns],
+        keys: k.columns.length,
+      }
+    : undefined;
+}
+
+// A dictionary's keys or values as columns: a table's own, or a list as one
+// column of that name
+function side(value: Value, name: string): Omit<Sheet, "keys"> | undefined {
+  if (value.type === 98) {
+    return sheet(value);
   }
-  if (listed(keys) && listed(values)) {
-    return {
-      rows: count(keys) ?? 0,
-      columns: [column("key", keys), column("value", values)],
-      keys: 0,
-    };
-  }
-  return undefined;
+  return listed(value)
+    ? { rows: count(value) ?? 0, columns: [column(name, value)] }
+    : undefined;
 }
 
 // Whether a value is a vector or a general list
