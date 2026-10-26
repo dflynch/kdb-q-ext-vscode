@@ -12,9 +12,7 @@ and tables in a grid (see [Features](#features)).
 
 ### Planned
 
-- In the grid: double-clicking a cell to see its whole value, or a table
-  inside it as a result of its own, and copying a selection as the text you
-  see
+- In the grid: copying a selection as the text you see
 - Go to definition, references, outline and workspace symbol search that
   follow q's namespaces and know which names are local to a lambda
 
@@ -141,9 +139,18 @@ header to sort, by q's order, with nulls first; its filter matches the text
 shown. Beside the tabs is the result's size, such as `312 of 1000000 rows,
 5 columns` while filtered.
 
+Double-click a cell, or press Enter on it, to see its value as a result of
+its own: a table in a cell in the Grid, a long string in full in the
+Console. A trail above the tabs, such as `Result › [427, 1] › [0, 2]`, says
+where it came from, each step a cell's row and column, counted from 0: the
+row as the result came, however it's sorted or filtered, and the column as
+the result has it, keys first. Click a step, or press Alt+Left, to go back,
+to find it as you left it.
+
 **kdb+/q: Keep Result**, also the pin in the tab's title bar, opens the
 latest result in an editor tab of its own, where the next query doesn't
-replace it, in the view it's shown in. Above it are the server, the time
+replace it, in the view it's shown in, on the cell drilled into, with the
+trail back. Above it are the server, the time
 and the query, all of it on hovering. Split the editor, or drag the tab to
 a window of its own, to compare results side by side. Kept tabs close with
 VS Code.

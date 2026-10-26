@@ -17,15 +17,26 @@ export type View = "console" | "grid";
 // when it was shown, in milliseconds since the epoch
 export type About = { query: string; server: string; at: number };
 
+// A cell drilled into from a grid: its row in the result, as the result
+// came, and its column, keys first
+export type Step = [row: number, column: number];
+
 // As posted, numbered, so that the webview's answer can be matched to it,
-// with the view chosen last, for a webview that opens on it. A kept result
-// also says what it answers.
-export type Posted = ToView & { id: number; about?: About; view?: View };
+// with the view chosen last and the cells drilled into, for a webview that
+// opens on them. A kept result also says what it answers.
+export type Posted = ToView & {
+  id: number;
+  about?: About;
+  view?: View;
+  path?: Step[];
+};
 
 // To the extension: the webview has loaded, and is listening; it has shown
 // what was posted, and how long the server took, where protected evaluation
-// said; or the view chosen
+// said; the view chosen; or the cells drilled into, after a drill or a step
+// back
 export type FromView =
   | { type: "ready" }
   | { type: "shown"; id: number; execution?: number }
-  | { type: "chose"; view: View };
+  | { type: "chose"; view: View }
+  | { type: "drilled"; path: Step[] };

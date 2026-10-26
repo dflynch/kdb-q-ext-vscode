@@ -121,6 +121,41 @@ suite("the Grid view's sheet", () => {
     ]);
   });
 
+  test("a cell's value, to drill into, whatever its column holds", () => {
+    const trades = sheetOf("table.trades");
+    assert.deepStrictEqual(trades.columns[0].value(1), {
+      type: -11,
+      value: "b",
+    });
+    assert.deepStrictEqual(trades.columns[1].value(2), {
+      type: -9,
+      value: 3.5,
+    });
+    assert.deepStrictEqual(sheetOf("table.multiKeyed").columns[1].value(0), {
+      type: -11,
+      value: "n",
+    });
+    // A string column's string, as a char vector
+    assert.deepStrictEqual(sheetOf("table.stringColumn").columns[0].value(1), {
+      type: 10,
+      attribute: 0,
+      data: new TextEncoder().encode("c"),
+    });
+    // A nested item, or a table in a cell, as it is
+    assert.deepStrictEqual(
+      sheetOf("table.nestedColumn").columns[0].value(1),
+      vector({ type: 7, data: BigInt64Array.of(3n, 4n, 5n) }),
+    );
+    const nested = value("table.trades");
+    const s = sheet({
+      type: 98,
+      attribute: 0,
+      columns: ["t"],
+      data: [{ type: 0, attribute: 0, items: [nested] }],
+    });
+    assert.strictEqual(s?.columns[0].value(0), nested);
+  });
+
   test("what isn't a table, a keyed table or a dictionary has none", () => {
     for (const name of ["list.mixed", "display.matrix"]) {
       assert.strictEqual(sheet(value(name)), undefined, name);

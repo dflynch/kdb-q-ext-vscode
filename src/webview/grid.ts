@@ -66,6 +66,10 @@ type Row = { row: number };
 // nothing of an old result's sort, filter or scroll is left on a new one
 export class Grid {
   private api?: GridApi<Row>;
+  // Whether its rows are drawn, and so can take the focus; if not, whether
+  // to take it once they are
+  private rendered = false;
+  private focusWhenRendered = false;
 
   constructor(
     private readonly place: HTMLElement,
@@ -73,10 +77,14 @@ export class Grid {
     private readonly nonce: string,
     // Told how many rows are shown, after each filter
     private readonly shown: (rows: number) => void,
+    // Told of a cell double-clicked, or Enter pressed on, to drill into: its
+    // row in the result, and its column in the sheet
+    private readonly drill: (row: number, column: number) => void,
   ) {}
 
   show(sheet: Sheet) {
     this.clear();
+    this.rendered = false;
     const columnDefs = sheet.columns.map(
       (column, j): ColDef<Row, number> => ({
         colId: String(j),
@@ -102,6 +110,47 @@ export class Grid {
       rowData: Array.from({ length: sheet.rows }, (_, row) => ({ row })),
       autoSizeStrategy: { type: "fitCellContents" },
       onModelUpdated: ({ api }) => this.shown(api.getDisplayedRowCount()),
+      onFirstDataRendered: () => {
+        this.rendered = true;
+        if (this.focusWhenRendered) {
+          this.focusWhenRendered = false;
+          this.focus();
+        }
+      },
+      onCellDoubleClicked: ({ api, data, column, rowIndex }) => {
+        if (data) {
+          // So that coming back finds the focus on the cell drilled into
+          if (rowIndex !== null) {
+            api.setFocusedCell(rowIndex, column);
+          }
+          this.drill(data.row, Number(column.getColId()));
+        }
+      },
+      onCellKeyDown: (cell) => {
+        const { data, event } = cell;
+        if (
+          "column" in cell &&
+          data &&
+          event instanceof KeyboardEvent &&
+          event.key === "Enter"
+        ) {
+          this.drill(data.row, Number(cell.column.getColId()));
+        }
+      },
+    });
+  }
+
+  // Put the focus back on the cell it was on, or the first, so that the
+  // keys work on coming back to the grid
+  focus() {
+    if (!this.rendered) {
+      this.focusWhenRendered = true;
+      return;
+    }
+    // Once its cells are in the page
+    requestAnimationFrame(() => {
+      const cell = this.api?.getFocusedCell();
+      this.api?.setFocusedCell(cell?.rowIndex ?? 0, cell?.column ?? "0");
     });
   }
 

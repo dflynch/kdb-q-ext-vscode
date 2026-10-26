@@ -14,7 +14,8 @@ All notable changes to the extension are documented in this file.
 - **kdb+/q: Run File on Server**, also the ▶ in the editor's title bar,
   which sends the whole file as one query, and shows the result in the
   **kdb+/q** tab of the bottom panel as q's console prints it, and a
-  table, keyed table or dictionary in a grid too, with sorting and filters
+  table, keyed table or dictionary in a grid too, with sorting and filters,
+  and a cell's value, double-clicked, as a result of its own
 - **kdb+/q: Run Selected Text on Server**, which sends the selection, or
   the current line, the same way
 - **kdb+/q: Keep Result**, also the pin in the **kdb+/q** tab's title

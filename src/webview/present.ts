@@ -1,4 +1,5 @@
-import { errorText, show } from "../format/console";
+import type { Value } from "../codec/types";
+import { errorText, type Size, show } from "../format/console";
 import type { ToView } from "../messages";
 import { QError, reply } from "../protection";
 import { type Sheet, sheet } from "./table";
@@ -21,8 +22,7 @@ export function present(message: ToView): {
   let execution: number | undefined;
   try {
     const replied = reply(message.message, message.wrapped);
-    text = show(replied.value, message.size);
-    table = sheet(replied.value);
+    ({ text, sheet: table } = shown(replied.value, message.size));
     execution = replied.execution;
   } catch (error) {
     const thrown = error instanceof Error ? error : new Error(String(error));
@@ -34,4 +34,15 @@ export function present(message: ToView): {
     ...(table && { sheet: table }),
     ...(execution !== undefined && { execution }),
   };
+}
+
+// A value as the Console view shows it, and as a sheet for the Grid view if
+// it's a table, a keyed table or a dictionary: a result, or a cell's value
+// drilled into
+export function shown(
+  value: Value,
+  size: Size,
+): { text: string; sheet?: Sheet } {
+  const table = sheet(value);
+  return { text: show(value, size), ...(table && { sheet: table }) };
 }

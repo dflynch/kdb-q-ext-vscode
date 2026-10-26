@@ -205,7 +205,7 @@ function textAt(texts: Texts, i: number): Uint8Array {
 }
 
 // An element of a vector, as an atom
-function element(vector: Vector, i: number): Atom {
+export function element(vector: Vector, i: number): Atom {
   switch (vector.type) {
     case 2:
       return { type: -2, value: vector.data.subarray(16 * i, 16 * i + 16) };
