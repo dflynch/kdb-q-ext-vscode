@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as commands from "./commands";
 import { Connections } from "./connections";
+import { exporting, saveCsv } from "./exporting";
 import { ResultView, registerResultView } from "./resultView";
 import { showStatus } from "./status";
 
@@ -14,6 +15,12 @@ export function activate(context: vscode.ExtensionContext) {
     registerResultView(results),
     vscode.commands.registerCommand("kdb-q-ext-vscode.keepResult", () =>
       results.keep(),
+    ),
+    vscode.commands.registerCommand("kdb-q-ext-vscode.exportResult", async () =>
+      saveCsv(await exporting(results.exportShown())),
+    ),
+    vscode.commands.registerCommand("kdb-q-ext-vscode.exportKept", async () =>
+      saveCsv(await exporting(results.exportKept())),
     ),
     vscode.commands.registerCommand("kdb-q-ext-vscode.connect", () =>
       commands.connect(connections),

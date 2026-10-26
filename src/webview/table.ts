@@ -6,7 +6,7 @@ import {
   type Value,
   type Vector,
 } from "../codec/types";
-import { cell, element, qText } from "../format/text";
+import { cell, csvCell, decoded, element, qText } from "../format/text";
 
 // What the Grid view shows of a result, apart from the grid that shows it:
 // columns read a row at a time, by the row's index in the result, so that a
@@ -19,6 +19,9 @@ export interface Column {
   type: number;
   // A row's cell as the q console shows it in a column
   text(row: number): string;
+  // A row's cell as q's csv 0: writes it, or, nested, which q won't write,
+  // as the grid shows it
+  csv(row: number): string;
   // A row's cell as a value of its own, to drill into
   value(row: number): Value;
   // How two rows' cells order, as q's asc orders them: nulls first
@@ -92,6 +95,7 @@ function column(name: string, data: Vector | List): Column {
       name,
       type: data.type,
       text: (row) => cell(data, row),
+      csv: (row) => csvCell(data, row),
       value: (row) => element(data, row),
       compare: order(data),
     };
@@ -108,6 +112,7 @@ function column(name: string, data: Vector | List): Column {
       name,
       type: 0,
       text: (row) => qText(string(row), unbounded),
+      csv: (row) => decoded(textAt(strings, row)),
       value: string,
       compare: (a, b) => bytewise(textAt(strings, a), textAt(strings, b)),
     };
@@ -120,6 +125,7 @@ function column(name: string, data: Vector | List): Column {
     name,
     type: 0,
     text,
+    csv: text,
     value: (row) => items[row],
     compare: (a, b) => compared(text(a), text(b)),
   };

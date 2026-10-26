@@ -158,6 +158,19 @@ and the query, all of it on hovering. Split the editor, or drag the tab to
 a window of its own, to compare results side by side. Kept tabs close with
 VS Code.
 
+**kdb+/q: Export Result to CSV**, also the export button in the tab's title
+bar, saves the Grid, of the result or a cell's value drilled into, where you
+choose: its rows as shown, sorted and filtered, and its columns in the order
+shown, under a line of their names, without the index. It's for the Grid
+only: with the Console shown, there's nothing to export. Values are written as q's `csv
+0:` writes them: symbols and strings bare, nulls blank, dates as
+`2026-10-26`, timestamps as `2026-10-26D12:00:00.000000001`, the rest as the
+Grid shows them; a value q won't write, such as a list in a cell, is
+written as the Grid shows it. A value with a comma, a quote or a line break
+is put in quotes, a quote in it doubled, as other programs read CSV, where q
+quotes only for a comma. A kept tab has its own button, and **kdb+/q:
+Export Kept Result to CSV**.
+
 There's more of it than q's console shows: 1000 lines of 1000 characters by
 default, set by `consoleSize` as `\c` takes them, with `..` where it's cut,
 as q has. Nulls are left blank as q leaves them. Where the text differs from
@@ -231,6 +244,8 @@ server commands on the status bar's.
 | kdb+/q: Run Selected Text on Server   | Ctrl/Cmd + Enter |
 | kdb+/q: Run Selected Text in Terminal | Shift + Enter    |
 | kdb+/q: Keep Result                   |                  |
+| kdb+/q: Export Result to CSV          |                  |
+| kdb+/q: Export Kept Result to CSV     |                  |
 | kdb+/q: Toggle Block Comment          | Shift + Alt + A  |
 | kdb+/q: Connect to Server             |                  |
 | kdb+/q: Disconnect from Server        |                  |

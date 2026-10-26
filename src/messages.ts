@@ -31,12 +31,20 @@ export type Posted = ToView & {
   path?: Step[];
 };
 
+// To the webview: asked for the value shown as CSV, numbered, to match the
+// answer to the asking
+export type Export = { type: "export"; request: number };
+
 // To the extension: the webview has loaded, and is listening; it has shown
 // what was posted, and how long the server took, where protected evaluation
-// said; the view chosen; or the cells drilled into, after a drill or a step
-// back
+// said; the view chosen; the cells drilled into, after a drill or a step
+// back; whether the Grid view is shown, and so can be exported, each time
+// it changes; or the Grid view as CSV, in UTF-8, and its rows, or nothing
+// with another view shown
 export type FromView =
   | { type: "ready" }
   | { type: "shown"; id: number; execution?: number }
   | { type: "chose"; view: View }
-  | { type: "drilled"; id: number; path: Step[] };
+  | { type: "drilled"; id: number; path: Step[] }
+  | { type: "exportable"; exportable: boolean }
+  | { type: "exported"; request: number; csv?: Uint8Array; rows?: number };
