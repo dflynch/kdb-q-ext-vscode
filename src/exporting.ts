@@ -23,8 +23,9 @@ export function exporting(exported: Promise<Exported>): Promise<Exported> {
 // when the view changed, or the webview closed, as it was asked for.
 export async function saveCsv({ csv, rows, mixed }: Exported) {
   if (mixed) {
+    const columns = mixed.length === 1 ? "column" : "columns";
     vscode.window.showErrorMessage(
-      `kdb+/q: Nothing exported: mixed columns ${mixed.join(", ")}`,
+      `kdb+/q: mixed ${columns} unsupported: ${mixed.join(", ")}`,
     );
     return;
   }
