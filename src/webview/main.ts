@@ -123,7 +123,8 @@ let consoleSize: Size | undefined;
 let shownId = 0;
 
 const shownLevel = () => levels[levels.length - 1];
-// Whether the value shown has a grid, as the extension was told last
+// Whether the Grid view is shown, and so can be exported, as the extension
+// was told last
 let exportable = false;
 
 function switchTo() {
@@ -144,8 +145,8 @@ function switchTo() {
     each.element.hidden = each !== level;
     each.element.inert = each !== level;
   }
-  if (exportable !== Boolean(sheet)) {
-    exportable = Boolean(sheet);
+  if (exportable !== (view === "grid")) {
+    exportable = view === "grid";
     vscode.postMessage({ type: "exportable", exportable });
   }
   level.text.hidden = view !== "console";
@@ -274,24 +275,20 @@ document.addEventListener(
   { capture: true },
 );
 
-// The value shown as CSV: its grid's rows and columns as shown, sorted,
-// filtered and moved, whichever view is chosen; or, a grid not yet drawn,
-// all of them, as they came
+// The Grid view as CSV: its rows and columns as shown, sorted, filtered and
+// moved. Nothing from another view, which shows the value otherwise.
 function exported(request: number): FromView {
-  const { sheet, grid } = shownLevel() ?? {};
-  if (!sheet) {
+  const level = shownLevel();
+  const order = exportable ? level?.grid.shownOrder() : undefined;
+  if (!level?.sheet || !order) {
     return { type: "exported", request };
   }
-  const { rows, columns } = grid.shownOrder() ?? {
-    rows: Array.from({ length: sheet.rows }, (_, i) => i),
-    columns: sheet.columns.map((_, j) => j),
-  };
-  const text = csv(sheet, rows, columns);
+  const text = csv(level.sheet, order.rows, order.columns);
   return {
     type: "exported",
     request,
     csv: new TextEncoder().encode(text),
-    rows: rows.length,
+    rows: order.rows.length,
   };
 }
 

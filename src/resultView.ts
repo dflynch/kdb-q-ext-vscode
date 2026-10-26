@@ -16,16 +16,16 @@ export const viewId = "kdb-q-ext-vscode.result";
 export const keptType = "kdb-q-ext-vscode.kept";
 // Whether there's a result to keep, for the Keep Result command
 export const hasResult = "kdb-q-ext-vscode.hasResult";
-// Whether the value shown, in the Result view and in the kept tab that's
-// active, has a grid, for the Export to CSV commands
+// Whether the Grid view is shown, in the Result view and in the kept tab
+// that's active, for the Export to CSV commands
 export const exportable = "kdb-q-ext-vscode.exportable";
 export const keptExportable = "kdb-q-ext-vscode.keptExportable";
 
-// A value shown, exported as CSV in UTF-8, and its rows; or nothing for one
-// with no grid
+// A Grid view, exported as CSV in UTF-8, and its rows; or nothing with
+// another view shown
 export type Exported = { csv?: Uint8Array; rows?: number };
 
-// A kept tab, and whether the value it shows has a grid
+// A kept tab, and whether it shows the Grid view
 type Kept = { panel: vscode.WebviewPanel; exportable: boolean };
 
 // Makes an editor tab with a webview: VS Code's, or a stand-in for tests
@@ -174,13 +174,12 @@ export class ResultView implements vscode.WebviewViewProvider {
     load(panel.webview, this.extensionUri);
   }
 
-  // The value shown in the Result view, exported as CSV: its grid's rows and
-  // columns as shown
+  // The Result view's grid, exported as CSV: its rows and columns as shown
   exportShown(): Promise<Exported> {
     return this.export(this.view?.webview);
   }
 
-  // The value shown in the kept tab that's active, exported as CSV
+  // The grid of the kept tab that's active, exported as CSV
   exportKept(): Promise<Exported> {
     return this.export(this.active?.panel.webview);
   }

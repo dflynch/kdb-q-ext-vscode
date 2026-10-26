@@ -17,9 +17,9 @@ export function exporting(exported: Promise<Exported>): Promise<Exported> {
   );
 }
 
-// Saves a value exported as CSV where the user says, then offers to open it
-// or show it in its folder. Nothing for a value with no grid, which can't be
-// exported, as when the value shown changed as it was asked for.
+// Saves a grid exported as CSV where the user says, then offers to open it
+// or show it in its folder. Nothing with another view shown, as when the
+// view changed as it was asked for.
 export async function saveCsv({ csv, rows }: Exported) {
   if (!csv) {
     return;

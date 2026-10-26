@@ -159,10 +159,10 @@ a window of its own, to compare results side by side. Kept tabs close with
 VS Code.
 
 **kdb+/q: Export Result to CSV**, also the export button in the tab's title
-bar, saves the value shown, the result or a cell's value drilled into, where
-you choose: its rows as the Grid shows them, sorted and filtered, and its
-columns in the order shown, under a line of their names, without the index.
-Only a value with a grid can be exported. Values are written as q's `csv
+bar, saves the Grid, of the result or a cell's value drilled into, where you
+choose: its rows as shown, sorted and filtered, and its columns in the order
+shown, under a line of their names, without the index. It's for the Grid
+only: with the Console shown, there's nothing to export. Values are written as q's `csv
 0:` writes them: symbols and strings bare, nulls blank, dates as
 `2026-10-26`, timestamps as `2026-10-26D12:00:00.000000001`, the rest as the
 Grid shows them; a value q won't write, such as a list in a cell, is

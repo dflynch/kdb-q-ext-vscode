@@ -23,7 +23,7 @@ All notable changes to the extension are documented in this file.
   bar, which opens the latest result in an editor tab of its own, where the
   next query doesn't replace it, for comparing results side by side
 - **kdb+/q: Export Result to CSV**, also a button in the **kdb+/q** tab's
-  title bar and a kept tab's, which saves the value shown, its rows as
+  title bar and a kept tab's, which saves the Grid shown, its rows as
   sorted and filtered, as q's `csv 0:` writes them, quoted as RFC 4180 has
   it
 - Settings: `servers`, `connectTimeout`, `consoleSize` and `sizeLimit`
