@@ -1,6 +1,14 @@
 Quirk: kdb+/q toolkit includes code from other projects, under their own
 licenses.
 
+The Grid's table symbol is from VS Code's Codicons, bundled as
+dist/codicon-*.ttf, https://github.com/microsoft/vscode-codicons:
+
+  Copyright (c) Microsoft Corporation.
+
+  Licensed under the Creative Commons Attribution 4.0 International
+  License, https://creativecommons.org/licenses/by/4.0/.
+
 src/codec/decompress.ts is ported from the uncompress method in c.java of
 KX's Java interface, https://github.com/KxSystems/javakdb:
 

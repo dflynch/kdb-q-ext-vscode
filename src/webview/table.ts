@@ -22,6 +22,8 @@ export interface Column {
   // A row's cell as q's csv 0: writes it; none for a mixed list, which q
   // won't write, but a string column
   csv?: (row: number) => string;
+  // A row's cell, where it's a table, as its shape, shown as a symbol
+  shape?: (row: number) => Shape | undefined;
   // A row's cell as a value of its own, to drill into
   value(row: number): Value;
   // How two rows' cells order, as q's asc orders them: nulls first
@@ -117,35 +119,70 @@ function column(name: string, data: Vector | List): Column {
       compare: (a, b) => bytewise(textAt(strings, a), textAt(strings, b)),
     };
   }
-  // Mixed or nested items, as q writes them; ordered by that text, as they
-  // have no order of their own
+  // Mixed or nested items, as q writes them, but a table as its shape.
+  // Ordered by that text, as they have no order of their own, but tables
+  // by their shapes, after the rest.
   const { items } = data;
-  const text = (row: number) => nested(items[row]);
+  const text = (row: number) => {
+    const table = shape(items[row]);
+    return table
+      ? `${table.rows} × ${table.columns}`
+      : qText(items[row], unbounded);
+  };
   return {
     name,
     type: 0,
     text,
+    shape: (row) => shape(items[row]),
     value: (row) => items[row],
-    compare: (a, b) => compared(text(a), text(b)),
+    compare: (a, b) => {
+      const x = shape(items[a]);
+      const y = shape(items[b]);
+      if (x && y) {
+        return (
+          Number(x.keyed) - Number(y.keyed) ||
+          x.rows - y.rows ||
+          x.columns - y.columns
+        );
+      }
+      return x ? 1 : y ? -1 : compared(text(a), text(b));
+    },
   };
 }
 
-// An item as q writes it, but a table, which has rows and columns of its
-// own and can't be read on one line, as what it is and its size
-function nested(item: Value): string {
-  const rows = count(item);
-  const plural = rows === 1 ? "row" : "rows";
+// A table in a cell, which has rows and columns of its own and can't be read
+// on one line, as its rows and columns, a keyed table's keys among them, as
+// the Grid shows it drilled into
+export type Shape = { keyed: boolean; rows: number; columns: number };
+
+function shape(item: Value): Shape | undefined {
+  // Not an on-disk table, which is only its name
   if (item.type === 98 && "data" in item) {
-    return `table, ${rows} ${plural}`;
+    return {
+      keyed: false,
+      rows: count(item) ?? 0,
+      columns: item.columns.length,
+    };
   }
   if (
     (item.type === 99 || item.type === 127) &&
     item.keys.type === 98 &&
     item.values.type === 98
   ) {
-    return `keyed table, ${rows} ${plural}`;
+    return {
+      keyed: true,
+      rows: count(item) ?? 0,
+      columns: item.keys.columns.length + item.values.columns.length,
+    };
   }
-  return qText(item, unbounded);
+  return undefined;
+}
+
+// A shape in words
+export function said({ keyed, rows, columns }: Shape): string {
+  const counted = (n: number, what: string) =>
+    `${n} ${what}${n === 1 ? "" : "s"}`;
+  return `${keyed ? "Keyed table" : "Table"}, ${counted(rows, "row")} and ${counted(columns, "column")}`;
 }
 
 // A cell isn't cut in the grid, which shows as much of it as fits

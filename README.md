@@ -136,11 +136,14 @@ column: symbols bare, strings in quotes, nulls blank, and numbers lined up
 on the right. A dictionary, a keyed table among them, is its keys, pinned on
 the left as it scrolls, then its values, as q's console lays it out: a
 table's columns, or a list as a `key` or a `value` column. A list is a
-`value` column, an item to a row. A table inside a cell shows as `table, 3
-rows`. At the left is each row's index in the result, from 0. Click a header
-to sort, by q's order, with nulls first, or the index's to put the rows back
-as they came; a column's filter matches the text shown. Beside the tabs is
-the result's size, such as `312 of 1000000 rows, 5 columns` while filtered.
+`value` column, an item to a row. A table inside a cell shows as a table
+symbol and its shape, `3 × 2` for 3 rows of 2 columns, said in words on
+hover; a keyed table's symbol has its keys at the left. At the left is each
+row's index in the result, from 0. Click a header to sort, by q's order,
+with nulls first, or the index's to put the rows back as they came; tables
+in cells sort by their shapes, after any other values. A column's filter
+matches the text shown. Beside the tabs is the result's size, such as
+`312 of 1000000 rows, 5 columns` while filtered.
 
 Double-click a cell, or press Enter on it, to see its value as a result of
 its own: a table or a list in a cell in the Grid, a long string in full in

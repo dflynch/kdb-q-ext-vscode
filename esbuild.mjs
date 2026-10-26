@@ -57,6 +57,8 @@ const contexts = await Promise.all([
       { in: "src/webview/main.css", out: "webview" },
     ],
     outdir: "dist",
+    // codicon.css's font, beside it
+    loader: { ".ttf": "file" },
     platform: "browser",
     format: "iife",
   }),

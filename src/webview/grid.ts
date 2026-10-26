@@ -14,7 +14,7 @@ import {
   themeQuartz,
 } from "ag-grid-community";
 import type { Step } from "../messages";
-import type { Sheet } from "./table";
+import { type Column, type Sheet, said } from "./table";
 
 // The Grid view: a sheet in ag-grid. Only this file knows ag-grid.
 
@@ -118,6 +118,7 @@ export class Grid {
         valueGetter: ({ data }) => data?.row,
         valueFormatter: ({ value }) =>
           value === null || value === undefined ? "" : column.text(value),
+        cellRenderer: column.shape && symbol(column),
         comparator: (a, b) => column.compare(a ?? 0, b ?? 0),
         filter: "agTextColumnFilter",
         filterValueGetter: ({ data }) => (data ? column.text(data.row) : ""),
@@ -216,4 +217,31 @@ export class Grid {
     this.api?.destroy();
     this.api = undefined;
   }
+}
+
+// A column's cells, but a table as its symbol before its shape, and its
+// shape in words on hover. The symbols are VS Code's own: a keyed table's
+// has its keys at the left, as the Grid pins them. Always an element, as a
+// string is HTML.
+function symbol(column: Column) {
+  return ({
+    value,
+    valueFormatted,
+  }: {
+    value?: number | null;
+    valueFormatted?: string | null;
+  }) => {
+    const cell = document.createElement("span");
+    const shape =
+      value === null || value === undefined ? undefined : column.shape?.(value);
+    if (shape) {
+      const icon = document.createElement("span");
+      icon.className = `codicon codicon-${shape.keyed ? "layout-sidebar-left" : "table"}`;
+      icon.ariaHidden = "true";
+      cell.append(icon, " ");
+      cell.title = `${said(shape)}: double-click to open`;
+    }
+    cell.append(valueFormatted ?? "");
+    return cell;
+  };
 }
