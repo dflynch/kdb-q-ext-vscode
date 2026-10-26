@@ -17,6 +17,9 @@ All notable changes to the extension are documented in this file.
   table, keyed table or dictionary in a grid too, with sorting and filters
 - **kdb+/q: Run Selected Text on Server**, which sends the selection, or
   the current line, the same way
+- **kdb+/q: Keep Result**, also the pin in the **kdb+/q** tab's title
+  bar, which opens the latest result in an editor tab of its own, where the
+  next query doesn't replace it, for comparing results side by side
 - Settings: `servers`, `connectTimeout`, `consoleSize` and `sizeLimit`
 
 ### Changed

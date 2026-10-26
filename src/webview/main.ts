@@ -1,7 +1,7 @@
-// The Result view's script, bundled into dist/webview.js. It runs in the
-// webview, with the DOM but no Node and no VS Code API, and talks to the
+// The script of the Result view and of each kept result's tab, bundled into
+// dist/webview.js. It runs in the webview, with the DOM but no Node and no VS Code API, and talks to the
 // extension only by messages
-import type { FromView, Posted } from "../messages";
+import type { About, FromView, Posted, View } from "../messages";
 import { Grid } from "./grid";
 import { present } from "./present";
 import type { Sheet } from "./table";
@@ -14,12 +14,12 @@ const vscode = acquireVsCodeApi();
 
 const empty = document.createElement("p");
 empty.className = "empty";
-// Until the first result, how to get one: Run Selected Text on Server's key
+// Until the first result, how to get one: Run Selected Text on Server's key.
+// A kept tab is posted its result as soon as it's ready.
 const key = navigator.userAgent.includes("Mac") ? "Cmd+Enter" : "Ctrl+Enter";
 empty.textContent = `Run a query with ${key} to see its result here`;
 
-// Two views of the latest result, Console and Grid, switched between by tabs
-type View = "console" | "grid";
+// Two views of the result, Console and Grid, switched between by tabs
 const tabs = document.createElement("div");
 tabs.className = "tabs";
 tabs.role = "tablist";
@@ -30,6 +30,7 @@ const tab = (view: View, name: string) => {
   button.addEventListener("click", () => {
     chosen = view;
     switchTo();
+    vscode.postMessage({ type: "chose", view });
   });
   tabs.append(button);
   return button;
@@ -50,10 +51,25 @@ const grid = new Grid(place, document.currentScript?.nonce ?? "", (rows) => {
   switchTo();
 });
 
+// A kept result says what it answers, above the tabs: the server, when it
+// was shown, and the query on one line, the whole of it on hovering
+const about = document.createElement("p");
+about.className = "about";
+const where = document.createElement("span");
+const query = document.createElement("code");
+about.append(where, query);
+
+function answers({ server, at, query: written }: About) {
+  where.textContent = `${server} · ${new Date(at).toLocaleTimeString()}`;
+  query.textContent = written.replace(/\s+/g, " ").trim();
+  query.title = written;
+}
+
 document.body.append(empty);
 
-// The view chosen last, kept for the next result: the Grid at first. A
-// result the grid can't show, or an error, is shown in the Console.
+// The view chosen last, kept for the next result: at first, the one the
+// extension says, or the Grid. A result the grid can't show, or an error, is
+// shown in the Console.
 let chosen: View = "grid";
 let sheet: Sheet | undefined;
 // Whether the grid shows the latest result: it's drawn only once it's in
@@ -99,8 +115,15 @@ window.addEventListener("message", ({ data }: MessageEvent<Posted>) => {
   grid.clear();
   drawn = false;
   filtered = undefined;
+  // The first result opens on the view chosen last, should this webview be
+  // new; later ones keep the one chosen here
   if (empty.isConnected) {
+    chosen = data.view ?? chosen;
     empty.replaceWith(tabs, text, place);
+    if (data.about) {
+      answers(data.about);
+      tabs.before(about);
+    }
   }
   switchTo();
   vscode.postMessage({ type: "shown", id: data.id, ...timing });

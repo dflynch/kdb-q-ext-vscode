@@ -12,6 +12,9 @@ export function activate(context: vscode.ExtensionContext) {
     status,
     connections,
     registerResultView(results),
+    vscode.commands.registerCommand("kdb-q-ext-vscode.keepResult", () =>
+      results.keep(),
+    ),
     vscode.commands.registerCommand("kdb-q-ext-vscode.connect", () =>
       commands.connect(connections),
     ),

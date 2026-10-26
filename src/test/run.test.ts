@@ -55,16 +55,18 @@ async function opened(link: Connection) {
 }
 
 // A Result view keeping each text it shows, as the Console view shows it,
-// and answering with the server's time; and a status bar keeping each
-// query's start, end and the server's time
+// and what each answers, and answering with the server's time; and a status
+// bar keeping each query's start, end and the server's time
 function shown() {
   const replaced: string[] = [];
+  const answers: { query: string; server: string }[] = [];
   const told: (string | number | undefined)[][] = [];
   const results: Results = {
     reveal: async () => {},
-    show: async (message) => {
+    show: async (message, about) => {
       const { text, execution } = present(message);
       replaced.push(text);
+      answers.push(about);
       return execution;
     },
   };
@@ -77,7 +79,7 @@ function shown() {
       };
     },
   };
-  return { replaced, told, results, status };
+  return { replaced, answers, told, results, status };
 }
 
 // A q editor with the text given, all of it selected
@@ -98,7 +100,7 @@ suite("runOnServer", () => {
 
   test("sends the selected text as one query, as written", async () => {
     const { link, sent } = scripted([protectedLong]);
-    const { replaced, told, results, status } = shown();
+    const { replaced, answers, told, results, status } = shown();
     await runOnServer(
       await selecting("f:{\n  x+1} / add one\nf 1"),
       await opened(link),
@@ -108,6 +110,9 @@ suite("runOnServer", () => {
     assert.deepStrictEqual(sent, ["f:{\n  x+1} / add one\nf 1"]);
     await answered();
     assert.deepStrictEqual(replaced, ["42"]);
+    assert.deepStrictEqual(answers, [
+      { query: "f:{\n  x+1} / add one\nf 1", server: "prod" },
+    ]);
     assert.deepStrictEqual(told, [
       ["running", "prod"],
       ["ended", "prod", 3],
