@@ -7,9 +7,11 @@ import {
   type GridApi,
   ModuleRegistry,
   RowApiModule,
+  ScrollApiModule,
   TextFilterModule,
   themeQuartz,
 } from "ag-grid-community";
+import type { Step } from "../messages";
 import type { Sheet } from "./table";
 
 // The Grid view: a sheet in ag-grid. Only this file knows ag-grid.
@@ -19,8 +21,10 @@ ModuleRegistry.registerModules([
   CellStyleModule,
   ClientSideRowModelModule,
   ColumnAutoSizeModule,
-  // For how many rows are shown
+  // For how many rows are shown, and finding a row by its index in the result
   RowApiModule,
+  // For bringing a cell into sight to focus it
+  ScrollApiModule,
   TextFilterModule,
 ]);
 
@@ -66,10 +70,10 @@ type Row = { row: number };
 // nothing of an old result's sort, filter or scroll is left on a new one
 export class Grid {
   private api?: GridApi<Row>;
-  // Whether its rows are drawn, and so can take the focus; if not, whether
-  // to take it once they are
+  // Whether its rows are drawn, and so can take the focus; if not, the cell
+  // to focus once they are
   private rendered = false;
-  private focusWhenRendered = false;
+  private focusWhenRendered?: { cell?: Step };
 
   constructor(
     private readonly place: HTMLElement,
@@ -108,21 +112,18 @@ export class Grid {
       styleNonce: this.nonce,
       columnDefs,
       rowData: Array.from({ length: sheet.rows }, (_, row) => ({ row })),
+      getRowId: ({ data }) => String(data.row),
       autoSizeStrategy: { type: "fitCellContents" },
       onModelUpdated: ({ api }) => this.shown(api.getDisplayedRowCount()),
       onFirstDataRendered: () => {
         this.rendered = true;
         if (this.focusWhenRendered) {
-          this.focusWhenRendered = false;
-          this.focus();
+          this.focus(this.focusWhenRendered.cell);
+          this.focusWhenRendered = undefined;
         }
       },
-      onCellDoubleClicked: ({ api, data, column, rowIndex }) => {
+      onCellDoubleClicked: ({ data, column }) => {
         if (data) {
-          // So that coming back finds the focus on the cell drilled into
-          if (rowIndex !== null) {
-            api.setFocusedCell(rowIndex, column);
-          }
           this.drill(data.row, Number(column.getColId()));
         }
       },
@@ -140,17 +141,24 @@ export class Grid {
     });
   }
 
-  // Put the focus back on the cell it was on, or the first, so that the
-  // keys work on coming back to the grid
-  focus() {
+  // Focus a cell, by its row in the result and its column, brought into
+  // sight wherever sorting has put it; or, with none or one filtered out,
+  // the first cell shown. So the keys work on coming to the grid.
+  focus(cell?: Step) {
     if (!this.rendered) {
-      this.focusWhenRendered = true;
+      this.focusWhenRendered = { cell };
       return;
     }
     // Once its cells are in the page
     requestAnimationFrame(() => {
-      const cell = this.api?.getFocusedCell();
-      this.api?.setFocusedCell(cell?.rowIndex ?? 0, cell?.column ?? "0");
+      const api = this.api;
+      const index = cell && api?.getRowNode(String(cell[0]))?.rowIndex;
+      if (cell && typeof index === "number") {
+        api?.ensureIndexVisible(index);
+        api?.setFocusedCell(index, String(cell[1]));
+      } else {
+        api?.setFocusedCell(0, "0");
+      }
     });
   }
 

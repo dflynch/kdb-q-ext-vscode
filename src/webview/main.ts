@@ -210,8 +210,10 @@ function drill(step: Step, told = true) {
   }
 }
 
-// Go back to the level at i, as it was left, dropping those after it
+// Go back to the level at i, as it was left, dropping those after it, with
+// the focus on the cell drilled into from it: the trail's next step
 function back(i: number) {
+  const from = levels[i + 1].step as Step;
   for (const level of levels.splice(i + 1)) {
     level.grid.clear();
     level.element.remove();
@@ -219,7 +221,7 @@ function back(i: number) {
   switchTo();
   tellPath();
   if (shownLevel().drawn) {
-    shownLevel().grid.focus();
+    shownLevel().grid.focus(from);
   }
 }
 
