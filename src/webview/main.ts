@@ -2,7 +2,8 @@
 // dist/webview.js. It runs in the webview, with the DOM but no Node and no
 // VS Code API, and talks to the extension only by messages
 import type { Size } from "../format/console";
-import type { About, FromView, Posted, Step, View } from "../messages";
+import type { About, Export, FromView, Posted, Step, View } from "../messages";
+import { csv } from "./csv";
 import { Grid } from "./grid";
 import { present, presented } from "./present";
 import type { Sheet } from "./table";
@@ -122,6 +123,8 @@ let consoleSize: Size | undefined;
 let shownId = 0;
 
 const shownLevel = () => levels[levels.length - 1];
+// Whether the value shown has a grid, as the extension was told last
+let exportable = false;
 
 function switchTo() {
   const level = shownLevel();
@@ -140,6 +143,10 @@ function switchTo() {
   for (const each of levels) {
     each.element.hidden = each !== level;
     each.element.inert = each !== level;
+  }
+  if (exportable !== Boolean(sheet)) {
+    exportable = Boolean(sheet);
+    vscode.postMessage({ type: "exportable", exportable });
   }
   level.text.hidden = view !== "console";
   level.place.hidden = view !== "grid";
@@ -267,9 +274,37 @@ document.addEventListener(
   { capture: true },
 );
 
+// The value shown as CSV: its grid's rows and columns as shown, sorted,
+// filtered and moved, whichever view is chosen; or, a grid not yet drawn,
+// all of them, as they came
+function exported(request: number): FromView {
+  const { sheet, grid } = shownLevel() ?? {};
+  if (!sheet) {
+    return { type: "exported", request };
+  }
+  const { rows, columns } = grid.shownOrder() ?? {
+    rows: Array.from({ length: sheet.rows }, (_, i) => i),
+    columns: sheet.columns.map((_, j) => j),
+  };
+  const text = csv(sheet, rows, columns);
+  return {
+    type: "exported",
+    request,
+    csv: new TextEncoder().encode(text),
+    rows: rows.length,
+  };
+}
+
+// What the extension posts: a result to show, or asking for it as CSV
+type Received = Posted | Export;
+
 // Each result replaces the last, drilled-into values and all, and the
 // extension is told how long the server took, for the status bar
-window.addEventListener("message", ({ data }: MessageEvent<Posted>) => {
+window.addEventListener("message", ({ data }: MessageEvent<Received>) => {
+  if (data.type === "export") {
+    vscode.postMessage(exported(data.request));
+    return;
+  }
   const { text, sheet, ...timing } = present(data);
   // The first result opens on the view chosen last, and the cells drilled
   // into, should this webview be new; later ones keep the view chosen here

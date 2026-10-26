@@ -1,15 +1,23 @@
 import * as assert from "node:assert";
 import * as vscode from "vscode";
 import { defaultSize } from "../format/console";
-import type { FromView, Posted, ToView } from "../messages";
-import { type Panels, page, ResultView, title, viewId } from "../resultView";
+import type { Export, FromView, Posted, ToView } from "../messages";
+import {
+  keptType,
+  type Panels,
+  page,
+  ResultView,
+  title,
+  viewId,
+} from "../resultView";
 
 const extension = vscode.Uri.file("/extension");
 
-// A stand-in webview, keeping what it's given and posted, and saying what
-// it's asked to
+// A stand-in webview, keeping what it's given and posted, exports asked for
+// apart, and saying what it's asked to
 function standIn() {
   const posted: Posted[] = [];
+  const exports: Export[] = [];
   let say: (message: FromView) => void = () => {};
   const webview = {
     cspSource: "https://source.example",
@@ -20,7 +28,8 @@ function standIn() {
     onDidReceiveMessage: (listener: (message: FromView) => void) => {
       say = listener;
     },
-    postMessage: async (message: Posted) => posted.push(message),
+    postMessage: async (message: Posted | Export) =>
+      message.type === "export" ? exports.push(message) : posted.push(message),
   };
   return {
     webview,
@@ -32,6 +41,7 @@ function standIn() {
       return webview.html;
     },
     posted,
+    exports,
     ready: () => say({ type: "ready" }),
     say: (message: FromView) => say(message),
   };
@@ -50,17 +60,27 @@ function resolved(results = new ResultView(extension)) {
   return Object.assign(view, { close: () => close() });
 }
 
-// Stand-in editor tabs, keeping how each was made
+// Stand-in editor tabs, keeping how each was made, each active as it's made
+// and can be made active again
 function tabs() {
   const made: {
     title: string;
     options: unknown;
     view: ReturnType<typeof standIn>;
+    activate: () => void;
   }[] = [];
   const panels = ((_type, title, _column, options) => {
     const view = standIn();
-    made.push({ title, options, view });
-    return { webview: view.webview } as unknown as vscode.WebviewPanel;
+    let changed = () => {};
+    made.push({ title, options, view, activate: () => changed() });
+    return {
+      webview: view.webview,
+      active: true,
+      onDidChangeViewState: (listener: () => void) => {
+        changed = listener;
+      },
+      onDidDispose: () => {},
+    } as unknown as vscode.WebviewPanel;
   }) as Panels;
   return { made, panels };
 }
@@ -416,6 +436,48 @@ suite("the Result view", () => {
     }
   });
 
+  test("asks the Result view for the value shown as CSV, and gives back its answer", async () => {
+    const results = new ResultView(extension);
+    const view = resolved(results);
+    const exported = results.exportShown();
+    assert.deepStrictEqual(view.exports, [{ type: "export", request: 1 }]);
+    const csv = new TextEncoder().encode("value\n1\n");
+    view.say({ type: "exported", request: 1, csv, rows: 1 });
+    assert.deepStrictEqual(await exported, { csv, rows: 1 });
+  });
+
+  test("an answer is matched to its asking", async () => {
+    const results = new ResultView(extension);
+    const view = resolved(results);
+    const first = results.exportShown();
+    const second = results.exportShown();
+    view.say({ type: "exported", request: 2, rows: 2 });
+    view.say({ type: "exported", request: 1 });
+    assert.deepStrictEqual(await first, { csv: undefined, rows: undefined });
+    assert.deepStrictEqual(await second, { csv: undefined, rows: 2 });
+  });
+
+  test("exports nothing with no Result view", async () => {
+    assert.deepStrictEqual(await new ResultView(extension).exportShown(), {});
+  });
+
+  test("asks the kept tab that's active for its value as CSV", async () => {
+    const { made, panels } = tabs();
+    const results = new ResultView(extension, panels);
+    assert.deepStrictEqual(await results.exportKept(), {});
+    results.show(two, asked);
+    results.keep();
+    results.keep();
+    made[0].activate();
+    const exported = results.exportKept();
+    assert.deepStrictEqual(made[1].view.exports, []);
+    assert.deepStrictEqual(made[0].view.exports, [
+      { type: "export", request: 1 },
+    ]);
+    made[0].view.say({ type: "exported", request: 1, rows: 3 });
+    assert.deepStrictEqual(await exported, { csv: undefined, rows: 3 });
+  });
+
   test("Keep Result is a command, pinned to the Result view", async () => {
     assert.ok(
       (await vscode.commands.getCommands(true)).includes(
@@ -432,8 +494,27 @@ suite("the Result view", () => {
           when,
         ],
       ),
-      [["kdb-q-ext-vscode.keepResult", `view == ${viewId}`]],
+      [
+        ["kdb-q-ext-vscode.exportResult", `view == ${viewId}`],
+        ["kdb-q-ext-vscode.keepResult", `view == ${viewId}`],
+      ],
     );
+  });
+
+  test("Export to CSV is a command for the Result view and for a kept tab", async () => {
+    const commands = await vscode.commands.getCommands(true);
+    assert.ok(commands.includes("kdb-q-ext-vscode.exportResult"));
+    assert.ok(commands.includes("kdb-q-ext-vscode.exportKept"));
+    const manifest = vscode.extensions.getExtension(
+      "dflynch3.kdb-q-ext-vscode",
+    )?.packageJSON;
+    assert.deepStrictEqual(manifest.contributes.menus["editor/title"], [
+      {
+        command: "kdb-q-ext-vscode.exportKept",
+        when: `activeWebviewPanelId == ${keptType}`,
+        group: "navigation",
+      },
+    ]);
   });
 
   test("is contributed, and opens", async () => {

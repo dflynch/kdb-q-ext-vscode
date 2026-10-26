@@ -1,7 +1,9 @@
 import {
   CellStyleModule,
+  ClientSideRowModelApiModule,
   ClientSideRowModelModule,
   type ColDef,
+  ColumnApiModule,
   ColumnAutoSizeModule,
   createGrid,
   type GridApi,
@@ -20,6 +22,9 @@ ModuleRegistry.registerModules([
   // For right-aligned cells
   CellStyleModule,
   ClientSideRowModelModule,
+  // For the rows and columns as shown, to export
+  ClientSideRowModelApiModule,
+  ColumnApiModule,
   ColumnAutoSizeModule,
   // For how many rows are shown, and finding a row by its index in the result
   RowApiModule,
@@ -183,6 +188,28 @@ export class Grid {
       api.ensureIndexVisible(index);
       api.setFocusedCell(index, String(cell[1]));
     });
+  }
+
+  // The rows shown, by their index in the result, and the columns, by their
+  // place in the sheet, in the order shown: sorted, filtered and moved. None
+  // until the grid is drawn.
+  shownOrder(): { rows: number[]; columns: number[] } | undefined {
+    const api = this.api;
+    if (!api) {
+      return undefined;
+    }
+    const rows: number[] = [];
+    api.forEachNodeAfterFilterAndSort(({ data }) => {
+      if (data) {
+        rows.push(data.row);
+      }
+    });
+    const columns = api
+      .getAllDisplayedColumns()
+      .map((column) => column.getColId())
+      .filter((id) => id !== "index")
+      .map(Number);
+    return { rows, columns };
   }
 
   clear() {

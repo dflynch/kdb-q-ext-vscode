@@ -1,6 +1,14 @@
 import { randomBytes } from "node:crypto";
 import * as vscode from "vscode";
-import type { About, FromView, Posted, Step, ToView, View } from "./messages";
+import type {
+  About,
+  Export,
+  FromView,
+  Posted,
+  Step,
+  ToView,
+  View,
+} from "./messages";
 
 // The Result view in the bottom panel: the latest result, shown in a webview
 export const viewId = "kdb-q-ext-vscode.result";
@@ -8,6 +16,17 @@ export const viewId = "kdb-q-ext-vscode.result";
 export const keptType = "kdb-q-ext-vscode.kept";
 // Whether there's a result to keep, for the Keep Result command
 export const hasResult = "kdb-q-ext-vscode.hasResult";
+// Whether the value shown, in the Result view and in the kept tab that's
+// active, has a grid, for the Export to CSV commands
+export const exportable = "kdb-q-ext-vscode.exportable";
+export const keptExportable = "kdb-q-ext-vscode.keptExportable";
+
+// A value shown, exported as CSV in UTF-8, and its rows; or nothing for one
+// with no grid
+export type Exported = { csv?: Uint8Array; rows?: number };
+
+// A kept tab, and whether the value it shows has a grid
+type Kept = { panel: vscode.WebviewPanel; exportable: boolean };
 
 // Makes an editor tab with a webview: VS Code's, or a stand-in for tests
 export type Panels = typeof vscode.window.createWebviewPanel;
@@ -28,6 +47,11 @@ export class ResultView implements vscode.WebviewViewProvider {
   private path: Step[] = [];
   // Gives the latest's answer to whoever showed it
   private answer?: (execution: number | undefined) => void;
+  // The kept tab that's active, if one is
+  private active?: Kept;
+  // The exports asked for and not yet answered, by number
+  private exports = new Map<number, (exported: Exported) => void>();
+  private request = 0;
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -37,6 +61,7 @@ export class ResultView implements vscode.WebviewViewProvider {
   resolveWebviewView(view: vscode.WebviewView) {
     this.view = view;
     this.ready = false;
+    vscode.commands.executeCommand("setContext", exportable, false);
     view.onDidDispose(() => {
       if (this.view === view) {
         this.view = undefined;
@@ -56,6 +81,14 @@ export class ResultView implements vscode.WebviewViewProvider {
         if (message.id === this.latest?.id) {
           this.path = message.path;
         }
+      } else if (message.type === "exportable") {
+        vscode.commands.executeCommand(
+          "setContext",
+          exportable,
+          message.exportable,
+        );
+      } else if (message.type === "exported") {
+        this.exported(message);
       } else if (message.id === this.latest?.id) {
         this.answer?.(message.execution);
         this.answer = undefined;
@@ -112,13 +145,77 @@ export class ResultView implements vscode.WebviewViewProvider {
       light: vscode.Uri.joinPath(this.extensionUri, "icons", "q-light.svg"),
       dark: vscode.Uri.joinPath(this.extensionUri, "icons", "q-dark.svg"),
     };
+    const tab: Kept = { panel, exportable: false };
+    // Active as it opens
+    this.activate(tab);
+    panel.onDidChangeViewState(() => {
+      if (panel.active) {
+        this.activate(tab);
+      }
+    });
+    panel.onDidDispose(() => {
+      if (this.active === tab) {
+        this.active = undefined;
+      }
+    });
     // Posted on each ready, should the webview be made anew
     panel.webview.onDidReceiveMessage((message: FromView) => {
       if (message.type === "ready") {
         panel.webview.postMessage(kept);
+      } else if (message.type === "exportable") {
+        tab.exportable = message.exportable;
+        if (this.active === tab) {
+          this.activate(tab);
+        }
+      } else if (message.type === "exported") {
+        this.exported(message);
       }
     });
     load(panel.webview, this.extensionUri);
+  }
+
+  // The value shown in the Result view, exported as CSV: its grid's rows and
+  // columns as shown
+  exportShown(): Promise<Exported> {
+    return this.export(this.view?.webview);
+  }
+
+  // The value shown in the kept tab that's active, exported as CSV
+  exportKept(): Promise<Exported> {
+    return this.export(this.active?.panel.webview);
+  }
+
+  // A webview that never answers, as one closed while it's asked, leaves it
+  // waiting
+  private export(webview?: vscode.Webview): Promise<Exported> {
+    if (!webview) {
+      return Promise.resolve({});
+    }
+    const request = ++this.request;
+    const exported = new Promise<Exported>((resolve) => {
+      this.exports.set(request, resolve);
+    });
+    const ask: Export = { type: "export", request };
+    webview.postMessage(ask);
+    return exported;
+  }
+
+  private exported({
+    request,
+    csv,
+    rows,
+  }: Extract<FromView, { type: "exported" }>) {
+    this.exports.get(request)?.({ csv, rows });
+    this.exports.delete(request);
+  }
+
+  private activate(tab: Kept) {
+    this.active = tab;
+    vscode.commands.executeCommand(
+      "setContext",
+      keptExportable,
+      tab.exportable,
+    );
   }
 
   private post() {

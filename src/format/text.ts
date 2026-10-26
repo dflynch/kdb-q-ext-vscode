@@ -314,6 +314,28 @@ export function cell(vector: Vector, i: number): string {
   return which ? infinity(a.type, which) : plain(a);
 }
 
+// An element as q's csv 0: writes it: as in a column, but a char as itself,
+// and a date with - between its parts, as ISO 8601 has it, a datetime with a
+// space before its time
+export function csvCell(vector: Vector, i: number): string {
+  const a = element(vector, i);
+  if (a.type === -10) {
+    return utf8.decode(Uint8Array.of(a.value));
+  }
+  const text = cell(vector, i);
+  if (a.type < -15 || a.type > -12 || special(a.type, a.value)) {
+    return text;
+  }
+  const date = text.slice(0, 10).replaceAll(".", "-");
+  const rest = text.slice(10);
+  return `${date}${a.type === -15 ? rest.replace("T", " ") : rest}`;
+}
+
+// Text as it is, without q's quotes and escapes
+export function decoded(bytes: Uint8Array): string {
+  return utf8.decode(bytes);
+}
+
 function attribute(value: { attribute: Attribute }, text: Text): void {
   if (value.attribute !== Attribute.None) {
     text.put(`\`${" supg"[value.attribute]}#`);

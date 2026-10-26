@@ -92,6 +92,20 @@
         "enablement": "kdb-q-ext-vscode.hasResult"
       },
       {
+        "command": "kdb-q-ext-vscode.exportResult",
+        "category": "kdb+/q",
+        "title": "Export Result to CSV",
+        "icon": "$(export)",
+        "enablement": "kdb-q-ext-vscode.exportable"
+      },
+      {
+        "command": "kdb-q-ext-vscode.exportKept",
+        "category": "kdb+/q",
+        "title": "Export Kept Result to CSV",
+        "icon": "$(export)",
+        "enablement": "kdb-q-ext-vscode.keptExportable"
+      },
+      {
         "command": "kdb-q-ext-vscode.connect",
         "category": "kdb+/q",
         "title": "Connect to Server"
@@ -153,12 +167,28 @@
         {
           "command": "kdb-q-ext-vscode.showServerMenu",
           "when": "false"
+        },
+        {
+          "command": "kdb-q-ext-vscode.exportKept",
+          "when": "activeWebviewPanelId == kdb-q-ext-vscode.kept"
         }
       ],
       "view/title": [
         {
+          "command": "kdb-q-ext-vscode.exportResult",
+          "when": "view == kdb-q-ext-vscode.result",
+          "group": "navigation@1"
+        },
+        {
           "command": "kdb-q-ext-vscode.keepResult",
           "when": "view == kdb-q-ext-vscode.result",
+          "group": "navigation@2"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "kdb-q-ext-vscode.exportKept",
+          "when": "activeWebviewPanelId == kdb-q-ext-vscode.kept",
           "group": "navigation"
         }
       ],
