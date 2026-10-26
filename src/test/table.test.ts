@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import { decode } from "../codec/decode";
 import { count, type Value, type Vector } from "../codec/types";
-import { type Sheet, sheet } from "../webview/table";
+import { type Sheet, said, sheet } from "../webview/table";
 
 const { values: fixtures } = JSON.parse(
   readFileSync(
@@ -132,7 +132,7 @@ suite("the Grid view's sheet", () => {
     ]);
   });
 
-  test("a table in a cell is what it is and its size", () => {
+  test("a table in a cell is its shape, rows × columns, a keyed table's keys among them", () => {
     const s = sheet({
       type: 98,
       attribute: 0,
@@ -159,11 +159,63 @@ suite("the Grid view's sheet", () => {
     assert.ok(s);
     assert.deepStrictEqual(cells(s), [
       ["t"],
-      ["table, 3 rows"],
-      ["keyed table, 2 rows"],
+      ["3 × 3"],
+      ["2 × 2"],
       ["`a`b`c!1 2 3"],
       ["(+(,`x)!,1 2)!`a`b"],
     ]);
+    const { shape } = s.columns[0];
+    assert.deepStrictEqual(
+      [0, 1, 2, 3].map((row) => shape?.(row)),
+      [
+        { keyed: false, rows: 3, columns: 3 },
+        { keyed: true, rows: 2, columns: 2 },
+        undefined,
+        undefined,
+      ],
+    );
+  });
+
+  test("a table's shape in words", () => {
+    assert.deepStrictEqual(
+      [
+        said({ keyed: false, rows: 1, columns: 1 }),
+        said({ keyed: true, rows: 2, columns: 3 }),
+      ],
+      ["Table, 1 row and 1 column", "Keyed table, 2 rows and 3 columns"],
+    );
+  });
+
+  test("tables in cells sort after the rest, keyed last, each by rows then columns", () => {
+    const table = (rows: number, columns: number): Value => ({
+      type: 98,
+      attribute: 0,
+      columns: Array.from({ length: columns }, (_, j) => `c${j}`),
+      data: Array.from({ length: columns }, () => ({
+        type: 7,
+        attribute: 0,
+        data: new BigInt64Array(rows),
+      })),
+    });
+    const keyed = (rows: number, keys: number, values: number): Value => ({
+      type: 99,
+      keys: table(rows, keys),
+      values: table(rows, values),
+    });
+    const s = sheet({
+      type: 0,
+      attribute: 0,
+      items: [
+        table(10, 1),
+        table(9, 2),
+        { type: -7, value: 5n },
+        keyed(9, 1, 1),
+        table(9, 1),
+        keyed(8, 2, 1),
+      ],
+    });
+    assert.ok(s);
+    assert.deepStrictEqual(sorted(s, 0), [2, 4, 1, 0, 5, 3]);
   });
 
   test("a cell's value, to drill into, whatever its column holds", () => {
