@@ -25,7 +25,7 @@ export async function saveCsv({ csv, rows, mixed }: Exported) {
   if (mixed) {
     const columns = mixed.length === 1 ? "column" : "columns";
     vscode.window.showErrorMessage(
-      `kdb+/q: mixed ${columns} unsupported: ${mixed.join(", ")}`,
+      `kdb+/q: export to CSV failed: mixed ${columns} ${mixed.join(", ")}`,
     );
     return;
   }
