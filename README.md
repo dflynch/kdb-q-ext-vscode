@@ -144,9 +144,8 @@ its own: a table in a cell in the Grid, a long string in full in the
 Console. A trail above the tabs, such as `⌂ › [427, 1] › [0, 2]`, says where
 it came from: `⌂` is the result, and each step a cell's row and column,
 counted from 0, the row as the result came, however it's sorted or
-filtered, and the column as the result has it, keys first. Hover a step for
-its column's name. Click a step, or press Alt+Left, to go back, to find it
-as you left it.
+filtered, and the column as the result has it, keys first. Click a step,
+or press Alt+Left, to go back, to find it as you left it.
 
 **kdb+/q: Keep Result**, also the pin in the tab's title bar, opens the
 latest result in an editor tab of its own, where the next query doesn't
