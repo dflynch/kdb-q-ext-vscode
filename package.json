@@ -388,12 +388,10 @@
     "@vscode/test-cli": "^0.0.15",
     "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^4.0.0",
+    "ag-grid-community": "36.2.0",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2",
     "vscode-oniguruma": "^2.0.1",
     "vscode-textmate": "^9.3.2"
-  },
-  "dependencies": {
-    "ag-grid-community": "36.2.0"
   }
 }
