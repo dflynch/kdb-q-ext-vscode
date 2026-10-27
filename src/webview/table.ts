@@ -26,6 +26,8 @@ export interface Column {
   shape?: (row: number) => Shape | undefined;
   // A row's cell as a value of its own, to drill into
   value(row: number): Value;
+  // The column itself, where it's a vector, for the Chart to read at once
+  vector?: Vector;
   // How two rows' cells order, as q's asc orders them: nulls first
   compare(a: number, b: number): number;
 }
@@ -99,6 +101,7 @@ function column(name: string, data: Vector | List): Column {
       text: (row) => cell(data, row),
       csv: (row) => csvCell(data, row),
       value: (row) => element(data, row),
+      vector: data,
       compare: order(data),
     };
   }

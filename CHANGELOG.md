@@ -22,8 +22,8 @@ All notable changes to the extension are documented in this file.
 - **kdb+/q: Keep Result**, also the pin in the **kdb+/q** tab's title
   bar, which opens the latest result in an editor tab of its own, where the
   next query doesn't replace it, for comparing results side by side; it
-  opens as it was left: the view, the cell drilled into, and each grid's
-  sort, filter and column order
+  opens as it was left: the view, the cell drilled into, each grid's sort,
+  filter and column order, and each chart's settings
 - **kdb+/q: Export Result to CSV**, also a button in the **kdb+/q** tab's
   title bar and a kept tab's, which saves the Grid shown, its rows as
   sorted and filtered, as q's `csv 0:` writes them, quoted as RFC 4180 has
@@ -34,6 +34,15 @@ All notable changes to the extension are documented in this file.
   for all. Cmd+C (Ctrl+C) copies the cells as tab-separated text, the
   values Export to CSV writes, and **Copy with Headers** in the grid's menu
   adds the column names; neither copies a column of lists or tables
+- A Chart view beside the Console and the Grid: a line, joining its points
+  or as steps, of numeric columns by a time, a number or each row's index,
+  or bars side by side for each row, labelled by any column. It opens on a
+  bar where the first column is a label, else a line by the first time or
+  number, of one series; its settings, at the right, choose the type and
+  the columns, and its legend hides and shows a series. Drag across it to
+  zoom, double-click to zoom out. It draws the whole result, as it came,
+  a line sorted by its x, and says how many nulls and infinities it left
+  out; times are in UTC, as q writes them
 - Settings: `servers`, `connectTimeout`, `consoleSize` and `sizeLimit`
 
 ### Changed

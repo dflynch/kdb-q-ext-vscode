@@ -166,12 +166,12 @@ suite("the Result view", () => {
     assert.deepStrictEqual(view.posted, []);
     view.ready();
     assert.deepStrictEqual(view.posted, [
-      { ...two, id: 2, view: "grid", path: [], arranged: [] },
+      { ...two, id: 2, view: "grid", settings: true, path: [], arranged: [] },
     ]);
     results.show(one, asked);
     assert.deepStrictEqual(view.posted, [
-      { ...two, id: 2, view: "grid", path: [], arranged: [] },
-      { ...one, id: 3, view: "grid", path: [], arranged: [] },
+      { ...two, id: 2, view: "grid", settings: true, path: [], arranged: [] },
+      { ...one, id: 3, view: "grid", settings: true, path: [], arranged: [] },
     ]);
   });
 
@@ -186,10 +186,10 @@ suite("the Result view", () => {
     assert.deepStrictEqual(second.posted, []);
     second.ready();
     assert.deepStrictEqual(first.posted, [
-      { ...one, id: 1, view: "grid", path: [], arranged: [] },
+      { ...one, id: 1, view: "grid", settings: true, path: [], arranged: [] },
     ]);
     assert.deepStrictEqual(second.posted, [
-      { ...two, id: 2, view: "grid", path: [], arranged: [] },
+      { ...two, id: 2, view: "grid", settings: true, path: [], arranged: [] },
     ]);
   });
 
@@ -232,7 +232,14 @@ suite("the Result view", () => {
     const second = resolved(results);
     second.ready();
     assert.deepStrictEqual(second.posted, [
-      { ...one, id: 1, view: "console", path: [], arranged: [] },
+      {
+        ...one,
+        id: 1,
+        view: "console",
+        settings: true,
+        path: [],
+        arranged: [],
+      },
     ]);
   });
 
@@ -249,7 +256,7 @@ suite("the Result view", () => {
         [0, 2],
       ],
       arranged: [
-        { sort: { sortModel: [{ colId: "0", sort: "desc" }] } },
+        { grid: { sort: { sortModel: [{ colId: "0", sort: "desc" }] } } },
         {},
         {},
       ],
@@ -261,12 +268,13 @@ suite("the Result view", () => {
         ...two,
         id: 1,
         view: "grid",
+        settings: true,
         path: [
           [3, 1],
           [0, 2],
         ],
         arranged: [
-          { sort: { sortModel: [{ colId: "0", sort: "desc" }] } },
+          { grid: { sort: { sortModel: [{ colId: "0", sort: "desc" }] } } },
           {},
           {},
         ],
@@ -277,6 +285,7 @@ suite("the Result view", () => {
       ...one,
       id: 2,
       view: "grid",
+      settings: true,
       path: [],
       arranged: [],
     });
@@ -296,12 +305,15 @@ suite("the Result view", () => {
     assert.deepStrictEqual(second.posted[0].arranged, []);
   });
 
-  test("keeps the cell drilled into, and its grids as arranged", () => {
+  test("keeps the cell drilled into, and its grids and charts as arranged", () => {
     const { made, panels } = tabs();
     const results = new ResultView(extension, panels);
     const view = resolved(results);
     results.show(two, asked);
-    const filtered = { filter: { filterModel: { "0": { type: "contains" } } } };
+    const filtered = {
+      grid: { filter: { filterModel: { "0": { type: "contains" } } } },
+      chart: { type: "bar", x: null, y: ["price"], hidden: [], steps: false },
+    };
     view.say({
       type: "levels",
       id: 1,
@@ -312,6 +324,23 @@ suite("the Result view", () => {
     made[0].view.ready();
     assert.deepStrictEqual(made[0].view.posted[0].path, [[3, 1]]);
     assert.deepStrictEqual(made[0].view.posted[0].arranged, [filtered, {}]);
+  });
+
+  test("the Chart chosen, and its settings closed, are what a new webview and a kept tab open on", () => {
+    const { made, panels } = tabs();
+    const results = new ResultView(extension, panels);
+    const first = resolved(results);
+    first.say({ type: "chose", view: "chart" });
+    first.say({ type: "settings", open: false });
+    results.show(one, asked);
+    const second = resolved(results);
+    second.ready();
+    assert.strictEqual(second.posted[0].view, "chart");
+    assert.strictEqual(second.posted[0].settings, false);
+    results.keep();
+    made[0].view.ready();
+    assert.strictEqual(made[0].view.posted[0].view, "chart");
+    assert.strictEqual(made[0].view.posted[0].settings, false);
   });
 
   test("keeps the latest in an editor tab, with what it answers, in the view chosen", () => {
@@ -336,6 +365,7 @@ suite("the Result view", () => {
       ...two,
       id: 1,
       view: "console",
+      settings: true,
       path: [],
       arranged: [],
       about: { ...asked, at },

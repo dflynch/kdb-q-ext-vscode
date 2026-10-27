@@ -10,8 +10,8 @@ export type ToView =
   | { type: "result"; message: Uint8Array; wrapped: boolean; size: Size }
   | { type: "error"; text: string };
 
-// The two views of a result
-export type View = "console" | "grid";
+// The three views of a result
+export type View = "console" | "grid" | "chart";
 
 // What a result answers: the query as written, the server it ran on, and
 // when it was shown, in milliseconds since the epoch
@@ -21,19 +21,25 @@ export type About = { query: string; server: string; at: number };
 // came, and its column, keys first
 export type Step = [row: number, column: number];
 
-// How a level's grid is arranged: its sort, filter and column order, as
-// the grid says them. The extension keeps it for a
-// webview that opens on it, and never reads it.
-export type Arrangement = Record<string, unknown>;
+// How a level is arranged: its grid's sort, filter and column order, as
+// the grid says them, and what its chart draws, as the chart's settings
+// say. The extension keeps it for a webview that opens on it, and never
+// reads it.
+export type Arrangement = {
+  grid?: Record<string, unknown>;
+  chart?: Record<string, unknown>;
+};
 
 // As posted, numbered, so that the webview's answer can be matched to it,
-// with the view chosen last, the cells drilled into, and how each level's
-// grid is arranged, the result's first, for a webview that opens on them.
-// A kept result also says what it answers.
+// with the view chosen last, whether the chart's settings are open, the
+// cells drilled into, and how each level is arranged, the result's first,
+// for a webview that opens on them. A kept result also says what it
+// answers.
 export type Posted = ToView & {
   id: number;
   about?: About;
   view?: View;
+  settings?: boolean;
   path?: Step[];
   arranged?: Arrangement[];
 };
@@ -48,9 +54,10 @@ export type Copy = { type: "copy" };
 
 // To the extension: the webview has loaded, and is listening; it has shown
 // what was posted, and how long the server took, where protected evaluation
-// said; the view chosen; the cells drilled into and how each level's grid
-// is arranged, the result's first, after a drill, a step back, or a sort,
-// filter or column changed, together so they never disagree; whether the
+// said; the view chosen; the chart's settings opened or closed; the cells
+// drilled into and how each level is arranged, the result's first, after a
+// drill, a step back, a sort, filter or column changed, or a chart's
+// settings changed, together so they never disagree; whether the
 // Grid view is shown, and so can be exported, each time it changes; or the
 // Grid view as CSV, in UTF-8, and its rows, or the shown columns that are
 // mixed lists, which CSV can't hold, or nothing with another view shown;
@@ -62,6 +69,7 @@ export type FromView =
   | { type: "ready" }
   | { type: "shown"; id: number; execution?: number }
   | { type: "chose"; view: View }
+  | { type: "settings"; open: boolean }
   | { type: "levels"; id: number; path: Step[]; arranged: Arrangement[] }
   | { type: "exportable"; exportable: boolean }
   | {
