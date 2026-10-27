@@ -48,7 +48,7 @@ export function ticks(times: number[], type: number, apart: number): string[] {
   if (dated && apart >= day) {
     return us.map(date);
   }
-  const digits = apart >= 1 ? 0 : apart >= 1e-3 ? 3 : 6;
+  const digits = apart >= 1 ? 0 : 3;
   const short = apart >= 60;
   return us.map((t, i) => {
     const time =

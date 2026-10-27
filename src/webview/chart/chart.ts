@@ -62,9 +62,9 @@ export class Chart {
     const x = spec.x === null ? undefined : sheet.columns[spec.x];
     const time = x && x.type >= 12 && x.type <= 19 ? x.type : undefined;
     const named = (j: number) => sheet.columns[j].name;
-    // A line of one x, which uPlot would put at the left of a thousand
-    // days, at the middle of its own unit either side: a month, a day, a
-    // minute, else a second
+    // One x, of a line or a lone bin, which uPlot would put at the left of
+    // a thousand days: a line's at the middle of its own unit either side,
+    // a month, a day, a minute, else a second, and a bin's as the bin
     const { x: xs } = plotted;
     const single = xs.length > 0 && xs[0] === xs[xs.length - 1];
     const unit =

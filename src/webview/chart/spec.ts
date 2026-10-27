@@ -146,7 +146,6 @@ export function fitted(spec: Spec, sheet: Sheet): Spec {
       bins !== null && Number.isInteger(bins) && bins >= 1 && bins <= mostBins
         ? bins
         : null,
-    others: spec.others ?? {},
   };
 }
 
