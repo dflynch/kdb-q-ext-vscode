@@ -95,6 +95,8 @@ export class Grid {
   // columns shown, by their ids, the index's apart, which its places count
   private selection?: Selection;
   private order: string[] = [];
+  // The cell focused last, to tell a move from the same cell focused again
+  private focusedAt?: Place;
   // A drag selecting cells: where the pointer is, and the next step while
   // it's held beyond the grid's edge, scrolling
   private drag?: { x: number; y: number; timer?: number };
@@ -175,15 +177,14 @@ export class Grid {
           .filter((id) => id !== "index");
         this.select(undefined);
       },
-      // Focusing a cell, by a click or a key, selects it alone, but for
-      // the cell the selection was started from
+      // Moving the focus to another cell, by a click or a key, selects it
+      // alone. The same cell again, as the page's focus follows ag-grid's,
+      // keeps the selection.
       onCellFocused: () => {
         const focused = this.focused();
-        const anchor = this.selection?.anchor;
-        if (
-          anchor &&
-          (focused?.row !== anchor.row || focused.column !== anchor.column)
-        ) {
+        const was = this.focusedAt;
+        this.focusedAt = focused;
+        if (focused?.row !== was?.row || focused?.column !== was?.column) {
           this.select(undefined);
         }
       },
@@ -270,7 +271,8 @@ export class Grid {
 
   // The cells selected, or the focused cell: their rows, by their index in
   // the result, and columns, by their place in the sheet, in the order
-  // shown. None with no cell focused.
+  // shown. None with no cell focused, or none of its rows shown, as when
+  // filtered to none.
   selected(): { rows: number[]; columns: number[] } | undefined {
     const api = this.api;
     const focused = this.focused();
@@ -287,10 +289,12 @@ export class Grid {
         indexes.push(row);
       }
     }
-    return {
-      rows: indexes,
-      columns: this.order.slice(columns[0], columns[1] + 1).map(Number),
-    };
+    return indexes.length
+      ? {
+          rows: indexes,
+          columns: this.order.slice(columns[0], columns[1] + 1).map(Number),
+        }
+      : undefined;
   }
 
   clear() {
@@ -306,6 +310,13 @@ export class Grid {
     return cell && column >= 0 && !cell.rowPinned
       ? { row: cell.rowIndex, column }
       : undefined;
+  }
+
+  // Focus a cell while selecting, which ag-grid says it has after the
+  // selection is made: as the cell focused last, so the selection is kept
+  private focusOn(place: Place) {
+    this.focusedAt = place;
+    this.api?.setFocusedCell(place.row, this.order[place.column]);
   }
 
   // The last row and column shown
@@ -362,7 +373,8 @@ export class Grid {
   // A press on a cell: on a row's index, selecting the row, from the row
   // the selection was started from with Shift; on another, with Shift,
   // selecting from the focused cell to it, the focus left where it is; or,
-  // without, selecting it alone, and starting a drag. A right-click in the
+  // without, or with no cell focused, selecting it alone, and starting a
+  // drag. A right-click in the
   // selection keeps it, to copy.
   private pressed(event: PointerEvent) {
     const place = this.placeOf(event.target);
@@ -390,21 +402,28 @@ export class Grid {
       const from = event.shiftKey
         ? (this.selection?.anchor.row ?? this.focused()?.row ?? place.row)
         : place.row;
-      api.setFocusedCell(from, this.order[0]);
+      // A cell of the row in sight takes the focus, the page's too, for
+      // the keys and Copy, the grid scrolled no further
+      const inSight = api
+        .getAllDisplayedVirtualColumns()
+        .map((column) => column.getColId())
+        .find((id) => id !== "index");
+      this.focusOn({
+        row: from,
+        column: Math.max(0, this.order.indexOf(inSight ?? "")),
+      });
       this.select({
         anchor: { row: from, column: 0 },
         end: { row: place.row, column: this.order.length - 1 },
       });
       return;
     }
-    if (event.shiftKey) {
+    const anchor = this.selection?.anchor ?? this.focused();
+    if (event.shiftKey && anchor) {
       handled();
-      const anchor = this.selection?.anchor ?? this.focused();
-      if (anchor) {
-        // Back to the focused cell, should the focus be elsewhere
-        api.setFocusedCell(anchor.row, this.order[anchor.column]);
-        this.reach(place);
-      }
+      // Back to the cell it's selected from, should the focus be elsewhere
+      this.focusOn(anchor);
+      this.reach(place);
       return;
     }
     // Even on the cell it was started from, where the focus doesn't move
@@ -495,14 +514,11 @@ export class Grid {
 
   // Keys that select, as a spreadsheet's: Shift and an arrow to extend the
   // selection; Cmd+A, Ctrl+A elsewhere, for every cell; Ctrl+Space for the
-  // focused cell's column, Shift+Space for its row. Not while typing, as
-  // in a filter.
+  // focused cell's column, Shift+Space for its row. Only on a cell: a
+  // header has keys of its own, and a filter is typed in.
   private keyed(event: KeyboardEvent) {
-    const typing =
-      event.target instanceof HTMLElement &&
-      event.target.matches("input, textarea, [contenteditable]");
     const focused = this.focused();
-    if (typing || !focused || event.altKey) {
+    if (!onCell(event.target) || !focused || event.altKey) {
       return;
     }
     const mac = navigator.userAgent.includes("Mac");
@@ -536,6 +552,12 @@ export class Grid {
       this.select(selection);
     }
   }
+}
+
+// Whether the page's focus, or an event, is on a cell of a grid, not its
+// headers or a filter, for the keys that select and copy
+export function onCell(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(".ag-cell") !== null;
 }
 
 // A column's cells, but a table as its symbol before its shape, and its

@@ -547,9 +547,7 @@ suite("the Result view", () => {
     made[0].view.say({ type: "menu" });
     results.copyWithHeaders();
     assert.deepStrictEqual(view.copies, []);
-    assert.deepStrictEqual(made[0].view.copies, [
-      { type: "copy", headers: true },
-    ]);
+    assert.deepStrictEqual(made[0].view.copies, [{ type: "copy" }]);
     // Not one closed, or loaded anew
     made[0].close();
     results.copyWithHeaders();

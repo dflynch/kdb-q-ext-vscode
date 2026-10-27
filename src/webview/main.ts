@@ -12,7 +12,7 @@ import type {
   View,
 } from "../messages";
 import { csv, tsv } from "./delimited";
-import { Grid } from "./grid";
+import { Grid, onCell } from "./grid";
 import { present, presented } from "./present";
 import type { Sheet } from "./table";
 
@@ -322,17 +322,11 @@ function copied(headers: boolean): FromView {
 
 // Copy, by its key or the webview's menu, with a grid's cell focused: the
 // cells selected, written to the clipboard by the extension. Elsewhere, as
-// in the Console or a filter, the page's own.
+// in the Console, a header or a filter, the page's own.
 document.addEventListener("copy", (event) => {
   const focus = document.activeElement;
   const level = shownLevel();
-  if (
-    !exportable ||
-    !level ||
-    !focus ||
-    !level.place.contains(focus) ||
-    focus.matches("input, textarea, [contenteditable]")
-  ) {
+  if (!exportable || !level?.place.contains(focus) || !onCell(focus)) {
     return;
   }
   event.preventDefault();
@@ -359,7 +353,7 @@ window.addEventListener("message", ({ data }: MessageEvent<Received>) => {
     return;
   }
   if (data.type === "copy") {
-    vscode.postMessage(copied(data.headers));
+    vscode.postMessage(copied(true));
     return;
   }
   const { text, sheet, ...timing } = present(data);

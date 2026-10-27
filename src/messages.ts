@@ -37,7 +37,7 @@ export type Export = { type: "export"; request: number };
 
 // To the webview: asked for the cells selected, with the columns' names, as
 // the grid's menu was opened on, for Copy with Headers
-export type Copy = { type: "copy"; headers: true };
+export type Copy = { type: "copy" };
 
 // To the extension: the webview has loaded, and is listening; it has shown
 // what was posted, and how long the server took, where protected evaluation

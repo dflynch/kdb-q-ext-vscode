@@ -221,7 +221,7 @@ export class ResultView implements vscode.WebviewViewProvider {
 
   // Copy with Headers: the cells selected in the grid whose menu was opened
   copyWithHeaders() {
-    const ask: Copy = { type: "copy", headers: true };
+    const ask: Copy = { type: "copy" };
     this.menu?.postMessage(ask);
   }
 
