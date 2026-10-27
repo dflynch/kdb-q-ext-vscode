@@ -1,6 +1,6 @@
 import * as assert from "node:assert";
 import { Attribute, type Texts, type Value } from "../codec/types";
-import { barred, lined, read, skipped } from "../webview/chart/data";
+import { barred, binned, lined, read, skipped } from "../webview/chart/data";
 import { fitted, initial, type Spec, xColumns } from "../webview/chart/spec";
 import { stamp, ticks } from "../webview/chart/time";
 import { type Sheet, sheet } from "../webview/table";
@@ -62,6 +62,7 @@ const spec = (to: Partial<Spec>): Spec => ({
   y: [],
   hidden: [],
   steps: false,
+  bins: null,
   ...to,
 });
 
@@ -236,6 +237,104 @@ suite("the Chart", () => {
     );
   });
 
+  test("a histogram counts the first number, else the first time, never the row's index", () => {
+    assert.deepStrictEqual(
+      fitted(spec({ type: "histogram", x: null, y: [3] }), trades),
+      spec({ type: "histogram", x: 2, y: [3] }),
+    );
+    // Any number, the only one too, or a time
+    const lone = table({ a: longs(1n, 2n), s: syms("x", "y") });
+    assert.deepStrictEqual(xColumns(lone, "histogram"), [0]);
+    assert.deepStrictEqual(xColumns(trades, "histogram"), [1, 2, 3]);
+  });
+
+  // The counts, and what each bin says it holds
+  const histogram = (s: Sheet, to: Partial<Spec>) => {
+    const plotted = binned(s, spec({ type: "histogram", x: 0, ...to }));
+    return {
+      counts: [...plotted.ys[0]],
+      said: plotted.ys[0].length
+        ? [0, plotted.ys[0].length - 1].map((i) => plotted.bins?.said(i))
+        : [],
+      nulls: plotted.nulls,
+    };
+  };
+
+  test("bins as numpy's auto does: here Sturges', narrower than Freedman–Diaconis'", () => {
+    // 4 values over 3: Sturges 3 / 3 = 1, Freedman–Diaconis 2 × 1.5 / ∛4
+    const floated = table({ v: floats(1, 2, 3, 4, Number.NaN) });
+    assert.deepStrictEqual(histogram(floated, {}), {
+      counts: [1, 1, 2],
+      said: ["1 – 2", "3 – 4"],
+      nulls: 1,
+    });
+    // As many as asked
+    assert.deepStrictEqual(histogram(floated, { bins: 2 }).counts, [2, 2]);
+  });
+
+  test("bins as wide as suits the values, rounded to a width that reads well and starting at a whole number of it", () => {
+    // Sturges 9.3 / 3 = 3.1, so 5, from 0
+    const floated = table({ v: floats(0.3, 1.7, 2.2, 9.6) });
+    assert.deepStrictEqual(histogram(floated, {}), {
+      counts: [3, 1],
+      said: ["0 – 5", "5 – 10"],
+      nulls: 0,
+    });
+    // 09:30 to 10:30 every 20 minutes: Sturges 20 minutes, so half hours
+    const minutes = (m: number) => BigInt(m) * 60_000_000_000n;
+    const timed = table({
+      t: {
+        type: 12,
+        attribute: none,
+        data: BigInt64Array.from([570, 590, 610, 630].map(minutes)),
+      },
+    });
+    assert.deepStrictEqual(histogram(timed, {}), {
+      counts: [2, 2],
+      said: [
+        "2000.01.01D09:30:00.000 – 2000.01.01D10:00:00.000",
+        "2000.01.01D10:00:00.000 – 2000.01.01D10:30:00.000",
+      ],
+      nulls: 0,
+    });
+  });
+
+  test("bins whole units, a bin for the highest too, for a column that counts in them", () => {
+    // 0 to 9: Sturges 9 / 4.32 = 2.08, so 3 wide
+    const counted = table({ v: longs(...[...Array(10).keys()].map(BigInt)) });
+    assert.deepStrictEqual(histogram(counted, {}), {
+      counts: [3, 3, 3, 1],
+      said: ["0 – 2", "9 – 11"],
+      nulls: 0,
+    });
+    // Seven days: Sturges 1.58 days, so 2
+    const dated = table({
+      d: ints(14, 8766, 8767, 8768, 8769, 8770, 8771, 8772),
+    });
+    assert.deepStrictEqual(histogram(dated, {}), {
+      counts: [2, 2, 2, 1],
+      said: ["2024.01.01 – 2024.01.02", "2024.01.07 – 2024.01.08"],
+      nulls: 0,
+    });
+  });
+
+  test("bins values all the same in one, a unit wide, and none at all in none", () => {
+    assert.deepStrictEqual(histogram(table({ v: longs(5n, 5n) }), {}).said, [
+      "5",
+      "5",
+    ]);
+    assert.deepStrictEqual(histogram(table({ v: floats(5, 5) }), {}), {
+      counts: [2],
+      said: ["4.5 – 5.5", "4.5 – 5.5"],
+      nulls: 0,
+    });
+    assert.deepStrictEqual(histogram(table({ v: floats(Number.NaN) }), {}), {
+      counts: [],
+      said: [],
+      nulls: 1,
+    });
+  });
+
   test("says what it left out", () => {
     const plotted = { x: new Float64Array(), ys: [] };
     assert.strictEqual(
@@ -262,6 +361,11 @@ suite("the Chart", () => {
     // Never wrapped to a day, as q writes them
     assert.strictEqual(stamp(30 * 3600, 17), "30:00");
     assert.strictEqual(stamp(-1, 19), "-00:00:01.000");
+    // To the microsecond where that's needed
+    assert.strictEqual(
+      stamp(t + 0.000456, 12, 6),
+      "2024.01.02D09:30:00.123456",
+    );
   });
 
   test("writes ticks as finely as they're apart, the date where it changes", () => {

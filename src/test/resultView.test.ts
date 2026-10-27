@@ -312,7 +312,14 @@ suite("the Result view", () => {
     results.show(two, asked);
     const filtered = {
       grid: { filter: { filterModel: { "0": { type: "contains" } } } },
-      chart: { type: "bar", x: null, y: [2], hidden: [], steps: false },
+      chart: {
+        type: "bar",
+        x: null,
+        y: [2],
+        hidden: [],
+        steps: false,
+        bins: null,
+      },
     };
     view.say({
       type: "levels",

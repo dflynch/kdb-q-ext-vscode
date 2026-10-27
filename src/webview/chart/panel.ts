@@ -8,6 +8,7 @@ import { type ChartType, fitted, type Spec, xColumns, yColumns } from "./spec";
 const types: [ChartType, string][] = [
   ["line", "Line"],
   ["bar", "Bar"],
+  ["histogram", "Histogram"],
 ];
 
 // A row's index, offered as an x, by a value no column's place can be
@@ -36,8 +37,13 @@ export class Panel {
     const type = select(types, spec.type, (value) =>
       change({ type: value as ChartType }),
     );
+    // A histogram counts a column's values, so never the row's index
+    const histogram = spec.type === "histogram";
     const x = select(
-      [[index, "Row index"], ...xColumns(sheet, spec.type).map(named)],
+      [
+        ...(histogram ? [] : [[index, "Row index"] as [string, string]]),
+        ...xColumns(sheet, spec.type).map(named),
+      ],
       spec.x === null ? index : String(spec.x),
       (value) => change({ x: value === index ? null : Number(value) }),
     );
@@ -79,15 +85,37 @@ export class Panel {
       spec.steps ? "steps" : "line",
       (value) => change({ steps: value === "steps" }),
     );
+    // A histogram's bins: as many as suit its values, else as many as typed,
+    // from 1 to 10,000
+    const bins = document.createElement("input");
+    bins.type = "number";
+    bins.min = "1";
+    bins.max = "10000";
+    bins.placeholder = "Auto";
+    bins.ariaLabel = "Bins, or none for as many as suit the values";
+    bins.value = spec.bins === null ? "" : String(spec.bins);
+    bins.addEventListener("change", () => {
+      const typed = Math.round(Number(bins.value));
+      change({
+        bins:
+          bins.value.trim() && Number.isFinite(typed)
+            ? Math.min(10000, Math.max(1, typed))
+            : null,
+      });
+    });
     // Made anew, the control changed keeps the focus, by its place
-    const controls = () => [...this.element.querySelectorAll("select, button")];
+    const controls = () => [
+      ...this.element.querySelectorAll("select, input, button"),
+    ];
     const focused = controls().findIndex((each) => each.matches(":focus"));
     this.element.replaceChildren(
       slot("Chart", type),
-      // How a line is drawn, with its type, before the columns
+      // How a line or a histogram is drawn, with its type, before the
+      // columns
       ...(spec.type === "line" ? [slot("Style", steps)] : []),
-      slot("X", x),
-      slot("Y", ...series, add),
+      ...(histogram
+        ? [slot("Bins", bins), slot("Values", x)]
+        : [slot("X", x), slot("Y", ...series, add)]),
     );
     const now = controls();
     if (focused >= 0) {
