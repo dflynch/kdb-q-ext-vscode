@@ -1,5 +1,14 @@
 import type { Sheet } from "../table";
-import { type ChartType, fitted, type Spec, xColumns, yColumns } from "./spec";
+import {
+  type ChartType,
+  fitted,
+  mostBins,
+  retyped,
+  type Spec,
+  typesOf,
+  xColumns,
+  yColumns,
+} from "./spec";
 
 // The Chart view's settings, beside the chart: its type, and a line's
 // style, then a slot for each of the columns it draws, offering only the
@@ -8,6 +17,7 @@ import { type ChartType, fitted, type Spec, xColumns, yColumns } from "./spec";
 const types: [ChartType, string][] = [
   ["line", "Line"],
   ["bar", "Bar"],
+  ["histogram", "Histogram"],
 ];
 
 // A row's index, offered as an x, by a value no column's place can be
@@ -15,6 +25,8 @@ const index = "index";
 
 export class Panel {
   readonly element = document.createElement("aside");
+  // What it shows
+  private shown?: { sheet: Sheet; spec: Spec };
 
   constructor(
     // Told of each change, with the chart to draw, to show anew
@@ -25,19 +37,45 @@ export class Panel {
   }
 
   show(sheet: Sheet, spec: Spec) {
+    // Not made anew for bins typed, which it shows as they are, so that a
+    // Tab or a click out of them, which says they're typed, goes on where
+    // it was going
+    const shown = this.shown;
+    this.shown = { sheet, spec };
+    if (
+      shown?.sheet === sheet &&
+      JSON.stringify({ ...shown.spec, bins: null }) ===
+        JSON.stringify({ ...spec, bins: null })
+    ) {
+      const input = this.element.querySelector("input");
+      if (input) {
+        input.value = spec.bins === null ? "" : String(spec.bins);
+      }
+      return;
+    }
     // Each column offered by its place, named as the grid names it
     const named = (j: number): [string, string] => [
       String(j),
       sheet.columns[j].name,
     ];
+    // A change to the spec shown, which may since have had bins typed
+    const latest = () => this.shown?.spec ?? spec;
     const change = (to: Partial<Spec>) => {
-      this.changed(fitted({ ...spec, ...to }, sheet));
+      this.changed(fitted({ ...latest(), ...to }, sheet));
     };
-    const type = select(types, spec.type, (value) =>
-      change({ type: value as ChartType }),
+    const type = select(
+      types.filter(([each]) => typesOf(sheet).includes(each)),
+      spec.type,
+      (value) =>
+        this.changed(fitted(retyped(latest(), value as ChartType), sheet)),
     );
+    // A histogram counts a column's values, so never the row's index
+    const histogram = spec.type === "histogram";
     const x = select(
-      [[index, "Row index"], ...xColumns(sheet, spec.type).map(named)],
+      [
+        ...(histogram ? [] : [[index, "Row index"] as [string, string]]),
+        ...xColumns(sheet, spec.type).map(named),
+      ],
       spec.x === null ? index : String(spec.x),
       (value) => change({ x: value === index ? null : Number(value) }),
     );
@@ -79,15 +117,37 @@ export class Panel {
       spec.steps ? "steps" : "line",
       (value) => change({ steps: value === "steps" }),
     );
+    // A histogram's bins: as many as suit its values, else as many as typed,
+    // from 1 to 10,000
+    const bins = document.createElement("input");
+    bins.type = "number";
+    bins.min = "1";
+    bins.max = String(mostBins);
+    bins.placeholder = "Auto";
+    bins.ariaLabel = "Bins, or none for as many as suit the values";
+    bins.value = spec.bins === null ? "" : String(spec.bins);
+    bins.addEventListener("change", () => {
+      const typed = Math.round(Number(bins.value));
+      change({
+        bins:
+          bins.value.trim() && Number.isFinite(typed)
+            ? Math.min(mostBins, Math.max(1, typed))
+            : null,
+      });
+    });
     // Made anew, the control changed keeps the focus, by its place
-    const controls = () => [...this.element.querySelectorAll("select, button")];
+    const controls = () => [
+      ...this.element.querySelectorAll("select, input, button"),
+    ];
     const focused = controls().findIndex((each) => each.matches(":focus"));
     this.element.replaceChildren(
       slot("Chart", type),
-      // How a line is drawn, with its type, before the columns
+      // How a line or a histogram is drawn, with its type, before the
+      // columns
       ...(spec.type === "line" ? [slot("Style", steps)] : []),
-      slot("X", x),
-      slot("Y", ...series, add),
+      ...(histogram
+        ? [slot("Bins", bins), slot("Values", x)]
+        : [slot("X", x), slot("Y", ...series, add)]),
     );
     const now = controls();
     if (focused >= 0) {

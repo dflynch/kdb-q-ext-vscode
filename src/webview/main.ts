@@ -270,7 +270,7 @@ function switchTo() {
   chartTab.title = spec
     ? ""
     : sheet
-      ? "Only a value with a numeric column shows in the Chart"
+      ? "Only a value with a numeric or a time column shows in the Chart"
       : `${shows} Chart`;
   const left = view === "chart" && level.plotted ? skipped(level.plotted) : "";
   size.textContent = sheet

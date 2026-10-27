@@ -287,7 +287,8 @@ body {
   gap: 4px;
 }
 
-.settings select {
+.settings select,
+.settings input {
   flex: 1;
   min-width: 0;
   padding: 2px 4px;
@@ -296,6 +297,17 @@ body {
   background-color: var(--vscode-dropdown-background);
   color: var(--vscode-dropdown-foreground);
   font: inherit;
+}
+
+/* A number typed, as VS Code's inputs */
+.settings input {
+  border-color: var(--vscode-input-border, transparent);
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+}
+
+.settings input::placeholder {
+  color: var(--vscode-input-placeholderForeground);
 }
 
 .settings button {
@@ -321,6 +333,7 @@ body {
 }
 
 .settings select:focus-visible,
+.settings input:focus-visible,
 .settings button:focus-visible,
 .tabs .toggle:focus-visible {
   outline: 1px solid var(--vscode-focusBorder);

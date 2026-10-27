@@ -1,6 +1,6 @@
 import uPlot from "uplot";
 import type { Sheet } from "../table";
-import { barred, lined, type Plotted } from "./data";
+import { barred, binned, fine, lined, type Plotted } from "./data";
 import type { Spec } from "./spec";
 import { stamp, ticks } from "./time";
 
@@ -54,13 +54,17 @@ export class Chart {
     this.clear();
     this.drawn = { sheet, spec };
     const plotted =
-      spec.type === "bar" ? barred(sheet, spec) : lined(sheet, spec);
+      spec.type === "bar"
+        ? barred(sheet, spec)
+        : spec.type === "histogram"
+          ? binned(sheet, spec)
+          : lined(sheet, spec);
     const x = spec.x === null ? undefined : sheet.columns[spec.x];
     const time = x && x.type >= 12 && x.type <= 19 ? x.type : undefined;
     const named = (j: number) => sheet.columns[j].name;
-    // A line of one x, which uPlot would put at the left of a thousand
-    // days, at the middle of its own unit either side: a month, a day, a
-    // minute, else a second
+    // One x, of a line or a lone bin, which uPlot would put at the left of
+    // a thousand days: a line's at the middle of its own unit either side,
+    // a month, a day, a minute, else a second, and a bin's as the bin
     const { x: xs } = plotted;
     const single = xs.length > 0 && xs[0] === xs[xs.length - 1];
     const unit =
@@ -74,7 +78,7 @@ export class Chart {
       ticks: { stroke: lines, width: 1 },
       size: depth,
     };
-    const { label } = plotted;
+    const { label, bins } = plotted;
     const bars = spec.y.length;
     // Each row's bars side by side, filling 80% of its width
     const width = 0.8 / bars;
@@ -94,16 +98,30 @@ export class Chart {
         x: label
           ? // Each row's bars about its index, half a row out at each end
             { time: false, range: (_, min, max) => [min - 0.5, max + 0.5] }
-          : {
-              time: time !== undefined,
-              ...(single &&
-                time !== undefined && {
-                  range: (): uPlot.Range.MinMax => [xs[0] - unit, xs[0] + unit],
-                }),
-            },
+          : bins
+            ? {
+                time: time !== undefined,
+                // All the bins, from the first's start to the last's end,
+                // where uPlot would go from the middle of one to the
+                // other's, or pad a lone one as it likes; or as zoomed
+                range: (_, min, max): uPlot.Range.MinMax =>
+                  single || (min === xs[0] && max === xs[xs.length - 1])
+                    ? [bins.from, bins.to]
+                    : [min, max],
+              }
+            : {
+                time: time !== undefined,
+                ...(single &&
+                  time !== undefined && {
+                    range: (): uPlot.Range.MinMax => [
+                      xs[0] - unit,
+                      xs[0] + unit,
+                    ],
+                  }),
+              },
         // Bars from 0, their heights to scale: with some room past the
         // tallest, as uPlot's own range has
-        ...(label && {
+        ...((label || bins) && {
           y: {
             range: (_, min, max) =>
               uPlot.rangeNum(Math.min(0, min), Math.max(0, max), 0.1, true),
@@ -113,16 +131,34 @@ export class Chart {
       series: [
         {
           label: x?.name ?? "Row index",
-          value: (_, value, __, i) =>
+          // A timestamp or timespan to the microsecond while less than a
+          // second is shown, a millisecond to a pixel or less
+          value: (plot, value, __, i) =>
             value === null || i === null
               ? ""
               : label
                 ? label(i)
-                : time !== undefined
-                  ? stamp(value, time)
-                  : String(value),
+                : bins
+                  ? bins.said(i)
+                  : time !== undefined
+                    ? stamp(value, time, fine(time) && shown(plot) < 1 ? 6 : 3)
+                    : String(value),
         },
-        ...spec.y.map(
+        // A histogram's one series, its counts, a bar to each bin, a
+        // pixel between them
+        ...(bins
+          ? [
+              {
+                label: "count",
+                stroke: colour(0),
+                fill: colour(0),
+                width: 1,
+                paths: uPlot.paths.bars?.({ size: [1, Infinity, 1], gap: 1 }),
+                points: { show: false },
+              },
+            ]
+          : []),
+        ...(bins ? [] : spec.y).map(
           (j, k): uPlot.Series => ({
             label: named(j),
             stroke: colour(k),
@@ -183,6 +219,10 @@ export class Chart {
       hooks: {
         setSeries: [
           (plot) => {
+            // A histogram's counts aren't a column
+            if (bins) {
+              return;
+            }
             const hidden = spec.y.filter((_, k) => !plot.series[k + 1].show);
             // Drawn so again, should the theme change
             this.drawn = { sheet, spec: { ...spec, hidden } };
@@ -199,7 +239,9 @@ export class Chart {
     // Named for a screen reader, which can't see the canvas: the legend
     // below it reads the values at the cursor
     this.plot.over.role = "img";
-    this.plot.over.ariaLabel = `${spec.type === "bar" ? "Bars" : "Line"} of ${spec.y.map(named).join(", ")} by ${x?.name ?? "row index"}`;
+    this.plot.over.ariaLabel = bins
+      ? `Histogram of ${x?.name}`
+      : `${spec.type === "bar" ? "Bars" : "Line"} of ${spec.y.map(named).join(", ")} by ${x?.name ?? "row index"}`;
     this.fit();
     this.resized.observe(this.place);
     this.themed.observe(document.documentElement, {
@@ -240,6 +282,12 @@ export class Chart {
       this.draw(drawn.sheet, drawn.spec);
     }
   }
+}
+
+// How much of the x is shown, as zoomed
+function shown(plot: uPlot): number {
+  const { min, max } = plot.scales.x;
+  return min === undefined || max === undefined ? Infinity : max - min;
 }
 
 // How wide the longest of the bars' labels is, in the font: by characters,
