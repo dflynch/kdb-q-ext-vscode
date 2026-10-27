@@ -3,7 +3,7 @@ import type { Column, Sheet } from "../table";
 import type { Spec } from "./spec";
 
 // A sheet's columns as the chart draws them: numbers, times as seconds
-// since 1970 in UTC, and nulls and infinities left out, and counted, so the
+// since 1970, read as UTC so that no time zone shifts them, and nulls and infinities left out, and counted, so the
 // chart can say what it didn't draw. Never a JavaScript number per cell
 // where a typed array will do.
 

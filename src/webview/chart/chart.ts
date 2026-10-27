@@ -73,7 +73,8 @@ export class Chart {
       height: this.place.clientHeight,
       // Room for half a bar's label beyond the first and last
       padding: [null, wide / 2, null, Math.max(0, wide / 2 - 40)],
-      // Times in UTC, as q's are
+      // Times as they are: a q time has no time zone, so it's read as
+      // UTC, which no zone shifts, and never as the machine's local time
       tzDate: (seconds) => uPlot.tzDate(new Date(seconds * 1000), "Etc/UTC"),
       scales: {
         x: label

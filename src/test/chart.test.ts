@@ -156,7 +156,7 @@ suite("the Chart", () => {
     );
   });
 
-  test("reads times as seconds since 1970 in UTC", () => {
+  test("reads times as seconds since 1970, unshifted by any time zone", () => {
     const at = (
       type: number,
       data: Int32Array | BigInt64Array | Float64Array,

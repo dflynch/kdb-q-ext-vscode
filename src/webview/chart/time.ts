@@ -1,6 +1,7 @@
 // Times on the chart, as q writes them: 2024.01.02D09:30:00.000 at the
 // cursor, and as much of that as the space between ticks needs on an axis.
-// A time is in seconds since 1970 in UTC, as the chart's data are, to the
+// A time is in seconds since 1970, as the chart's data are, read as UTC so
+// that it's written as it is, unshifted by the machine's time zone; to the
 // millisecond, which is as fine as a pixel ever is.
 
 const day = 86400;
