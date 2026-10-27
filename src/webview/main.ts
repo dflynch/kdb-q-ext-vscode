@@ -4,6 +4,7 @@
 import type { Size } from "../format/console";
 import type {
   About,
+  Arrangement,
   Copy,
   Export,
   FromView,
@@ -101,6 +102,9 @@ class Level {
     text: string,
     readonly sheet: Sheet | undefined,
     public chosen: View,
+    // How its grid is arranged: as it was, for a webview opening on it, or
+    // as it's changed here
+    public arranged: Arrangement,
   ) {
     this.element.className = "level";
     this.text.className = "console";
@@ -119,6 +123,10 @@ class Level {
         switchTo();
       },
       (row, column) => drill([row, column]),
+      (arranged) => {
+        this.arranged = arranged;
+        tellLevels();
+      },
     );
   }
 }
@@ -166,7 +174,7 @@ function switchTo() {
   if (sheet && view === "grid" && !level.drawn) {
     // First, as the grid says how many rows it shows as it's drawn
     level.drawn = true;
-    level.grid.show(sheet);
+    level.grid.show(sheet, level.arranged);
   }
   showTrail();
 }
@@ -212,9 +220,10 @@ function showTrail() {
   });
 }
 
-// Show a cell's value of the value shown, as a value of its own. It
-// can't fail for a cell the grid shows, so a step that does is a bug.
-function drill(step: Step, told = true, view = chosen) {
+// Show a cell's value of the value shown, as a value of its own, its grid
+// arranged as given. It can't fail for a cell the grid shows, so a step
+// that does is a bug.
+function drill(step: Step, told = true, view = chosen, arranged = {}) {
   const [row, column] = step;
   const sheet = shownLevel().sheet;
   if (!sheet || !consoleSize) {
@@ -224,12 +233,12 @@ function drill(step: Step, told = true, view = chosen) {
     sheet.columns[column].value(row),
     consoleSize,
   );
-  const level = new Level(step, text, table, view);
+  const level = new Level(step, text, table, view, arranged);
   levels.push(level);
   stack.append(level.element);
   switchTo();
   if (told) {
-    tellPath();
+    tellLevels();
   }
   if (level.drawn) {
     level.grid.focus();
@@ -247,7 +256,7 @@ function back(i: number) {
     level.element.remove();
   }
   switchTo();
-  tellPath();
+  tellLevels();
   if (chosen !== shownLevel().chosen) {
     chosen = shownLevel().chosen;
     vscode.postMessage({ type: "chose", view: chosen });
@@ -257,11 +266,13 @@ function back(i: number) {
   }
 }
 
-// The extension keeps the cells drilled into, so that a kept tab, or this
-// view made anew, opens on the same value
-function tellPath() {
+// The extension keeps the cells drilled into, and how each level's grid
+// is arranged, so that a kept tab, or this view made anew, opens on the
+// same value, arranged the same
+function tellLevels() {
   const path = levels.slice(1).map((level) => level.step as Step);
-  vscode.postMessage({ type: "drilled", id: shownId, path });
+  const arranged = levels.map((level) => level.arranged);
+  vscode.postMessage({ type: "levels", id: shownId, path, arranged });
 }
 
 // Alt+Left goes back a step, as a browser's Back, but not while typing, as
@@ -375,13 +386,27 @@ window.addEventListener("message", ({ data }: MessageEvent<Received>) => {
   consoleSize = data.type === "result" ? data.size : undefined;
   shownId = data.id;
   // Each value a cell was drilled into from was in the Grid; the last
-  // drilled into opens on the view chosen
+  // drilled into opens on the view chosen. Each grid is arranged as it was.
   const path = first ? (data.path ?? []) : [];
-  levels = [new Level(undefined, text, sheet, path.length ? "grid" : chosen)];
+  const arranged = first ? (data.arranged ?? []) : [];
+  levels = [
+    new Level(
+      undefined,
+      text,
+      sheet,
+      path.length ? "grid" : chosen,
+      arranged[0] ?? {},
+    ),
+  ];
   stack.append(levels[0].element);
   switchTo();
   path.forEach((step, i) => {
-    drill(step, false, i < path.length - 1 ? "grid" : chosen);
+    drill(
+      step,
+      false,
+      i < path.length - 1 ? "grid" : chosen,
+      arranged[i + 1] ?? {},
+    );
   });
   vscode.postMessage({ type: "shown", id: data.id, ...timing });
 });

@@ -166,12 +166,12 @@ suite("the Result view", () => {
     assert.deepStrictEqual(view.posted, []);
     view.ready();
     assert.deepStrictEqual(view.posted, [
-      { ...two, id: 2, view: "grid", path: [] },
+      { ...two, id: 2, view: "grid", path: [], arranged: [] },
     ]);
     results.show(one, asked);
     assert.deepStrictEqual(view.posted, [
-      { ...two, id: 2, view: "grid", path: [] },
-      { ...one, id: 3, view: "grid", path: [] },
+      { ...two, id: 2, view: "grid", path: [], arranged: [] },
+      { ...one, id: 3, view: "grid", path: [], arranged: [] },
     ]);
   });
 
@@ -186,10 +186,10 @@ suite("the Result view", () => {
     assert.deepStrictEqual(second.posted, []);
     second.ready();
     assert.deepStrictEqual(first.posted, [
-      { ...one, id: 1, view: "grid", path: [] },
+      { ...one, id: 1, view: "grid", path: [], arranged: [] },
     ]);
     assert.deepStrictEqual(second.posted, [
-      { ...two, id: 2, view: "grid", path: [] },
+      { ...two, id: 2, view: "grid", path: [], arranged: [] },
     ]);
   });
 
@@ -232,21 +232,26 @@ suite("the Result view", () => {
     const second = resolved(results);
     second.ready();
     assert.deepStrictEqual(second.posted, [
-      { ...one, id: 1, view: "console", path: [] },
+      { ...one, id: 1, view: "console", path: [], arranged: [] },
     ]);
   });
 
-  test("a new webview opens on the cells drilled into, until the next result", () => {
+  test("a new webview opens on the cells drilled into, and its grids as arranged, until the next result", () => {
     const results = new ResultView(extension);
     const first = resolved(results);
     first.ready();
     results.show(two, asked);
     first.say({
-      type: "drilled",
+      type: "levels",
       id: 1,
       path: [
         [3, 1],
         [0, 2],
+      ],
+      arranged: [
+        { sort: { sortModel: [{ colId: "0", sort: "desc" }] } },
+        {},
+        {},
       ],
     });
     const second = resolved(results);
@@ -260,6 +265,11 @@ suite("the Result view", () => {
           [3, 1],
           [0, 2],
         ],
+        arranged: [
+          { sort: { sortModel: [{ colId: "0", sort: "desc" }] } },
+          {},
+          {},
+        ],
       },
     ]);
     results.show(one, asked);
@@ -268,6 +278,7 @@ suite("the Result view", () => {
       id: 2,
       view: "grid",
       path: [],
+      arranged: [],
     });
   });
 
@@ -278,21 +289,29 @@ suite("the Result view", () => {
     results.show(two, asked);
     results.show(one, asked);
     // Drilled into the first before the second arrived
-    first.say({ type: "drilled", id: 1, path: [[3, 1]] });
+    first.say({ type: "levels", id: 1, path: [[3, 1]], arranged: [{}, {}] });
     const second = resolved(results);
     second.ready();
     assert.deepStrictEqual(second.posted[0].path, []);
+    assert.deepStrictEqual(second.posted[0].arranged, []);
   });
 
-  test("keeps the cell drilled into", () => {
+  test("keeps the cell drilled into, and its grids as arranged", () => {
     const { made, panels } = tabs();
     const results = new ResultView(extension, panels);
     const view = resolved(results);
     results.show(two, asked);
-    view.say({ type: "drilled", id: 1, path: [[3, 1]] });
+    const filtered = { filter: { filterModel: { "0": { type: "contains" } } } };
+    view.say({
+      type: "levels",
+      id: 1,
+      path: [[3, 1]],
+      arranged: [filtered, {}],
+    });
     results.keep();
     made[0].view.ready();
     assert.deepStrictEqual(made[0].view.posted[0].path, [[3, 1]]);
+    assert.deepStrictEqual(made[0].view.posted[0].arranged, [filtered, {}]);
   });
 
   test("keeps the latest in an editor tab, with what it answers, in the view chosen", () => {
@@ -318,6 +337,7 @@ suite("the Result view", () => {
       id: 1,
       view: "console",
       path: [],
+      arranged: [],
       about: { ...asked, at },
     });
   });

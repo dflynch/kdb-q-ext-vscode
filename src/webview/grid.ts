@@ -7,6 +7,8 @@ import {
   ColumnAutoSizeModule,
   createGrid,
   type GridApi,
+  type GridState,
+  GridStateModule,
   ModuleRegistry,
   RenderApiModule,
   RowApiModule,
@@ -14,7 +16,7 @@ import {
   TextFilterModule,
   themeQuartz,
 } from "ag-grid-community";
-import type { Step } from "../messages";
+import type { Arrangement, Step } from "../messages";
 import {
   contains,
   moved,
@@ -35,6 +37,8 @@ ModuleRegistry.registerModules([
   ClientSideRowModelApiModule,
   ColumnApiModule,
   ColumnAutoSizeModule,
+  // For how the grid is arranged, for a kept tab or a remade view
+  GridStateModule,
   // For showing which cells are selected
   RenderApiModule,
   // For how many rows are shown, and finding a row by its index in the result
@@ -80,6 +84,11 @@ const theme = themeQuartz.withParams({
 // Short, int, long, real and float
 const numbers = [5, 6, 7, 8, 9];
 
+// What of the grid's state is its arrangement, carried to a kept tab: not
+// its widths, fitted anew, its scroll or focus, nor its hidden columns, as
+// one hidden by mistake has no way back but running the query again
+const arrangement = ["sort", "filter", "columnOrder"] as const;
+
 // A row is its index in the result: the sheet reads the cells
 type Row = { row: number };
 
@@ -110,6 +119,9 @@ export class Grid {
     // Told of a cell double-clicked, or Enter pressed on, to drill into: its
     // row in the result, and its column in the sheet
     private readonly drill: (row: number, column: number) => void,
+    // Told how the grid is arranged, each time its sort, filter or columns
+    // change
+    private readonly arranged: (arrangement: Arrangement) => void,
   ) {
     // Caught on their way down, before ag-grid, which would take a press
     // as focusing a cell, and a key as moving the focus
@@ -121,7 +133,9 @@ export class Grid {
     });
   }
 
-  show(sheet: Sheet) {
+  // Show a sheet, arranged as it was, should it have been: sorted,
+  // filtered, its columns moved
+  show(sheet: Sheet, arranged: Arrangement = {}) {
     // Each row's index in the result, at the left as a spreadsheet's row
     // headers: not a column of the sheet, so not a cell to drill into
     const index: ColDef<Row, number> = {
@@ -165,6 +179,18 @@ export class Grid {
       rowData: Array.from({ length: sheet.rows }, (_, row) => ({ row })),
       getRowId: ({ data }) => String(data.row),
       autoSizeStrategy: { type: "fitCellContents" },
+      initialState: arranged as GridState,
+      onStateUpdated: ({ sources, state }) => {
+        if (arrangement.some((part) => sources.includes(part))) {
+          this.arranged(
+            Object.fromEntries(
+              arrangement.flatMap((part) =>
+                state[part] ? [[part, state[part]]] : [],
+              ),
+            ),
+          );
+        }
+      },
       onModelUpdated: ({ api }) => this.shown(api.getDisplayedRowCount()),
       // Sorting, filtering or moving a column clears the selection, which
       // would otherwise be of other cells
@@ -217,10 +243,10 @@ export class Grid {
 
   // Focus a cell, by its row in the result and its column, brought into
   // sight wherever sorting has put it; or, with none, the first cell shown.
-  // So the keys work on coming to the grid. A cell drilled from is shown,
-  // but for a filter typed half a second or less before drilling, which
-  // ag-grid applies after its pause, while the grid is hidden: a risk taken,
-  // as filtering at every key takes up to 0.8 s a million rows.
+  // So the keys work on coming to the grid. A cell drilled from may be
+  // filtered out, by a filter typed half a second or less before drilling,
+  // which ag-grid applies after its pause, while the grid is hidden; and a
+  // kept tab keeps that filter. Then nothing is focused.
   focus(cell?: Step) {
     if (!this.rendered) {
       this.focusWhenRendered = { cell };
@@ -238,9 +264,7 @@ export class Grid {
       }
       const index = api.getRowNode(String(cell[0]))?.rowIndex;
       if (typeof index !== "number") {
-        throw new Error("index", {
-          cause: `drilled-from row ${cell[0]} not shown`,
-        });
+        return;
       }
       api.ensureIndexVisible(index);
       api.setFocusedCell(index, String(cell[1]));

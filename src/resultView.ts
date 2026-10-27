@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import { copy as clipboard } from "./exporting";
 import type {
   About,
+  Arrangement,
   Copy,
   Export,
   FromView,
@@ -48,10 +49,12 @@ export class ResultView implements vscode.WebviewViewProvider {
   private ready = false;
   private latest?: Posted;
   private about?: About;
-  // The view chosen last, and the cells drilled into in the latest, kept
-  // here too so a new webview opens on them
+  // The view chosen last, and the cells drilled into in the latest and how
+  // each level's grid is arranged, kept here too so a new webview, or a
+  // kept tab, opens on them
   private chosen: View = "grid";
   private path: Step[] = [];
+  private arranged: Arrangement[] = [];
   // Gives the latest's answer to whoever showed it
   private answer?: (execution: number | undefined) => void;
   // The kept tab that's active, if one is
@@ -97,10 +100,11 @@ export class ResultView implements vscode.WebviewViewProvider {
         this.post();
       } else if (message.type === "chose") {
         this.chosen = message.view;
-      } else if (message.type === "drilled") {
-        // Not about an earlier one, drilled into before the latest arrived
+      } else if (message.type === "levels") {
+        // Not about an earlier one, changed before the latest arrived
         if (message.id === this.latest?.id) {
           this.path = message.path;
+          this.arranged = message.arranged;
         }
       } else if (message.type === "exportable") {
         vscode.commands.executeCommand(
@@ -138,6 +142,7 @@ export class ResultView implements vscode.WebviewViewProvider {
     this.latest = { ...message, id: (this.latest?.id ?? 0) + 1 };
     this.about = { ...about, at: Date.now() };
     this.path = [];
+    this.arranged = [];
     vscode.commands.executeCommand("setContext", hasResult, true);
     const answered = new Promise<number | undefined>((resolve) => {
       this.answer = resolve;
@@ -146,8 +151,9 @@ export class ResultView implements vscode.WebviewViewProvider {
     return answered;
   }
 
-  // Keep the latest in an editor tab of its own, in the view it's shown in
-  // and on the cell drilled into, where the next result doesn't replace it.
+  // Keep the latest in an editor tab of its own, in the view it's shown in,
+  // on the cell drilled into and with its grids arranged as they are, where
+  // the next result doesn't replace it.
   // The tab is kept alive when hidden, as the Result view is, and closes
   // with VS Code: nothing is saved.
   keep() {
@@ -159,6 +165,7 @@ export class ResultView implements vscode.WebviewViewProvider {
       about: this.about,
       view: this.chosen,
       path: this.path,
+      arranged: this.arranged,
     };
     const panel = this.panels(
       keptType,
@@ -281,6 +288,7 @@ export class ResultView implements vscode.WebviewViewProvider {
         ...this.latest,
         view: this.chosen,
         path: this.path,
+        arranged: this.arranged,
       });
     }
   }
