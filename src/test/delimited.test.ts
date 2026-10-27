@@ -1,6 +1,6 @@
 import * as assert from "node:assert";
 import { decode } from "../codec/decode";
-import { csv, tsv } from "../webview/csv";
+import { csv, tsv } from "../webview/delimited";
 import { type Sheet, sheet } from "../webview/table";
 
 // A sheet of a value from q's -8!

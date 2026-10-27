@@ -11,7 +11,7 @@ import type {
   Step,
   View,
 } from "../messages";
-import { csv, tsv } from "./csv";
+import { csv, tsv } from "./delimited";
 import { Grid } from "./grid";
 import { present, presented } from "./present";
 import type { Sheet } from "./table";

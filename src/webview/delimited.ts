@@ -1,5 +1,7 @@
 import type { Sheet } from "./table";
 
+// A sheet's cells as delimited text: CSV to export, tab-separated to copy
+
 // A sheet as CSV: a header of the columns' names, then a line to a row, in
 // the order given, each cell as q's csv 0: writes it. Quoted as RFC 4180
 // has it, where q's isn't: a cell with a comma, a quote or a line break is
