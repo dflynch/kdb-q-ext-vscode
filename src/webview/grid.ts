@@ -134,7 +134,7 @@ export class Grid {
   }
 
   // Show a sheet, arranged as it was, should it have been: sorted,
-  // filtered, its columns moved or hidden
+  // filtered, its columns moved
   show(sheet: Sheet, arranged: Arrangement = {}) {
     // Each row's index in the result, at the left as a spreadsheet's row
     // headers: not a column of the sheet, so not a cell to drill into
