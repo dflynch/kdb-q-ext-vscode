@@ -1,7 +1,7 @@
 import * as assert from "node:assert";
 import { Attribute, type Texts, type Value } from "../codec/types";
 import { barred, lined, read, skipped } from "../webview/chart/data";
-import { fitted, initial, type Spec } from "../webview/chart/spec";
+import { fitted, initial, type Spec, xColumns } from "../webview/chart/spec";
 import { stamp, ticks } from "../webview/chart/time";
 import { type Sheet, sheet } from "../webview/table";
 
@@ -69,7 +69,7 @@ suite("the Chart", () => {
   test("first draws a bar of the first numbers where the first column is a label", () => {
     assert.deepStrictEqual(
       initial(trades),
-      spec({ type: "bar", x: "sym", y: ["price"] }),
+      spec({ type: "bar", x: 0, y: [2] }),
     );
   });
 
@@ -79,49 +79,71 @@ suite("the Chart", () => {
       time: ints(19, 1),
       size: longs(1n),
     });
-    assert.deepStrictEqual(initial(timed), spec({ x: "time", y: ["price"] }));
+    assert.deepStrictEqual(initial(timed), spec({ x: 1, y: [0] }));
     const numbered = table({ price: floats(1), size: longs(1n) });
-    assert.deepStrictEqual(
-      initial(numbered),
-      spec({ x: "price", y: ["size"] }),
-    );
+    assert.deepStrictEqual(initial(numbered), spec({ x: 0, y: [1] }));
   });
 
   test("draws a lone number by each row's index, and nothing where there are no numbers", () => {
     assert.deepStrictEqual(
       initial(table({ price: floats(1, 2) })),
-      spec({ x: null, y: ["price"] }),
+      spec({ x: null, y: [0] }),
     );
     assert.strictEqual(initial(table({ sym: syms("a") })), undefined);
     assert.strictEqual(initial(table({ time: ints(14, 1) })), undefined);
   });
 
+  test("never offers as the x the only number, which would leave no series", () => {
+    const lone = table({ a: longs(1n, 2n), s: syms("x", "y") });
+    assert.deepStrictEqual(xColumns(lone, "line"), []);
+    assert.deepStrictEqual(xColumns(lone, "bar"), [1]);
+    assert.deepStrictEqual(xColumns(trades, "line"), [1, 2, 3]);
+    assert.deepStrictEqual(
+      fitted(spec({ x: 0, y: [0] }), lone),
+      spec({ x: null, y: [0] }),
+    );
+  });
+
+  test("tells columns of the same name apart by their place", () => {
+    const twice = sheet({
+      type: 99,
+      keys: { type: 98, attribute: none, columns: ["a"], data: [floats(1, 2)] },
+      values: {
+        type: 98,
+        attribute: none,
+        columns: ["a"],
+        data: [floats(3, 4)],
+      },
+    } as Value);
+    assert.ok(twice);
+    const plotted = lined(twice, spec({ x: 0, y: [1] }));
+    assert.deepStrictEqual([...plotted.x], [1, 2]);
+    assert.deepStrictEqual(
+      plotted.ys.map((y) => [...y]),
+      [[3, 4]],
+    );
+  });
+
   test("fits a spec to a sheet, keeping what fits and choosing afresh what doesn't", () => {
     // A line can't take a label as its x
     assert.deepStrictEqual(
-      fitted(
-        spec({ x: "sym", y: ["size", "price"], hidden: ["size"] }),
-        trades,
-      ),
-      spec({ x: "time", y: ["size", "price"], hidden: ["size"] }),
+      fitted(spec({ x: 0, y: [3, 2], hidden: [3] }), trades),
+      spec({ x: 1, y: [3, 2], hidden: [3] }),
     );
     // A series that's become the x, or is no number, goes, and a series is
     // chosen where none is left
     assert.deepStrictEqual(
-      fitted(
-        spec({ x: "price", y: ["price", "sym"], hidden: ["price"] }),
-        trades,
-      ),
-      spec({ x: "price", y: ["size"] }),
+      fitted(spec({ x: 2, y: [2, 0], hidden: [2] }), trades),
+      spec({ x: 2, y: [3] }),
     );
     // A bar takes any column as its x, and a row's index stays
     assert.deepStrictEqual(
-      fitted(spec({ type: "bar", x: "sym", y: ["size"] }), trades),
-      spec({ type: "bar", x: "sym", y: ["size"] }),
+      fitted(spec({ type: "bar", x: 0, y: [3] }), trades),
+      spec({ type: "bar", x: 0, y: [3] }),
     );
     assert.deepStrictEqual(
-      fitted(spec({ x: null, y: ["size"] }), trades),
-      spec({ x: null, y: ["size"] }),
+      fitted(spec({ x: null, y: [3] }), trades),
+      spec({ x: null, y: [3] }),
     );
   });
 
@@ -181,7 +203,7 @@ suite("the Chart", () => {
       time: ints(19, 3000, -2147483648, 1000, 2000),
       price: floats(3, 9, 1, Number.NaN),
     });
-    const plotted = lined(t, spec({ x: "time", y: ["price"] }));
+    const plotted = lined(t, spec({ x: 0, y: [1] }));
     assert.deepStrictEqual([...plotted.x], [1, 2, 3]);
     assert.deepStrictEqual(plotted.ys, [[1, null, 3]]);
     assert.deepStrictEqual([plotted.nulls, plotted.infinities], [2, 0]);
@@ -189,7 +211,7 @@ suite("the Chart", () => {
   });
 
   test("draws a line in order as it came, and by each row's index", () => {
-    const plotted = lined(trades, spec({ x: null, y: ["price", "size"] }));
+    const plotted = lined(trades, spec({ x: null, y: [2, 3] }));
     assert.deepStrictEqual([...plotted.x], [0, 1, 2]);
     assert.deepStrictEqual(
       plotted.ys.map((y) => [...y]),
@@ -202,10 +224,7 @@ suite("the Chart", () => {
   });
 
   test("draws a bar for each row, labelled with its x as the grid shows it", () => {
-    const plotted = barred(
-      trades,
-      spec({ type: "bar", x: "time", y: ["size"] }),
-    );
+    const plotted = barred(trades, spec({ type: "bar", x: 1, y: [3] }));
     assert.deepStrictEqual([...plotted.x], [0, 1, 2]);
     assert.deepStrictEqual(
       [0, 1, 2].map((row) => plotted.label?.(row)),
@@ -240,6 +259,9 @@ suite("the Chart", () => {
     assert.strictEqual(stamp(34200, 17), "09:30");
     assert.strictEqual(stamp(86400 + 34200, 16), "1D09:30:00.000");
     assert.strictEqual(stamp(-60, 16), "-0D00:01:00.000");
+    // Never wrapped to a day, as q writes them
+    assert.strictEqual(stamp(30 * 3600, 17), "30:00");
+    assert.strictEqual(stamp(-1, 19), "-00:00:01.000");
   });
 
   test("writes ticks as finely as they're apart, the date where it changes", () => {

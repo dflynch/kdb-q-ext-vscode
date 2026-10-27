@@ -7,6 +7,15 @@ import { stamp, ticks } from "./time";
 // The Chart view: a spec of a sheet drawn by uPlot. Only this file knows
 // uPlot.
 
+// Ticks for dates, as far apart as uPlot's own: days, then months and years
+// as uPlot counts them
+const day = 86400;
+const days = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15].map((n) => n * day);
+const months = [
+  ...[1, 2, 3, 4, 6].map((n) => n * 30 * day),
+  ...[1, 2, 5, 10, 25, 50, 100].map((n) => n * 365 * day),
+];
+
 // Series in VS Code's own chart colours, as its views draw them, in turn
 const palette = ["blue", "orange", "green", "purple", "red", "yellow"];
 
@@ -36,7 +45,7 @@ export class Chart {
   constructor(
     private readonly place: HTMLElement,
     // Told the series hidden, each time the legend hides or shows one
-    private readonly hid: (hidden: string[]) => void,
+    private readonly hid: (hidden: number[]) => void,
   ) {}
 
   // Draw a spec of a sheet, in place of what was. It says what's drawn,
@@ -46,11 +55,16 @@ export class Chart {
     this.drawn = { sheet, spec };
     const plotted =
       spec.type === "bar" ? barred(sheet, spec) : lined(sheet, spec);
-    const x =
-      spec.x === null
-        ? undefined
-        : sheet.columns.find(({ name }) => name === spec.x);
+    const x = spec.x === null ? undefined : sheet.columns[spec.x];
     const time = x && x.type >= 12 && x.type <= 19 ? x.type : undefined;
+    const named = (j: number) => sheet.columns[j].name;
+    // A line of one x, which uPlot would put at the left of a thousand
+    // days, at the middle of its own unit either side: a month, a day, a
+    // minute, else a second
+    const { x: xs } = plotted;
+    const single = xs.length > 0 && xs[0] === xs[xs.length - 1];
+    const unit =
+      time === 13 ? 31 * day : time === 14 ? day : time === 17 ? 60 : 1;
     const { text, lines, font, series } = styles();
     const colour = (i: number) => series[i % series.length];
     const axis: uPlot.Axis = {
@@ -80,7 +94,13 @@ export class Chart {
         x: label
           ? // Each row's bars about its index, half a row out at each end
             { time: false, range: (_, min, max) => [min - 0.5, max + 0.5] }
-          : { time: time !== undefined },
+          : {
+              time: time !== undefined,
+              ...(single &&
+                time !== undefined && {
+                  range: (): uPlot.Range.MinMax => [xs[0] - unit, xs[0] + unit],
+                }),
+            },
         // Bars from 0, their heights to scale: with some room past the
         // tallest, as uPlot's own range has
         ...(label && {
@@ -92,7 +112,7 @@ export class Chart {
       },
       series: [
         {
-          label: spec.x ?? "Row index",
+          label: x?.name ?? "Row index",
           value: (_, value, __, i) =>
             value === null || i === null
               ? ""
@@ -103,11 +123,11 @@ export class Chart {
                   : String(value),
         },
         ...spec.y.map(
-          (name, k): uPlot.Series => ({
-            label: name,
+          (j, k): uPlot.Series => ({
+            label: named(j),
             stroke: colour(k),
             width: 1,
-            show: !spec.hidden.includes(name),
+            show: !spec.hidden.includes(j),
             ...(label
               ? {
                   fill: colour(k),
@@ -149,6 +169,10 @@ export class Chart {
               }
             : time !== undefined
               ? {
+                  // A month or a date ticked at months or days at least,
+                  // as it has no time of day
+                  ...(time === 13 && { incrs: months }),
+                  ...(time === 14 && { incrs: [...days, ...months] }),
                   values: (_, splits, __, ___, apart) =>
                     ticks(splits, time, apart),
                 }
@@ -172,6 +196,10 @@ export class Chart {
       [plotted.x, ...plotted.ys] as unknown as uPlot.AlignedData,
       this.place,
     );
+    // Named for a screen reader, which can't see the canvas: the legend
+    // below it reads the values at the cursor
+    this.plot.over.role = "img";
+    this.plot.over.ariaLabel = `${spec.type === "bar" ? "Bars" : "Line"} of ${spec.y.map(named).join(", ")} by ${x?.name ?? "row index"}`;
     this.fit();
     this.resized.observe(this.place);
     this.themed.observe(document.documentElement, {

@@ -39,7 +39,10 @@ empty.textContent = `Run a query with ${key} to see its result here`;
 // by tabs
 const tabs = document.createElement("div");
 tabs.className = "tabs";
-tabs.role = "tablist";
+const views = document.createElement("div");
+views.className = "views";
+views.role = "tablist";
+tabs.append(views);
 const tab = (view: View, name: string) => {
   const button = document.createElement("button");
   button.role = "tab";
@@ -50,7 +53,7 @@ const tab = (view: View, name: string) => {
     switchTo();
     vscode.postMessage({ type: "chose", view });
   });
-  tabs.append(button);
+  views.append(button);
   return button;
 };
 const consoleTab = tab("console", "Console");
@@ -185,12 +188,15 @@ class Level {
   }
 
   // A chart changed, by its settings, drawn anew, or by its legend, as
-  // drawn already
+  // drawn already; either way, its settings show it, for the next change
   charted(spec: Spec, redraw: boolean) {
     this.spec = spec;
     this.arranged = { ...this.arranged, chart: spec };
-    if (redraw && this.sheet) {
-      this.plotted = this.chart.draw(this.sheet, spec);
+    if (this.sheet) {
+      if (redraw) {
+        this.plotted = this.chart.draw(this.sheet, spec);
+      }
+      this.panel.show(this.sheet, spec);
       switchTo();
     }
     tellLevels();

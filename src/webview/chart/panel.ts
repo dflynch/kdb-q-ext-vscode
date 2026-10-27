@@ -9,15 +9,14 @@ const types: [ChartType, string][] = [
   ["bar", "Bar"],
 ];
 
-// A row's index, offered as an x, by a value no column's name can be: a
-// name is a symbol, which can't hold a 0 byte
-const index = "\0";
+// A row's index, offered as an x, by a value no column's place can be
+const index = "index";
 
 export class Panel {
   readonly element = document.createElement("aside");
 
   constructor(
-    // Told of each change, with the chart to draw
+    // Told of each change, with the chart to draw, to show anew
     private readonly changed: (spec: Spec) => void,
   ) {
     this.element.className = "settings";
@@ -25,39 +24,36 @@ export class Panel {
   }
 
   show(sheet: Sheet, spec: Spec) {
+    // Each column offered by its place, named as the grid names it
+    const named = (j: number): [string, string] => [
+      String(j),
+      sheet.columns[j].name,
+    ];
     const change = (to: Partial<Spec>) => {
-      const next = fitted({ ...spec, ...to }, sheet);
-      this.show(sheet, next);
-      this.changed(next);
+      this.changed(fitted({ ...spec, ...to }, sheet));
     };
     const type = select(types, spec.type, (value) =>
       change({ type: value as ChartType }),
     );
     const x = select(
-      [
-        [index, "Row index"],
-        ...xColumns(sheet, spec.type).map((name): [string, string] => [
-          name,
-          name,
-        ]),
-      ],
-      spec.x ?? index,
-      (value) => change({ x: value === index ? null : value }),
+      [[index, "Row index"], ...xColumns(sheet, spec.type).map(named)],
+      spec.x === null ? index : String(spec.x),
+      (value) => change({ x: value === index ? null : Number(value) }),
     );
     // A series each, offering the numbers neither the x nor another series
-    const ys = yColumns(sheet).filter((name) => name !== spec.x);
-    const series = spec.y.map((name, i) => {
+    const ys = yColumns(sheet).filter((j) => j !== spec.x);
+    const series = spec.y.map((column, i) => {
       const row = document.createElement("div");
       row.className = "series";
       const others = spec.y.filter((_, j) => j !== i);
       const choice = select(
-        ys
-          .filter((each) => !others.includes(each))
-          .map((each): [string, string] => [each, each]),
-        name,
-        (value) => change({ y: spec.y.map((y, j) => (j === i ? value : y)) }),
+        ys.filter((j) => !others.includes(j)).map(named),
+        String(column),
+        (value) =>
+          change({ y: spec.y.map((y, k) => (k === i ? Number(value) : y)) }),
       );
       choice.ariaLabel = `Series ${i + 1}`;
+      const name = sheet.columns[column].name;
       const remove = button("codicon-close", `Remove ${name}`, () =>
         change({ y: others }),
       );
@@ -66,7 +62,7 @@ export class Panel {
       row.append(choice, remove);
       return row;
     });
-    const unused = ys.filter((name) => !spec.y.includes(name));
+    const unused = ys.filter((j) => !spec.y.includes(j));
     const add = button(
       "codicon-add",
       "Add series",

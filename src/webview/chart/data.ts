@@ -126,7 +126,7 @@ function seconds(type: number): (v: number) => number {
 // A row's index is its x where there's no column for it.
 export function lined(sheet: Sheet, spec: Spec): Plotted {
   const x = spec.x === null ? undefined : read(vectorOf(sheet, spec.x));
-  const ys = spec.y.map((name) => read(vectorOf(sheet, name)));
+  const ys = spec.y.map((j) => read(vectorOf(sheet, j)));
   const xs =
     x?.values ?? Float64Array.from({ length: sheet.rows }, (_, i) => i);
   // The rows drawn, in the order drawn
@@ -153,7 +153,7 @@ export function lined(sheet: Sheet, spec: Spec): Plotted {
 // A bar's: each row in order, labelled with its x as the grid shows it, or
 // its index, at 0, 1, 2 and on
 export function barred(sheet: Sheet, spec: Spec): Plotted {
-  const ys = spec.y.map((name) => read(vectorOf(sheet, name)));
+  const ys = spec.y.map((j) => read(vectorOf(sheet, j)));
   const x = spec.x === null ? undefined : columnOf(sheet, spec.x);
   return {
     x: Float64Array.from({ length: sheet.rows }, (_, i) => i),
@@ -184,16 +184,16 @@ function gapped(values: Float64Array): Float64Array | (number | null)[] {
     : values;
 }
 
-function columnOf(sheet: Sheet, name: string): Column {
-  const column = sheet.columns.find((each) => each.name === name);
+function columnOf(sheet: Sheet, j: number): Column {
+  const column = sheet.columns[j];
   if (!column) {
-    throw new Error("name", { cause: `charted column ${name} not in sheet` });
+    throw new Error("index", { cause: `charted column ${j} not in sheet` });
   }
   return column;
 }
 
-function vectorOf(sheet: Sheet, name: string): Vector {
-  const { vector } = columnOf(sheet, name);
+function vectorOf(sheet: Sheet, j: number): Vector {
+  const { vector, name } = columnOf(sheet, j);
   if (!vector) {
     throw new Error("type", { cause: `charted column ${name} not a vector` });
   }

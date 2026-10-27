@@ -21,11 +21,11 @@ export function stamp(seconds: number, type: number): string {
     case 16:
       return span(ms, 3);
     case 17:
-      return clock(ms, 0).slice(0, 5);
+      return hours(ms, 0).slice(0, -3);
     case 18:
-      return clock(ms, 0);
+      return hours(ms, 0);
   }
-  return clock(ms, 3);
+  return hours(ms, 3);
 }
 
 // Each tick's time on an axis, of a column of q's type, the ticks this many
@@ -50,9 +50,13 @@ export function ticks(times: number[], type: number, apart: number): string[] {
     const time =
       type === 16
         ? span(ms, digits, short)
-        : short
-          ? clock(ms, 0).slice(0, 5)
-          : clock(ms, digits);
+        : dated
+          ? short
+            ? clock(ms, 0).slice(0, 5)
+            : clock(ms, digits)
+          : short
+            ? hours(ms, 0).slice(0, -3)
+            : hours(ms, digits);
     const first = i === 0 || date(ms) !== date(Math.round(times[i - 1] * 1000));
     return dated && first ? `${date(ms)}\n${time}` : time;
   });
@@ -70,6 +74,16 @@ function clock(ms: number, digits: number): string {
   const within = ((ms % (day * 1000)) + day * 1000) % (day * 1000);
   const text = new Date(within).toISOString().slice(11, 23);
   return digits ? text : text.slice(0, 8);
+}
+
+// A minute, second or time, as q writes it: as hours, minutes, seconds
+// and milliseconds, never wrapped to a day, as 30:00 or -00:00:01.000
+function hours(ms: number, digits: number): string {
+  const sign = ms < 0 ? "-" : "";
+  const size = Math.abs(ms);
+  const within = clock(size, digits).slice(2);
+  const whole = String(Math.floor(size / 3600000)).padStart(2, "0");
+  return `${sign}${whole}${within}`;
 }
 
 // A span, as q writes a timespan: 0D09:30:00.123, its days and sign first
