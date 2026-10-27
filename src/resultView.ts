@@ -1,7 +1,9 @@
 import { randomBytes } from "node:crypto";
 import * as vscode from "vscode";
+import { copy as clipboard } from "./exporting";
 import type {
   About,
+  Copy,
   Export,
   FromView,
   Posted,
@@ -25,6 +27,10 @@ export const keptExportable = "kdb-q-ext-vscode.keptExportable";
 // that are mixed lists, which CSV can't hold; or nothing with another view
 // shown
 export type Exported = { csv?: Uint8Array; rows?: number; mixed?: string[] };
+
+// Cells copied from a grid, as tab-separated text; or the selected columns
+// that are mixed lists, which it can't hold; or nothing with none selected
+export type Copied = { text?: string; mixed?: string[] };
 
 // A kept tab, and whether it shows the Grid view
 type Kept = { panel: vscode.WebviewPanel; exportable: boolean };
@@ -57,10 +63,14 @@ export class ResultView implements vscode.WebviewViewProvider {
     { webview: vscode.Webview; resolve: (exported: Exported) => void }
   >();
   private request = 0;
+  // The webview whose grid's menu was opened last, for Copy with Headers
+  private menu?: vscode.Webview;
 
   constructor(
     private readonly extensionUri: vscode.Uri,
     private readonly panels: Panels = vscode.window.createWebviewPanel,
+    // Puts cells copied on the clipboard: VS Code's, or a stand-in for tests
+    private readonly copy: (copied: Copied) => void = clipboard,
   ) {}
 
   resolveWebviewView(view: vscode.WebviewView) {
@@ -100,6 +110,10 @@ export class ResultView implements vscode.WebviewViewProvider {
         );
       } else if (message.type === "exported") {
         this.exported(message);
+      } else if (message.type === "menu") {
+        this.menu = view.webview;
+      } else if (message.type === "copied") {
+        this.copied(message);
       } else if (message.id === this.latest?.id) {
         this.answer?.(message.execution);
         this.answer = undefined;
@@ -186,6 +200,10 @@ export class ResultView implements vscode.WebviewViewProvider {
         }
       } else if (message.type === "exported") {
         this.exported(message);
+      } else if (message.type === "menu") {
+        this.menu = panel.webview;
+      } else if (message.type === "copied") {
+        this.copied(message);
       }
     });
     load(panel.webview, this.extensionUri);
@@ -199,6 +217,16 @@ export class ResultView implements vscode.WebviewViewProvider {
   // The grid of the kept tab that's active, exported as CSV
   exportKept(): Promise<Exported> {
     return this.export(this.active?.panel.webview);
+  }
+
+  // Copy with Headers: the cells selected in the grid whose menu was opened
+  copyWithHeaders() {
+    const ask: Copy = { type: "copy", headers: true };
+    this.menu?.postMessage(ask);
+  }
+
+  private copied({ type, ...copied }: Extract<FromView, { type: "copied" }>) {
+    this.copy(copied);
   }
 
   // Answered with nothing if the webview closes or loads anew first
@@ -224,8 +252,12 @@ export class ResultView implements vscode.WebviewViewProvider {
     this.exports.delete(request);
   }
 
-  // Answers with nothing what was asked of a webview that won't answer
+  // Answers with nothing what was asked of a webview that won't answer,
+  // and forgets its menu
   private unanswered(webview: vscode.Webview) {
+    if (this.menu === webview) {
+      this.menu = undefined;
+    }
     for (const [request, asked] of this.exports) {
       if (asked.webview === webview) {
         asked.resolve({});

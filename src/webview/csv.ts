@@ -11,18 +11,45 @@ export function csv(
   rows: Iterable<number>,
   columns: number[],
 ): { text: string } | { mixed: string[] } {
+  const written = delimited(sheet, rows, columns, ",", true, /[",\n\r]/);
+  return "text" in written ? { text: `${written.text}\n` } : written;
+}
+
+// Cells copied, as a spreadsheet copies them: the same cells as CSV, but
+// tab-separated, with the header only when asked for, and quoted only where
+// a spreadsheet pasting them would read a cell otherwise: one with a tab or
+// a line break, or starting with a quote. No line break after the last, so
+// that one cell pastes as itself.
+export function tsv(
+  sheet: Sheet,
+  rows: Iterable<number>,
+  columns: number[],
+  headers: boolean,
+): { text: string } | { mixed: string[] } {
+  return delimited(sheet, rows, columns, "\t", headers, /^"|[\t\n\r]/);
+}
+
+function delimited(
+  sheet: Sheet,
+  rows: Iterable<number>,
+  columns: number[],
+  separator: string,
+  headers: boolean,
+  // Which cells are quoted
+  quoted: RegExp,
+): { text: string } | { mixed: string[] } {
   const shown = columns.map((j) => sheet.columns[j]);
   const writers = shown.flatMap(({ csv }) => (csv ? [csv] : []));
   if (writers.length < shown.length) {
     return { mixed: shown.filter(({ csv }) => !csv).map(({ name }) => name) };
   }
-  const lines = [shown.map(({ name }) => field(name)).join(",")];
+  const field = (text: string) =>
+    quoted.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+  const lines = headers
+    ? [shown.map(({ name }) => field(name)).join(separator)]
+    : [];
   for (const row of rows) {
-    lines.push(writers.map((write) => field(write(row))).join(","));
+    lines.push(writers.map((write) => field(write(row))).join(separator));
   }
-  return { text: `${lines.join("\n")}\n` };
-}
-
-function field(text: string): string {
-  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+  return { text: lines.join("\n") };
 }

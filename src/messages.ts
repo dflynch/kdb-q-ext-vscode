@@ -35,13 +35,20 @@ export type Posted = ToView & {
 // answer to the asking
 export type Export = { type: "export"; request: number };
 
+// To the webview: asked for the cells selected, with the columns' names, as
+// the grid's menu was opened on, for Copy with Headers
+export type Copy = { type: "copy"; headers: true };
+
 // To the extension: the webview has loaded, and is listening; it has shown
 // what was posted, and how long the server took, where protected evaluation
 // said; the view chosen; the cells drilled into, after a drill or a step
 // back; whether the Grid view is shown, and so can be exported, each time
 // it changes; or the Grid view as CSV, in UTF-8, and its rows, or the
 // shown columns that are mixed lists, which CSV can't hold, or nothing with
-// another view shown
+// another view shown; the grid's menu opened, the webview's own and ours;
+// or the cells selected, copied, as tab-separated text, or the selected
+// columns that are mixed lists, which it can't hold, or nothing with no
+// cell selected
 export type FromView =
   | { type: "ready" }
   | { type: "shown"; id: number; execution?: number }
@@ -54,4 +61,6 @@ export type FromView =
       csv?: Uint8Array;
       rows?: number;
       mixed?: string[];
-    };
+    }
+  | { type: "menu" }
+  | { type: "copied"; text?: string; mixed?: string[] };

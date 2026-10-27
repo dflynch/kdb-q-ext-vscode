@@ -22,6 +22,9 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("kdb-q-ext-vscode.exportKept", async () =>
       saveCsv(await exporting(results.exportKept())),
     ),
+    vscode.commands.registerCommand("kdb-q-ext-vscode.copyWithHeaders", () =>
+      results.copyWithHeaders(),
+    ),
     vscode.commands.registerCommand("kdb-q-ext-vscode.connect", () =>
       commands.connect(connections),
     ),

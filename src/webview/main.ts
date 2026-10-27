@@ -2,8 +2,16 @@
 // dist/webview.js. It runs in the webview, with the DOM but no Node and no
 // VS Code API, and talks to the extension only by messages
 import type { Size } from "../format/console";
-import type { About, Export, FromView, Posted, Step, View } from "../messages";
-import { csv } from "./csv";
+import type {
+  About,
+  Copy,
+  Export,
+  FromView,
+  Posted,
+  Step,
+  View,
+} from "../messages";
+import { csv, tsv } from "./csv";
 import { Grid } from "./grid";
 import { present, presented } from "./present";
 import type { Sheet } from "./table";
@@ -98,6 +106,10 @@ class Level {
     this.text.className = "console";
     this.text.textContent = text;
     this.place.className = "grid";
+    // For Copy with Headers in the grid's menu, beside the webview's own
+    this.place.dataset.vscodeContext = JSON.stringify({
+      webviewSection: "grid",
+    });
     this.element.append(this.text, this.place);
     this.grid = new Grid(
       this.place,
@@ -294,14 +306,60 @@ function exported(request: number): FromView {
       };
 }
 
-// What the extension posts: a result to show, or asking for it as CSV
-type Received = Posted | Export;
+// The cells selected in the Grid view shown, or the focused cell, as
+// tab-separated text, to copy
+function copied(headers: boolean): FromView {
+  const level = shownLevel();
+  const selected = exportable ? level?.grid.selected() : undefined;
+  if (!level?.sheet || !selected) {
+    return { type: "copied" };
+  }
+  const written = tsv(level.sheet, selected.rows, selected.columns, headers);
+  return "mixed" in written
+    ? { type: "copied", mixed: written.mixed }
+    : { type: "copied", text: written.text };
+}
+
+// Copy, by its key or the webview's menu, with a grid's cell focused: the
+// cells selected, written to the clipboard by the extension. Elsewhere, as
+// in the Console or a filter, the page's own.
+document.addEventListener("copy", (event) => {
+  const focus = document.activeElement;
+  const level = shownLevel();
+  if (
+    !exportable ||
+    !level ||
+    !focus ||
+    !level.place.contains(focus) ||
+    focus.matches("input, textarea, [contenteditable]")
+  ) {
+    return;
+  }
+  event.preventDefault();
+  vscode.postMessage(copied(false));
+});
+
+// The grid's menu, for the extension to ask this webview, of any, for
+// Copy with Headers
+document.addEventListener("contextmenu", (event) => {
+  if (event.target instanceof Element && event.target.closest(".grid")) {
+    vscode.postMessage({ type: "menu" });
+  }
+});
+
+// What the extension posts: a result to show, or asking for it as CSV, or
+// for the cells selected
+type Received = Posted | Export | Copy;
 
 // Each result replaces the last, drilled-into values and all, and the
 // extension is told how long the server took, for the status bar
 window.addEventListener("message", ({ data }: MessageEvent<Received>) => {
   if (data.type === "export") {
     vscode.postMessage(exported(data.request));
+    return;
+  }
+  if (data.type === "copy") {
+    vscode.postMessage(copied(data.headers));
     return;
   }
   const { text, sheet, ...timing } = present(data);
