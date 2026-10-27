@@ -21,14 +21,21 @@ export type About = { query: string; server: string; at: number };
 // came, and its column, keys first
 export type Step = [row: number, column: number];
 
+// How a level's grid is arranged: its sort, filter, column order and
+// hidden columns, as the grid says them. The extension keeps it for a
+// webview that opens on it, and never reads it.
+export type Arrangement = Record<string, unknown>;
+
 // As posted, numbered, so that the webview's answer can be matched to it,
-// with the view chosen last and the cells drilled into, for a webview that
-// opens on them. A kept result also says what it answers.
+// with the view chosen last, the cells drilled into, and how each level's
+// grid is arranged, the result's first, for a webview that opens on them.
+// A kept result also says what it answers.
 export type Posted = ToView & {
   id: number;
   about?: About;
   view?: View;
   path?: Step[];
+  arranged?: Arrangement[];
 };
 
 // To the webview: asked for the value shown as CSV, numbered, to match the
@@ -41,8 +48,9 @@ export type Copy = { type: "copy" };
 
 // To the extension: the webview has loaded, and is listening; it has shown
 // what was posted, and how long the server took, where protected evaluation
-// said; the view chosen; the cells drilled into, after a drill or a step
-// back; whether the Grid view is shown, and so can be exported, each time
+// said; the view chosen; the cells drilled into and how each level's grid
+// is arranged, the result's first, after a drill, a step back, or a sort,
+// filter or column changed, together so they never disagree; whether the Grid view is shown, and so can be exported, each time
 // it changes; or the Grid view as CSV, in UTF-8, and its rows, or the
 // shown columns that are mixed lists, which CSV can't hold, or nothing with
 // another view shown; the grid's menu opened, the webview's own and ours;
@@ -53,7 +61,7 @@ export type FromView =
   | { type: "ready" }
   | { type: "shown"; id: number; execution?: number }
   | { type: "chose"; view: View }
-  | { type: "drilled"; id: number; path: Step[] }
+  | { type: "levels"; id: number; path: Step[]; arranged: Arrangement[] }
   | { type: "exportable"; exportable: boolean }
   | {
       type: "exported";

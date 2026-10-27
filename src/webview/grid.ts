@@ -7,6 +7,8 @@ import {
   ColumnAutoSizeModule,
   createGrid,
   type GridApi,
+  type GridState,
+  GridStateModule,
   ModuleRegistry,
   RenderApiModule,
   RowApiModule,
@@ -14,7 +16,7 @@ import {
   TextFilterModule,
   themeQuartz,
 } from "ag-grid-community";
-import type { Step } from "../messages";
+import type { Arrangement, Step } from "../messages";
 import {
   contains,
   moved,
@@ -35,6 +37,8 @@ ModuleRegistry.registerModules([
   ClientSideRowModelApiModule,
   ColumnApiModule,
   ColumnAutoSizeModule,
+  // For how the grid is arranged, kept in a kept tab
+  GridStateModule,
   // For showing which cells are selected
   RenderApiModule,
   // For how many rows are shown, and finding a row by its index in the result
@@ -80,6 +84,15 @@ const theme = themeQuartz.withParams({
 // Short, int, long, real and float
 const numbers = [5, 6, 7, 8, 9];
 
+// What of the grid's state is its arrangement, carried to a kept tab: not
+// its widths, fitted anew, nor its scroll or focus
+const arrangement = [
+  "sort",
+  "filter",
+  "columnOrder",
+  "columnVisibility",
+] as const;
+
 // A row is its index in the result: the sheet reads the cells
 type Row = { row: number };
 
@@ -110,6 +123,9 @@ export class Grid {
     // Told of a cell double-clicked, or Enter pressed on, to drill into: its
     // row in the result, and its column in the sheet
     private readonly drill: (row: number, column: number) => void,
+    // Told how the grid is arranged, each time its sort, filter or columns
+    // change
+    private readonly arranged: (arrangement: Arrangement) => void,
   ) {
     // Caught on their way down, before ag-grid, which would take a press
     // as focusing a cell, and a key as moving the focus
@@ -121,7 +137,9 @@ export class Grid {
     });
   }
 
-  show(sheet: Sheet) {
+  // Show a sheet, arranged as it was, should it have been: sorted,
+  // filtered, its columns moved or hidden
+  show(sheet: Sheet, arranged: Arrangement = {}) {
     // Each row's index in the result, at the left as a spreadsheet's row
     // headers: not a column of the sheet, so not a cell to drill into
     const index: ColDef<Row, number> = {
@@ -165,6 +183,18 @@ export class Grid {
       rowData: Array.from({ length: sheet.rows }, (_, row) => ({ row })),
       getRowId: ({ data }) => String(data.row),
       autoSizeStrategy: { type: "fitCellContents" },
+      initialState: arranged as GridState,
+      onStateUpdated: ({ sources, state }) => {
+        if (arrangement.some((part) => sources.includes(part))) {
+          this.arranged(
+            Object.fromEntries(
+              arrangement.flatMap((part) =>
+                state[part] ? [[part, state[part]]] : [],
+              ),
+            ),
+          );
+        }
+      },
       onModelUpdated: ({ api }) => this.shown(api.getDisplayedRowCount()),
       // Sorting, filtering or moving a column clears the selection, which
       // would otherwise be of other cells
