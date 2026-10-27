@@ -23,7 +23,7 @@ All notable changes to the extension are documented in this file.
   bar, which opens the latest result in an editor tab of its own, where the
   next query doesn't replace it, for comparing results side by side; it
   opens as it was left: the view, the cell drilled into, and each grid's
-  sort, filter, column order and hidden columns
+  sort, filter and column order
 - **kdb+/q: Export Result to CSV**, also a button in the **kdb+/q** tab's
   title bar and a kept tab's, which saves the Grid shown, its rows as
   sorted and filtered, as q's `csv 0:` writes them, quoted as RFC 4180 has

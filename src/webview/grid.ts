@@ -85,13 +85,9 @@ const theme = themeQuartz.withParams({
 const numbers = [5, 6, 7, 8, 9];
 
 // What of the grid's state is its arrangement, carried to a kept tab: not
-// its widths, fitted anew, nor its scroll or focus
-const arrangement = [
-  "sort",
-  "filter",
-  "columnOrder",
-  "columnVisibility",
-] as const;
+// its widths, fitted anew, its scroll or focus, nor its hidden columns, as
+// one hidden by mistake has no way back but running the query again
+const arrangement = ["sort", "filter", "columnOrder"] as const;
 
 // A row is its index in the result: the sheet reads the cells
 type Row = { row: number };
@@ -247,10 +243,10 @@ export class Grid {
 
   // Focus a cell, by its row in the result and its column, brought into
   // sight wherever sorting has put it; or, with none, the first cell shown.
-  // So the keys work on coming to the grid. A cell drilled from is shown,
-  // but for a filter typed half a second or less before drilling, which
-  // ag-grid applies after its pause, while the grid is hidden: a risk taken,
-  // as filtering at every key takes up to 0.8 s a million rows.
+  // So the keys work on coming to the grid. A cell drilled from may be
+  // filtered out, by a filter typed half a second or less before drilling,
+  // which ag-grid applies after its pause, while the grid is hidden; and a
+  // kept tab keeps that filter. Then nothing is focused.
   focus(cell?: Step) {
     if (!this.rendered) {
       this.focusWhenRendered = { cell };
@@ -268,9 +264,7 @@ export class Grid {
       }
       const index = api.getRowNode(String(cell[0]))?.rowIndex;
       if (typeof index !== "number") {
-        throw new Error("index", {
-          cause: `drilled-from row ${cell[0]} not shown`,
-        });
+        return;
       }
       api.ensureIndexVisible(index);
       api.setFocusedCell(index, String(cell[1]));

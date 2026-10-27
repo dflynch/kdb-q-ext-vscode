@@ -21,8 +21,8 @@ export type About = { query: string; server: string; at: number };
 // came, and its column, keys first
 export type Step = [row: number, column: number];
 
-// How a level's grid is arranged: its sort, filter, column order and
-// hidden columns, as the grid says them. The extension keeps it for a
+// How a level's grid is arranged: its sort, filter and column order, as
+// the grid says them. The extension keeps it for a
 // webview that opens on it, and never reads it.
 export type Arrangement = Record<string, unknown>;
 
