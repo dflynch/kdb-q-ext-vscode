@@ -37,7 +37,7 @@ ModuleRegistry.registerModules([
   ClientSideRowModelApiModule,
   ColumnApiModule,
   ColumnAutoSizeModule,
-  // For how the grid is arranged, kept in a kept tab
+  // For how the grid is arranged, for a kept tab or a remade view
   GridStateModule,
   // For showing which cells are selected
   RenderApiModule,

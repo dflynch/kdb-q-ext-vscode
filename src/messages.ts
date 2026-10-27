@@ -50,10 +50,11 @@ export type Copy = { type: "copy" };
 // what was posted, and how long the server took, where protected evaluation
 // said; the view chosen; the cells drilled into and how each level's grid
 // is arranged, the result's first, after a drill, a step back, or a sort,
-// filter or column changed, together so they never disagree; whether the Grid view is shown, and so can be exported, each time
-// it changes; or the Grid view as CSV, in UTF-8, and its rows, or the
-// shown columns that are mixed lists, which CSV can't hold, or nothing with
-// another view shown; the grid's menu opened, the webview's own and ours;
+// filter or column changed, together so they never disagree; whether the
+// Grid view is shown, and so can be exported, each time it changes; or the
+// Grid view as CSV, in UTF-8, and its rows, or the shown columns that are
+// mixed lists, which CSV can't hold, or nothing with another view shown;
+// the grid's menu opened, the webview's own and ours;
 // or the cells selected, copied, as tab-separated text, or the selected
 // columns that are mixed lists, which it can't hold, or nothing with no
 // cell selected
