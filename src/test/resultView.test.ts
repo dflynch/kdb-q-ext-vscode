@@ -1,8 +1,9 @@
 import * as assert from "node:assert";
 import * as vscode from "vscode";
 import { defaultSize } from "../format/console";
-import type { Export, FromView, Posted, ToView } from "../messages";
+import type { Copy, Export, FromView, Posted, ToView } from "../messages";
 import {
+  type Copied,
   keptType,
   type Panels,
   page,
@@ -13,11 +14,12 @@ import {
 
 const extension = vscode.Uri.file("/extension");
 
-// A stand-in webview, keeping what it's given and posted, exports asked for
-// apart, and saying what it's asked to
+// A stand-in webview, keeping what it's given and posted, exports and
+// copies asked for apart, and saying what it's asked to
 function standIn() {
   const posted: Posted[] = [];
   const exports: Export[] = [];
+  const copies: Copy[] = [];
   let say: (message: FromView) => void = () => {};
   const webview = {
     cspSource: "https://source.example",
@@ -28,8 +30,12 @@ function standIn() {
     onDidReceiveMessage: (listener: (message: FromView) => void) => {
       say = listener;
     },
-    postMessage: async (message: Posted | Export) =>
-      message.type === "export" ? exports.push(message) : posted.push(message),
+    postMessage: async (message: Posted | Export | Copy) =>
+      message.type === "export"
+        ? exports.push(message)
+        : message.type === "copy"
+          ? copies.push(message)
+          : posted.push(message),
   };
   return {
     webview,
@@ -42,6 +48,7 @@ function standIn() {
     },
     posted,
     exports,
+    copies,
     ready: () => say({ type: "ready" }),
     say: (message: FromView) => say(message),
   };
@@ -514,6 +521,59 @@ suite("the Result view", () => {
     ]);
     made[0].view.say({ type: "exported", request: 1, rows: 3 });
     assert.deepStrictEqual(await exported, { rows: 3 });
+  });
+
+  test("cells copied are put on the clipboard, or mixed columns refused, as they came", () => {
+    const copied: Copied[] = [];
+    const { made, panels } = tabs();
+    const results = new ResultView(extension, panels, (c) => copied.push(c));
+    const view = resolved(results);
+    view.say({ type: "copied", text: "a\t1" });
+    results.show(two, asked);
+    results.keep();
+    made[0].view.say({ type: "copied", mixed: ["v"] });
+    view.say({ type: "copied" });
+    assert.deepStrictEqual(copied, [{ text: "a\t1" }, { mixed: ["v"] }, {}]);
+  });
+
+  test("Copy with Headers asks the webview whose grid's menu was opened last", () => {
+    const { made, panels } = tabs();
+    const results = new ResultView(extension, panels, () => {});
+    const view = resolved(results);
+    results.copyWithHeaders();
+    results.show(two, asked);
+    results.keep();
+    view.say({ type: "menu" });
+    made[0].view.say({ type: "menu" });
+    results.copyWithHeaders();
+    assert.deepStrictEqual(view.copies, []);
+    assert.deepStrictEqual(made[0].view.copies, [{ type: "copy" }]);
+    // Not one closed, or loaded anew
+    made[0].close();
+    results.copyWithHeaders();
+    view.say({ type: "menu" });
+    view.ready();
+    results.copyWithHeaders();
+    assert.strictEqual(made[0].view.copies.length, 1);
+    assert.deepStrictEqual(view.copies, []);
+  });
+
+  test("Copy with Headers is in the menu of a grid, in the Result view and a kept tab", async () => {
+    assert.ok(
+      (await vscode.commands.getCommands(true)).includes(
+        "kdb-q-ext-vscode.copyWithHeaders",
+      ),
+    );
+    const manifest = vscode.extensions.getExtension(
+      "dflynch3.kdb-q-ext-vscode",
+    )?.packageJSON;
+    assert.deepStrictEqual(manifest.contributes.menus["webview/context"], [
+      {
+        command: "kdb-q-ext-vscode.copyWithHeaders",
+        when: `webviewSection == grid && (webviewId == ${viewId} || webviewId == ${keptType})`,
+        group: "9_cutcopypaste",
+      },
+    ]);
   });
 
   test("Keep Result is a command, pinned to the Result view", async () => {

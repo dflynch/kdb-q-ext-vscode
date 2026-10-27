@@ -189,3 +189,8 @@ body {
   font-size: inherit;
   vertical-align: text-bottom;
 }
+
+/* Cells selected, to copy, as the editor's selected text */
+.grid .ag-cell.selected {
+  background-color: var(--vscode-editor-selectionBackground);
+}

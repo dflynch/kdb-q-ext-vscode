@@ -1,6 +1,6 @@
 import * as assert from "node:assert";
 import { decode } from "../codec/decode";
-import { csv } from "../webview/csv";
+import { csv, tsv } from "../webview/delimited";
 import { type Sheet, sheet } from "../webview/table";
 
 // A sheet of a value from q's -8!
@@ -77,5 +77,59 @@ suite("Export to CSV", () => {
       "010000002700000000000200000007000200000001000000000000000200000000000000f56100",
     );
     assert.deepStrictEqual(all(list), { mixed: ["value"] });
+  });
+});
+
+suite("Copy", () => {
+  // ([]s:`$("a,b";"x");str:("say \"hi\"";"two\nlines"))
+  const quoted =
+    "010000004c0000006200630b00020000007300737472000000020000000b0002000000612c620078000000020000000a000800000073617920226869220a000900000074776f0a6c696e6573";
+
+  test("cells as CSV writes them, tab-separated, a line to a row and none after", () => {
+    // ([k:`a`b]n:1 2)
+    const s = sheetOf(
+      "010000004b000000636200630b00010000006b000000010000000b0002000000610062006200630b00010000006e0000000100000007000200000001000000000000000200000000000000",
+    );
+    assert.deepStrictEqual(tsv(s, [0, 1], [0, 1], false), {
+      text: "a\t1\nb\t2",
+    });
+    assert.deepStrictEqual(tsv(s, [1], [1], false), { text: "2" });
+  });
+
+  test("the header only when asked for", () => {
+    const s = sheetOf(quoted);
+    assert.deepStrictEqual(tsv(s, [1], [1, 0], true), {
+      text: 'str\ts\n"two\nlines"\tx',
+    });
+  });
+
+  test("a cell with a tab or a line break, or starting with a quote, is quoted, as a spreadsheet would read it otherwise", () => {
+    const s = sheetOf(quoted);
+    assert.deepStrictEqual(tsv(s, [0, 1], [0, 1], false), {
+      text: 'a,b\tsay "hi"\nx\t"two\nlines"',
+    });
+    // ([]s:enlist`$"a\tb")
+    const tab = sheetOf(
+      "01000000230000006200630b000100000073000000010000000b000100000061096200",
+    );
+    assert.deepStrictEqual(tsv(tab, [0], [0], false), { text: '"a\tb"' });
+    // ([]s:enlist`$"\"a\" b")
+    const opening = sheetOf(
+      "01000000250000006200630b000100000073000000010000000b0001000000226122206200",
+    );
+    assert.deepStrictEqual(tsv(opening, [0], [0], false), {
+      text: '"""a"" b"',
+    });
+  });
+
+  test("mixed lists aren't copied, as they aren't exported: their names instead", () => {
+    // ([k:`a`b]n:(1 2;3 4);t:(([]a:1 2);([]a:enlist 3)))
+    const s = sheetOf(
+      "01000000b5000000636200630b00010000006b000000010000000b0002000000610062006200630b00020000006e00740000000200000000000200000007000200000001000000000000000200000000000000070002000000030000000000000004000000000000000000020000006200630b00010000006100000001000000070002000000010000000000000002000000000000006200630b000100000061000000010000000700010000000300000000000000",
+    );
+    assert.deepStrictEqual(tsv(s, [0, 1], [0, 1, 2], false), {
+      mixed: ["n", "t"],
+    });
+    assert.deepStrictEqual(tsv(s, [0, 1], [0], true), { text: "k\na\nb" });
   });
 });

@@ -26,6 +26,12 @@ All notable changes to the extension are documented in this file.
   title bar and a kept tab's, which saves the Grid shown, its rows as
   sorted and filtered, as q's `csv 0:` writes them, quoted as RFC 4180 has
   it; like q's, it won't write a column of lists or tables
+- Copy in the Grid: click a cell, then drag, Shift+click or Shift+arrows
+  for a rectangle, scrolling as a drag reaches the edge; a row's index for
+  the row, Ctrl+Space for a column, Shift+Space for a row, Cmd+A (Ctrl+A)
+  for all. Cmd+C (Ctrl+C) copies the cells as tab-separated text, the
+  values Export to CSV writes, and **Copy with Headers** in the grid's menu
+  adds the column names; neither copies a column of lists or tables
 - Settings: `servers`, `connectTimeout`, `consoleSize` and `sizeLimit`
 
 ### Changed

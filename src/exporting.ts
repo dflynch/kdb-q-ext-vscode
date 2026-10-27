@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import * as vscode from "vscode";
-import type { Exported } from "./resultView";
+import type { Copied, Exported } from "./resultView";
 
 // Where the last export was saved, for the next to be saved beside it, this
 // session; at first, the workspace's folder, or the home folder with none
@@ -23,10 +23,7 @@ export function exporting(exported: Promise<Exported>): Promise<Exported> {
 // when the view changed, or the webview closed, as it was asked for.
 export async function saveCsv({ csv, rows, mixed }: Exported) {
   if (mixed) {
-    const columns = mixed.length === 1 ? "column" : "columns";
-    vscode.window.showErrorMessage(
-      `kdb+/q: failed to export mixed ${columns}: ${mixed.join(", ")}`,
-    );
+    failed("export", mixed);
     return;
   }
   if (!csv) {
@@ -69,6 +66,24 @@ export async function saveCsv({ csv, rows, mixed }: Exported) {
   } else if (choice === reveal) {
     await vscode.commands.executeCommand("revealFileInOS", uri);
   }
+}
+
+// Puts cells copied from a grid on the clipboard. Nothing with a mixed
+// list selected, which can't be written whole, as Export to CSV won't; or
+// with no cell selected.
+export async function copy({ text, mixed }: Copied) {
+  if (mixed) {
+    failed("copy", mixed);
+  } else if (text !== undefined) {
+    await vscode.env.clipboard.writeText(text);
+  }
+}
+
+function failed(action: string, mixed: string[]) {
+  const columns = mixed.length === 1 ? "column" : "columns";
+  vscode.window.showErrorMessage(
+    `kdb+/q: failed to ${action} mixed ${columns}: ${mixed.join(", ")}`,
+  );
 }
 
 // What VS Code calls showing a file in its folder, on each platform
