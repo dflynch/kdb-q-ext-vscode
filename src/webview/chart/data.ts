@@ -1,6 +1,6 @@
 import { count, type Vector } from "../../codec/types";
 import type { Column, Sheet } from "../table";
-import type { Spec } from "./spec";
+import { mostBins, type Spec } from "./spec";
 import { stamp } from "./time";
 
 // A sheet's columns as the chart draws them: numbers, times as seconds
@@ -40,8 +40,9 @@ const ranges: Record<number, number> = {
   19: 2 ** 31,
 };
 
-// A numeric or temporal column's cells, as numbers or seconds since 1970
-export function read(vector: Vector): Read {
+// A numeric or temporal column's cells, as numbers or seconds since 1970,
+// or, raw, as q counts them, as days since 2000.01.01 for a date
+export function read(vector: Vector, raw = false): Read {
   const n = count(vector) ?? 0;
   const values = new Float64Array(n);
   let nulls = 0;
@@ -54,7 +55,7 @@ export function read(vector: Vector): Read {
       infinities++;
     }
   };
-  const scale = seconds(vector.type);
+  const scale = raw ? (v: number) => v : seconds(vector.type);
   switch (vector.type) {
     case 7:
     case 12:
@@ -168,23 +169,22 @@ export function barred(sheet: Sheet, spec: Spec): Plotted {
 }
 
 // A histogram's bins: how many of a column's values fall in each, at the
-// middle of each, as many bins as asked or, if not, as suit the values.
-// Bins of a whole number of a column's unit, for a column that counts in
-// them, such as days, so that no bin holds more of them than another.
+// middle of each, as many bins as asked or, if not, as suit the values,
+// 10,000 at most. A column of whole units, such as ints, days or months,
+// is binned as q counts them, a whole number of them to a bin and a bin
+// for the highest too, so that no bin holds more of them than another and
+// none is lost to rounding.
 export function binned(sheet: Sheet, spec: Spec): Plotted {
   if (spec.x === null) {
     throw new Error("type", { cause: "histogram of row index" });
   }
-  const column = columnOf(sheet, spec.x);
-  const values = read(vectorOf(sheet, spec.x));
-  const drawn = values.values.filter((v) => !Number.isNaN(v)).sort();
-  const n = drawn.length;
-  const unit = units[column.type] ?? 0;
-  // A time to the millisecond, or the microsecond for bins finer than one
-  const write = (v: number) =>
-    column.type >= 12
-      ? stamp(v, column.type, width < 1e-3 ? 6 : 3)
-      : String(Number(v.toPrecision(6)));
+  const { type } = columnOf(sheet, spec.x);
+  const whole = wholes.includes(type);
+  const values = read(vectorOf(sheet, spec.x), whole);
+  // Where a value is drawn, in seconds since 1970 for a time
+  const drawn = whole ? seconds(type) : (v: number) => v;
+  const sorted = values.values.filter((v) => !Number.isNaN(v)).sort();
+  const n = sorted.length;
   if (!n) {
     return {
       x: new Float64Array(),
@@ -192,55 +192,78 @@ export function binned(sheet: Sheet, spec: Spec): Plotted {
       ...counted([values]),
     };
   }
-  const low = drawn[0];
-  const spread = drawn[n - 1] - low;
-  // As many bins as asked at most: values of a unit span a unit more than
-  // from the lowest to the highest. Else as wide as suits them, rounded
-  // up, where they don't count in units, to a width that reads well, the
-  // bins starting at a whole number of it: 5 minutes from 09:35, not
-  // 4 minutes 51.3 seconds from 09:33:12.7.
-  let width = spec.bins ? (spread + unit) / spec.bins : suited(drawn);
-  const round = !spec.bins && !unit && spread > 0 && width > 0;
-  if (round) {
-    width = readable(width, column.type >= 12);
+  const low = sorted[0];
+  const high = sorted[n - 1];
+  const spread = high - low;
+  const time = type >= 12;
+  let width: number;
+  let start: number;
+  let count: number;
+  if (whole) {
+    // Values of whole units span one more than from the lowest to the
+    // highest
+    const fits = (wide: number) => Math.max(1, Math.ceil(wide - 1e-9));
+    width = fits(spec.bins ? (spread + 1) / spec.bins : suited(sorted));
+    if (Math.floor(spread / width) + 1 > mostBins) {
+      width = fits((spread + 1) / mostBins);
+    }
+    start = low;
+    count = Math.floor(spread / width) + 1;
+  } else if (!spread) {
+    // One bin, for values all the same, one either side of them
+    width = 1;
+    start = low - 0.5;
+    count = 1;
+  } else {
+    // As wide as asked, or as suits the values, rounded up to a width that
+    // reads well, the bins starting at a whole number of it: 5 minutes
+    // from 09:35, not 4 minutes 51.3 seconds from 09:33:12.7
+    width = spec.bins ? spread / spec.bins : readable(suited(sorted), time);
+    if (spread / width > mostBins) {
+      width = readable(spread / mostBins, time);
+    }
+    start = spec.bins ? low : Math.floor(low / width) * width;
+    // The highest in the last bin, which ends with it or after it
+    count = Math.max(1, Math.ceil((high - start) / width - 1e-9));
   }
-  // One bin, for values all the same: a unit wide, or one either side of
-  // them
-  const start = round
-    ? Math.floor(low / width) * width
-    : !spread && !unit
-      ? low - 0.5
-      : low;
-  if (!spread || !width) {
-    width = unit || 1;
-  } else if (unit) {
-    width = Math.max(1, Math.ceil(width / unit - 1e-9)) * unit;
-  }
-  // A whole number of units has a bin for its highest too; else the
-  // highest is in the last bin, which ends with it or after it
-  const count = unit
-    ? Math.floor(spread / width + 1e-9) + 1
-    : Math.max(1, Math.ceil((drawn[n - 1] - start) / width - 1e-9));
   const counts = new Float64Array(count);
-  for (const v of drawn) {
-    counts[Math.min(count - 1, Math.floor((v - start) / width + 1e-9))]++;
+  for (const v of sorted) {
+    const bin = Math.floor((v - start) / width + (whole ? 0 : 1e-9));
+    counts[Math.min(count - 1, bin)]++;
   }
+  const edge = (bin: number) => drawn(start + bin * width);
+  // As many digits as tell one bin's edge from the next
+  const digits = Math.min(15, Math.max(0, Math.ceil(-Math.log10(width)) + 1));
+  const write = (v: number) =>
+    time
+      ? stamp(drawn(v), type, fine(type) && width < 1e-3 ? 6 : 3)
+      : String(whole ? v : Number(v.toFixed(digits)));
   return {
-    x: Float64Array.from(counts, (_, i) => start + (i + 0.5) * width),
+    x: Float64Array.from(counts, (_, i) => (edge(i) + edge(i + 1)) / 2),
     ys: [counts],
     bins: {
-      from: start,
-      to: start + count * width,
-      // From its first value to its last, of a column of units, else from
-      // where it starts to where the next does
+      from: edge(0),
+      to: edge(count),
+      // From its first value to its last, of a column of whole units, else
+      // from where it starts to where the next does
       said: (bin) => {
         const from = start + bin * width;
-        const last = unit ? from + width - unit : from + width;
+        const last = from + width - (whole ? 1 : 0);
         return last === from ? write(from) : `${write(from)} – ${write(last)}`;
       },
     },
     ...counted([values]),
   };
+}
+
+// Columns of whole units: shorts, ints and longs, and months, dates,
+// minutes, seconds and times
+const wholes = [5, 6, 7, 13, 14, 17, 18, 19];
+
+// Whether a type holds times finer than a millisecond: a timestamp or a
+// timespan, of nanoseconds
+export function fine(type: number): boolean {
+  return type === 12 || type === 16;
 }
 
 // A width at least this, that reads well: 1, 2, 2.5 or 5 of a power of 10;
@@ -257,19 +280,6 @@ function readable(width: number, time: boolean): number {
   const step = [1, 2, 2.5, 5, 10].find((each) => each * power >= width - 1e-12);
   return (step ?? 10) * power;
 }
-
-// The unit of a column of whole units, in the chart's numbers: a short,
-// int or long's 1, a date's day, a minute's minute, a second's and a
-// time's millisecond. A month isn't one: they differ in length.
-const units: Record<number, number> = {
-  5: 1,
-  6: 1,
-  7: 1,
-  14: 86400,
-  17: 60,
-  18: 1,
-  19: 0.001,
-};
 
 // How wide bins suit sorted values, as numpy's "auto" has it: the
 // narrower of Sturges' rule, for few values, and Freedman–Diaconis', for

@@ -1,7 +1,14 @@
 import * as assert from "node:assert";
 import { Attribute, type Texts, type Value } from "../codec/types";
 import { barred, binned, lined, read, skipped } from "../webview/chart/data";
-import { fitted, initial, type Spec, xColumns } from "../webview/chart/spec";
+import {
+  fitted,
+  initial,
+  retyped,
+  type Spec,
+  typesOf,
+  xColumns,
+} from "../webview/chart/spec";
 import { stamp, ticks } from "../webview/chart/time";
 import { type Sheet, sheet } from "../webview/table";
 
@@ -63,6 +70,7 @@ const spec = (to: Partial<Spec>): Spec => ({
   hidden: [],
   steps: false,
   bins: null,
+  others: {},
   ...to,
 });
 
@@ -85,13 +93,16 @@ suite("the Chart", () => {
     assert.deepStrictEqual(initial(numbered), spec({ x: 0, y: [1] }));
   });
 
-  test("draws a lone number by each row's index, and nothing where there are no numbers", () => {
+  test("draws a lone number by each row's index, times alone as a histogram, and nothing where there are neither", () => {
     assert.deepStrictEqual(
       initial(table({ price: floats(1, 2) })),
       spec({ x: null, y: [0] }),
     );
+    const dated = table({ s: syms("a"), d: ints(14, 1) });
+    assert.deepStrictEqual(initial(dated), spec({ type: "histogram", x: 1 }));
+    assert.deepStrictEqual(typesOf(dated), ["histogram"]);
+    assert.deepStrictEqual(typesOf(trades), ["line", "bar", "histogram"]);
     assert.strictEqual(initial(table({ sym: syms("a") })), undefined);
-    assert.strictEqual(initial(table({ time: ints(14, 1) })), undefined);
   });
 
   test("never offers as the x the only number, which would leave no series", () => {
@@ -316,6 +327,60 @@ suite("the Chart", () => {
       said: ["2024.01.01 – 2024.01.02", "2024.01.07 – 2024.01.08"],
       nulls: 0,
     });
+  });
+
+  test("never bins in more than 10,000, however the values lie", () => {
+    // One far out makes Freedman–Diaconis' bins tiny
+    const outlier = table({
+      v: floats(...Array.from({ length: 1000 }, (_, i) => i / 1000), 1e9),
+    });
+    assert.ok(histogram(outlier, {}).counts.length <= 10000);
+    const counted = table({ v: longs(0n, 1n, 10n ** 12n) });
+    assert.ok(histogram(counted, { bins: 10000 }).counts.length <= 10000);
+  });
+
+  test("says a whole number in full, and a time of whole milliseconds in its own bin", () => {
+    const big = table({ v: longs(1234567n, 1234568n, 1234569n, 1234590n) });
+    assert.deepStrictEqual(histogram(big, { bins: 24 }).said, [
+      "1234567",
+      "1234590",
+    ]);
+    // 09:30:00.000 to 09:30:02.000, a bin to each millisecond
+    const ms = table({
+      t: ints(19, ...Array.from({ length: 2001 }, (_, i) => 34200000 + i)),
+    });
+    const { counts } = histogram(ms, { bins: 2001 });
+    assert.deepStrictEqual(new Set(counts), new Set([1]));
+  });
+
+  test("bins months as months", () => {
+    // 2020.01m to 2024.12m: Sturges 59 / 6.9 = 8.5, so 9 months
+    const months: Value = {
+      type: 13,
+      attribute: none,
+      data: Int32Array.from({ length: 60 }, (_, i) => 240 + i),
+    };
+    assert.deepStrictEqual(histogram(table({ m: months }), {}), {
+      counts: [9, 9, 9, 9, 9, 9, 6],
+      said: ["2020.01m – 2020.09m", "2024.07m – 2025.03m"],
+      nulls: 0,
+    });
+    assert.deepStrictEqual(histogram(table({ m: months }), { bins: 60 }).said, [
+      "2020.01m",
+      "2024.12m",
+    ]);
+  });
+
+  test("keeps each type's columns for coming back to it, and only bins that could be typed", () => {
+    const line = spec({ x: 1, y: [2] });
+    const histogram = fitted({ ...retyped(line, "histogram"), x: 3 }, trades);
+    assert.deepStrictEqual(retyped(histogram, "line"), {
+      ...line,
+      others: { histogram: { x: 3, y: [2] } },
+    });
+    for (const bins of [0, 2.5, 10001]) {
+      assert.strictEqual(fitted(spec({ bins }), trades).bins, null);
+    }
   });
 
   test("bins values all the same in one, a unit wide, and none at all in none", () => {

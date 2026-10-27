@@ -1,6 +1,6 @@
 import uPlot from "uplot";
 import type { Sheet } from "../table";
-import { barred, binned, lined, type Plotted } from "./data";
+import { barred, binned, fine, lined, type Plotted } from "./data";
 import type { Spec } from "./spec";
 import { stamp, ticks } from "./time";
 
@@ -103,9 +103,9 @@ export class Chart {
                 time: time !== undefined,
                 // All the bins, from the first's start to the last's end,
                 // where uPlot would go from the middle of one to the
-                // other's; or as zoomed
+                // other's, or pad a lone one as it likes; or as zoomed
                 range: (_, min, max): uPlot.Range.MinMax =>
-                  min === xs[0] && (max === xs[xs.length - 1] || single)
+                  single || (min === xs[0] && max === xs[xs.length - 1])
                     ? [bins.from, bins.to]
                     : [min, max],
               }
@@ -131,7 +131,8 @@ export class Chart {
       series: [
         {
           label: x?.name ?? "Row index",
-          // A time to the microsecond while less than a second is shown
+          // A timestamp or timespan to the microsecond while less than a
+          // second is shown, a millisecond to a pixel or less
           value: (plot, value, __, i) =>
             value === null || i === null
               ? ""
@@ -140,7 +141,7 @@ export class Chart {
                 : bins
                   ? bins.said(i)
                   : time !== undefined
-                    ? stamp(value, time, shown(plot) < 1 ? 6 : 3)
+                    ? stamp(value, time, fine(time) && shown(plot) < 1 ? 6 : 3)
                     : String(value),
         },
         // A histogram's one series, its counts, a bar to each bin, a

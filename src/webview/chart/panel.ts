@@ -1,5 +1,14 @@
 import type { Sheet } from "../table";
-import { type ChartType, fitted, type Spec, xColumns, yColumns } from "./spec";
+import {
+  type ChartType,
+  fitted,
+  mostBins,
+  retyped,
+  type Spec,
+  typesOf,
+  xColumns,
+  yColumns,
+} from "./spec";
 
 // The Chart view's settings, beside the chart: its type, and a line's
 // style, then a slot for each of the columns it draws, offering only the
@@ -16,6 +25,8 @@ const index = "index";
 
 export class Panel {
   readonly element = document.createElement("aside");
+  // What it shows
+  private shown?: { sheet: Sheet; spec: Spec };
 
   constructor(
     // Told of each change, with the chart to draw, to show anew
@@ -26,16 +37,37 @@ export class Panel {
   }
 
   show(sheet: Sheet, spec: Spec) {
+    // Not made anew for bins typed, which it shows as they are, so that a
+    // Tab or a click out of them, which says they're typed, goes on where
+    // it was going
+    const shown = this.shown;
+    this.shown = { sheet, spec };
+    if (
+      shown?.sheet === sheet &&
+      JSON.stringify({ ...shown.spec, bins: null }) ===
+        JSON.stringify({ ...spec, bins: null })
+    ) {
+      const input = this.element.querySelector("input");
+      if (input) {
+        input.value = spec.bins === null ? "" : String(spec.bins);
+      }
+      return;
+    }
     // Each column offered by its place, named as the grid names it
     const named = (j: number): [string, string] => [
       String(j),
       sheet.columns[j].name,
     ];
+    // A change to the spec shown, which may since have had bins typed
+    const latest = () => this.shown?.spec ?? spec;
     const change = (to: Partial<Spec>) => {
-      this.changed(fitted({ ...spec, ...to }, sheet));
+      this.changed(fitted({ ...latest(), ...to }, sheet));
     };
-    const type = select(types, spec.type, (value) =>
-      change({ type: value as ChartType }),
+    const type = select(
+      types.filter(([each]) => typesOf(sheet).includes(each)),
+      spec.type,
+      (value) =>
+        this.changed(fitted(retyped(latest(), value as ChartType), sheet)),
     );
     // A histogram counts a column's values, so never the row's index
     const histogram = spec.type === "histogram";
@@ -90,7 +122,7 @@ export class Panel {
     const bins = document.createElement("input");
     bins.type = "number";
     bins.min = "1";
-    bins.max = "10000";
+    bins.max = String(mostBins);
     bins.placeholder = "Auto";
     bins.ariaLabel = "Bins, or none for as many as suit the values";
     bins.value = spec.bins === null ? "" : String(spec.bins);
@@ -99,7 +131,7 @@ export class Panel {
       change({
         bins:
           bins.value.trim() && Number.isFinite(typed)
-            ? Math.min(10000, Math.max(1, typed))
+            ? Math.min(mostBins, Math.max(1, typed))
             : null,
       });
     });

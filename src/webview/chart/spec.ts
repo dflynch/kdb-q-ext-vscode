@@ -21,7 +21,27 @@ export type Spec = {
   // no series: it counts its values.
   steps: boolean;
   bins: number | null;
+  // Each other type's columns, as last chosen, for coming back to it
+  others: Partial<Record<ChartType, Columns>>;
 };
+
+// A type's columns: its x and its series
+export type Columns = Pick<Spec, "x" | "y">;
+
+// The most bins a histogram has, typed or not
+export const mostBins = 10000;
+
+// A spec of another type: with its columns as they were when it was left,
+// should it have been, and this type's kept for coming back to it
+export function retyped(spec: Spec, type: ChartType): Spec {
+  const { [type]: back, ...others } = spec.others;
+  return {
+    ...spec,
+    ...back,
+    type,
+    others: { ...others, [spec.type]: { x: spec.x, y: spec.y } },
+  };
+}
 
 // What a column holds, as the slots take them
 export type Kind = "numeric" | "temporal" | "other";
@@ -33,6 +53,12 @@ export function kind({ type }: Pick<Column, "type">): Kind {
     : type >= 12 && type <= 19
       ? "temporal"
       : "other";
+}
+
+// The types a sheet can be drawn as: a line or a bar where there's a number
+// for a series, and a histogram where there's a number or a time
+export function typesOf(sheet: Sheet): ChartType[] {
+  return yColumns(sheet).length ? ["line", "bar", "histogram"] : ["histogram"];
 }
 
 // The columns a series can be: numbers
@@ -61,17 +87,22 @@ function places(
   return sheet.columns.flatMap((column, j) => (takes(column, j) ? [j] : []));
 }
 
-// The chart first drawn of a sheet, or none for a sheet with no numbers.
-// A bar where the first column is neither a number nor a time, a label for
-// each row, else a line; a line's x the first time, else the first number;
-// and one series, the first number that isn't the x. The x is each row's
-// index where no column fits.
+// The chart first drawn of a sheet, or none for a sheet with no numbers or
+// times. A bar where the first column is neither a number nor a time, a
+// label for each row, else a line; a line's x the first time, else the
+// first number; and one series, the first number that isn't the x. The x
+// is each row's index where no column fits. With times but no numbers, a
+// histogram of the first time, as there's nothing for a series.
 export function initial(sheet: Sheet): Spec | undefined {
   const first = sheet.columns[0];
-  if (!first || !yColumns(sheet).length) {
+  if (!first || !xColumns(sheet, "histogram").length) {
     return undefined;
   }
-  const type: ChartType = kind(first) === "other" ? "bar" : "line";
+  const type: ChartType = !yColumns(sheet).length
+    ? "histogram"
+    : kind(first) === "other"
+      ? "bar"
+      : "line";
   return fitted(
     {
       type,
@@ -80,6 +111,7 @@ export function initial(sheet: Sheet): Spec | undefined {
       hidden: [],
       steps: false,
       bins: null,
+      others: {},
     },
     sheet,
   );
@@ -103,11 +135,18 @@ export function fitted(spec: Spec, sheet: Sheet): Spec {
     const other = ys.find((j) => j !== x);
     y = other === undefined ? [] : [other];
   }
+  // A whole number of bins, as typed, as a kept tab may carry any
+  const { bins } = spec;
   return {
     ...spec,
     x,
     y,
     hidden: spec.hidden.filter((j) => y.includes(j)),
+    bins:
+      bins !== null && Number.isInteger(bins) && bins >= 1 && bins <= mostBins
+        ? bins
+        : null,
+    others: spec.others ?? {},
   };
 }
 
