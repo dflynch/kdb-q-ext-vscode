@@ -1,8 +1,9 @@
 import type { Sheet } from "../table";
 import { type ChartType, fitted, type Spec, xColumns, yColumns } from "./spec";
 
-// The Chart view's settings, beside the chart: its type, then a slot for
-// each of the columns it draws, offering only the columns a slot takes
+// The Chart view's settings, beside the chart: its type, and a line's
+// style, then a slot for each of the columns it draws, offering only the
+// columns a slot takes
 
 const types: [ChartType, string][] = [
   ["line", "Line"],
@@ -83,9 +84,10 @@ export class Panel {
     const focused = controls().findIndex((each) => each.matches(":focus"));
     this.element.replaceChildren(
       slot("Chart", type),
+      // How a line is drawn, with its type, before the columns
+      ...(spec.type === "line" ? [slot("Style", steps)] : []),
       slot("X", x),
       slot("Y", ...series, add),
-      ...(spec.type === "line" ? [slot("Style", steps)] : []),
     );
     const now = controls();
     if (focused >= 0) {
