@@ -12,6 +12,10 @@ import type {
   Step,
   View,
 } from "../messages";
+import { Chart } from "./chart/chart";
+import { type Plotted, skipped } from "./chart/data";
+import { Panel } from "./chart/panel";
+import { fitted, initial, type Spec } from "./chart/spec";
 import { csv, tsv } from "./delimited";
 import { Grid, onCell } from "./grid";
 import { present, presented } from "./present";
@@ -31,10 +35,14 @@ empty.className = "empty";
 const key = navigator.userAgent.includes("Mac") ? "Cmd+Enter" : "Ctrl+Enter";
 empty.textContent = `Run a query with ${key} to see its result here`;
 
-// Two views of the value shown, Console and Grid, switched between by tabs
+// Three views of the value shown, Console, Grid and Chart, switched between
+// by tabs
 const tabs = document.createElement("div");
 tabs.className = "tabs";
-tabs.role = "tablist";
+const views = document.createElement("div");
+views.className = "views";
+views.role = "tablist";
+tabs.append(views);
 const tab = (view: View, name: string) => {
   const button = document.createElement("button");
   button.role = "tab";
@@ -45,15 +53,29 @@ const tab = (view: View, name: string) => {
     switchTo();
     vscode.postMessage({ type: "chose", view });
   });
-  tabs.append(button);
+  views.append(button);
   return button;
 };
 const consoleTab = tab("console", "Console");
 const gridTab = tab("grid", "Grid");
-// The value's size, at the tabs' right
+const chartTab = tab("chart", "Chart");
+// The value's size, at the tabs' right, and what the chart left out
 const size = document.createElement("span");
 size.className = "size";
 tabs.append(size);
+// In the Chart view, a button to open and close the chart's settings, open
+// at first, and as they were left for each result after
+const settings = document.createElement("button");
+settings.className = "toggle codicon codicon-settings-gear";
+settings.title = "Chart Settings";
+settings.ariaLabel = "Chart Settings";
+let settingsOpen = true;
+settings.addEventListener("click", () => {
+  settingsOpen = !settingsOpen;
+  openSettings();
+  vscode.postMessage({ type: "settings", open: settingsOpen });
+});
+tabs.append(settings);
 
 // A kept result says what it answers, above the tabs: the server, when it
 // was shown, and the query on one line, the whole of it on hovering
@@ -79,12 +101,17 @@ trail.ariaLabel = "Cells drilled into";
 const stack = document.createElement("div");
 stack.className = "stack";
 
+function openSettings() {
+  settings.ariaPressed = String(settingsOpen);
+  stack.classList.toggle("closed", !settingsOpen);
+}
+
 document.body.append(empty);
 
 // A value shown: the result, or a cell's value drilled into from a grid.
-// Each has its own console text, grid and view, and is kept, hidden, while
-// a cell in it is drilled into, so that coming back finds it as it was:
-// its sort, filter, scroll and view.
+// Each has its own console text, grid, chart and view, and is kept, hidden,
+// while a cell in it is drilled into, so that coming back finds it as it
+// was: its sort, filter, scroll, chart and view.
 class Level {
   readonly element = document.createElement("div");
   readonly text = document.createElement("pre");
@@ -95,6 +122,14 @@ class Level {
   drawn = false;
   // How many rows the grid shows, once it's drawn: fewer when filtered
   filtered?: number;
+  // The chart beside its settings, and what it draws, none for a value
+  // with no numbers to draw; drawn, as the grid, once in sight, and what
+  // was drawn, for what was left out
+  readonly charts = document.createElement("div");
+  readonly chart: Chart;
+  readonly panel: Panel;
+  spec?: Spec;
+  plotted?: Plotted;
 
   constructor(
     // The cell drilled into, or none for the result
@@ -114,7 +149,21 @@ class Level {
     this.place.dataset.vscodeContext = JSON.stringify({
       webviewSection: "grid",
     });
-    this.element.append(this.text, this.place);
+    this.charts.className = "charts";
+    const plot = document.createElement("div");
+    plot.className = "plot";
+    this.chart = new Chart(plot, (hidden) => {
+      if (this.spec) {
+        this.charted({ ...this.spec, hidden }, false);
+      }
+    });
+    this.panel = new Panel((spec) => this.charted(spec, true));
+    this.charts.append(plot, this.panel.element);
+    // As it was, should it have been, else as first drawn
+    this.spec =
+      sheet &&
+      (arranged.chart ? fitted(arranged.chart as Spec, sheet) : initial(sheet));
+    this.element.append(this.text, this.place, this.charts);
     this.grid = new Grid(
       this.place,
       nonce,
@@ -123,11 +172,40 @@ class Level {
         switchTo();
       },
       (row, column) => drill([row, column]),
-      (arranged) => {
-        this.arranged = arranged;
+      (grid) => {
+        this.arranged = { ...this.arranged, grid };
         tellLevels();
       },
     );
+  }
+
+  // Draw the chart, once in sight
+  draw() {
+    if (this.sheet && this.spec && !this.plotted) {
+      this.plotted = this.chart.draw(this.sheet, this.spec);
+      this.panel.show(this.sheet, this.spec);
+    }
+  }
+
+  // A chart changed, by its settings, drawn anew, or by its legend, as
+  // drawn already; either way, its settings show it, for the next change
+  charted(spec: Spec, redraw: boolean) {
+    this.spec = spec;
+    this.arranged = { ...this.arranged, chart: spec };
+    if (this.sheet) {
+      if (redraw) {
+        this.plotted = this.chart.draw(this.sheet, spec);
+      }
+      this.panel.show(this.sheet, spec);
+      switchTo();
+    }
+    tellLevels();
+  }
+
+  clear() {
+    this.grid.clear();
+    this.chart.clear();
+    this.element.remove();
   }
 }
 
@@ -147,19 +225,19 @@ const shownLevel = () => levels[levels.length - 1];
 // was told last
 let exportable = false;
 
+// The view shown: the one chosen, else the Grid, else the Console
+function viewOf({ chosen, sheet, spec }: Level): View {
+  return chosen === "chart" && spec
+    ? "chart"
+    : chosen !== "console" && sheet
+      ? "grid"
+      : "console";
+}
+
 function switchTo() {
   const level = shownLevel();
-  const { sheet } = level;
-  const view = sheet && level.chosen === "grid" ? "grid" : "console";
-  consoleTab.ariaSelected = String(view === "console");
-  gridTab.ariaSelected = String(view === "grid");
-  gridTab.disabled = !sheet;
-  gridTab.title = sheet
-    ? ""
-    : "Only a table, a dictionary or a list, but a string, shows in the Grid";
-  size.textContent = sheet
-    ? sized(sheet, view === "grid" ? level.filtered : undefined)
-    : "";
+  const { sheet, spec } = level;
+  const view = viewOf(level);
   // Inert, as well as hidden, so no key or click reaches one drilled from
   for (const each of levels) {
     each.element.hidden = each !== level;
@@ -171,11 +249,36 @@ function switchTo() {
   }
   level.text.hidden = view !== "console";
   level.place.hidden = view !== "grid";
+  level.charts.hidden = view !== "chart";
   if (sheet && view === "grid" && !level.drawn) {
     // First, as the grid says how many rows it shows as it's drawn
     level.drawn = true;
-    level.grid.show(sheet, level.arranged);
+    level.grid.show(sheet, level.arranged.grid);
   }
+  if (view === "chart") {
+    // In sight, to fill its place
+    level.draw();
+  }
+  consoleTab.ariaSelected = String(view === "console");
+  gridTab.ariaSelected = String(view === "grid");
+  chartTab.ariaSelected = String(view === "chart");
+  const shows =
+    "Only a table, a dictionary or a list, but a string, shows in the";
+  gridTab.disabled = !sheet;
+  gridTab.title = sheet ? "" : `${shows} Grid`;
+  chartTab.disabled = !spec;
+  chartTab.title = spec
+    ? ""
+    : sheet
+      ? "Only a value with a numeric column shows in the Chart"
+      : `${shows} Chart`;
+  const left = view === "chart" && level.plotted ? skipped(level.plotted) : "";
+  size.textContent = sheet
+    ? [sized(sheet, view === "grid" ? level.filtered : undefined), left]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
+  settings.hidden = view !== "chart";
   showTrail();
 }
 
@@ -252,8 +355,7 @@ function drill(step: Step, told = true, view = chosen, arranged = {}) {
 function back(i: number) {
   const from = levels[i + 1].step as Step;
   for (const level of levels.splice(i + 1)) {
-    level.grid.clear();
-    level.element.remove();
+    level.clear();
   }
   switchTo();
   tellLevels();
@@ -373,6 +475,8 @@ window.addEventListener("message", ({ data }: MessageEvent<Received>) => {
   const first = empty.isConnected;
   if (first) {
     chosen = data.view ?? chosen;
+    settingsOpen = data.settings ?? settingsOpen;
+    openSettings();
     empty.replaceWith(trail, tabs, stack);
     if (data.about) {
       answers(data.about);
@@ -380,8 +484,7 @@ window.addEventListener("message", ({ data }: MessageEvent<Received>) => {
     }
   }
   for (const level of levels) {
-    level.grid.clear();
-    level.element.remove();
+    level.clear();
   }
   consoleSize = data.type === "result" ? data.size : undefined;
   shownId = data.id;

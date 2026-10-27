@@ -49,10 +49,11 @@ export class ResultView implements vscode.WebviewViewProvider {
   private ready = false;
   private latest?: Posted;
   private about?: About;
-  // The view chosen last, and the cells drilled into in the latest and how
-  // each level's grid is arranged, kept here too so a new webview, or a
-  // kept tab, opens on them
+  // The view chosen last, whether the chart's settings are open, and the
+  // cells drilled into in the latest and how each level is arranged, kept
+  // here too so a new webview, or a kept tab, opens on them
   private chosen: View = "grid";
+  private settings = true;
   private path: Step[] = [];
   private arranged: Arrangement[] = [];
   // Gives the latest's answer to whoever showed it
@@ -100,6 +101,8 @@ export class ResultView implements vscode.WebviewViewProvider {
         this.post();
       } else if (message.type === "chose") {
         this.chosen = message.view;
+      } else if (message.type === "settings") {
+        this.settings = message.open;
       } else if (message.type === "levels") {
         // Not about an earlier one, changed before the latest arrived
         if (message.id === this.latest?.id) {
@@ -164,6 +167,7 @@ export class ResultView implements vscode.WebviewViewProvider {
       ...this.latest,
       about: this.about,
       view: this.chosen,
+      settings: this.settings,
       path: this.path,
       arranged: this.arranged,
     };
@@ -287,6 +291,7 @@ export class ResultView implements vscode.WebviewViewProvider {
       this.view.webview.postMessage({
         ...this.latest,
         view: this.chosen,
+        settings: this.settings,
         path: this.path,
         arranged: this.arranged,
       });

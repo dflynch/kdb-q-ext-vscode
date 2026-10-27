@@ -121,7 +121,7 @@ export class Grid {
     private readonly drill: (row: number, column: number) => void,
     // Told how the grid is arranged, each time its sort, filter or columns
     // change
-    private readonly arranged: (arrangement: Arrangement) => void,
+    private readonly arranged: (arrangement: Arrangement["grid"]) => void,
   ) {
     // Caught on their way down, before ag-grid, which would take a press
     // as focusing a cell, and a key as moving the focus
@@ -135,7 +135,7 @@ export class Grid {
 
   // Show a sheet, arranged as it was, should it have been: sorted,
   // filtered, its columns moved
-  show(sheet: Sheet, arranged: Arrangement = {}) {
+  show(sheet: Sheet, arranged: Arrangement["grid"] = {}) {
     // Each row's index in the result, at the left as a spreadsheet's row
     // headers: not a column of the sheet, so not a cell to drill into
     const index: ColDef<Row, number> = {

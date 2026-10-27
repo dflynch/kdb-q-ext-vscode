@@ -3,6 +3,8 @@
 
 /* VS Code's own icons, as its views show them */
 @import "@vscode/codicons/dist/codicon.css";
+/* uPlot's own layout of its chart and legend, styled below */
+@import "uplot/dist/uPlot.min.css";
 
 html,
 body {
@@ -49,7 +51,9 @@ body {
 /* The view not shown */
 .console[hidden],
 .grid[hidden],
-.trail[hidden] {
+.charts[hidden],
+.trail[hidden],
+.toggle[hidden] {
   display: none;
 }
 
@@ -119,7 +123,8 @@ body {
 }
 
 /* As the panel's own titles: the chosen one underlined */
-.tabs {
+.tabs,
+.tabs .views {
   display: flex;
   gap: 16px;
   flex: none;
@@ -163,6 +168,26 @@ body {
   font-size: 11px;
 }
 
+/* The chart's settings button, as a view's title bar action */
+.tabs .toggle {
+  align-self: center;
+  margin-right: -4px;
+  padding: 2px;
+  border-radius: 5px;
+  color: var(--vscode-icon-foreground);
+  font-size: 16px;
+  text-transform: none;
+}
+
+.tabs .toggle:hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+.tabs .toggle[aria-pressed="true"] {
+  background-color: var(--vscode-inputOption-activeBackground);
+  color: var(--vscode-inputOption-activeForeground);
+}
+
 /* q's console text, in the editor's font */
 .console {
   flex: 1;
@@ -193,4 +218,111 @@ body {
 /* Cells selected, to copy, as the editor's selected text */
 .grid .ag-cell.selected {
   background-color: var(--vscode-editor-selectionBackground);
+}
+
+/* The chart, filling the rest, its settings at the right */
+.charts {
+  display: flex;
+  flex: 1;
+  gap: 16px;
+  min-height: 0;
+  margin-top: 8px;
+}
+
+.charts .plot {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Its legend and labels small, as the tabs' names, in the view's colours */
+.charts .uplot {
+  font-family: var(--vscode-font-family);
+  color: var(--vscode-foreground);
+}
+
+.charts .u-legend {
+  font-size: 11px;
+}
+
+.charts .u-legend .u-value {
+  font-family: var(--vscode-editor-font-family);
+}
+
+/* Dragged across, to zoom, as the editor's selected text */
+.charts .u-select {
+  background-color: var(--vscode-editor-selectionBackground);
+  opacity: 0.5;
+}
+
+/* The chart's settings: each slot's name above its columns, as VS Code's
+   settings editor sets out a setting */
+.settings {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 12px;
+  width: 180px;
+  overflow-y: auto;
+  font-size: 11px;
+}
+
+.closed .settings {
+  display: none;
+}
+
+.settings .slot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings .name {
+  color: var(--vscode-foreground);
+  font-weight: 600;
+}
+
+.settings .series {
+  display: flex;
+  gap: 4px;
+}
+
+.settings select {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 4px;
+  border: 1px solid var(--vscode-dropdown-border);
+  border-radius: 2px;
+  background-color: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  font: inherit;
+}
+
+.settings button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  color: var(--vscode-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+
+.settings button:hover:enabled {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+.settings button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.settings select:focus-visible,
+.settings button:focus-visible,
+.tabs .toggle:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
 }
