@@ -22,7 +22,12 @@ export type Size = Bounds & { cell?: number };
 // How much of a value to show: far more than q's \c, as the panel scrolls.
 // A value with more lines shows the first 999 and then .., and a wider line
 // or cell shows all but its last two characters that fit and then ...
-export const defaultSize: Size = { lines: 1000, width: 1000, cell: 256 };
+export const defaultSize: Size = {
+  lines: 1000,
+  width: 1000,
+  cell: 256,
+  precision: 7,
+};
 
 // A value as the q console shows it
 export function show(value: Value, size: Size = defaultSize): string {
@@ -71,7 +76,7 @@ function lines(value: Value, rows: number, size: Size): string[] {
   if (value.type > 0 && value.type <= 19) {
     const vector = value as Vector;
     const n = Math.min(count(vector) ?? 0, rows);
-    return Array.from({ length: n }, (_, i) => cell(vector, i));
+    return Array.from({ length: n }, (_, i) => cell(vector, i, size.precision));
   }
   return [qText(value, size)];
 }
@@ -118,7 +123,7 @@ function layout(rows: (Vector | List)[], size: Size): string[] {
   return besides(rows.length, columns, size, (j) =>
     rows.map((row, i) =>
       row.type !== 0
-        ? cell(row, j)
+        ? cell(row, j, size.precision)
         : (inner[i]?.[j] ?? qText(itemAt(row, j), size)),
     ),
   );

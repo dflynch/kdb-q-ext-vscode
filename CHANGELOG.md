@@ -52,7 +52,9 @@ All notable changes to the extension are documented in this file.
   as a latency, is drawn as 0, and zoomed no closer than ten milliseconds;
   integers are written as q writes them, and a long past 2^53 is drawn as
   nearly as a double holds it, as a float is
-- Settings: `servers`, `connectTimeout`, `consoleSize` and `sizeLimit`
+- Settings: `servers`, `connectTimeout`, `consoleSize`, `precision`, as
+  q's `\P`, for floats and reals wherever a result is written, and
+  `sizeLimit`
 
 ### Changed
 

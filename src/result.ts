@@ -29,6 +29,29 @@ export function sizeSetting(setting: unknown): {
   };
 }
 
+// How many significant digits floats and reals are written to, as q's \P
+// takes it: a whole number from 0, for as many as each holds, to 17. The
+// problem is said for one that's wrong, and the default used.
+export function precisionSetting(setting: unknown): {
+  precision: number;
+  problem?: string;
+} {
+  if (setting === undefined) {
+    return { precision: defaultSize.precision };
+  }
+  if (
+    Number.isInteger(setting) &&
+    (setting as number) >= 0 &&
+    (setting as number) <= 17
+  ) {
+    return { precision: setting as number };
+  }
+  return {
+    precision: defaultSize.precision,
+    problem: "the precision isn't a whole number from 0 to 17",
+  };
+}
+
 // What to show for a query in the Result view: its response, for the
 // webview to decode and show at the console size, or the extension's own
 // error as the q console shows errors

@@ -372,6 +372,13 @@
           },
           "markdownDescription": "How much of a result **Run File on Server** and **Run Selected Text on Server** show, as lines then width, as q's `\\c` takes them. A result with more lines shows the first of them and then `..`, and a wider line is cut, ending in `..`."
         },
+        "kdb-q-ext-vscode.precision": {
+          "type": "integer",
+          "default": 7,
+          "minimum": 0,
+          "maximum": 17,
+          "markdownDescription": "How many significant digits **Run File on Server** and **Run Selected Text on Server** write floats and reals to, as q's `\\P` takes them, in the Console, the Grid, Copy, Export to CSV and the Chart's values at the cursor. 0 writes as many as each holds: 17 for a float, 8 for a real."
+        },
         "kdb-q-ext-vscode.sizeLimit": {
           "type": "number",
           "default": 10,

@@ -47,7 +47,8 @@ suite("the Console view", () => {
 
   test("the result cut at the console size", () => {
     assert.strictEqual(
-      present(result(til(100), false, { lines: 10, width: 10 })).text,
+      present(result(til(100), false, { lines: 10, width: 10, precision: 7 }))
+        .text,
       "0 1 2 3 ..",
     );
   });

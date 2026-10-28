@@ -36,12 +36,15 @@ function symbols(...names: string[]): Texts {
 
 // A table of these columns, as the Grid's sheet
 function table(columns: Record<string, Value>): Sheet {
-  const s = sheet({
-    type: 98,
-    attribute: none,
-    columns: Object.keys(columns),
-    data: Object.values(columns) as never,
-  });
+  const s = sheet(
+    {
+      type: 98,
+      attribute: none,
+      columns: Object.keys(columns),
+      data: Object.values(columns) as never,
+    },
+    7,
+  );
   assert.ok(s);
   return s;
 }
@@ -139,16 +142,24 @@ suite("the Chart", () => {
   });
 
   test("tells columns of the same name apart by their place", () => {
-    const twice = sheet({
-      type: 99,
-      keys: { type: 98, attribute: none, columns: ["a"], data: [floats(1, 2)] },
-      values: {
-        type: 98,
-        attribute: none,
-        columns: ["a"],
-        data: [floats(3, 4)],
-      },
-    } as Value);
+    const twice = sheet(
+      {
+        type: 99,
+        keys: {
+          type: 98,
+          attribute: none,
+          columns: ["a"],
+          data: [floats(1, 2)],
+        },
+        values: {
+          type: 98,
+          attribute: none,
+          columns: ["a"],
+          data: [floats(3, 4)],
+        },
+      } as Value,
+      7,
+    );
     assert.ok(twice);
     const plotted = lined(twice, spec({ x: 0, y: [1] }));
     assert.deepStrictEqual([...plotted.x], [1, 2]);

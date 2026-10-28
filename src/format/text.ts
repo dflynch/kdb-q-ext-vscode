@@ -22,8 +22,9 @@ import * as temporal from "./temporal";
 // it's full, so as not to format what would be dropped.
 
 // How much text to take: past as many lines, or a line as wide as width,
-// it's cut
-export type Bounds = { lines: number; width: number };
+// it's cut; and how many significant digits a float or a real is written
+// to, as q's \P: 1 to 17, or 0 for as many as each holds, 17 and 8
+export type Bounds = { lines: number; width: number; precision: number };
 
 class Text {
   private parts: string[] = [];
@@ -31,7 +32,7 @@ class Text {
   // The length of the last line
   private line = 0;
 
-  constructor(private size: Bounds) {}
+  constructor(readonly size: Bounds) {}
 
   get full(): boolean {
     return this.line > this.size.width || this.lines > this.size.lines;
@@ -217,7 +218,7 @@ export function element(vector: Vector, i: number): Atom {
 }
 
 // An ordinary value of an atom, without its type's suffix
-function plain(atom: Atom): string {
+function plain(atom: Atom, precision: number): string {
   switch (atom.type) {
     case -1:
     case -5:
@@ -229,8 +230,9 @@ function plain(atom: Atom): string {
     case -4:
       return hex(atom.value);
     case -8:
+      return float(atom.value, precision || 8);
     case -9:
-      return float(atom.value);
+      return float(atom.value, precision || 17);
     case -10:
       // Raw, as in a column, unless it can't be shown
       return atom.value >= 0x20 && atom.value < 0x7f
@@ -264,10 +266,10 @@ function infinity(type: number, which: "infinity" | "-infinity"): string {
 }
 
 // q's form of an atom
-function atom(a: Atom): string {
+function atom(a: Atom, precision: number): string {
   if (special(a.type, a.value)) {
     // A long and a float have no letter
-    return `${inVector(a)}${[-7, -9].includes(a.type) ? "" : letters[-a.type]}`;
+    return `${inVector(a, precision)}${[-7, -9].includes(a.type) ? "" : letters[-a.type]}`;
   }
   switch (a.type) {
     case -1:
@@ -279,9 +281,9 @@ function atom(a: Atom): string {
     case -6:
       return `${a.value}i`;
     case -8:
-      return `${float(a.value)}e`;
+      return `${plain(a, precision)}e`;
     case -9: {
-      const text = float(a.value);
+      const text = plain(a, precision);
       return /[.e]/.test(text) ? text : `${text}f`;
     }
     case -10:
@@ -291,39 +293,39 @@ function atom(a: Atom): string {
     case -13:
       return `${temporal.month(a.value)}m`;
   }
-  return plain(a);
+  return plain(a, precision);
 }
 
 // An element as q writes it among a vector's others: a null or infinity
 // without its type's letter, which goes once at the end of the vector
-function inVector(a: Atom): string {
+function inVector(a: Atom, precision: number): string {
   const which = special(a.type, a.value);
   if (which === "null") {
     return a.type === -9 ? "0n" : "0N";
   }
-  return which ? infinity(a.type, which) : plain(a);
+  return which ? infinity(a.type, which) : plain(a, precision);
 }
 
 // An element as the console shows it in a column: a null is blank, though a
 // null guid shows its zeros, and a char that can't be shown is escaped
-export function cell(vector: Vector, i: number): string {
+export function cell(vector: Vector, i: number, precision: number): string {
   const a = element(vector, i);
   const which = special(a.type, a.value);
   if (which === "null") {
     return "";
   }
-  return which ? infinity(a.type, which) : plain(a);
+  return which ? infinity(a.type, which) : plain(a, precision);
 }
 
 // An element as q's csv 0: writes it: as in a column, but a char as itself,
 // and a date with - between its parts, as ISO 8601 has it, a datetime with a
 // space before its time
-export function csvCell(vector: Vector, i: number): string {
+export function csvCell(vector: Vector, i: number, precision: number): string {
   const a = element(vector, i);
   if (a.type === -10) {
     return utf8.decode(Uint8Array.of(a.value));
   }
-  const text = cell(vector, i);
+  const text = cell(vector, i, precision);
   if (a.type < -15 || a.type > -12 || special(a.type, a.value)) {
     return text;
   }
@@ -351,7 +353,7 @@ function vector(v: Vector, text: Text): void {
     return;
   }
   if (n === 1 && v.type !== 10) {
-    text.put(`,${atom(element(v, 0))}`);
+    text.put(`,${atom(element(v, 0), text.size.precision)}`);
     return;
   }
   switch (v.type) {
@@ -385,7 +387,7 @@ function vector(v: Vector, text: Text): void {
   let shown = false;
   for (let i = 0; i < n && !text.full; i++) {
     const a = element(v, i);
-    const e = inVector(a);
+    const e = inVector(a, text.size.precision);
     ordinary ||= special(a.type, a.value) === undefined;
     shown ||= /[.enw]/.test(e);
     text.put(i ? ` ${e}` : e);
@@ -522,7 +524,7 @@ function fn(f: QFunction, text: Text): void {
 // Write a value in q's form
 function write(value: Value, text: Text): void {
   if (value.type < 0 && value.type >= -19) {
-    text.put(atom(value as Atom));
+    text.put(atom(value as Atom, text.size.precision));
     return;
   }
   switch (value.type) {
