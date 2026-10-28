@@ -14,7 +14,9 @@ import { splits, steps, ticks } from "./time";
 // The Chart view: a spec of a sheet drawn by uPlot. Only this file knows
 // uPlot.
 
-const day = 86400;
+// A day and a second, in microseconds, as times are drawn
+const day = 86_400_000_000;
+const second = 1_000_000;
 
 // Series in VS Code's own chart colours, as its views draw them, in turn
 const palette = ["blue", "orange", "green", "purple", "red", "yellow"];
@@ -74,7 +76,20 @@ export class Chart {
     const { x: xs } = plotted;
     const single = xs.length > 0 && xs[0] === xs[xs.length - 1];
     const unit =
-      time === 13 ? 31 * day : time === 14 ? day : time === 17 ? 60 : 1;
+      time === 13
+        ? 31 * day
+        : time === 14
+          ? day
+          : time === 17
+            ? 60 * second
+            : second;
+    // Zoomed no closer than ten of a time's finest ticks apart, as it's
+    // drawn no finer: ten microseconds for a timestamp
+    const least = time === undefined ? 0 : 10 * steps(time)[0];
+    const widened = (min: number, max: number): uPlot.Range.MinMax =>
+      max - min >= least
+        ? [min, max]
+        : [(min + max - least) / 2, (min + max + least) / 2];
     const { text, lines, font, series } = styles();
     const colour = (i: number) => series[i % series.length];
     const axis: uPlot.Axis = {
@@ -147,17 +162,14 @@ export class Chart {
                 range: (_, min, max): uPlot.Range.MinMax =>
                   single || (min === xs[0] && max === xs[xs.length - 1])
                     ? [bins.from, bins.to]
-                    : [min, max],
+                    : widened(min, max),
               }
             : {
                 time: false,
-                ...(single &&
-                  time !== undefined && {
-                    range: (): uPlot.Range.MinMax => [
-                      xs[0] - unit,
-                      xs[0] + unit,
-                    ],
-                  }),
+                ...(time !== undefined && {
+                  range: (_, min, max): uPlot.Range.MinMax =>
+                    single ? [xs[0] - unit, xs[0] + unit] : widened(min, max),
+                }),
               },
         // Bars from 0, their heights to scale: with some room past the
         // tallest, as uPlot's own range has

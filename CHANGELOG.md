@@ -46,8 +46,10 @@ All notable changes to the extension are documented in this file.
   zoom, double-click to zoom out. It draws the whole result, as it came,
   a line sorted by its x, and says how many nulls and infinities it left
   out; a value at the cursor is as the Grid shows it, numbers on the axes
-  as q writes them, and times as q writes them, to the nanosecond, never
-  shifted to the machine's time zone
+  as q writes them, and times as q writes them, never shifted to the
+  machine's time zone, a timestamp or timespan drawn and binned to the
+  microsecond, its nanoseconds cut off as q casts, and zoomed no closer
+  than ten microseconds
 - Settings: `servers`, `connectTimeout`, `consoleSize` and `sizeLimit`
 
 ### Changed
