@@ -124,12 +124,11 @@ function special(type: number, x: unknown): Special {
   return i < 0 ? undefined : (["null", "infinity", "-infinity"] as const)[i];
 }
 
-// A float as C's %.7g writes it, q's default \P 7: seven significant
-// digits, or as many as asked, trailing zeros dropped, and exponent form for
-// the very large and the very small. JavaScript rounds as C does, from the
-// float's exact value, but for an exact tie, which C rounds to even:
-// 1000.0625 is 1000.062.
-export function float(x: number, precision = 7): string {
+// A float as C's %g writes it to so many significant digits, as q's \P:
+// trailing zeros dropped, and exponent form for the very large and the very
+// small. JavaScript rounds as C does, from the float's exact value, but for
+// an exact tie, which C rounds to even: 1000.0625 is 1000.062 to seven.
+export function float(x: number, precision: number): string {
   if (x === 0) {
     return Object.is(x, -0) ? "-0" : "0";
   }
