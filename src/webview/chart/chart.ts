@@ -61,11 +61,11 @@ export class Chart {
             : lined(sheet, spec);
     const x = spec.x === null ? undefined : sheet.columns[spec.x];
     const time = x && x.type >= 12 && x.type <= 19 ? x.type : undefined;
-    // A short's, an int's or a long's, measured from its middle
+    // A short's, an int's or a long's, written as an integer
     const whole = x !== undefined && x.type >= 5 && x.type <= 7;
     const named = (j: number) => sheet.columns[j].name;
     // A cell at the cursor as the grid shows it, of the row a point is of
-    const { rows, origin = 0, middle = 0n } = plotted;
+    const { rows } = plotted;
     const cell = (j: number, i: number) =>
       sheet.columns[j].text(rows ? rows[i] : i);
     // One x, of a line of times or a lone bin, which would otherwise be
@@ -83,7 +83,7 @@ export class Chart {
             ? 60 * second
             : second;
     // Zoomed no closer than ten of a time's finest ticks apart, as it's
-    // drawn no finer: ten microseconds for a timestamp, or ten for an
+    // drawn no finer: ten milliseconds for a timestamp, or ten for an
     // integer
     const least = time !== undefined ? 10 * steps(time)[0] : whole ? 10 : 0;
     const widened = (min: number, max: number): uPlot.Range.MinMax =>
@@ -116,22 +116,11 @@ export class Chart {
       values: (_, splits, __, ___, step) => numbers(splits, step),
     };
     const across = { ...valued, space: spaced(numbers) };
-    // An integer as q writes it, the middle it's measured from added back
-    // exactly, ticked at whole steps from 0, however far that middle is
+    // An integer as q writes it, ticked at whole steps
     const integers = (splits: number[]) =>
-      splits.map((t) => String(BigInt(Math.round(t)) + middle));
+      splits.map((t) => String(Math.round(t)));
     const counting: Partial<uPlot.Axis> = {
       incrs: wholeSteps,
-      splits: (_, __, min, max, step) => {
-        const each = BigInt(step);
-        const shift = Number(((middle % each) + each) % each);
-        const all: number[] = [];
-        const last = Math.floor((max + shift) / step);
-        for (let k = Math.ceil((min + shift) / step); k <= last; k++) {
-          all.push(k * step - shift);
-        }
-        return all;
-      },
       values: (_, splits) => integers(splits),
       space: spaced(integers),
     };
@@ -168,8 +157,8 @@ export class Chart {
               ((plot.axes[1] as { _size?: number })._size ?? 0),
           ),
       ],
-      // Times as numbers, of microseconds from their origin, which the
-      // chart ticks itself
+      // Times as numbers, of milliseconds since 2000.01.01, which the chart
+      // ticks itself
       scales: {
         x: label
           ? // Each row's bars about its index, half a row out at each end
@@ -283,12 +272,10 @@ export class Chart {
               ? {
                   incrs: steps(time),
                   splits: (_, __, min, max, step) =>
-                    splits(min, max, step, origin, time),
+                    splits(min, max, step, time),
                   values: (_, splits, __, ___, step) =>
-                    ticks(splits, origin, time, step),
-                  space: spaced((splits, step) =>
-                    ticks(splits, origin, time, step),
-                  ),
+                    ticks(splits, time, step),
+                  space: spaced((splits, step) => ticks(splits, time, step)),
                 }
               : whole
                 ? counting
@@ -560,7 +547,7 @@ class Nearest {
 }
 
 // How far apart an integer's ticks can be: 1, 2 and 5 of a power of 10, as
-// a long's can be, every one a whole number a double holds
+// a long's can be
 const wholeSteps = Array.from({ length: 19 }, (_, power) =>
   [1, 2, 5].map((n) => n * 10 ** power),
 ).flat();
