@@ -1,6 +1,13 @@
 import * as assert from "node:assert";
 import { Attribute, type Texts, type Value } from "../codec/types";
-import { barred, binned, lined, read, skipped } from "../webview/chart/data";
+import {
+  barred,
+  binned,
+  lined,
+  read,
+  scattered,
+  skipped,
+} from "../webview/chart/data";
 import {
   fitted,
   initial,
@@ -101,7 +108,18 @@ suite("the Chart", () => {
     const dated = table({ s: syms("a"), d: ints(14, 1) });
     assert.deepStrictEqual(initial(dated), spec({ type: "histogram", x: 1 }));
     assert.deepStrictEqual(typesOf(dated), ["histogram"]);
-    assert.deepStrictEqual(typesOf(trades), ["line", "bar", "histogram"]);
+    assert.deepStrictEqual(typesOf(trades), [
+      "line",
+      "bar",
+      "histogram",
+      "scatter",
+    ]);
+    // A scatter takes two numbers
+    assert.deepStrictEqual(typesOf(table({ v: floats(1), d: ints(14, 1) })), [
+      "line",
+      "bar",
+      "histogram",
+    ]);
     assert.strictEqual(initial(table({ sym: syms("a") })), undefined);
   });
 
@@ -398,6 +416,42 @@ suite("the Chart", () => {
       said: [],
       nulls: 1,
     });
+  });
+
+  test("a scatter is of numbers by a number, never by the row's index or a time", () => {
+    assert.deepStrictEqual(
+      fitted(retyped(spec({ x: null, y: [3] }), "scatter"), trades),
+      spec({
+        type: "scatter",
+        x: 2,
+        y: [3],
+        others: { line: { x: null, y: [3] } },
+      }),
+    );
+    assert.deepStrictEqual(xColumns(trades, "scatter"), [2, 3]);
+  });
+
+  test("scatters each row with both an x and a y, each series apart", () => {
+    const t = table({
+      x: floats(1, 2, Number.NaN, 4),
+      y: floats(10, Number.NaN, 30, 40),
+      z: longs(100n, 200n, 300n, 400n),
+    });
+    const plotted = scattered(t, spec({ type: "scatter", x: 0, y: [1, 2] }));
+    assert.deepStrictEqual(
+      plotted.points?.map(([xs, ys]) => [[...xs], [...ys]]),
+      [
+        [
+          [1, 4],
+          [10, 40],
+        ],
+        [
+          [1, 2, 4],
+          [100, 200, 400],
+        ],
+      ],
+    );
+    assert.strictEqual(skipped(plotted), "2 nulls not drawn");
   });
 
   test("says what it left out", () => {

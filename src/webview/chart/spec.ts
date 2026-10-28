@@ -4,12 +4,12 @@ import type { Column, Sheet } from "../table";
 // slots, by their place in the sheet, as two may share a name. The settings
 // panel edits it, and a kept tab carries it.
 
-export type ChartType = "line" | "bar" | "histogram";
+export type ChartType = "line" | "bar" | "histogram" | "scatter";
 
 export type Spec = {
   type: ChartType;
   // The x axis: a column, or null for each row's index. A histogram's
-  // values, which are never the index.
+  // values, and a scatter's x, which are never the index.
   x: number | null;
   // The series, numeric columns, drawn in this order
   y: number[];
@@ -56,9 +56,15 @@ export function kind({ type }: Pick<Column, "type">): Kind {
 }
 
 // The types a sheet can be drawn as: a line or a bar where there's a number
-// for a series, and a histogram where there's a number or a time
+// for a series, a histogram where there's a number or a time, and a
+// scatter where there are two numbers, one by the other
 export function typesOf(sheet: Sheet): ChartType[] {
-  return yColumns(sheet).length ? ["line", "bar", "histogram"] : ["histogram"];
+  const ys = yColumns(sheet).length;
+  return [
+    ...(ys ? ["line", "bar"] : []),
+    "histogram",
+    ...(ys > 1 ? ["scatter"] : []),
+  ] as ChartType[];
 }
 
 // The columns a series can be: numbers
@@ -69,13 +75,17 @@ export function yColumns(sheet: Sheet): number[] {
 // The columns a type's x takes: a line's, a number or a time, as it's
 // drawn to scale; a bar's, any column, as each row's bar is labelled with
 // its cell; not the only number, which would leave no series. A
-// histogram's, a number or a time, to count.
+// histogram's, a number or a time, to count. A scatter's, a number, not the
+// only one.
 export function xColumns(sheet: Sheet, type: ChartType): number[] {
   const ys = yColumns(sheet);
   return places(
     sheet,
     (column, j) =>
-      (type === "bar" || kind(column) !== "other") &&
+      (type === "bar" ||
+        (type === "scatter"
+          ? kind(column) === "numeric"
+          : kind(column) !== "other")) &&
       (type === "histogram" || !(ys.length === 1 && ys[0] === j)),
   );
 }
@@ -124,7 +134,7 @@ export function fitted(spec: Spec, sheet: Sheet): Spec {
   const ys = yColumns(sheet);
   const x =
     spec.x === null
-      ? spec.type === "histogram"
+      ? spec.type === "histogram" || spec.type === "scatter"
         ? initialX(sheet, spec.type)
         : null
       : xColumns(sheet, spec.type).includes(spec.x)
@@ -156,8 +166,11 @@ function initialX(sheet: Sheet, type: ChartType): number | null {
   }
   const first = (wanted: Kind) =>
     xs.find((j) => kind(sheet.columns[j]) === wanted);
-  // A histogram of the first number, else the first time
+  // A histogram of the first number, else the first time; a scatter by
+  // the first number
   return type === "histogram"
     ? (first("numeric") ?? first("temporal") ?? null)
-    : (first("temporal") ?? first("numeric") ?? null);
+    : type === "scatter"
+      ? (first("numeric") ?? null)
+      : (first("temporal") ?? first("numeric") ?? null);
 }

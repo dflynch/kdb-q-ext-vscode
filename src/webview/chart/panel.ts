@@ -18,6 +18,7 @@ const types: [ChartType, string][] = [
   ["line", "Line"],
   ["bar", "Bar"],
   ["histogram", "Histogram"],
+  ["scatter", "Scatter"],
 ];
 
 // A row's index, offered as an x, by a value no column's place can be
@@ -69,11 +70,13 @@ export class Panel {
       (value) =>
         this.changed(fitted(retyped(latest(), value as ChartType), sheet)),
     );
-    // A histogram counts a column's values, so never the row's index
+    // A histogram counts a column's values, and a scatter's points are
+    // each by a value, so never by the row's index
     const histogram = spec.type === "histogram";
+    const indexed = spec.type === "line" || spec.type === "bar";
     const x = select(
       [
-        ...(histogram ? [] : [[index, "Row index"] as [string, string]]),
+        ...(indexed ? [[index, "Row index"] as [string, string]] : []),
         ...xColumns(sheet, spec.type).map(named),
       ],
       spec.x === null ? index : String(spec.x),
