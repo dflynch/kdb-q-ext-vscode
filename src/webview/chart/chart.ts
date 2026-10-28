@@ -197,8 +197,9 @@ export class Chart {
       series: [
         {
           label: x?.name ?? "Row index",
-          value: (_, value, __, i) =>
-            value === null || i === null
+          // Never a gap: a line's rows without an x aren't drawn
+          value: (_, __, ___, i) =>
+            i === null
               ? ""
               : label
                 ? label(i)
