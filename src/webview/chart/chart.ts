@@ -147,7 +147,7 @@ export class Chart {
               ((plot.axes[1] as { _size?: number })._size ?? 0),
           ),
       ],
-      // Times as numbers, of seconds from their first day, which the
+      // Times as numbers, of microseconds from their origin, which the
       // chart ticks itself
       scales: {
         x: label
