@@ -1,34 +1,51 @@
 import { count, type Vector } from "../../codec/types";
+import { float } from "../../format/text";
 import type { Column, Sheet } from "../table";
 import { mostBins, type Spec } from "./spec";
-import { stamp } from "./time";
+import { monthDay, stamp } from "./time";
 
-// A sheet's columns as the chart draws them: numbers, times as seconds
-// since 1970, read as UTC so that no time zone shifts them, and nulls and infinities left out, and counted, so the
-// chart can say what it didn't draw. Never a JavaScript number per cell
-// where a typed array will do.
+// A sheet's columns as the chart draws them: numbers, and times as seconds
+// from their first day, as a double holds a timestamp's nanoseconds only
+// that near; nulls and infinities left out, and counted, so the chart can
+// say what it didn't draw. Never a JavaScript number per cell where a typed
+// array will do.
 
-// A column's cells as numbers, NaN for a null or an infinity
-type Read = { values: Float64Array; nulls: number; infinities: number };
+// A column's cells as numbers, NaN for a null or an infinity, and the day
+// its times count from, in days since 2000.01.01, or 0 for a column that
+// isn't of dates
+type Read = {
+  values: Float64Array;
+  nulls: number;
+  infinities: number;
+  origin: number;
+};
 
 // What's drawn: the x, ascending, and a series for each column, null where
-// a cell is left out; a bar's label, by its row, made only for the bars a
-// tick or the cursor is at; a histogram's bins, from the first's start to
-// the last's end, each said as the values it counts; a scatter's points,
-// each series' x and y, in place of an x shared by the series; and how
-// many nulls and infinities were left out
+// a cell is left out; the row each x is of; a bar's label, by its row, made
+// only for the bars a tick or the cursor is at; a histogram's bins, from
+// the first's start to the last's end, each said as the values it counts,
+// and how many there are of how many values each, where that isn't as many
+// as typed; a scatter's points, each series' x and y and the rows they're
+// of, in place of an x shared by the series; the day the x counts from;
+// and how many nulls and infinities were left out
 export type Plotted = {
   x: Float64Array;
   ys: (Float64Array | (number | null)[])[];
+  rows?: Uint32Array;
   label?: (row: number) => string;
-  bins?: { from: number; to: number; said: (bin: number) => string };
-  points?: [x: Float64Array, y: Float64Array][];
+  bins?: {
+    from: number;
+    to: number;
+    said: (bin: number) => string;
+    fewer?: { count: number; each: number };
+  };
+  points?: [x: Float64Array, y: Float64Array, rows: Uint32Array][];
+  origin?: number;
   nulls: number;
   infinities: number;
 };
 
-// 2000.01.01, where q counts from, in seconds since 1970
-const epoch = 946684800;
+const day = 86400;
 
 // The smallest and largest of a type's integers are its null and its
 // infinities, the rest of the span its values
@@ -42,13 +59,15 @@ const ranges: Record<number, number> = {
   19: 2 ** 31,
 };
 
-// A numeric or temporal column's cells, as numbers or seconds since 1970,
-// or, raw, as q counts them, as days since 2000.01.01 for a date
+// A numeric or temporal column's cells, as numbers or seconds from the
+// first's day, or, raw, as q counts them, as days since 2000.01.01 for a
+// date
 export function read(vector: Vector, raw = false): Read {
   const n = count(vector) ?? 0;
   const values = new Float64Array(n);
   let nulls = 0;
   let infinities = 0;
+  let origin: number | undefined;
   const left = (i: number, isNull: boolean) => {
     values[i] = Number.NaN;
     if (isNull) {
@@ -57,20 +76,26 @@ export function read(vector: Vector, raw = false): Read {
       infinities++;
     }
   };
-  const scale = raw ? (v: number) => v : seconds(vector.type);
   switch (vector.type) {
     case 7:
     case 12:
     case 16: {
       const data = vector.data;
       const most = 2n ** 63n - 1n;
+      // A timestamp's nanoseconds from its day, exactly, then as a number
+      let from = 0n;
       for (let i = 0; i < n; i++) {
         const v = data[i];
         if (v === -most - 1n || v === most || v === -most) {
           left(i, v === -most - 1n);
-        } else {
-          values[i] = scale(Number(v));
+          continue;
         }
+        if (origin === undefined && vector.type === 12) {
+          origin = Number(floored(v, BigInt(day) * 1_000_000_000n));
+          from = BigInt(origin) * BigInt(day) * 1_000_000_000n;
+        }
+        values[i] =
+          raw || vector.type === 7 ? Number(v) : Number(v - from) / 1e9;
       }
       break;
     }
@@ -82,9 +107,12 @@ export function read(vector: Vector, raw = false): Read {
         const v = data[i];
         if (Number.isNaN(v) || !Number.isFinite(v)) {
           left(i, Number.isNaN(v));
-        } else {
-          values[i] = scale(v);
+          continue;
         }
+        if (origin === undefined && vector.type === 15) {
+          origin = Math.floor(v);
+        }
+        values[i] = raw || vector.type !== 15 ? v : (v - (origin ?? 0)) * day;
       }
       break;
     }
@@ -94,38 +122,46 @@ export function read(vector: Vector, raw = false): Read {
       if (range === undefined) {
         throw new Error("type", { cause: "charted column not a number" });
       }
+      const dated = vector.type === 13 || vector.type === 14;
+      let scale = raw || dated ? undefined : seconds(vector.type, 0);
       for (let i = 0; i < n; i++) {
         const v = data[i];
         if (v === -range || v === range - 1 || v === 1 - range) {
           left(i, v === -range);
-        } else {
-          values[i] = scale(v);
+          continue;
         }
+        if (origin === undefined && dated) {
+          origin = vector.type === 13 ? monthDay(v) : v;
+          scale = raw ? undefined : seconds(vector.type, origin);
+        }
+        values[i] = scale ? scale(v) : v;
       }
     }
   }
-  return { values, nulls, infinities };
+  return { values, nulls, infinities, origin: origin ?? 0 };
 }
 
-// A type's count in seconds since 1970: its date from 2000.01.01, or its
-// time of day or span as a time on 1970.01.01, which is how it's drawn
-function seconds(type: number): (v: number) => number {
+// A type's count, as q keeps it, in seconds from the day given, in days
+// since 2000.01.01: a date's or a month's start, or a time of day or a
+// span, which aren't of a day, from 0
+function seconds(type: number, origin: number): (v: number) => number {
   switch (type) {
-    case 12:
-      return (ns) => epoch + ns / 1e9;
     case 13:
-      return (months) => Date.UTC(2000, months) / 1000;
+      return (months) => (monthDay(months) - origin) * day;
     case 14:
-    case 15:
-      return (days) => epoch + days * 86400;
-    case 16:
-      return (ns) => ns / 1e9;
+      return (days) => (days - origin) * day;
     case 17:
       return (minutes) => minutes * 60;
     case 19:
       return (ms) => ms / 1000;
   }
   return (v) => v;
+}
+
+// Division rounded down, where a bigint's rounds toward zero
+function floored(n: bigint, d: bigint): bigint {
+  const q = n / d;
+  return n % d < 0n ? q - 1n : q;
 }
 
 // A line's points: each row with an x, ascending by it, as the chart draws
@@ -153,6 +189,8 @@ export function lined(sheet: Sheet, spec: Spec): Plotted {
   return {
     x: picked(xs, rows),
     ys: ys.map(({ values }) => gapped(picked(values, rows))),
+    rows,
+    origin: x?.origin,
     ...counted([...(x ? [x] : []), ...ys]),
   };
 }
@@ -171,14 +209,16 @@ export function scattered(sheet: Sheet, spec: Spec): Plotted {
     points: ys.map(({ values }) => {
       const xs = new Float64Array(sheet.rows);
       const vs = new Float64Array(sheet.rows);
+      const rows = new Uint32Array(sheet.rows);
       let n = 0;
       for (let i = 0; i < sheet.rows; i++) {
         if (!Number.isNaN(x.values[i]) && !Number.isNaN(values[i])) {
           xs[n] = x.values[i];
-          vs[n++] = values[i];
+          vs[n] = values[i];
+          rows[n++] = i;
         }
       }
-      return [xs.slice(0, n), vs.slice(0, n)];
+      return [xs.slice(0, n), vs.slice(0, n), rows.slice(0, n)];
     }),
     ...counted([x, ...ys]),
   };
@@ -202,7 +242,8 @@ export function barred(sheet: Sheet, spec: Spec): Plotted {
 // 10,000 at most. A column of whole units, such as ints, days or months,
 // is binned as q counts them, a whole number of them to a bin and a bin
 // for the highest too, so that no bin holds more of them than another and
-// none is lost to rounding.
+// none is lost to rounding: fewer bins than asked, where as many wouldn't
+// each hold as many.
 export function binned(sheet: Sheet, spec: Spec): Plotted {
   if (spec.x === null) {
     throw new Error("type", { cause: "histogram of row index" });
@@ -210,14 +251,16 @@ export function binned(sheet: Sheet, spec: Spec): Plotted {
   const { type } = columnOf(sheet, spec.x);
   const whole = wholes.includes(type);
   const values = read(vectorOf(sheet, spec.x), whole);
-  // Where a value is drawn, in seconds since 1970 for a time
-  const drawn = whole ? seconds(type) : (v: number) => v;
+  const { origin } = values;
+  // Where a value is drawn, in seconds from its first day for a time
+  const drawn = whole ? seconds(type, origin) : (v: number) => v;
   const sorted = values.values.filter((v) => !Number.isNaN(v)).sort();
   const n = sorted.length;
   if (!n) {
     return {
       x: new Float64Array(),
       ys: [new Float64Array()],
+      origin,
       ...counted([values]),
     };
   }
@@ -228,59 +271,97 @@ export function binned(sheet: Sheet, spec: Spec): Plotted {
   let width: number;
   let start: number;
   let count: number;
+  // Where each bin starts: a whole number of widths, or of the spread over
+  // as many as typed, from where the first does, so that no rounding builds
+  // up across them, and a bin at 0 starts at 0
+  let edge: (bin: number) => number;
+  let fewer: { count: number; each: number } | undefined;
   if (whole) {
     // Values of whole units span one more than from the lowest to the
-    // highest
+    // highest. A time's bins are a step of a clock, as a timestamp's, from
+    // a whole number of them.
     const fits = (wide: number) => Math.max(1, Math.ceil(wide - 1e-9));
-    width = fits(spec.bins ? (spread + 1) / spec.bins : suited(sorted));
+    const unit = clocked[type];
+    width = spec.bins
+      ? fits((spread + 1) / spec.bins)
+      : unit
+        ? fits(readable(suited(sorted) * unit, true) / unit)
+        : fits(suited(sorted));
     if (Math.floor(spread / width) + 1 > mostBins) {
       width = fits((spread + 1) / mostBins);
     }
-    start = low;
-    count = Math.floor(spread / width) + 1;
+    start = unit && !spec.bins ? Math.floor(low / width) * width : low;
+    count = Math.floor((high - start) / width) + 1;
+    if (spec.bins && count !== spec.bins) {
+      fewer = { count, each: width };
+    }
+    edge = (bin) => start + bin * width;
   } else if (!spread) {
     // One bin, for values all the same, one either side of them
     width = 1;
     start = low - 0.5;
     count = 1;
+    edge = (bin) => start + bin;
+  } else if (spec.bins) {
+    width = spread / spec.bins;
+    start = low;
+    count = spec.bins;
+    edge = (bin) => low + (spread * bin) / count;
   } else {
-    // As wide as asked, or as suits the values, rounded up to a width that
-    // reads well, the bins starting at a whole number of it: 5 minutes
-    // from 09:35, not 4 minutes 51.3 seconds from 09:33:12.7
-    width = spec.bins ? spread / spec.bins : readable(suited(sorted), time);
+    // As suits the values, rounded up to a width that reads well, the bins
+    // starting at a whole number of it: 5 minutes from 09:35, not 4 minutes
+    // 51.3 seconds from 09:33:12.7
+    width = readable(suited(sorted), time);
     if (spread / width > mostBins) {
       width = readable(spread / mostBins, time);
     }
-    start = spec.bins ? low : Math.floor(low / width) * width;
+    const first = Math.floor(low / width);
+    start = first * width;
     // The highest in the last bin, which ends with it or after it
     count = Math.max(1, Math.ceil((high - start) / width - 1e-9));
+    edge = (bin) => (first + bin) * width;
   }
   const counts = new Float64Array(count);
   for (const v of sorted) {
     const bin = Math.floor((v - start) / width + (whole ? 0 : 1e-9));
     counts[Math.min(count - 1, bin)]++;
   }
-  const edge = (bin: number) => drawn(start + bin * width);
-  // As many digits as tell one bin's edge from the next
-  const digits = Math.min(15, Math.max(0, Math.ceil(-Math.log10(width)) + 1));
+  // A number to as many digits as tell one edge from the next, 7 at least,
+  // as q writes it; a time to as many as its width needs
+  const digits = Math.max(
+    7,
+    figures(Math.max(Math.abs(edge(0)), Math.abs(edge(count))), width),
+  );
   const write = (v: number) =>
     time
-      ? stamp(drawn(v), type, fine(type) && width < 1e-3 ? 6 : 3)
-      : String(whole ? v : Number(v.toFixed(digits)));
+      ? stamp(
+          drawn(v),
+          origin,
+          type,
+          fine(type) ? (width < 1e-6 ? 9 : width < 1e-3 ? 6 : 3) : undefined,
+        )
+      : whole
+        ? String(v)
+        : float(v, digits);
   return {
-    x: Float64Array.from(counts, (_, i) => (edge(i) + edge(i + 1)) / 2),
+    x: Float64Array.from(
+      counts,
+      (_, i) => (drawn(edge(i)) + drawn(edge(i + 1))) / 2,
+    ),
     ys: [counts],
     bins: {
-      from: edge(0),
-      to: edge(count),
+      from: drawn(edge(0)),
+      to: drawn(edge(count)),
       // From its first value to its last, of a column of whole units, else
       // from where it starts to where the next does
       said: (bin) => {
-        const from = start + bin * width;
-        const last = from + width - (whole ? 1 : 0);
+        const from = edge(bin);
+        const last = edge(bin + 1) - (whole ? 1 : 0);
         return last === from ? write(from) : `${write(from)} – ${write(last)}`;
       },
+      fewer,
     },
+    origin,
     ...counted([values]),
   };
 }
@@ -289,15 +370,39 @@ export function binned(sheet: Sheet, spec: Spec): Plotted {
 // minutes, seconds and times
 const wholes = [5, 6, 7, 13, 14, 17, 18, 19];
 
+// The seconds in a unit of each of those that's a time of fixed length,
+// which a month isn't
+const clocked: Record<number, number> = { 14: day, 17: 60, 18: 1, 19: 1e-3 };
+
 // Whether a type holds times finer than a millisecond: a timestamp or a
 // timespan, of nanoseconds
 export function fine(type: number): boolean {
   return type === 12 || type === 16;
 }
 
+// How many significant digits tell numbers as large as this apart, a step
+// apart: from the largest's first to the step's last, of three at most
+export function figures(largest: number, step: number): number {
+  if (!largest || !step) {
+    return 1;
+  }
+  const [mantissa, exponent] = Math.abs(step).toExponential().split("e");
+  const significant = Math.min(3, mantissa.replace(".", "").length);
+  const [, top] = Math.abs(largest).toExponential().split("e");
+  return Math.max(1, Number(top) - Number(exponent) + significant);
+}
+
+// Numbers on an axis as q writes them: to 7 significant digits, or as many
+// more as tell one tick from the next, and a 0 never as -0
+export function numbers(splits: number[], step: number): string[] {
+  const largest = Math.max(0, ...splits.map(Math.abs));
+  const digits = Math.max(7, figures(largest, step));
+  return splits.map((v) => float(v + 0, digits));
+}
+
 // A width at least this, that reads well: 1, 2, 2.5 or 5 of a power of 10;
 // or, for a time, a step of a clock, as 15 seconds, 5 minutes or 6 hours,
-// and whole days past a day
+// whole days past a day, and 1, 2 or 5 of a power of 10 within a second
 function readable(width: number, time: boolean): number {
   const clock = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600];
   const hours = [7200, 10800, 21600, 43200, 86400];
@@ -306,7 +411,8 @@ function readable(width: number, time: boolean): number {
     return step ?? Math.ceil(readable(width / 86400, false)) * 86400;
   }
   const power = 10 ** Math.floor(Math.log10(width));
-  const step = [1, 2, 2.5, 5, 10].find((each) => each * power >= width - 1e-12);
+  const steps = time ? [1, 2, 5, 10] : [1, 2, 2.5, 5, 10];
+  const step = steps.find((each) => each * power >= width - 1e-12);
   return (step ?? 10) * power;
 }
 
@@ -364,13 +470,22 @@ function vectorOf(sheet: Sheet, j: number): Vector {
   return vector;
 }
 
-// What the chart left out, in words: as 12 nulls, 2 infinities not drawn
-export function skipped({ nulls, infinities }: Plotted): string {
+// What the chart says of what it drew: fewer bins than typed, as 5 bins of
+// 2 values each, and what it left out, as 12 nulls, 2 infinities not drawn
+export function noted({ bins, nulls, infinities }: Plotted): string {
   const counted = (n: number, word: string, words: string) =>
     n ? [`${n.toLocaleString("en-US")} ${n === 1 ? word : words}`] : [];
-  const parts = [
+  const left = [
     ...counted(nulls, "null", "nulls"),
     ...counted(infinities, "infinity", "infinities"),
   ];
-  return parts.length ? `${parts.join(", ")} not drawn` : "";
+  const fewer = bins?.fewer;
+  return [
+    ...(fewer
+      ? [
+          `${counted(fewer.count, "bin", "bins")} of ${counted(fewer.each, "value", "values")} each`,
+        ]
+      : []),
+    ...(left.length ? [`${left.join(", ")} not drawn`] : []),
+  ].join(" · ");
 }

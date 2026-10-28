@@ -124,10 +124,10 @@ function special(type: number, x: unknown): Special {
 }
 
 // A float as C's %.7g writes it, q's default \P 7: seven significant
-// digits, trailing zeros dropped, and exponent form for the very large and
-// the very small. JavaScript rounds as C does except for an exact tie,
-// which C rounds to even: 1000.0625 is 1000.062.
-function float(x: number): string {
+// digits, or as many as asked, trailing zeros dropped, and exponent form for
+// the very large and the very small. JavaScript rounds as C does except for
+// an exact tie, which C rounds to even: 1000.0625 is 1000.062.
+export function float(x: number, precision = 7): string {
   if (x === 0) {
     return Object.is(x, -0) ? "-0" : "0";
   }
@@ -135,17 +135,17 @@ function float(x: number): string {
   // shows as a 5 then zeros
   const [m, e] = Math.abs(x).toExponential(20).split("e");
   const all = m.replace(".", "");
-  const rest = all.slice(7);
+  const rest = all.slice(precision);
   const tie = /^50*$/.test(rest);
-  const up = rest[0] >= "5" && (!tie || Number(all[6]) % 2 === 1);
-  let digits = String(Number(all.slice(0, 7)) + (up ? 1 : 0));
+  const up = rest[0] >= "5" && (!tie || Number(all[precision - 1]) % 2 === 1);
+  let digits = String(Number(all.slice(0, precision)) + (up ? 1 : 0));
   let exponent = Number(e);
-  if (digits.length > 7) {
-    digits = digits.slice(0, 7);
+  if (digits.length > precision) {
+    digits = digits.slice(0, precision);
     exponent += 1;
   }
   const sign = x < 0 ? "-" : "";
-  if (exponent < -4 || exponent >= 7) {
+  if (exponent < -4 || exponent >= precision) {
     const power = `${exponent < 0 ? "-" : "+"}${String(Math.abs(exponent)).padStart(2, "0")}`;
     const mantissa = `${digits[0]}.${digits.slice(1)}`;
     // q keeps the zeros of a tie it rounds down: 10541605 is 1.054160e+07

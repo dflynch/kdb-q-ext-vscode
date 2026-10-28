@@ -45,8 +45,9 @@ All notable changes to the extension are documented in this file.
   the columns, and its legend hides and shows a series. Drag across it to
   zoom, double-click to zoom out. It draws the whole result, as it came,
   a line sorted by its x, and says how many nulls and infinities it left
-  out; times are as q writes them, never shifted to the machine's time
-  zone
+  out; a value at the cursor is as the Grid shows it, numbers on the axes
+  as q writes them, and times as q writes them, to the nanosecond, never
+  shifted to the machine's time zone
 - Settings: `servers`, `connectTimeout`, `consoleSize` and `sizeLimit`
 
 ### Changed
