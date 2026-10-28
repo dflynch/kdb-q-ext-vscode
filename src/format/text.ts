@@ -138,7 +138,8 @@ export function float(x: number, precision = 7): string {
   const rest = all.slice(precision);
   const tie = /^50*$/.test(rest);
   const up = rest[0] >= "5" && (!tie || Number(all[precision - 1]) % 2 === 1);
-  let digits = String(Number(all.slice(0, precision)) + (up ? 1 : 0));
+  // As a bigint, as 16 or 17 digits can be past what a double holds
+  let digits = String(BigInt(all.slice(0, precision)) + (up ? 1n : 0n));
   let exponent = Number(e);
   if (digits.length > precision) {
     digits = digits.slice(0, precision);

@@ -274,13 +274,19 @@ export function binned(sheet: Sheet, spec: Spec): Plotted {
       width = fits((spread + 1) / most);
     }
     start = aligned ? Math.floor(low / width) * width : low;
-    count = Math.floor((high - start) / width) + 1;
+    // No more than typed, where the spread is past what a double tells
+    // apart from one more
+    count = Math.min(
+      Math.floor((high - start) / width) + 1,
+      spec.bins ?? Number.POSITIVE_INFINITY,
+    );
     if (spec.bins && count !== spec.bins) {
       fewer = { count, each: width };
     }
     edge = (bin) => start + bin * width;
-  } else if (!spread) {
-    // One bin, for values all the same, about them: a unit wide, or as
+  } else if (spread <= Math.max(Math.abs(low), Math.abs(high)) * 2 ** -50) {
+    // One bin, for values all the same, or differing only where a double
+    // rounds, as 0.1 + 0.2 and 0.3 do, about them: a unit wide, or as
     // narrow as a double, so large, still tells from them
     width = Math.max(1, Math.abs(low) * 2 ** -50);
     start = low - width / 2;
@@ -300,7 +306,9 @@ export function binned(sheet: Sheet, spec: Spec): Plotted {
     if (spread / width > mostBins - 1) {
       width = readable(spread / (mostBins - 1), false);
     }
-    const first = Math.floor(low / width);
+    // As the values are counted, so the lowest isn't counted in the bin
+    // after the first: 0.3 / 0.1 is 2.9999999999999996
+    const first = Math.floor(low / width + 1e-9);
     start = first * width;
     // The highest in the last bin, which ends with it or after it
     count = Math.max(1, Math.ceil((high - start) / width - 1e-9));
@@ -387,18 +395,40 @@ export function numbers(splits: number[], step: number): string[] {
   return splits.map((v) => float(v + 0, digits));
 }
 
+// Ticks at whole numbers of a step, as uPlot's own, but counted: uPlot adds
+// the step to the last, which never passes it where the step is less than
+// a double tells apart at that size, as about 10^18 it is, and so never
+// ends, as adding 1 to a count of steps that large wouldn't either. As many
+// as a thousand, which no axis shows.
+export function stepped(min: number, max: number, step: number): number[] {
+  const first = Math.ceil(min / step);
+  const many = Math.min(1000, Math.floor(max / step) - first + 1);
+  const all: number[] = [];
+  for (let i = 0; i < many; i++) {
+    const t = first * step + i * step;
+    if (t !== all[all.length - 1]) {
+      all.push(t);
+    }
+  }
+  return all;
+}
+
 // A width at least this, that reads well: 1, 2, 2.5 or 5 of a power of 10;
 // or, for a time, a step of a clock, as 15 seconds, 5 minutes or 6 hours,
-// whole days past a day, and 1, 2 or 5 of a power of 10 within a second
+// 1, 2 or 5 of a power of 10 of days past a day, and of a second within one
 function readable(width: number, time: boolean): number {
   const clock = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600];
   const hours = [7200, 10800, 21600, 43200, 86400];
   if (time && width >= 1) {
     const step = [...clock, ...hours].find((each) => each >= width - 1e-9);
-    return step ?? Math.ceil(readable(width / 86400, false)) * 86400;
+    return step ?? tenths(width / 86400, [1, 2, 5, 10]) * 86400;
   }
+  return tenths(width, time ? [1, 2, 5, 10] : [1, 2, 2.5, 5, 10]);
+}
+
+// A width at least this, of one of these steps of a power of 10
+function tenths(width: number, steps: number[]): number {
   const power = 10 ** Math.floor(Math.log10(width));
-  const steps = time ? [1, 2, 5, 10] : [1, 2, 2.5, 5, 10];
   const step = steps.find((each) => each * power >= width - 1e-12);
   return (step ?? 10) * power;
 }

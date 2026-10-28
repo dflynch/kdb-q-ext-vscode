@@ -37,7 +37,9 @@ function written(t: number, type: number): string {
     case 14:
       return q.date(days);
     case 15:
-      return q.datetime(days + within / day);
+      // From its date and time, where its days as a float would round
+      // away its milliseconds past 2^16 days from 2000
+      return `${q.date(days)}T${q.time(within)}`;
     case 16:
       return q.timespan(ns);
     case 17:

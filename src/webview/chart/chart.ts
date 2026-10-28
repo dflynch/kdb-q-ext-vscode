@@ -7,6 +7,7 @@ import {
   numbers,
   type Plotted,
   scattered,
+  stepped,
 } from "./data";
 import type { Spec } from "./spec";
 import { day, second, splits, steps, ticks } from "./time";
@@ -83,9 +84,8 @@ export class Chart {
             ? 60 * second
             : second;
     // Zoomed no closer than ten of a time's finest ticks apart, as it's
-    // drawn no finer: ten milliseconds for a timestamp, or ten for an
-    // integer
-    const least = time !== undefined ? 10 * steps(time)[0] : whole ? 10 : 0;
+    // drawn no finer: ten milliseconds for a timestamp
+    const least = time === undefined ? 0 : 10 * steps(time)[0];
     const widened = (min: number, max: number): uPlot.Range.MinMax =>
       max - min >= least
         ? [min, max]
@@ -112,7 +112,8 @@ export class Chart {
         );
     // Numbers as q writes them, on the y axis as uPlot spaces them, and
     // on the x as their labels are wide
-    const valued: Pick<uPlot.Axis, "values"> = {
+    const valued: Pick<uPlot.Axis, "splits" | "values"> = {
+      splits: (_, __, min, max, step) => stepped(min, max, step),
       values: (_, splits, __, ___, step) => numbers(splits, step),
     };
     const across = { ...valued, space: spaced(numbers) };
@@ -121,6 +122,7 @@ export class Chart {
       splits.map((t) => String(Math.round(t)));
     const counting: Partial<uPlot.Axis> = {
       incrs: wholeSteps,
+      splits: valued.splits,
       values: (_, splits) => integers(splits),
       space: spaced(integers),
     };
@@ -134,6 +136,8 @@ export class Chart {
       return depth(plot, values, i, cycle);
     };
     const { label, bins } = plotted;
+    // A histogram has one series, its counts, bins or none
+    const histogram = spec.type === "histogram";
     const bars = spec.y.length;
     // Each row's bars side by side, filling 80% of its width
     const width = 0.8 / bars;
@@ -176,16 +180,14 @@ export class Chart {
               }
             : {
                 time: false,
-                ...((time !== undefined || whole) && {
+                ...(time !== undefined && {
                   range: (_, min, max): uPlot.Range.MinMax =>
-                    single && time !== undefined
-                      ? [xs[0] - unit, xs[0] + unit]
-                      : widened(min, max),
+                    single ? [xs[0] - unit, xs[0] + unit] : widened(min, max),
                 }),
               },
         // Bars from 0, their heights to scale: with some room past the
         // tallest, as uPlot's own range has
-        ...((label || bins) && {
+        ...((label || histogram) && {
           y: {
             range: (_, min, max) =>
               uPlot.rangeNum(Math.min(0, min), Math.max(0, max), 0.1, true),
@@ -208,7 +210,7 @@ export class Chart {
         },
         // A histogram's one series, its counts, a bar to each bin, a
         // pixel between them
-        ...(bins
+        ...(histogram
           ? [
               {
                 label: "count",
@@ -220,14 +222,14 @@ export class Chart {
               },
             ]
           : []),
-        ...(bins ? [] : spec.y).map(
+        ...(histogram ? [] : spec.y).map(
           (j, k): uPlot.Series => ({
             label: named(j),
             stroke: colour(k),
             width: 1,
             show: !spec.hidden.includes(j),
-            value: (_, value, __, i) =>
-              value === null || i === null ? "" : cell(j, i),
+            // A gap's too, as the grid shows its null or infinity
+            value: (_, __, ___, i) => (i === null ? "" : cell(j, i)),
             ...(label
               ? {
                   fill: colour(k),
@@ -287,7 +289,7 @@ export class Chart {
         setSeries: [
           (plot) => {
             // A histogram's counts aren't a column
-            if (bins) {
+            if (histogram) {
               return;
             }
             const hidden = spec.y.filter((_, k) => !plot.series[k + 1].show);
@@ -310,10 +312,7 @@ export class Chart {
         scales: {
           x: {
             time: false,
-            range: (_, min, max): uPlot.Range.MinMax => {
-              const [from, to] = uPlot.rangeNum(min, max, 0.1, true);
-              return whole ? widened(from ?? min, to ?? max) : [from, to];
-            },
+            range: (_, min, max) => uPlot.rangeNum(min, max, 0.1, true),
           },
           y: {},
         },

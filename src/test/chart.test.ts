@@ -1,6 +1,7 @@
 import * as assert from "node:assert";
 import { Attribute, type Texts, type Value } from "../codec/types";
 import { datetime } from "../format/temporal";
+import { float } from "../format/text";
 import {
   barred,
   binned,
@@ -9,6 +10,7 @@ import {
   numbers,
   read,
   scattered,
+  stepped,
 } from "../webview/chart/data";
 import {
   fitted,
@@ -485,6 +487,21 @@ suite("the Chart", () => {
     assert.ok((plotted.bins?.from ?? 0) < (plotted.bins?.to ?? 0));
   });
 
+  test("bins floats that differ only where a double rounds as one value, and counts the lowest in the first bin", () => {
+    const rounded = histogram(table({ v: floats(0.3, 0.1 + 0.2) }), {});
+    assert.deepStrictEqual(rounded.counts, [2]);
+    // 0.3 / 0.1 is 2.9999999999999996, which mustn't start the bins at 0.2
+    const from = table({
+      v: floats(...Array.from({ length: 40 }, (_, i) => 0.3 + i / 100)),
+    });
+    assert.ok((histogram(from, {}).counts[0] ?? 0) > 0);
+  });
+
+  test("never draws more bins than typed, even of longs past what a double tells apart", () => {
+    const huge = table({ v: longs(0n, 2n ** 62n) });
+    assert.ok(histogram(huge, { bins: 7 }).counts.length <= 7);
+  });
+
   test("bins months as months", () => {
     // 2020.01m to 2024.12m: Sturges 59 / 6.9 = 8.5, so 9 months
     const months: Value = {
@@ -597,6 +614,11 @@ suite("the Chart", () => {
     // Never wrapped to a day, as q writes them
     assert.strictEqual(stamp(30 * 3_600_000, 17), "30:00");
     assert.strictEqual(stamp(-1000, 19), "-00:00:01.000");
+    // Far from 2000, to the millisecond: 2200.01.01T10:40, q's day 73049
+    assert.strictEqual(
+      stamp(73049 * day + 38_400_000, 15),
+      "2200.01.01T10:40:00.000",
+    );
     // Before 2000, and a moment before midnight, never the next day
     assert.strictEqual(stamp(-1, 12, 3), "1999.12.31D23:59:59.999");
   });
@@ -668,6 +690,17 @@ suite("the Chart", () => {
     assert.strictEqual(steps(19)[0], 1);
     assert.strictEqual(steps(17)[0], 60_000);
     assert.ok((steps(14).at(-1) ?? 0) >= 1000 * 365 * day);
+  });
+
+  test("ticks numbers about 10^18 without end, where a step is less than a double tells apart", () => {
+    const ticks = stepped(1.7e18, 1.7e18 + 256, 100);
+    assert.ok(ticks.length >= 1 && ticks.length <= 4);
+    assert.strictEqual(new Set(ticks).size, ticks.length);
+  });
+
+  test("writes 16 and 17 digits exactly", () => {
+    assert.strictEqual(float(0.40516741630084363, 17), "0.40516741630084363");
+    assert.strictEqual(float(1.0851234567890122, 17), "1.0851234567890122");
   });
 
   test("writes numbers on an axis as q does, to as many digits as tell the ticks apart", () => {
