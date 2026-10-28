@@ -22,9 +22,11 @@ try {
   rmSync(dir, { recursive: true, force: true });
 }
 
-// At the size q showed them
+// At the size q showed them, and q's default \P 7. q on macOS keeps the
+// zeros of a tie it rounds down in exponent form, as 1.054160e+07, which C's
+// %g and q on Linux don't, nor this, so on macOS such a value can differ.
 const [lines, width] = fuzz.size;
-const size = { lines, width };
+const size = { lines, width, precision: 7 };
 const values = fuzz.values;
 const wrong = values.filter((v) => {
   const ours = show(decode(Buffer.from(v.bytes, "hex")), size);

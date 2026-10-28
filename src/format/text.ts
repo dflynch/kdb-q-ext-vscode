@@ -126,38 +126,56 @@ function special(type: number, x: unknown): Special {
 
 // A float as C's %.7g writes it, q's default \P 7: seven significant
 // digits, or as many as asked, trailing zeros dropped, and exponent form for
-// the very large and the very small. JavaScript rounds as C does except for
-// an exact tie, which C rounds to even: 1000.0625 is 1000.062.
+// the very large and the very small. JavaScript rounds as C does, from the
+// float's exact value, but for an exact tie, which C rounds to even:
+// 1000.0625 is 1000.062.
 export function float(x: number, precision = 7): string {
   if (x === 0) {
     return Object.is(x, -0) ? "-0" : "0";
   }
-  // Twenty digits after the first are past a double's precision, so a tie
-  // shows as a 5 then zeros
-  const [m, e] = Math.abs(x).toExponential(20).split("e");
-  const all = m.replace(".", "");
-  const rest = all.slice(precision);
-  const tie = /^50*$/.test(rest);
-  const up = rest[0] >= "5" && (!tie || Number(all[precision - 1]) % 2 === 1);
-  // As a bigint, as 16 or 17 digits can be past what a double holds
-  let digits = String(BigInt(all.slice(0, precision)) + (up ? 1n : 0n));
+  const size = Math.abs(x);
+  const [m, e] = size.toExponential(precision - 1).split("e");
+  let digits = m.replace(".", "");
   let exponent = Number(e);
-  if (digits.length > precision) {
-    digits = digits.slice(0, precision);
-    exponent += 1;
+  // A tie shows in twenty digits after the first as a 5 then zeros, but so
+  // does a float only near one, so it's told exactly
+  const [m20, e20] = size.toExponential(20).split("e");
+  const all = m20.replace(".", "");
+  if (
+    /^50*$/.test(all.slice(precision)) &&
+    Number(all[precision - 1]) % 2 === 0 &&
+    exactly(size).length === precision + 1
+  ) {
+    digits = all.slice(0, precision);
+    exponent = Number(e20);
   }
   const sign = x < 0 ? "-" : "";
   if (exponent < -4 || exponent >= precision) {
     const power = `${exponent < 0 ? "-" : "+"}${String(Math.abs(exponent)).padStart(2, "0")}`;
-    const mantissa = `${digits[0]}.${digits.slice(1)}`;
-    // q keeps the zeros of a tie it rounds down: 10541605 is 1.054160e+07
-    return `${sign}${tie && !up ? mantissa : trim(mantissa)}e${power}`;
+    return `${sign}${trim(`${digits[0]}.${digits.slice(1)}`)}e${power}`;
   }
   const point =
     exponent < 0
       ? `0.${"0".repeat(-exponent - 1)}${digits}`
       : `${digits.slice(0, exponent + 1)}.${digits.slice(exponent + 1)}`;
   return `${sign}${trim(point)}`;
+}
+
+// A positive float's significant digits, exactly, as its bits hold them: a
+// whole number times a power of 2, or, past the point, times 5s over 10s
+function exactly(x: number): string {
+  const view = new DataView(new ArrayBuffer(8));
+  view.setFloat64(0, x);
+  const bits = view.getBigUint64(0);
+  const biased = Number(bits >> 52n);
+  const fraction = bits & ((1n << 52n) - 1n);
+  const whole = biased ? fraction | (1n << 52n) : fraction;
+  const power = (biased || 1) - 1075;
+  const digits =
+    power >= 0
+      ? (whole << BigInt(power)).toString()
+      : (whole * 5n ** BigInt(-power)).toString();
+  return digits.replace(/0+$/, "");
 }
 
 function trim(digits: string): string {
