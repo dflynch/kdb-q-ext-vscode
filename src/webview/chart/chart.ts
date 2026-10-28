@@ -1,20 +1,19 @@
 import uPlot from "uplot";
 import type { Sheet } from "../table";
-import { barred, binned, fine, lined, type Plotted, scattered } from "./data";
+import {
+  barred,
+  binned,
+  lined,
+  numbers,
+  type Plotted,
+  scattered,
+  stepped,
+} from "./data";
 import type { Spec } from "./spec";
-import { stamp, ticks } from "./time";
+import { day, second, splits, steps, ticks } from "./time";
 
 // The Chart view: a spec of a sheet drawn by uPlot. Only this file knows
 // uPlot.
-
-// Ticks for dates, as far apart as uPlot's own: days, then months and years
-// as uPlot counts them
-const day = 86400;
-const days = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15].map((n) => n * day);
-const months = [
-  ...[1, 2, 3, 4, 6].map((n) => n * 30 * day),
-  ...[1, 2, 5, 10, 25, 50, 100].map((n) => n * 365 * day),
-];
 
 // Series in VS Code's own chart colours, as its views draw them, in turn
 const palette = ["blue", "orange", "green", "purple", "red", "yellow"];
@@ -63,14 +62,34 @@ export class Chart {
             : lined(sheet, spec);
     const x = spec.x === null ? undefined : sheet.columns[spec.x];
     const time = x && x.type >= 12 && x.type <= 19 ? x.type : undefined;
+    // A short's, an int's or a long's, written as an integer
+    const whole = x !== undefined && x.type >= 5 && x.type <= 7;
     const named = (j: number) => sheet.columns[j].name;
-    // One x, of a line or a lone bin, which uPlot would put at the left of
-    // a thousand days: a line's at the middle of its own unit either side,
-    // a month, a day, a minute, else a second, and a bin's as the bin
+    // A cell at the cursor as the grid shows it, of the row a point is of
+    const { rows } = plotted;
+    const cell = (j: number, i: number) =>
+      sheet.columns[j].text(rows ? rows[i] : i);
+    // One x, of a line of times or a lone bin, which would otherwise be
+    // shown as closely as a zoom goes: a line's at the middle of its own
+    // unit either side, a month, a day, a minute, else a second, and a
+    // bin's as the bin
     const { x: xs } = plotted;
     const single = xs.length > 0 && xs[0] === xs[xs.length - 1];
     const unit =
-      time === 13 ? 31 * day : time === 14 ? day : time === 17 ? 60 : 1;
+      time === 13
+        ? 31 * day
+        : time === 14
+          ? day
+          : time === 17
+            ? 60 * second
+            : second;
+    // Zoomed no closer than ten of a time's finest ticks apart, as it's
+    // drawn no finer: ten milliseconds for a timestamp
+    const least = time === undefined ? 0 : 10 * steps(time)[0];
+    const widened = (min: number, max: number): uPlot.Range.MinMax =>
+      max - min >= least
+        ? [min, max]
+        : [(min + max - least) / 2, (min + max + least) / 2];
     const { text, lines, font, series } = styles();
     const colour = (i: number) => series[i % series.length];
     const axis: uPlot.Axis = {
@@ -80,7 +99,45 @@ export class Chart {
       ticks: { stroke: lines, width: 1 },
       size: depth,
     };
+    // Ticks as far apart as their labels are wide, at about the step
+    // they'd be at, where uPlot's 50 pixels would crowd them
+    const spaced =
+      (write: (splits: number[], step: number) => string[]): uPlot.Axis.Space =>
+      (_, __, min, max, dim) =>
+        Math.max(
+          50,
+          ...write([min, max], ((max - min) * 50) / Math.max(1, dim)).map(
+            (each) => measure(each, font) + 16,
+          ),
+        );
+    // Numbers as q writes them, on the y axis as uPlot spaces them, and
+    // on the x as their labels are wide
+    const valued: Pick<uPlot.Axis, "splits" | "values"> = {
+      splits: (_, __, min, max, step) => stepped(min, max, step),
+      values: (_, splits, __, ___, step) => numbers(splits, step),
+    };
+    const across = { ...valued, space: spaced(numbers) };
+    // An integer as q writes it, ticked at whole steps
+    const integers = (splits: number[]) =>
+      splits.map((t) => String(Math.round(t)));
+    const counting: Partial<uPlot.Axis> = {
+      incrs: wholeSteps,
+      splits: valued.splits,
+      values: (_, splits) => integers(splits),
+      space: spaced(integers),
+    };
+    // Room for half the first and the last tick's labels, which are
+    // centred on them, as the plot may start or end at them
+    let overhang = [0, 0];
+    const below: uPlot.Axis.Size = (plot, values, i, cycle) => {
+      overhang = [values?.[0], values?.[values.length - 1]].map((each) =>
+        each ? Math.ceil(measure(each, font) / 2) : 0,
+      );
+      return depth(plot, values, i, cycle);
+    };
     const { label, bins } = plotted;
+    // A histogram has one series, its counts, bins or none
+    const histogram = spec.type === "histogram";
     const bars = spec.y.length;
     // Each row's bars side by side, filling 80% of its width
     const width = 0.8 / bars;
@@ -91,39 +148,46 @@ export class Chart {
     const options: uPlot.Options = {
       width: this.place.clientWidth,
       height: this.place.clientHeight,
-      // Room for half a bar's label beyond the first and last
-      padding: [null, wide / 2, null, Math.max(0, wide / 2 - 40)],
-      // Times as they are: a q time has no time zone, so it's read as
-      // UTC, which no zone shifts, and never as the machine's local time
-      tzDate: (seconds) => uPlot.tzDate(new Date(seconds * 1000), "Etc/UTC"),
+      // Room for half a bar's label or a tick's beyond the first and last,
+      // the y axis's labels taking some of it at the left
+      padding: [
+        null,
+        () => Math.max(wide / 2, overhang[1]),
+        null,
+        (plot) =>
+          Math.max(
+            0,
+            Math.max(wide / 2, overhang[0]) -
+              ((plot.axes[1] as { _size?: number })._size ?? 0),
+          ),
+      ],
+      // Times as numbers, of milliseconds since 2000.01.01, which the chart
+      // ticks itself
       scales: {
         x: label
           ? // Each row's bars about its index, half a row out at each end
             { time: false, range: (_, min, max) => [min - 0.5, max + 0.5] }
           : bins
             ? {
-                time: time !== undefined,
+                time: false,
                 // All the bins, from the first's start to the last's end,
                 // where uPlot would go from the middle of one to the
                 // other's, or pad a lone one as it likes; or as zoomed
                 range: (_, min, max): uPlot.Range.MinMax =>
                   single || (min === xs[0] && max === xs[xs.length - 1])
                     ? [bins.from, bins.to]
-                    : [min, max],
+                    : widened(min, max),
               }
             : {
-                time: time !== undefined,
-                ...(single &&
-                  time !== undefined && {
-                    range: (): uPlot.Range.MinMax => [
-                      xs[0] - unit,
-                      xs[0] + unit,
-                    ],
-                  }),
+                time: false,
+                ...(time !== undefined && {
+                  range: (_, min, max): uPlot.Range.MinMax =>
+                    single ? [xs[0] - unit, xs[0] + unit] : widened(min, max),
+                }),
               },
         // Bars from 0, their heights to scale: with some room past the
         // tallest, as uPlot's own range has
-        ...((label || bins) && {
+        ...((label || histogram) && {
           y: {
             range: (_, min, max) =>
               uPlot.rangeNum(Math.min(0, min), Math.max(0, max), 0.1, true),
@@ -133,22 +197,21 @@ export class Chart {
       series: [
         {
           label: x?.name ?? "Row index",
-          // A timestamp or timespan to the microsecond while less than a
-          // second is shown, a millisecond to a pixel or less
-          value: (plot, value, __, i) =>
-            value === null || i === null
+          // Never a gap: a line's rows without an x aren't drawn
+          value: (_, __, ___, i) =>
+            i === null
               ? ""
               : label
                 ? label(i)
                 : bins
                   ? bins.said(i)
-                  : time !== undefined
-                    ? stamp(value, time, fine(time) && shown(plot) < 1 ? 6 : 3)
-                    : number(value),
+                  : spec.x === null
+                    ? String(rows ? rows[i] : i)
+                    : cell(spec.x, i),
         },
         // A histogram's one series, its counts, a bar to each bin, a
         // pixel between them
-        ...(bins
+        ...(histogram
           ? [
               {
                 label: "count",
@@ -160,14 +223,14 @@ export class Chart {
               },
             ]
           : []),
-        ...(bins ? [] : spec.y).map(
+        ...(histogram ? [] : spec.y).map(
           (j, k): uPlot.Series => ({
             label: named(j),
             stroke: colour(k),
             width: 1,
             show: !spec.hidden.includes(j),
-            // As a scatter's and the x are, not uPlot's 3 places
-            value: (_, value) => (value === null ? "" : number(value)),
+            // A gap's too, as the grid shows its null or infinity
+            value: (_, __, ___, i) => (i === null ? "" : cell(j, i)),
             ...(label
               ? {
                   fill: colour(k),
@@ -192,6 +255,7 @@ export class Chart {
       axes: [
         {
           ...axis,
+          size: below,
           ...(label
             ? {
                 // A label at each row whose index falls on a tick, the
@@ -209,22 +273,24 @@ export class Chart {
               }
             : time !== undefined
               ? {
-                  // A month or a date ticked at months or days at least,
-                  // as it has no time of day
-                  ...(time === 13 && { incrs: months }),
-                  ...(time === 14 && { incrs: [...days, ...months] }),
-                  values: (_, splits, __, ___, apart) =>
-                    ticks(splits, time, apart),
+                  incrs: steps(time),
+                  splits: (_, __, min, max, step) =>
+                    splits(min, max, step, time),
+                  values: (_, splits, __, ___, step) =>
+                    ticks(splits, time, step),
+                  space: spaced((splits, step) => ticks(splits, time, step)),
                 }
-              : {}),
+              : whole
+                ? counting
+                : across),
         },
-        axis,
+        { ...axis, ...valued },
       ],
       hooks: {
         setSeries: [
           (plot) => {
             // A histogram's counts aren't a column
-            if (bins) {
+            if (histogram) {
               return;
             }
             const hidden = spec.y.filter((_, k) => !plot.series[k + 1].show);
@@ -243,7 +309,6 @@ export class Chart {
       const near = new Nearest();
       Object.assign(options, {
         mode: 2,
-        padding: [null, null, null, null],
         // Padded in x as uPlot pads y, so a lone x isn't a range of none
         scales: {
           x: {
@@ -266,18 +331,28 @@ export class Chart {
                 { scale: "y", auto: true },
               ],
               paths: squares(colour(k)),
-              // Its x and y at the cursor
-              value: (plot, _, i, at) => {
-                const [xs, ys] = plot.data[i] as unknown as Float64Array[];
-                return at === null
-                  ? ""
-                  : `${number(xs[at])}, ${number(ys[at])}`;
+              // Its x and y at the cursor, as the grid shows them
+              value: (_, __, ___, at) => {
+                if (at === null || spec.x === null) {
+                  return "";
+                }
+                const row = points[k][2][at];
+                return `${sheet.columns[spec.x].text(row)}, ${sheet.columns[j].text(row)}`;
               },
             }),
           ),
         ],
         // Named below, as the legend names only the ys
-        axes: [{ ...axis, label: x?.name, labelFont: font }, axis],
+        axes: [
+          {
+            ...axis,
+            ...(whole ? counting : across),
+            size: below,
+            label: x?.name,
+            labelFont: font,
+          },
+          { ...axis, ...valued },
+        ],
         cursor: {
           drag: { x: true, y: true },
           dataIdx: (plot, i) => near.at(plot, i),
@@ -288,7 +363,7 @@ export class Chart {
     this.plot = new uPlot(
       options,
       (points
-        ? [null, ...points]
+        ? [null, ...points.map(([xs, ys]) => [xs, ys])]
         : [plotted.x, ...plotted.ys]) as unknown as uPlot.AlignedData,
       this.place,
     );
@@ -471,19 +546,29 @@ class Nearest {
   }
 }
 
+// How far apart an integer's ticks can be: 1, 2 and 5 of a power of 10, as
+// a long's can be
+const wholeSteps = Array.from({ length: 19 }, (_, power) =>
+  [1, 2, 5].map((n) => n * 10 ** power),
+).flat();
+
 // How near the cursor a point is found, in pixels
 const reach = 12;
 
-// A number at the cursor, to 6 decimal places at most, grouped as the
-// axes' are
-const number = new Intl.NumberFormat(undefined, {
-  maximumFractionDigits: 6,
-}).format;
+// A canvas's context to measure text with, made once it's needed
+let measuring: CanvasRenderingContext2D | null | undefined;
 
-// How much of the x is shown, as zoomed
-function shown(plot: uPlot): number {
-  const { min, max } = plot.scales.x;
-  return min === undefined || max === undefined ? Infinity : max - min;
+// How wide a text is in the font: its widest line
+function measure(text: string, font: string): number {
+  measuring ??= document.createElement("canvas").getContext("2d");
+  if (!measuring) {
+    return 50;
+  }
+  measuring.font = font;
+  const context = measuring;
+  return Math.max(
+    ...text.split("\n").map((line) => context.measureText(line).width),
+  );
 }
 
 // How wide the longest of the bars' labels is, in the font: by characters,
@@ -502,12 +587,7 @@ function widest(
       longest = text;
     }
   }
-  const context = document.createElement("canvas").getContext("2d");
-  if (!context) {
-    return 50;
-  }
-  context.font = font;
-  return context.measureText(longest).width;
+  return measure(longest, font);
 }
 
 // An axis as deep as its labels need: as wide as the widest, for the y, or

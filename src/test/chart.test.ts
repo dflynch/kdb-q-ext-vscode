@@ -1,12 +1,16 @@
 import * as assert from "node:assert";
 import { Attribute, type Texts, type Value } from "../codec/types";
+import { datetime } from "../format/temporal";
+import { float } from "../format/text";
 import {
   barred,
   binned,
   lined,
+  noted,
+  numbers,
   read,
   scattered,
-  skipped,
+  stepped,
 } from "../webview/chart/data";
 import {
   fitted,
@@ -16,7 +20,7 @@ import {
   typesOf,
   xColumns,
 } from "../webview/chart/spec";
-import { stamp, ticks } from "../webview/chart/time";
+import { splits, stamp, steps, ticks } from "../webview/chart/time";
 import { type Sheet, sheet } from "../webview/table";
 
 const none = Attribute.None;
@@ -208,24 +212,52 @@ suite("the Chart", () => {
     );
   });
 
-  test("reads times as seconds since 1970, unshifted by any time zone", () => {
+  test("reads times as whole units, a timestamp's and a timespan's in milliseconds, cut", () => {
     const at = (
       type: number,
       data: Int32Array | BigInt64Array | Float64Array,
-    ) => read({ type, attribute: none, data } as never).values[0];
-    // 2000.01.02, 2000.02m, 2000.01.01D00:00:01, 00:01, 00:00:01.500
-    assert.strictEqual(at(14, Int32Array.of(1)), Date.UTC(2000, 0, 2) / 1000);
-    assert.strictEqual(at(13, Int32Array.of(1)), Date.UTC(2000, 1, 1) / 1000);
-    assert.strictEqual(
-      at(12, BigInt64Array.of(1_000_000_000n)),
-      Date.UTC(2000, 0, 1, 0, 0, 1) / 1000,
+    ) => [...read({ type, attribute: none, data } as never).values];
+    // 2000.01.02 and 2000.02m, as q counts them
+    assert.deepStrictEqual(at(14, Int32Array.of(1)), [1]);
+    assert.deepStrictEqual(at(13, Int32Array.of(1)), [1]);
+    // 2000.01.01T12:00:00.0004 in milliseconds, cut
+    assert.deepStrictEqual(
+      at(15, Float64Array.of(0.5 + 0.0004 / 86400)),
+      [43_200_000],
     );
-    assert.strictEqual(
-      at(15, Float64Array.of(0.5)),
-      Date.UTC(2000, 0, 1, 12) / 1000,
+    assert.deepStrictEqual(at(19, Int32Array.of(1500)), [1500]);
+    // 2026.10.27D09:30, then every 100 microseconds: milliseconds, cut
+    const from = 9796n * 86_400_000_000_000n + 34_200_000_000_000n;
+    const stamps = at(
+      12,
+      BigInt64Array.from({ length: 30 }, (_, i) => from + 100_000n * BigInt(i)),
     );
-    assert.strictEqual(at(17, Int32Array.of(1)), 60);
-    assert.strictEqual(at(19, Int32Array.of(1500)), 1.5);
+    assert.deepStrictEqual(
+      stamps.map((v) => v - (9796 * 86_400_000 + 34_200_000)),
+      Array.from({ length: 30 }, (_, i) => Math.floor(i / 10)),
+    );
+    // A timespan's too, a negative one down: -0D00:00:00.000000001 is
+    // -00:00:00.001, as q casts it
+    assert.deepStrictEqual(at(16, BigInt64Array.of(1_999_999n, -1n)), [1, -1]);
+    // A datetime placed at the millisecond the Grid writes, however it
+    // rounds
+    for (let k = 0; k < 2000; k++) {
+      const days = (Math.random() - 0.5) * 20000;
+      assert.strictEqual(
+        stamp(at(15, Float64Array.of(days))[0], 15),
+        datetime(days),
+        String(days),
+      );
+    }
+    // A long as a double, as a float is: past 2^53, as near as it holds
+    const big = 1_698_400_000_000_000_001n;
+    assert.deepStrictEqual(at(7, BigInt64Array.of(big)), [Number(big)]);
+  });
+
+  test("draws times in milliseconds since 2000.01.01, unshifted by any time zone", () => {
+    const t = table({ d: ints(14, 1, 3), v: floats(1, 2) });
+    const plotted = lined(t, spec({ x: 0, y: [1] }));
+    assert.deepStrictEqual([...plotted.x], [86_400_000, 3 * 86_400_000]);
   });
 
   test("draws a line's rows in order of its x, leaving out those with none", () => {
@@ -234,10 +266,12 @@ suite("the Chart", () => {
       price: floats(3, 9, 1, Number.NaN),
     });
     const plotted = lined(t, spec({ x: 0, y: [1] }));
-    assert.deepStrictEqual([...plotted.x], [1, 2, 3]);
+    assert.deepStrictEqual([...plotted.x], [1000, 2000, 3000]);
+    // Each point's row, for the cursor to show its cells
+    assert.deepStrictEqual([...(plotted.rows ?? [])], [2, 3, 0]);
     assert.deepStrictEqual(plotted.ys, [[1, null, 3]]);
     assert.deepStrictEqual([plotted.nulls, plotted.infinities], [2, 0]);
-    assert.strictEqual(skipped(plotted), "2 nulls not drawn");
+    assert.strictEqual(noted(plotted), "2 nulls not drawn");
   });
 
   test("draws a line in order as it came, and by each row's index", () => {
@@ -250,7 +284,7 @@ suite("the Chart", () => {
         [100, 200, 300],
       ],
     );
-    assert.strictEqual(skipped(plotted), "");
+    assert.strictEqual(noted(plotted), "");
   });
 
   test("draws a bar for each row, labelled with its x as the grid shows it", () => {
@@ -309,7 +343,8 @@ suite("the Chart", () => {
       said: ["0 – 5", "5 – 10"],
       nulls: 0,
     });
-    // 09:30 to 10:30 every 20 minutes: Sturges 20 minutes, so half hours
+    // 09:30 to 10:30 every 20 minutes: Sturges 20 minutes, so half hours,
+    // of whole milliseconds, a bin for the highest too
     const minutes = (m: number) => BigInt(m) * 60_000_000_000n;
     const timed = table({
       t: {
@@ -319,13 +354,29 @@ suite("the Chart", () => {
       },
     });
     assert.deepStrictEqual(histogram(timed, {}), {
-      counts: [2, 2],
+      counts: [2, 1, 1],
       said: [
-        "2000.01.01D09:30:00.000 – 2000.01.01D10:00:00.000",
-        "2000.01.01D10:00:00.000 – 2000.01.01D10:30:00.000",
+        "2000.01.01D09:30:00.000 – 2000.01.01D09:59:59.999",
+        "2000.01.01D10:30:00.000 – 2000.01.01D10:59:59.999",
       ],
       nulls: 0,
     });
+  });
+
+  test("bins times of day in steps of a clock, from a whole number of them, as a timestamp's", () => {
+    // 09:30:00.008, then 09:40 to 10:30 every 10 minutes: Sturges 15.8
+    // minutes, so half hours from 09:30, not 09:30:00.008
+    const t = table({
+      t: ints(
+        19,
+        34200008,
+        ...[580, 590, 600, 610, 620, 630].map((m) => m * 60_000),
+      ),
+    });
+    assert.deepStrictEqual(histogram(t, {}).said, [
+      "09:30:00.000 – 09:59:59.999",
+      "10:30:00.000 – 10:59:59.999",
+    ]);
   });
 
   test("bins whole units, a bin for the highest too, for a column that counts in them", () => {
@@ -369,6 +420,86 @@ suite("the Chart", () => {
     });
     const { counts } = histogram(ms, { bins: 2001 });
     assert.deepStrictEqual(new Set(counts), new Set([1]));
+  });
+
+  test("draws fewer bins than typed of whole units, where as many wouldn't hold as many each, and says so", () => {
+    const counted = table({ v: longs(...[...Array(10).keys()].map(BigInt)) });
+    const plotted = binned(counted, spec({ type: "histogram", x: 0, bins: 7 }));
+    assert.strictEqual(plotted.ys[0].length, 5);
+    assert.strictEqual(noted(plotted), "5 bins of 2 values each");
+    const asked = binned(counted, spec({ type: "histogram", x: 0, bins: 5 }));
+    assert.strictEqual(noted(asked), "");
+  });
+
+  test("says a bin's edges in full, however near 0", () => {
+    // Two bins from -0.7, the second from 5e-06, not 0
+    const floated = table({ v: floats(-0.7, 0.70001) });
+    assert.deepStrictEqual(histogram(floated, { bins: 2 }).said, [
+      "-0.7 – 5e-06",
+      "5e-06 – 0.70001",
+    ]);
+  });
+
+  test("bins times of more than a day from 0D, or 2000.01.01, as the axis ticks them, whatever the data", () => {
+    // 0D to 22D, a day apart: Sturges 4 days, so 5, from 0D
+    const spans: Value = {
+      type: 16,
+      attribute: none,
+      data: BigInt64Array.from(
+        { length: 23 },
+        (_, i) => BigInt(i) * 86_400_000_000_000n,
+      ),
+    };
+    assert.deepStrictEqual(histogram(table({ s: spans }), {}).said, [
+      "0D00:00:00.000 – 4D23:59:59.999",
+      "20D00:00:00.000 – 24D23:59:59.999",
+    ]);
+  });
+
+  test("never bins in more than 10,000, though starting at a whole number of a width takes one more", () => {
+    const spans: Value = {
+      type: 16,
+      attribute: none,
+      data: BigInt64Array.from(
+        [
+          -17709060000000, 472395000000, -295673, 25088000000, -653370000000000,
+          565396100000000, 8576380000000, -251911200, -3047298, 47858700000,
+          51514400000000, -3873643, -104409400, 351985200, -224631600,
+          51820020000, -8296410000, 5213000000, -1212466000000,
+          -586369000000000, 28760710000000, 48389900,
+        ].map(BigInt),
+      ),
+    };
+    const { counts } = histogram(table({ s: spans }), {});
+    assert.ok(counts.length <= 10000);
+    assert.strictEqual(
+      counts.reduce((a, b) => (a ?? 0) + (b ?? 0), 0),
+      22,
+    );
+  });
+
+  test("bins a huge value all alone in a bin wider than none", () => {
+    const plotted = binned(
+      table({ v: floats(1e16, 1e16) }),
+      spec({ type: "histogram", x: 0 }),
+    );
+    assert.deepStrictEqual([...plotted.ys[0]], [2]);
+    assert.ok((plotted.bins?.from ?? 0) < (plotted.bins?.to ?? 0));
+  });
+
+  test("bins floats that differ only where a double rounds as one value, and counts the lowest in the first bin", () => {
+    const rounded = histogram(table({ v: floats(0.3, 0.1 + 0.2) }), {});
+    assert.deepStrictEqual(rounded.counts, [2]);
+    // 0.3 / 0.1 is 2.9999999999999996, which mustn't start the bins at 0.2
+    const from = table({
+      v: floats(...Array.from({ length: 40 }, (_, i) => 0.3 + i / 100)),
+    });
+    assert.ok((histogram(from, {}).counts[0] ?? 0) > 0);
+  });
+
+  test("never draws more bins than typed, even of longs past what a double tells apart", () => {
+    const huge = table({ v: longs(0n, 2n ** 62n) });
+    assert.ok(histogram(huge, { bins: 7 }).counts.length <= 7);
   });
 
   test("bins months as months", () => {
@@ -451,57 +582,147 @@ suite("the Chart", () => {
         ],
       ],
     );
-    assert.strictEqual(skipped(plotted), "2 nulls not drawn");
+    assert.strictEqual(noted(plotted), "2 nulls not drawn");
   });
 
   test("says what it left out", () => {
     const plotted = { x: new Float64Array(), ys: [] };
     assert.strictEqual(
-      skipped({ ...plotted, nulls: 1, infinities: 1 }),
+      noted({ ...plotted, nulls: 1, infinities: 1 }),
       "1 null, 1 infinity not drawn",
     );
     assert.strictEqual(
-      skipped({ ...plotted, nulls: 0, infinities: 1200 }),
+      noted({ ...plotted, nulls: 0, infinities: 1200 }),
       "1,200 infinities not drawn",
     );
   });
 
-  test("writes a time at the cursor as q does", () => {
-    const t = Date.UTC(2024, 0, 2, 9, 30, 0, 123) / 1000;
-    assert.strictEqual(stamp(t, 12), "2024.01.02D09:30:00.123");
+  test("writes a time as q does, its digits cut, not rounded", () => {
+    // 2024.01.02, q's day 8767, in milliseconds since 2000.01.01
+    const day = 86_400_000;
+    const t = 8767 * day + 34_200_123;
+    assert.strictEqual(stamp(t, 12), "2024.01.02D09:30:00.123000000");
+    assert.strictEqual(stamp(t, 12, 3), "2024.01.02D09:30:00.123");
     assert.strictEqual(stamp(t, 15), "2024.01.02T09:30:00.123");
-    assert.strictEqual(stamp(t, 14), "2024.01.02");
-    assert.strictEqual(stamp(t, 13), "2024.01m");
-    assert.strictEqual(stamp(34200.5, 19), "09:30:00.500");
-    assert.strictEqual(stamp(34200, 18), "09:30:00");
-    assert.strictEqual(stamp(34200, 17), "09:30");
-    assert.strictEqual(stamp(86400 + 34200, 16), "1D09:30:00.000");
-    assert.strictEqual(stamp(-60, 16), "-0D00:01:00.000");
+    assert.strictEqual(stamp(8767 * day, 14), "2024.01.02");
+    assert.strictEqual(stamp(8766 * day, 13), "2024.01m");
+    assert.strictEqual(stamp(34_200_500, 19), "09:30:00.500");
+    assert.strictEqual(stamp(34_200_000, 18), "09:30:00");
+    assert.strictEqual(stamp(34_200_000, 17), "09:30");
+    assert.strictEqual(stamp(120_600_000, 16, 3), "1D09:30:00.000");
+    assert.strictEqual(stamp(-60_000, 16, 3), "-0D00:01:00.000");
     // Never wrapped to a day, as q writes them
-    assert.strictEqual(stamp(30 * 3600, 17), "30:00");
-    assert.strictEqual(stamp(-1, 19), "-00:00:01.000");
-    // To the microsecond where that's needed
+    assert.strictEqual(stamp(30 * 3_600_000, 17), "30:00");
+    assert.strictEqual(stamp(-1000, 19), "-00:00:01.000");
+    // Far from 2000, to the millisecond: 2200.01.01T10:40, q's day 73049
     assert.strictEqual(
-      stamp(t + 0.000456, 12, 6),
-      "2024.01.02D09:30:00.123456",
+      stamp(73049 * day + 38_400_000, 15),
+      "2200.01.01T10:40:00.000",
     );
+    // Before 2000, and a moment before midnight, never the next day
+    assert.strictEqual(stamp(-1, 12, 3), "1999.12.31D23:59:59.999");
   });
 
   test("writes ticks as finely as they're apart, the date where it changes", () => {
-    const day = Date.UTC(2024, 0, 2) / 1000;
-    assert.deepStrictEqual(ticks([day, day + 86400], 14, 86400), [
+    // From 2024.01.02, q's day 8767, in milliseconds
+    const day = 86_400_000;
+    const hour = 3_600_000;
+    const from = 8767 * day;
+    assert.deepStrictEqual(ticks([from, from + day], 14, day), [
       "2024.01.02",
       "2024.01.03",
     ]);
-    assert.deepStrictEqual(ticks([day, day + 31 * 86400], 12, 31 * 86400), [
+    assert.deepStrictEqual(ticks([from, from + 31 * day], 12, 31 * day), [
       "2024.01",
       "2024.02",
     ]);
     assert.deepStrictEqual(
-      ticks([day + 82800, day + 86400, day + 90000], 12, 3600),
+      ticks([from + 23 * hour, from + day, from + day + hour], 12, hour),
       ["2024.01.02\n23:00", "2024.01.03\n00:00", "01:00"],
     );
-    assert.deepStrictEqual(ticks([1, 2], 18, 1), ["00:00:01", "00:00:02"]);
-    assert.deepStrictEqual(ticks([0.5], 19, 0.5), ["00:00:00.500"]);
+    assert.deepStrictEqual(ticks([1000, 2000], 18, 1000), [
+      "00:00:01",
+      "00:00:02",
+    ]);
+    assert.deepStrictEqual(ticks([500], 19, 500), ["00:00:00.500"]);
+    assert.deepStrictEqual(ticks([34_200_000, 36_000_000], 17, 1_800_000), [
+      "09:30",
+      "10:00",
+    ]);
+    // A timestamp's milliseconds
+    const at = from + 34_200_000;
+    assert.deepStrictEqual(ticks([at + 1, at + 2], 12, 1), [
+      "2024.01.02\n09:30:00.001",
+      "09:30:00.002",
+    ]);
+  });
+
+  test("ticks times at steps of a clock or a calendar, a millisecond to centuries apart", () => {
+    const day = 86_400_000;
+    // Every millisecond from 09:30
+    const at = 8767 * day + 34_200_000;
+    assert.deepStrictEqual(
+      splits(at, at + 3, 1, 12).map((t) => t - at),
+      [0, 1, 2, 3],
+    );
+    // The first of each month, from 2024.01.15, q's day 8780, to April
+    assert.deepStrictEqual(
+      splits(8780 * day, 8870 * day, 30 * day, 14).map((t) => stamp(t, 14)),
+      ["2024.02.01", "2024.03.01", "2024.04.01"],
+    );
+    // 1900.01.01 to 9999.12.31, every 1,000 years
+    const years = splits(-36524 * day, 2921939 * day, 1000 * 365 * day, 14);
+    assert.deepStrictEqual(
+      years.map((t) => stamp(t, 14).slice(0, 4)),
+      ["2000", "3000", "4000", "5000", "6000", "7000", "8000", "9000"],
+    );
+    // Days apart from 2000.01.01, and from 0D, wherever the data are
+    assert.deepStrictEqual(
+      splits(9034 * day, 9074 * day, 10 * day, 14).map((t) => t / day),
+      [9040, 9050, 9060, 9070],
+    );
+    assert.deepStrictEqual(
+      splits(0, 22 * day, 5 * day, 16).map((t) => t / day),
+      [0, 5, 10, 15, 20],
+    );
+    // As fine as a type is drawn, and as far apart as dates go
+    assert.strictEqual(steps(12)[0], 1);
+    assert.strictEqual(steps(19)[0], 1);
+    assert.strictEqual(steps(17)[0], 60_000);
+    assert.ok((steps(14).at(-1) ?? 0) >= 1000 * 365 * day);
+  });
+
+  test("ticks numbers about 10^18 without end, where a step is less than a double tells apart", () => {
+    const ticks = stepped(1.7e18, 1.7e18 + 256, 100);
+    assert.ok(ticks.length >= 1 && ticks.length <= 4);
+    assert.strictEqual(new Set(ticks).size, ticks.length);
+  });
+
+  test("writes 16 and 17 digits exactly", () => {
+    assert.strictEqual(float(0.40516741630084363, 17), "0.40516741630084363");
+    assert.strictEqual(float(1.0851234567890122, 17), "1.0851234567890122");
+  });
+
+  test("writes numbers on an axis as q does, to as many digits as tell the ticks apart", () => {
+    // No more than a double holds
+    assert.strictEqual(numbers([1e22, 1e22 + 2 ** 21], 2 ** 21)[0], "1e+22");
+    assert.deepStrictEqual(numbers([1.08505, 1.0851, 1.08515], 0.00005), [
+      "1.08505",
+      "1.0851",
+      "1.08515",
+    ]);
+    assert.deepStrictEqual(numbers([-0.0005, -0, 0.0005], 0.0005), [
+      "-0.0005",
+      "0",
+      "0.0005",
+    ]);
+    assert.deepStrictEqual(numbers([1e-12, 2e-12], 1e-12), ["1e-12", "2e-12"]);
+    assert.deepStrictEqual(numbers([0, 1e15], 1e15), ["0", "1e+15"]);
+    assert.deepStrictEqual(numbers([20000, 40000], 20000), ["20000", "40000"]);
+    // More than 7 where the ticks need them
+    assert.deepStrictEqual(numbers([100.000001, 100.000002], 1e-6), [
+      "100.000001",
+      "100.000002",
+    ]);
   });
 });

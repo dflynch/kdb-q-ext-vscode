@@ -45,8 +45,13 @@ All notable changes to the extension are documented in this file.
   the columns, and its legend hides and shows a series. Drag across it to
   zoom, double-click to zoom out. It draws the whole result, as it came,
   a line sorted by its x, and says how many nulls and infinities it left
-  out; times are as q writes them, never shifted to the machine's time
-  zone
+  out; a value at the cursor is as the Grid shows it, numbers on the axes
+  as q writes them, and times as q writes them, never shifted to the
+  machine's time zone; times are drawn and binned to the millisecond,
+  finer digits cut off as q casts, so a timespan under a millisecond, such
+  as a latency, is drawn as 0, and zoomed no closer than ten milliseconds;
+  integers are written as q writes them, and a long past 2^53 is drawn as
+  nearly as a double holds it, as a float is
 - Settings: `servers`, `connectTimeout`, `consoleSize` and `sizeLimit`
 
 ### Changed

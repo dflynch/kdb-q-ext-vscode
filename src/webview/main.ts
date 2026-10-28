@@ -13,7 +13,7 @@ import type {
   View,
 } from "../messages";
 import { Chart } from "./chart/chart";
-import { type Plotted, skipped } from "./chart/data";
+import { noted, type Plotted } from "./chart/data";
 import { Panel } from "./chart/panel";
 import { fitted, initial, type Spec } from "./chart/spec";
 import { csv, tsv } from "./delimited";
@@ -272,7 +272,7 @@ function switchTo() {
     : sheet
       ? "Only a value with a numeric or a time column shows in the Chart"
       : `${shows} Chart`;
-  const left = view === "chart" && level.plotted ? skipped(level.plotted) : "";
+  const left = view === "chart" && level.plotted ? noted(level.plotted) : "";
   size.textContent = sheet
     ? [sized(sheet, view === "grid" ? level.filtered : undefined), left]
         .filter(Boolean)
