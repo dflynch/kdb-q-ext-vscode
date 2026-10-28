@@ -246,6 +246,17 @@ suite("the Chart", () => {
       stamps.values.map((v) => v - 34_200_000_000),
       Array.from({ length: 50 }, (_, i) => Math.floor(i / 10)),
     );
+    // A timespan's too, from the middle day: 1D00:00:00.000000150 and
+    // 3D00:00:00.000001999, from 2D
+    const spans = at(
+      16,
+      BigInt64Array.of(86_400_000_000_150n, 3n * 86_400_000_000_000n + 1999n),
+    );
+    assert.deepStrictEqual(spans, {
+      values: [-86_400_000_000, 86_400_000_001],
+      origin: 2,
+    });
+    assert.strictEqual(stamp(spans.values[1], 2, 16), "3D00:00:00.000001000");
     // Exactly, for a column spanning under 570 years: 1710.01.01 and
     // 2270.01.01, each a microsecond on, further from 2000 than a double
     // holds microseconds exactly, but not from their middle, where a
