@@ -274,7 +274,14 @@ Open Keyboard Shortcuts**.
 | `kdb-q-ext-vscode.servers`        | `{}`           | The servers to connect to, by name (see [Servers](#servers)) |
 | `kdb-q-ext-vscode.connectTimeout` | `2000`         | How long to wait to connect and log in, in ms; 0 waits       |
 | `kdb-q-ext-vscode.consoleSize`    | `[1000, 1000]` | How much of a result to show, as lines then width            |
+| `kdb-q-ext-vscode.precision`      | `7`            | Significant digits of floats and reals, as `\P`; 0 for all   |
 | `kdb-q-ext-vscode.sizeLimit`      | `10`           | The largest result to take, in MB, uncompressed              |
+
+`precision` works as q's `\P`: from 1 to 17 significant digits, or 0 for as
+many as each type holds, 17 for a float and 8 for a real. It applies wherever
+a result's floats and reals are written: the Console, the Grid, Copy, Export
+to CSV and the Chart's values at the cursor. Like `\P`, it applies from the
+next run; a result already shown, or kept, stays as it was.
 
 A result over `sizeLimit` is refused and the connection closed. The extension
 holds the latest result as it arrived, and decodes it in the **kdb+/q** tab,
