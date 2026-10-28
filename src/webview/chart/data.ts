@@ -2,7 +2,7 @@ import { count, type Vector } from "../../codec/types";
 import { float } from "../../format/text";
 import type { Column, Sheet } from "../table";
 import { mostBins, type Spec } from "./spec";
-import { monthDay, phase, stamp } from "./time";
+import { day, monthDay, phase, stamp } from "./time";
 
 // A sheet's columns as the chart draws them: numbers, and times as whole
 // microseconds from a day in the middle of their range, which a double
@@ -51,8 +51,7 @@ export type Plotted = {
   infinities: number;
 };
 
-// A day, in microseconds and nanoseconds
-const day = 86_400_000_000;
+// A day, in nanoseconds
 const dayNs = 86_400_000_000_000n;
 
 // The smallest and largest of a type's integers are its null and its
@@ -188,7 +187,7 @@ export function read(vector: Vector, measured = false): Read {
 }
 
 // A type's values, as read, in microseconds from the origin, as drawn
-export function micros(type: number, origin: number): (v: number) => number {
+function micros(type: number, origin: number): (v: number) => number {
   switch (type) {
     case 13:
       return (months) => (monthDay(months) - origin) * day;
@@ -438,14 +437,14 @@ const clocked: Record<number, number> = {
 
 // Whether a type holds times finer than a millisecond: a timestamp or a
 // timespan, of nanoseconds
-export function fine(type: number): boolean {
+function fine(type: number): boolean {
   return type === 12 || type === 16;
 }
 
 // How many significant digits tell numbers as large as this apart, a step
 // apart: from the largest's first to the step's last, of three at most, and
 // 17 at most, all a double holds
-export function figures(largest: number, step: number): number {
+function figures(largest: number, step: number): number {
   if (!largest || !step) {
     return 1;
   }

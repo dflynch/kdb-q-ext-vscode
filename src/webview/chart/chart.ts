@@ -9,14 +9,10 @@ import {
   scattered,
 } from "./data";
 import type { Spec } from "./spec";
-import { splits, steps, ticks } from "./time";
+import { day, second, splits, steps, ticks } from "./time";
 
 // The Chart view: a spec of a sheet drawn by uPlot. Only this file knows
 // uPlot.
-
-// A day and a second, in microseconds, as times are drawn
-const day = 86_400_000_000;
-const second = 1_000_000;
 
 // Series in VS Code's own chart colours, as its views draw them, in turn
 const palette = ["blue", "orange", "green", "purple", "red", "yellow"];
@@ -72,9 +68,10 @@ export class Chart {
     const { rows, origin = 0, middle = 0n } = plotted;
     const cell = (j: number, i: number) =>
       sheet.columns[j].text(rows ? rows[i] : i);
-    // One x, of a line or a lone bin, which uPlot would put at the left of
-    // a thousand days: a line's at the middle of its own unit either side,
-    // a month, a day, a minute, else a second, and a bin's as the bin
+    // One x, of a line of times or a lone bin, which would otherwise be
+    // shown as closely as a zoom goes: a line's at the middle of its own
+    // unit either side, a month, a day, a minute, else a second, and a
+    // bin's as the bin
     const { x: xs } = plotted;
     const single = xs.length > 0 && xs[0] === xs[xs.length - 1];
     const unit =

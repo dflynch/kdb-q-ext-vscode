@@ -8,9 +8,9 @@ import * as q from "../../format/temporal";
 // finer than a millisecond, and reads times as seconds since 1970, so the
 // chart ticks them itself.
 
-// A day and a second, in microseconds
-const day = 86_400_000_000;
-const second = 1_000_000;
+// A day and a second, in microseconds, as times are drawn
+export const day = 86_400_000_000;
+export const second = 1_000_000;
 
 // A time as q writes it, of a column of q's type, with as many digits of a
 // second as asked, the rest cut off, as q casts a time to a coarser one
