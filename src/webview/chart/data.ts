@@ -14,12 +14,14 @@ import { monthDay, phase, stamp } from "./time";
 // A column's cells as numbers, NaN for a null or an infinity: a time as a
 // whole number of its unit, as q counts it, but a timestamp's and a
 // timespan's in microseconds and a datetime's in milliseconds, from the
-// origin, in days since 2000.01.01, 0 for times of day
+// origin, in days since 2000.01.01, 0 for times of day; and, measured, an
+// integer from the middle, exactly, for any spread a double holds
 type Read = {
   values: Float64Array;
   nulls: number;
   infinities: number;
   origin: number;
+  middle: bigint;
 };
 
 // What's drawn: the x, ascending, and a series for each column, null where
@@ -28,8 +30,9 @@ type Read = {
 // the first's start to the last's end, each said as the values it counts,
 // and how many there are of how many values each, where that isn't as many
 // as typed; a scatter's points, each series' x and y and the rows they're
-// of, in place of an x shared by the series; the day a time x counts from;
-// and how many nulls and infinities were left out
+// of, in place of an x shared by the series; the day a time x counts from,
+// or the integer an integer x does; and how many nulls and infinities were
+// left out
 export type Plotted = {
   x: Float64Array;
   ys: (Float64Array | (number | null)[])[];
@@ -43,6 +46,7 @@ export type Plotted = {
   };
   points?: [x: Float64Array, y: Float64Array, rows: Uint32Array][];
   origin?: number;
+  middle?: bigint;
   nulls: number;
   infinities: number;
 };
@@ -63,13 +67,15 @@ const ranges: Record<number, number> = {
   19: 2 ** 31,
 };
 
-// A numeric or temporal column's cells
-export function read(vector: Vector): Read {
+// A numeric or temporal column's cells, an integer's measured from its
+// middle, for an x or a histogram's values, which are of one column
+export function read(vector: Vector, measured = false): Read {
   const n = count(vector) ?? 0;
   const values = new Float64Array(n);
   let nulls = 0;
   let infinities = 0;
   let origin = 0;
+  let middle = 0n;
   const left = (i: number, isNull: boolean) => {
     values[i] = Number.NaN;
     if (isNull) {
@@ -102,6 +108,8 @@ export function read(vector: Vector): Read {
       const timed = vector.type !== 7 && low <= high;
       if (timed) {
         origin = Number(floored((low + high) / 2n, dayNs));
+      } else if (measured && low <= high) {
+        middle = floored(low + high, 2n);
       }
       const from = BigInt(origin) * dayNs;
       for (let i = 0; i < n; i++) {
@@ -109,7 +117,9 @@ export function read(vector: Vector): Read {
         if (special(v)) {
           left(i, v === -most - 1n);
         } else {
-          values[i] = timed ? Number(floored(v - from, 1000n)) : Number(v);
+          values[i] = timed
+            ? Number(floored(v - from, 1000n))
+            : Number(v - middle);
         }
       }
       break;
@@ -163,13 +173,18 @@ export function read(vector: Vector): Read {
           high = Math.max(high, v);
         }
       }
+      const centre = Math.floor((low + high) / 2);
       if (low <= high && (vector.type === 13 || vector.type === 14)) {
-        const middle = Math.floor((low + high) / 2);
-        origin = vector.type === 13 ? monthDay(middle) : middle;
+        origin = vector.type === 13 ? monthDay(centre) : centre;
+      } else if (low <= high && measured && vector.type <= 6) {
+        middle = BigInt(centre);
+        for (let i = 0; i < n; i++) {
+          values[i] -= centre;
+        }
       }
     }
   }
-  return { values, nulls, infinities, origin };
+  return { values, nulls, infinities, origin, middle };
 }
 
 // A type's values, as read, in microseconds from the origin, as drawn
@@ -200,7 +215,7 @@ function floored(n: bigint, d: bigint): bigint {
 // a line from left to right. Rows come sorted where they aren't already.
 // A row's index is its x where there's no column for it.
 export function lined(sheet: Sheet, spec: Spec): Plotted {
-  const x = spec.x === null ? undefined : read(vectorOf(sheet, spec.x));
+  const x = spec.x === null ? undefined : read(vectorOf(sheet, spec.x), true);
   const ys = spec.y.map((j) => read(vectorOf(sheet, j)));
   const type = spec.x === null ? 0 : columnOf(sheet, spec.x).type;
   const xs = x
@@ -225,6 +240,7 @@ export function lined(sheet: Sheet, spec: Spec): Plotted {
     ys: ys.map(({ values }) => gapped(picked(values, rows))),
     rows,
     origin: x?.origin,
+    middle: x?.middle,
     ...counted([...(x ? [x] : []), ...ys]),
   };
 }
@@ -235,10 +251,11 @@ export function scattered(sheet: Sheet, spec: Spec): Plotted {
   if (spec.x === null) {
     throw new Error("type", { cause: "scatter by row index" });
   }
-  const x = read(vectorOf(sheet, spec.x));
+  const x = read(vectorOf(sheet, spec.x), true);
   const ys = spec.y.map((j) => read(vectorOf(sheet, j)));
   return {
     x: new Float64Array(),
+    middle: x.middle,
     ys: [],
     points: ys.map(({ values }) => {
       const xs = new Float64Array(sheet.rows);
@@ -285,8 +302,8 @@ export function binned(sheet: Sheet, spec: Spec): Plotted {
   const { type } = columnOf(sheet, spec.x);
   // Every column but of reals and floats counts in whole units
   const whole = type !== 8 && type !== 9;
-  const values = read(vectorOf(sheet, spec.x));
-  const { origin } = values;
+  const values = read(vectorOf(sheet, spec.x), true);
+  const { origin, middle } = values;
   // Where a value is drawn
   const drawn = micros(type, origin);
   const sorted = values.values.filter((v) => !Number.isNaN(v)).sort();
@@ -381,7 +398,7 @@ export function binned(sheet: Sheet, spec: Spec): Plotted {
     time
       ? stamp(drawn(v), origin, type, fine(type) ? 6 : undefined)
       : whole
-        ? String(v)
+        ? String(BigInt(v) + middle)
         : float(v, digits);
   return {
     x: Float64Array.from(
@@ -402,6 +419,7 @@ export function binned(sheet: Sheet, spec: Spec): Plotted {
       fewer,
     },
     origin,
+    middle,
     ...counted([values]),
   };
 }

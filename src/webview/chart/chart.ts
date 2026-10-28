@@ -65,9 +65,11 @@ export class Chart {
             : lined(sheet, spec);
     const x = spec.x === null ? undefined : sheet.columns[spec.x];
     const time = x && x.type >= 12 && x.type <= 19 ? x.type : undefined;
+    // A short's, an int's or a long's, measured from its middle
+    const whole = x !== undefined && x.type >= 5 && x.type <= 7;
     const named = (j: number) => sheet.columns[j].name;
     // A cell at the cursor as the grid shows it, of the row a point is of
-    const { rows, origin = 0 } = plotted;
+    const { rows, origin = 0, middle = 0n } = plotted;
     const cell = (j: number, i: number) =>
       sheet.columns[j].text(rows ? rows[i] : i);
     // One x, of a line or a lone bin, which uPlot would put at the left of
@@ -84,8 +86,9 @@ export class Chart {
             ? 60 * second
             : second;
     // Zoomed no closer than ten of a time's finest ticks apart, as it's
-    // drawn no finer: ten microseconds for a timestamp
-    const least = time === undefined ? 0 : 10 * steps(time)[0];
+    // drawn no finer: ten microseconds for a timestamp, or ten for an
+    // integer
+    const least = time !== undefined ? 10 * steps(time)[0] : whole ? 10 : 0;
     const widened = (min: number, max: number): uPlot.Range.MinMax =>
       max - min >= least
         ? [min, max]
@@ -116,6 +119,25 @@ export class Chart {
       values: (_, splits, __, ___, step) => numbers(splits, step),
     };
     const across = { ...valued, space: spaced(numbers) };
+    // An integer as q writes it, the middle it's measured from added back
+    // exactly, ticked at whole steps from 0, however far that middle is
+    const integers = (splits: number[]) =>
+      splits.map((t) => String(BigInt(Math.round(t)) + middle));
+    const counting: Partial<uPlot.Axis> = {
+      incrs: wholeSteps,
+      splits: (_, __, min, max, step) => {
+        const each = BigInt(step);
+        const shift = Number(((middle % each) + each) % each);
+        const all: number[] = [];
+        const last = Math.floor((max + shift) / step);
+        for (let k = Math.ceil((min + shift) / step); k <= last; k++) {
+          all.push(k * step - shift);
+        }
+        return all;
+      },
+      values: (_, splits) => integers(splits),
+      space: spaced(integers),
+    };
     // Room for half the first and the last tick's labels, which are
     // centred on them, as the plot may start or end at them
     let overhang = [0, 0];
@@ -168,9 +190,11 @@ export class Chart {
               }
             : {
                 time: false,
-                ...(time !== undefined && {
+                ...((time !== undefined || whole) && {
                   range: (_, min, max): uPlot.Range.MinMax =>
-                    single ? [xs[0] - unit, xs[0] + unit] : widened(min, max),
+                    single && time !== undefined
+                      ? [xs[0] - unit, xs[0] + unit]
+                      : widened(min, max),
                 }),
               },
         // Bars from 0, their heights to scale: with some room past the
@@ -269,7 +293,9 @@ export class Chart {
                     ticks(splits, origin, time, step),
                   ),
                 }
-              : across),
+              : whole
+                ? counting
+                : across),
         },
         { ...axis, ...valued },
       ],
@@ -300,7 +326,10 @@ export class Chart {
         scales: {
           x: {
             time: false,
-            range: (_, min, max) => uPlot.rangeNum(min, max, 0.1, true),
+            range: (_, min, max): uPlot.Range.MinMax => {
+              const [from, to] = uPlot.rangeNum(min, max, 0.1, true);
+              return whole ? widened(from ?? min, to ?? max) : [from, to];
+            },
           },
           y: {},
         },
@@ -331,7 +360,13 @@ export class Chart {
         ],
         // Named below, as the legend names only the ys
         axes: [
-          { ...axis, ...across, size: below, label: x?.name, labelFont: font },
+          {
+            ...axis,
+            ...(whole ? counting : across),
+            size: below,
+            label: x?.name,
+            labelFont: font,
+          },
           { ...axis, ...valued },
         ],
         cursor: {
@@ -526,6 +561,12 @@ class Nearest {
     return { order, starts, across };
   }
 }
+
+// How far apart an integer's ticks can be: 1, 2 and 5 of a power of 10, as
+// a long's can be, every one a whole number a double holds
+const wholeSteps = Array.from({ length: 19 }, (_, power) =>
+  [1, 2, 5].map((n) => n * 10 ** power),
+).flat();
 
 // How near the cursor a point is found, in pixels
 const reach = 12;

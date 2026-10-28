@@ -281,6 +281,37 @@ suite("the Chart", () => {
     );
   });
 
+  test("measures an integer x, or a histogram's, from its middle, exactly past 2^53, but a series as it is", () => {
+    // Nanoseconds since 1970 as longs, a nanosecond apart, which a double
+    // past 2^53 would round to the same
+    const from = 1_698_400_000_000_000_000n;
+    const stamps = longs(from + 1n, from + 2n, from + 3n, -(2n ** 63n));
+    const measured = read(stamps as never, true);
+    assert.strictEqual(measured.middle, from + 2n);
+    assert.deepStrictEqual([...measured.values].slice(0, 3), [-1, 0, 1]);
+    assert.strictEqual(measured.nulls, 1);
+    // A series isn't, as it shares its axis
+    const plain = read(stamps as never);
+    assert.strictEqual(plain.middle, 0n);
+    assert.strictEqual(plain.values[0], Number(from + 1n));
+    // An int too, so its labels are written as an integer's
+    const counted = read(ints(6, 10, 20, 31) as never, true);
+    assert.deepStrictEqual(
+      [counted.middle, ...counted.values],
+      [20n, -10, 0, 11],
+    );
+    const t = table({ t: stamps, v: floats(1, 2, 3, 4) });
+    const line = lined(t, spec({ x: 0, y: [1] }));
+    assert.deepStrictEqual([line.middle, ...line.x], [from + 2n, -1, 0, 1]);
+    // A histogram's bins said exactly, a nanosecond to each
+    const plotted = binned(t, spec({ type: "histogram", x: 0, bins: 3 }));
+    assert.deepStrictEqual([...plotted.ys[0]], [1, 1, 1]);
+    assert.deepStrictEqual(
+      [0, 2].map((i) => plotted.bins?.said(i)),
+      [String(from + 1n), String(from + 3n)],
+    );
+  });
+
   test("draws times in microseconds, unshifted by any time zone", () => {
     const t = table({ d: ints(14, 1, 3), v: floats(1, 2) });
     const plotted = lined(t, spec({ x: 0, y: [1] }));

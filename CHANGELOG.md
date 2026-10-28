@@ -49,7 +49,9 @@ All notable changes to the extension are documented in this file.
   as q writes them, and times as q writes them, never shifted to the
   machine's time zone, a timestamp or timespan drawn and binned to the
   microsecond, its nanoseconds cut off as q casts, and zoomed no closer
-  than ten microseconds
+  than ten microseconds; an x or a histogram of shorts, ints or longs is
+  exact, longs past 2^53 too, and written as q writes them, and a series
+  is drawn to 16 significant digits, as a float is
 - Settings: `servers`, `connectTimeout`, `consoleSize` and `sizeLimit`
 
 ### Changed
