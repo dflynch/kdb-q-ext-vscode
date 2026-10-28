@@ -166,6 +166,8 @@ export class Chart {
             stroke: colour(k),
             width: 1,
             show: !spec.hidden.includes(j),
+            // As a scatter's and the x are, not uPlot's 3 places
+            value: (_, value) => (value === null ? "" : number(value)),
             ...(label
               ? {
                   fill: colour(k),
@@ -242,7 +244,14 @@ export class Chart {
       Object.assign(options, {
         mode: 2,
         padding: [null, null, null, null],
-        scales: { x: { time: false }, y: {} },
+        // Padded in x as uPlot pads y, so a lone x isn't a range of none
+        scales: {
+          x: {
+            time: false,
+            range: (_, min, max) => uPlot.rangeNum(min, max, 0.1, true),
+          },
+          y: {},
+        },
         series: [
           {},
           ...spec.y.map(
@@ -267,7 +276,8 @@ export class Chart {
             }),
           ),
         ],
-        axes: [axis, axis],
+        // Named below, as the legend names only the ys
+        axes: [{ ...axis, label: x?.name, labelFont: font }, axis],
         cursor: {
           drag: { x: true, y: true },
           dataIdx: (plot, i) => near.at(plot, i),
@@ -344,12 +354,18 @@ function squares(colour: string): uPlot.Series.PathBuilder {
     const side = 3 * devicePixelRatio;
     const { left, top, width, height } = plot.bbox;
     const across = Math.ceil(width) + 1;
-    const painted = new Uint8Array(across * (Math.ceil(height) + 1));
+    const down = Math.ceil(height) + 1;
+    const painted = new Uint8Array(across * down);
+    // Within the plot, and its colour not left for uPlot's next drawing
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(left, top, width, height);
+    ctx.clip();
     ctx.fillStyle = colour;
     for (let at = 0; at < xs.length; at++) {
       const x = Math.round(plot.valToPos(xs[at], "x", true) - left);
       const y = Math.round(plot.valToPos(ys[at], "y", true) - top);
-      if (x >= 0 && x <= width && y >= 0 && y <= height) {
+      if (x >= 0 && x < across && y >= 0 && y < down) {
         const pixel = y * across + x;
         if (!painted[pixel]) {
           painted[pixel] = 1;
@@ -357,6 +373,7 @@ function squares(colour: string): uPlot.Series.PathBuilder {
         }
       }
     }
+    ctx.restore();
     return null;
   };
 }
@@ -380,7 +397,7 @@ class Nearest {
   at(plot: uPlot, i: number): number | null {
     const left = plot.cursor.left ?? -1;
     const top = plot.cursor.top ?? -1;
-    if (i === 0 || left < 0 || top < 0) {
+    if (!plot.series[i].show || left < 0 || top < 0) {
       return null;
     }
     const [xs, ys] = plot.data[i] as unknown as Float64Array[];
@@ -417,20 +434,25 @@ class Nearest {
     if (made) {
       return made;
     }
-    const width = plot.bbox.width / devicePixelRatio;
-    const height = plot.bbox.height / devicePixelRatio;
-    const across = Math.ceil(width / reach) + 1;
-    const cells = across * (Math.ceil(height / reach) + 1);
+    const width = Math.ceil(plot.bbox.width / devicePixelRatio) + 1;
+    const height = Math.ceil(plot.bbox.height / devicePixelRatio) + 1;
+    const across = Math.ceil(width / reach);
+    const cells = across * Math.ceil(height / reach);
     const of = new Int32Array(xs.length);
     const starts = new Uint32Array(cells + 1);
+    // A pixel's first point only, as drawn, so a cell holds a point to
+    // each of its pixels at most, however many fall on one
+    const taken = new Uint8Array(width * height);
     for (let at = 0; at < xs.length; at++) {
-      const x = plot.valToPos(xs[at], "x");
-      const y = plot.valToPos(ys[at], "y");
+      const x = Math.round(plot.valToPos(xs[at], "x"));
+      const y = Math.round(plot.valToPos(ys[at], "y"));
+      const pixel = y * width + x;
       of[at] =
-        x >= 0 && x <= width && y >= 0 && y <= height
+        x >= 0 && x < width && y >= 0 && y < height && !taken[pixel]
           ? Math.floor(y / reach) * across + Math.floor(x / reach)
           : -1;
       if (of[at] >= 0) {
+        taken[pixel] = 1;
         starts[of[at] + 1]++;
       }
     }

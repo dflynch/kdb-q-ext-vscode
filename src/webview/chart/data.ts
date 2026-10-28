@@ -169,13 +169,16 @@ export function scattered(sheet: Sheet, spec: Spec): Plotted {
     x: new Float64Array(),
     ys: [],
     points: ys.map(({ values }) => {
-      const rows = Uint32Array.from({ length: sheet.rows }, (_, i) => i).filter(
-        (i) => !Number.isNaN(x.values[i]) && !Number.isNaN(values[i]),
-      );
-      return [
-        Float64Array.from(rows, (i) => x.values[i]),
-        Float64Array.from(rows, (i) => values[i]),
-      ];
+      const xs = new Float64Array(sheet.rows);
+      const vs = new Float64Array(sheet.rows);
+      let n = 0;
+      for (let i = 0; i < sheet.rows; i++) {
+        if (!Number.isNaN(x.values[i]) && !Number.isNaN(values[i])) {
+          xs[n] = x.values[i];
+          vs[n++] = values[i];
+        }
+      }
+      return [xs.slice(0, n), vs.slice(0, n)];
     }),
     ...counted([x, ...ys]),
   };
