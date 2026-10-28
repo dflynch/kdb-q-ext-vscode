@@ -2,7 +2,7 @@ import { count, type Vector } from "../../codec/types";
 import { float } from "../../format/text";
 import type { Column, Sheet } from "../table";
 import { mostBins, type Spec } from "./spec";
-import { monthDay, stamp } from "./time";
+import { monthDay, phase, stamp } from "./time";
 
 // A sheet's columns as the chart draws them: numbers, and times as whole
 // microseconds from a day in the middle of their range, which a double
@@ -132,12 +132,15 @@ export function read(vector: Vector): Read {
       }
       if (vector.type === 15 && low <= high) {
         // A datetime's days as milliseconds, rounded to the microsecond
-        // then cut, as q writes it
+        // half away from 0 then cut, as q writes it, and as the Grid does
         origin = Math.floor((low + high) / 2);
         for (let i = 0; i < n; i++) {
-          values[i] = Math.floor(
-            Math.round((values[i] - origin) * 864e8) / 1000,
-          );
+          if (Number.isNaN(values[i])) {
+            continue;
+          }
+          const product = values[i] * 86_400_000_000;
+          const us = Math.sign(product) * Math.round(Math.abs(product));
+          values[i] = Number(floored(BigInt(us), 1000n)) - origin * 86_400_000;
         }
       }
       break;
@@ -311,29 +314,38 @@ export function binned(sheet: Sheet, spec: Spec): Plotted {
   if (whole) {
     // Values of whole units span one more than from the lowest to the
     // highest. A time's bins are a step of a clock, from a whole number of
-    // them.
+    // them from 2000.01.01, or 0, as its ticks are: which can take a bin
+    // more, so fewer fit.
     const fits = (wide: number) => Math.max(1, Math.ceil(wide - 1e-9));
     const unit = clocked[type];
+    const aligned = unit !== undefined && !spec.bins;
     width = spec.bins
       ? fits((spread + 1) / spec.bins)
       : unit
         ? fits((readable((suited(sorted) * unit) / 1e6, true) * 1e6) / unit)
         : fits(suited(sorted));
-    if (Math.floor(spread / width) + 1 > mostBins) {
-      width = fits((spread + 1) / mostBins);
+    const most = aligned ? mostBins - 1 : mostBins;
+    if (Math.floor(spread / width) + 1 > most) {
+      width = fits((spread + 1) / most);
     }
-    start = unit && !spec.bins ? Math.floor(low / width) * width : low;
+    // A timestamp's, a datetime's and a timespan's are from the origin
+    const shift =
+      aligned && (type === 12 || type === 15 || type === 16)
+        ? phase(origin, day / unit, width)
+        : 0;
+    start = aligned ? Math.floor((low + shift) / width) * width - shift : low;
     count = Math.floor((high - start) / width) + 1;
     if (spec.bins && count !== spec.bins) {
       fewer = { count, each: width };
     }
     edge = (bin) => start + bin * width;
   } else if (!spread) {
-    // One bin, for values all the same, one either side of them
-    width = 1;
-    start = low - 0.5;
+    // One bin, for values all the same, about them: a unit wide, or as
+    // narrow as a double, so large, still tells from them
+    width = Math.max(1, Math.abs(low) * 2 ** -50);
+    start = low - width / 2;
     count = 1;
-    edge = (bin) => start + bin;
+    edge = (bin) => start + bin * width;
   } else if (spec.bins) {
     width = spread / spec.bins;
     start = low;
@@ -342,9 +354,11 @@ export function binned(sheet: Sheet, spec: Spec): Plotted {
   } else {
     // As suits the values, rounded up to a width that reads well, the bins
     // starting at a whole number of it: 0.5 from 1.5, not 0.48 from 1.53
+    // A bin fewer than the most, as starting at a whole number of it can
+    // take one more
     width = readable(suited(sorted), false);
-    if (spread / width > mostBins) {
-      width = readable(spread / mostBins, false);
+    if (spread / width > mostBins - 1) {
+      width = readable(spread / (mostBins - 1), false);
     }
     const first = Math.floor(low / width);
     start = first * width;
@@ -411,7 +425,8 @@ export function fine(type: number): boolean {
 }
 
 // How many significant digits tell numbers as large as this apart, a step
-// apart: from the largest's first to the step's last, of three at most
+// apart: from the largest's first to the step's last, of three at most, and
+// 17 at most, all a double holds
 export function figures(largest: number, step: number): number {
   if (!largest || !step) {
     return 1;
@@ -419,7 +434,10 @@ export function figures(largest: number, step: number): number {
   const [mantissa, exponent] = Math.abs(step).toExponential().split("e");
   const significant = Math.min(3, mantissa.replace(".", "").length);
   const [, top] = Math.abs(largest).toExponential().split("e");
-  return Math.max(1, Number(top) - Number(exponent) + significant);
+  return Math.min(
+    17,
+    Math.max(1, Number(top) - Number(exponent) + significant),
+  );
 }
 
 // Numbers on an axis as q writes them: to 7 significant digits, or as many

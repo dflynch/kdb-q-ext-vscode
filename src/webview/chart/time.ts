@@ -135,8 +135,9 @@ export function steps(type: number): number[] {
 }
 
 // Where ticks fall between two times, a step apart: at whole numbers of the
-// step from the origin's midnight, within a month, or at the starts of
-// months or years, every so many, counted from 2000
+// step from 2000.01.01, or from 0 for a time that isn't of a date, within a
+// month, or at the starts of months or years, every so many, counted from
+// 2000, so that where they fall doesn't depend on the data
 export function splits(
   min: number,
   max: number,
@@ -147,8 +148,10 @@ export function splits(
   const dated = type >= 12 && type <= 15;
   const all: number[] = [];
   if (!dated || step < 28 * day) {
-    for (let k = Math.ceil(min / step); k <= Math.floor(max / step); k++) {
-      all.push(k * step);
+    const shift = phase(origin, day, step);
+    const last = Math.floor((max + shift) / step);
+    for (let k = Math.ceil((min + shift) / step); k <= last; k++) {
+      all.push(k * step - shift);
     }
     return all;
   }
@@ -169,6 +172,14 @@ export function splits(
     }
     at += months;
   }
+}
+
+// How far past a whole number of steps from 2000.01.01, or from 0, the
+// origin is, in days, a day being so many of the steps' units: exactly,
+// as days' microseconds can be past what a double holds
+export function phase(origin: number, perDay: number, step: number): number {
+  const each = BigInt(Math.round(step));
+  return Number((((BigInt(origin) * BigInt(perDay)) % each) + each) % each);
 }
 
 // The day a month starts, both counted from 2000.01.01

@@ -110,10 +110,12 @@ export class Chart {
             (each) => measure(each, font) + 16,
           ),
         );
-    const valued: Pick<uPlot.Axis, "values" | "space"> = {
+    // Numbers as q writes them, on the y axis as uPlot spaces them, and
+    // on the x as their labels are wide
+    const valued: Pick<uPlot.Axis, "values"> = {
       values: (_, splits, __, ___, step) => numbers(splits, step),
-      space: spaced(numbers),
     };
+    const across = { ...valued, space: spaced(numbers) };
     // Room for half the first and the last tick's labels, which are
     // centred on them, as the plot may start or end at them
     let overhang = [0, 0];
@@ -267,7 +269,7 @@ export class Chart {
                     ticks(splits, origin, time, step),
                   ),
                 }
-              : valued),
+              : across),
         },
         { ...axis, ...valued },
       ],
@@ -329,7 +331,7 @@ export class Chart {
         ],
         // Named below, as the legend names only the ys
         axes: [
-          { ...axis, ...valued, size: below, label: x?.name, labelFont: font },
+          { ...axis, ...across, size: below, label: x?.name, labelFont: font },
           { ...axis, ...valued },
         ],
         cursor: {

@@ -1,5 +1,6 @@
 import * as assert from "node:assert";
 import { Attribute, type Texts, type Value } from "../codec/types";
+import { datetime } from "../format/temporal";
 import {
   barred,
   binned,
@@ -257,6 +258,17 @@ suite("the Chart", () => {
       origin: 2,
     });
     assert.strictEqual(stamp(spans.values[1], 2, 16), "3D00:00:00.000001000");
+    // A datetime placed at the millisecond the Grid writes, however it
+    // rounds
+    for (let k = 0; k < 2000; k++) {
+      const days = (Math.random() - 0.5) * 20000;
+      const { values, origin } = at(15, Float64Array.of(days));
+      assert.strictEqual(
+        stamp(values[0] * 1000, origin, 15),
+        datetime(days),
+        String(days),
+      );
+    }
     // Exactly, for a column spanning under 570 years: 1710.01.01 and
     // 2270.01.01, each a microsecond on, further from 2000 than a double
     // holds microseconds exactly, but not from their middle, where a
@@ -456,6 +468,53 @@ suite("the Chart", () => {
     ]);
   });
 
+  test("bins times of more than a day from 0D, or 2000.01.01, as the axis ticks them, whatever the data", () => {
+    // 0D to 22D, a day apart: Sturges 4 days, so 5, from 0D
+    const spans: Value = {
+      type: 16,
+      attribute: none,
+      data: BigInt64Array.from(
+        { length: 23 },
+        (_, i) => BigInt(i) * 86_400_000_000_000n,
+      ),
+    };
+    assert.deepStrictEqual(histogram(table({ s: spans }), {}).said, [
+      "0D00:00:00.000000 – 4D23:59:59.999999",
+      "20D00:00:00.000000 – 24D23:59:59.999999",
+    ]);
+  });
+
+  test("never bins in more than 10,000, though starting at a whole number of a width takes one more", () => {
+    const spans: Value = {
+      type: 16,
+      attribute: none,
+      data: BigInt64Array.from(
+        [
+          -17709060000000, 472395000000, -295673, 25088000000, -653370000000000,
+          565396100000000, 8576380000000, -251911200, -3047298, 47858700000,
+          51514400000000, -3873643, -104409400, 351985200, -224631600,
+          51820020000, -8296410000, 5213000000, -1212466000000,
+          -586369000000000, 28760710000000, 48389900,
+        ].map(BigInt),
+      ),
+    };
+    const { counts } = histogram(table({ s: spans }), {});
+    assert.ok(counts.length <= 10000);
+    assert.strictEqual(
+      counts.reduce((a, b) => (a ?? 0) + (b ?? 0), 0),
+      22,
+    );
+  });
+
+  test("bins a huge value all alone in a bin wider than none", () => {
+    const plotted = binned(
+      table({ v: floats(1e16, 1e16) }),
+      spec({ type: "histogram", x: 0 }),
+    );
+    assert.deepStrictEqual([...plotted.ys[0]], [2]);
+    assert.ok((plotted.bins?.from ?? 0) < (plotted.bins?.to ?? 0));
+  });
+
   test("bins months as months", () => {
     // 2020.01m to 2024.12m: Sturges 59 / 6.9 = 8.5, so 9 months
     const months: Value = {
@@ -634,6 +693,16 @@ suite("the Chart", () => {
       years.map((t) => stamp(t, from, 14).slice(0, 4)),
       ["2000", "3000", "4000", "5000", "6000", "7000", "8000", "9000"],
     );
+    // Days apart from 2000.01.01, and from 0D, wherever the data's middle
+    const fromDay = (t: number, origin: number) => t / day + origin;
+    assert.deepStrictEqual(
+      splits(0, 40 * day, 10 * day, 9034, 14).map((t) => fromDay(t, 9034)),
+      [9040, 9050, 9060, 9070],
+    );
+    assert.deepStrictEqual(
+      splits(-11 * day, 11 * day, 5 * day, 11, 16).map((t) => fromDay(t, 11)),
+      [0, 5, 10, 15, 20],
+    );
     // As fine as a type is drawn, and as far apart as dates go
     assert.strictEqual(steps(12)[0], 1);
     assert.strictEqual(steps(19)[0], 1000);
@@ -642,6 +711,8 @@ suite("the Chart", () => {
   });
 
   test("writes numbers on an axis as q does, to as many digits as tell the ticks apart", () => {
+    // No more than a double holds
+    assert.strictEqual(numbers([1e22, 1e22 + 2 ** 21], 2 ** 21)[0], "1e+22");
     assert.deepStrictEqual(numbers([1.08505, 1.0851, 1.08515], 0.00005), [
       "1.08505",
       "1.0851",
