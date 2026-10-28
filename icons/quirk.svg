@@ -12,8 +12,8 @@
   </defs>
   <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#bg)"/>
   <rect x="8" y="8" width="240" height="120" rx="56" fill="url(#sheen)"/>
-  <g fill="none" stroke="#ffffff" stroke-width="28" stroke-linecap="round">
-    <circle cx="114" cy="110" r="44"/>
-    <path d="M158 70V204"/>
+  <g fill="none" stroke="#ffffff" stroke-width="31" stroke-linecap="round">
+    <circle cx="122" cy="108" r="48"/>
+    <path d="M170 64V211"/>
   </g>
 </svg>
