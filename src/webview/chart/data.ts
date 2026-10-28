@@ -14,13 +14,15 @@ type Read = { values: Float64Array; nulls: number; infinities: number };
 // What's drawn: the x, ascending, and a series for each column, null where
 // a cell is left out; a bar's label, by its row, made only for the bars a
 // tick or the cursor is at; a histogram's bins, from the first's start to
-// the last's end, each said as the values it counts; and how many nulls
-// and infinities were left out
+// the last's end, each said as the values it counts; a scatter's points,
+// each series' x and y, in place of an x shared by the series; and how
+// many nulls and infinities were left out
 export type Plotted = {
   x: Float64Array;
   ys: (Float64Array | (number | null)[])[];
   label?: (row: number) => string;
   bins?: { from: number; to: number; said: (bin: number) => string };
+  points?: [x: Float64Array, y: Float64Array][];
   nulls: number;
   infinities: number;
 };
@@ -152,6 +154,30 @@ export function lined(sheet: Sheet, spec: Spec): Plotted {
     x: picked(xs, rows),
     ys: ys.map(({ values }) => gapped(picked(values, rows))),
     ...counted([...(x ? [x] : []), ...ys]),
+  };
+}
+
+// A scatter's: each row with both an x and a y, a point to each, in the
+// order they came, as a point's place is its x and y
+export function scattered(sheet: Sheet, spec: Spec): Plotted {
+  if (spec.x === null) {
+    throw new Error("type", { cause: "scatter by row index" });
+  }
+  const x = read(vectorOf(sheet, spec.x));
+  const ys = spec.y.map((j) => read(vectorOf(sheet, j)));
+  return {
+    x: new Float64Array(),
+    ys: [],
+    points: ys.map(({ values }) => {
+      const rows = Uint32Array.from({ length: sheet.rows }, (_, i) => i).filter(
+        (i) => !Number.isNaN(x.values[i]) && !Number.isNaN(values[i]),
+      );
+      return [
+        Float64Array.from(rows, (i) => x.values[i]),
+        Float64Array.from(rows, (i) => values[i]),
+      ];
+    }),
+    ...counted([x, ...ys]),
   };
 }
 

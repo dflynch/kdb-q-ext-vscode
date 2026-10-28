@@ -1,6 +1,6 @@
 import uPlot from "uplot";
 import type { Sheet } from "../table";
-import { barred, binned, fine, lined, type Plotted } from "./data";
+import { barred, binned, fine, lined, type Plotted, scattered } from "./data";
 import type { Spec } from "./spec";
 import { stamp, ticks } from "./time";
 
@@ -58,7 +58,9 @@ export class Chart {
         ? barred(sheet, spec)
         : spec.type === "histogram"
           ? binned(sheet, spec)
-          : lined(sheet, spec);
+          : spec.type === "scatter"
+            ? scattered(sheet, spec)
+            : lined(sheet, spec);
     const x = spec.x === null ? undefined : sheet.columns[spec.x];
     const time = x && x.type >= 12 && x.type <= 19 ? x.type : undefined;
     const named = (j: number) => sheet.columns[j].name;
@@ -142,7 +144,7 @@ export class Chart {
                   ? bins.said(i)
                   : time !== undefined
                     ? stamp(value, time, fine(time) && shown(plot) < 1 ? 6 : 3)
-                    : String(value),
+                    : number(value),
         },
         // A histogram's one series, its counts, a bar to each bin, a
         // pixel between them
@@ -231,17 +233,63 @@ export class Chart {
         ],
       },
     };
+    const { points } = plotted;
+    if (points) {
+      // A scatter, in uPlot's mode for points with an x each: a series to
+      // each y, drawn as squares, zoomed in x and y together, and the
+      // cursor at the point nearest it
+      const near = new Nearest();
+      Object.assign(options, {
+        mode: 2,
+        padding: [null, null, null, null],
+        scales: { x: { time: false }, y: {} },
+        series: [
+          {},
+          ...spec.y.map(
+            (j, k): uPlot.Series => ({
+              label: named(j),
+              stroke: colour(k),
+              fill: colour(k),
+              width: 0,
+              show: !spec.hidden.includes(j),
+              facets: [
+                { scale: "x", auto: true },
+                { scale: "y", auto: true },
+              ],
+              paths: squares(colour(k)),
+              // Its x and y at the cursor
+              value: (plot, _, i, at) => {
+                const [xs, ys] = plot.data[i] as unknown as Float64Array[];
+                return at === null
+                  ? ""
+                  : `${number(xs[at])}, ${number(ys[at])}`;
+              },
+            }),
+          ),
+        ],
+        axes: [axis, axis],
+        cursor: {
+          drag: { x: true, y: true },
+          dataIdx: (plot, i) => near.at(plot, i),
+        },
+      } satisfies Partial<uPlot.Options>);
+      options.hooks = { ...options.hooks, draw: [() => near.clear()] };
+    }
     this.plot = new uPlot(
       options,
-      [plotted.x, ...plotted.ys] as unknown as uPlot.AlignedData,
+      (points
+        ? [null, ...points]
+        : [plotted.x, ...plotted.ys]) as unknown as uPlot.AlignedData,
       this.place,
     );
     // Named for a screen reader, which can't see the canvas: the legend
     // below it reads the values at the cursor
     this.plot.over.role = "img";
-    this.plot.over.ariaLabel = bins
-      ? `Histogram of ${x?.name}`
-      : `${spec.type === "bar" ? "Bars" : "Line"} of ${spec.y.map(named).join(", ")} by ${x?.name ?? "row index"}`;
+    const drawn = { line: "Line", bar: "Bars", scatter: "Points" };
+    this.plot.over.ariaLabel =
+      spec.type === "histogram"
+        ? `Histogram of ${x?.name}`
+        : `${drawn[spec.type]} of ${spec.y.map(named).join(", ")} by ${x?.name ?? "row index"}`;
     this.fit();
     this.resized.observe(this.place);
     this.themed.observe(document.documentElement, {
@@ -283,6 +331,132 @@ export class Chart {
     }
   }
 }
+
+// A scatter's points, as squares 3 pixels a side, painted straight onto
+// the canvas, as uPlot's own scatter does: a path of half a million
+// squares or more is drawn as nothing at all. A pixel painted already
+// isn't painted again, so a million points take no longer than the pixels
+// they cover.
+function squares(colour: string): uPlot.Series.PathBuilder {
+  return (plot, i) => {
+    const [xs, ys] = plot.data[i] as unknown as Float64Array[];
+    const { ctx } = plot;
+    const side = 3 * devicePixelRatio;
+    const { left, top, width, height } = plot.bbox;
+    const across = Math.ceil(width) + 1;
+    const painted = new Uint8Array(across * (Math.ceil(height) + 1));
+    ctx.fillStyle = colour;
+    for (let at = 0; at < xs.length; at++) {
+      const x = Math.round(plot.valToPos(xs[at], "x", true) - left);
+      const y = Math.round(plot.valToPos(ys[at], "y", true) - top);
+      if (x >= 0 && x <= width && y >= 0 && y <= height) {
+        const pixel = y * across + x;
+        if (!painted[pixel]) {
+          painted[pixel] = 1;
+          ctx.fillRect(left + x - side / 2, top + y - side / 2, side, side);
+        }
+      }
+    }
+    return null;
+  };
+}
+
+// The point of a scatter's series nearest the cursor, within a few pixels:
+// found among those in the cells about it, the plot cut into cells, each
+// point in the cell it falls in, made once for each drawing on the first
+// hover, and none where none is near
+class Nearest {
+  // Of each series: its points, ordered by cell, and where each cell's
+  // start, with the cells across
+  private cells = new Map<
+    number,
+    { order: Uint32Array; starts: Uint32Array; across: number }
+  >();
+
+  clear() {
+    this.cells.clear();
+  }
+
+  at(plot: uPlot, i: number): number | null {
+    const left = plot.cursor.left ?? -1;
+    const top = plot.cursor.top ?? -1;
+    if (i === 0 || left < 0 || top < 0) {
+      return null;
+    }
+    const [xs, ys] = plot.data[i] as unknown as Float64Array[];
+    const { order, starts, across } = this.cellsOf(plot, i, xs, ys);
+    const column = Math.floor(left / reach);
+    const row = Math.floor(top / reach);
+    let nearest: number | null = null;
+    let least = reach * reach;
+    for (let r = row - 1; r <= row + 1; r++) {
+      for (let c = column - 1; c <= column + 1; c++) {
+        if (c < 0 || c >= across || r < 0) {
+          continue;
+        }
+        const cell = r * across + c;
+        if (cell + 1 >= starts.length) {
+          continue;
+        }
+        for (let o = starts[cell]; o < starts[cell + 1]; o++) {
+          const at = order[o];
+          const dx = plot.valToPos(xs[at], "x") - left;
+          const dy = plot.valToPos(ys[at], "y") - top;
+          if (dx * dx + dy * dy < least) {
+            least = dx * dx + dy * dy;
+            nearest = at;
+          }
+        }
+      }
+    }
+    return nearest;
+  }
+
+  private cellsOf(plot: uPlot, i: number, xs: Float64Array, ys: Float64Array) {
+    const made = this.cells.get(i);
+    if (made) {
+      return made;
+    }
+    const width = plot.bbox.width / devicePixelRatio;
+    const height = plot.bbox.height / devicePixelRatio;
+    const across = Math.ceil(width / reach) + 1;
+    const cells = across * (Math.ceil(height / reach) + 1);
+    const of = new Int32Array(xs.length);
+    const starts = new Uint32Array(cells + 1);
+    for (let at = 0; at < xs.length; at++) {
+      const x = plot.valToPos(xs[at], "x");
+      const y = plot.valToPos(ys[at], "y");
+      of[at] =
+        x >= 0 && x <= width && y >= 0 && y <= height
+          ? Math.floor(y / reach) * across + Math.floor(x / reach)
+          : -1;
+      if (of[at] >= 0) {
+        starts[of[at] + 1]++;
+      }
+    }
+    for (let cell = 0; cell < cells; cell++) {
+      starts[cell + 1] += starts[cell];
+    }
+    const order = new Uint32Array(starts[cells]);
+    const next = starts.slice(0, cells);
+    for (let at = 0; at < xs.length; at++) {
+      if (of[at] >= 0) {
+        order[next[of[at]]++] = at;
+      }
+    }
+    this.cells.set(i, { order, starts, across });
+    return { order, starts, across };
+  }
+}
+
+// How near the cursor a point is found, in pixels
+const reach = 12;
+
+// A number at the cursor, to 6 decimal places at most, grouped as the
+// axes' are
+const number = new Intl.NumberFormat(undefined, {
+  maximumFractionDigits: 6,
+}).format;
 
 // How much of the x is shown, as zoomed
 function shown(plot: uPlot): number {
