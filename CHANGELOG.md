@@ -37,14 +37,15 @@ All notable changes to the extension are documented in this file.
   adds the column names; neither copies a column of lists or tables
 - A Chart view beside the Console and the Grid: a line, joining its points
   or as steps, of numeric columns by a time, a number or each row's index,
-  or bars side by side for each row, labelled by any column, or a
+  or bars side by side for each row, labelled by any columns, or a
   histogram of a numeric or time column, binned as numpy's `auto` bins,
   in widths that read well, or into as many bins as typed, or a scatter
   of numeric columns by another, a million points at a time. It opens on a
-  bar where the first column is a label, else a line by the first time or
-  number, of one series; its settings, at the right, choose the type and
-  the columns, and its legend hides and shows a series. Drag across it to
-  zoom, double-click to zoom out. It draws the whole result, as it came,
+  bar where the first column is a label, labelled by it or a keyed table's
+  keys, else a line by the first time or number, of one series; its
+  settings, at the right, choose the type and the columns, and its legend
+  hides and shows a series. Drag across it to zoom, double-click to zoom
+  out. It draws the whole result, as it came,
   a line sorted by its x, and says how many nulls and infinities it left
   out; a value at the cursor is as the Grid shows it, numbers on the axes
   as q writes them, and times as q writes them, never shifted to the

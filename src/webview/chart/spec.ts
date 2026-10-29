@@ -8,9 +8,13 @@ export type ChartType = "line" | "bar" | "histogram" | "scatter";
 
 export type Spec = {
   type: ChartType;
-  // The x axis: a column, or null for each row's index. A histogram's
-  // values, and a scatter's x, which are never the index.
+  // The x axis: a column, or null for each row's index. A bar's first
+  // label, a histogram's values, and a scatter's x, which are never the
+  // index.
   x: number | null;
+  // A bar's further columns, after its x, each bar labelled with its cells
+  // in them all, as a keyed table's keys name its rows
+  labels: number[];
   // The series, numeric columns, drawn in this order
   y: number[];
   // The series hidden by their legend
@@ -25,8 +29,8 @@ export type Spec = {
   others: Partial<Record<ChartType, Columns>>;
 };
 
-// A type's columns: its x and its series
-export type Columns = Pick<Spec, "x" | "y">;
+// A type's columns: its x, a bar's further labels, and its series
+export type Columns = Pick<Spec, "x" | "labels" | "y">;
 
 // The most bins a histogram has, typed or not
 export const mostBins = 10000;
@@ -39,7 +43,10 @@ export function retyped(spec: Spec, type: ChartType): Spec {
     ...spec,
     ...back,
     type,
-    others: { ...others, [spec.type]: { x: spec.x, y: spec.y } },
+    others: {
+      ...others,
+      [spec.type]: { x: spec.x, labels: spec.labels, y: spec.y },
+    },
   };
 }
 
@@ -73,8 +80,8 @@ export function yColumns(sheet: Sheet): number[] {
 }
 
 // The columns a type's x takes: a line's, a number or a time, as it's
-// drawn to scale; a bar's, any column, as each row's bar is labelled with
-// its cell; not the only number, which would leave no series. A
+// drawn to scale; a bar's, and its further labels, any column, as each
+// row's bar is labelled with its cells; not the only number, which would leave no series. A
 // histogram's, a number or a time, to count. A scatter's, a number, not the
 // only one.
 export function xColumns(sheet: Sheet, type: ChartType): number[] {
@@ -99,10 +106,11 @@ function places(
 
 // The chart first drawn of a sheet, or none for a sheet with no numbers or
 // times. A bar where the first column is neither a number nor a time, a
-// label for each row, else a line; a line's x the first time, else the
-// first number; and one series, the first number that isn't the x. The x
-// is each row's index where no column fits. With times but no numbers, a
-// histogram of the first time, as there's nothing for a series.
+// label for each row, else a line; a bar's labels a keyed table's keys, as
+// they name its rows; a line's x the first time, else the first number; and
+// one series, the first number that isn't the x. The x is each row's index
+// where no column fits. With times but no numbers, a histogram of the first
+// time, as there's nothing for a series.
 export function initial(sheet: Sheet): Spec | undefined {
   const first = sheet.columns[0];
   if (!first || !xColumns(sheet, "histogram").length) {
@@ -117,6 +125,7 @@ export function initial(sheet: Sheet): Spec | undefined {
     {
       type,
       x: initialX(sheet, type),
+      labels: Array.from({ length: sheet.keys }, (_, j) => j).slice(1),
       y: [],
       hidden: [],
       steps: false,
@@ -129,20 +138,37 @@ export function initial(sheet: Sheet): Spec | undefined {
 
 // A spec made to fit a sheet: as it is where it does, and otherwise, slot
 // by slot, the initial chart's choice. For a type chosen anew, where the
-// x may no longer fit, or a spec carried by a kept tab.
+// x may no longer fit, or a spec carried by a kept tab. A bar's labels are
+// columns its x could be, each once, and never all the numbers, which
+// would leave no series; other types have none.
 export function fitted(spec: Spec, sheet: Sheet): Spec {
   const ys = yColumns(sheet);
+  const xs = xColumns(sheet, spec.type);
   const x =
     spec.x === null
       ? spec.type === "histogram" || spec.type === "scatter"
         ? initialX(sheet, spec.type)
         : null
-      : xColumns(sheet, spec.type).includes(spec.x)
+      : xs.includes(spec.x)
         ? spec.x
         : initialX(sheet, spec.type);
-  let y = spec.y.filter((j) => ys.includes(j) && j !== x);
+  // None in a kept tab's spec from before bars had them
+  let labels =
+    spec.type === "bar" && x !== null
+      ? [...new Set(spec.labels ?? [])].filter((j) => j !== x && xs.includes(j))
+      : [];
+  // The last number labelling given up, while it leaves no series
+  while (ys.every((j) => j === x || labels.includes(j))) {
+    const last = labels.findLastIndex((j) => ys.includes(j));
+    if (last < 0) {
+      break;
+    }
+    labels = labels.filter((_, k) => k !== last);
+  }
+  const used = (j: number) => j === x || labels.includes(j);
+  let y = spec.y.filter((j) => ys.includes(j) && !used(j));
   if (!y.length) {
-    const other = ys.find((j) => j !== x);
+    const other = ys.find((j) => !used(j));
     y = other === undefined ? [] : [other];
   }
   // A whole number of bins, as typed, as a kept tab may carry any
@@ -150,6 +176,7 @@ export function fitted(spec: Spec, sheet: Sheet): Spec {
   return {
     ...spec,
     x,
+    labels,
     y,
     hidden: spec.hidden.filter((j) => y.includes(j)),
     bins:

@@ -80,6 +80,7 @@ const trades = table({
 const spec = (to: Partial<Spec>): Spec => ({
   type: "line",
   x: null,
+  labels: [],
   y: [],
   hidden: [],
   steps: false,
@@ -94,6 +95,53 @@ suite("the Chart", () => {
       initial(trades),
       spec({ type: "bar", x: 0, y: [2] }),
     );
+  });
+
+  test("first labels a keyed table's bars with its keys, as they name its rows", () => {
+    const keyed = sheet(
+      {
+        type: 99,
+        keys: {
+          type: 98,
+          attribute: none,
+          columns: ["sym", "venue"],
+          data: [syms("a", "a"), syms("x", "y")],
+        },
+        values: {
+          type: 98,
+          attribute: none,
+          columns: ["size"],
+          data: [longs(1n, 2n)],
+        },
+      } as Value,
+      7,
+    );
+    assert.ok(keyed);
+    assert.deepStrictEqual(
+      initial(keyed),
+      spec({ type: "bar", x: 0, labels: [1], y: [2] }),
+    );
+    // A line, where the first key is a time, has none
+    const timed = sheet(
+      {
+        type: 99,
+        keys: {
+          type: 98,
+          attribute: none,
+          columns: ["date", "sym"],
+          data: [ints(14, 1, 2), syms("a", "b")],
+        },
+        values: {
+          type: 98,
+          attribute: none,
+          columns: ["size"],
+          data: [longs(1n, 2n)],
+        },
+      } as Value,
+      7,
+    );
+    assert.ok(timed);
+    assert.deepStrictEqual(initial(timed), spec({ x: 0, y: [2] }));
   });
 
   test("first draws a line of the first numbers by the first time, else the first number", () => {
@@ -296,6 +344,70 @@ suite("the Chart", () => {
       ],
     );
     assert.strictEqual(noted(plotted), "");
+  });
+
+  test("labels a bar with its x and further columns, each once, keeping a number for a series", () => {
+    // Labels go, but for a bar with a column for its x
+    assert.deepStrictEqual(
+      fitted(spec({ x: 1, labels: [0] }), trades).labels,
+      [],
+    );
+    assert.deepStrictEqual(
+      fitted(spec({ type: "bar", x: null, labels: [0] }), trades).labels,
+      [],
+    );
+    // Each once, not the x, and a series that's become one goes
+    assert.deepStrictEqual(
+      fitted(
+        spec({ type: "bar", x: 0, labels: [1, 0, 1, 2], y: [2, 3] }),
+        trades,
+      ),
+      spec({ type: "bar", x: 0, labels: [1, 2], y: [3] }),
+    );
+    // The last number labelling given up where it would leave no series
+    assert.deepStrictEqual(
+      fitted(spec({ type: "bar", x: 0, labels: [3, 1, 2], y: [2] }), trades),
+      spec({ type: "bar", x: 0, labels: [3, 1], y: [2] }),
+    );
+    // A kept tab's spec from before labels
+    assert.deepStrictEqual(
+      fitted(
+        {
+          ...spec({ type: "bar", x: 0, y: [3] }),
+          labels: undefined,
+        } as unknown as Spec,
+        trades,
+      ),
+      spec({ type: "bar", x: 0, y: [3] }),
+    );
+    const plotted = barred(
+      trades,
+      spec({ type: "bar", x: 0, labels: [1], y: [3] }),
+    );
+    assert.deepStrictEqual(
+      [0, 1, 2].map((row) => plotted.label?.(row)),
+      ["a 00:00:03.000", "b 00:00:01.000", "c 00:00:02.000"],
+    );
+    // A kept tab's bar from before labels, come back to
+    const old = {
+      ...spec({ x: 1, y: [3] }),
+      others: { bar: { x: 0, y: [3] } },
+    } as unknown as Spec;
+    assert.deepStrictEqual(
+      fitted(retyped(old, "bar"), trades),
+      spec({
+        type: "bar",
+        x: 0,
+        y: [3],
+        others: { line: { x: 1, labels: [], y: [3] } },
+      }),
+    );
+    // Kept for coming back to a bar
+    const bar = spec({ type: "bar", x: 0, labels: [1], y: [3] });
+    assert.deepStrictEqual(
+      retyped(fitted(retyped(bar, "line"), trades), "bar"),
+      { ...bar, others: { line: { x: 1, labels: [], y: [3] } } },
+    );
   });
 
   test("draws a bar for each row, labelled with its x as the grid shows it", () => {
@@ -536,7 +648,7 @@ suite("the Chart", () => {
     const histogram = fitted({ ...retyped(line, "histogram"), x: 3 }, trades);
     assert.deepStrictEqual(retyped(histogram, "line"), {
       ...line,
-      others: { histogram: { x: 3, y: [2] } },
+      others: { histogram: { x: 3, labels: [], y: [2] } },
     });
     for (const bins of [0, 2.5, 10001]) {
       assert.strictEqual(fitted(spec({ bins }), trades).bins, null);
@@ -567,7 +679,7 @@ suite("the Chart", () => {
         type: "scatter",
         x: 2,
         y: [3],
-        others: { line: { x: null, y: [3] } },
+        others: { line: { x: null, labels: [], y: [3] } },
       }),
     );
     assert.deepStrictEqual(xColumns(trades, "scatter"), [2, 3]);
