@@ -121,6 +121,27 @@ suite("the Chart", () => {
       initial(keyed),
       spec({ type: "bar", x: 0, labels: [1], y: [2] }),
     );
+    // A line, where the first key is a time, has none
+    const timed = sheet(
+      {
+        type: 99,
+        keys: {
+          type: 98,
+          attribute: none,
+          columns: ["date", "sym"],
+          data: [ints(14, 1, 2), syms("a", "b")],
+        },
+        values: {
+          type: 98,
+          attribute: none,
+          columns: ["size"],
+          data: [longs(1n, 2n)],
+        },
+      } as Value,
+      7,
+    );
+    assert.ok(timed);
+    assert.deepStrictEqual(initial(timed), spec({ x: 0, y: [2] }));
   });
 
   test("first draws a line of the first numbers by the first time, else the first number", () => {
@@ -366,6 +387,20 @@ suite("the Chart", () => {
     assert.deepStrictEqual(
       [0, 1, 2].map((row) => plotted.label?.(row)),
       ["a 00:00:03.000", "b 00:00:01.000", "c 00:00:02.000"],
+    );
+    // A kept tab's bar from before labels, come back to
+    const old = {
+      ...spec({ x: 1, y: [3] }),
+      others: { bar: { x: 0, y: [3] } },
+    } as unknown as Spec;
+    assert.deepStrictEqual(
+      fitted(retyped(old, "bar"), trades),
+      spec({
+        type: "bar",
+        x: 0,
+        y: [3],
+        others: { line: { x: 1, labels: [], y: [3] } },
+      }),
     );
     // Kept for coming back to a bar
     const bar = spec({ type: "bar", x: 0, labels: [1], y: [3] });

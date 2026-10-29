@@ -70,13 +70,15 @@ export class Panel {
       (value) =>
         this.changed(fitted(retyped(latest(), value as ChartType), sheet)),
     );
-    // A histogram counts a column's values, and a scatter's points are
-    // each by a value, so never by the row's index
+    // Any other's x: a line's, or each row's index; a histogram counts a
+    // column's values, and a scatter's points are each by a value, so never
+    // by the row's index
     const histogram = spec.type === "histogram";
-    const indexed = spec.type === "line" || spec.type === "bar";
     const x = select(
       [
-        ...(indexed ? [[index, "Row index"] as [string, string]] : []),
+        ...(spec.type === "line"
+          ? [[index, "Row index"] as [string, string]]
+          : []),
         ...xColumns(sheet, spec.type).map(named),
       ],
       spec.x === null ? index : String(spec.x),
@@ -85,13 +87,13 @@ export class Panel {
     // A bar's x and further labels, each a column, offering those no other
     // takes, and those a series has only for the x, which swaps them; the x
     // the row's index too, which takes no others
-    const xs = spec.x === null ? [] : [spec.x, ...spec.labels];
+    const labelling = spec.x === null ? [] : [spec.x, ...spec.labels];
     const labelled = (to: number[]) =>
       change({ x: to[0] ?? null, labels: to.slice(1) });
-    const labels = (spec.x === null ? [null] : xs).map((column, i) => {
+    const labels = (spec.x === null ? [null] : labelling).map((column, i) => {
       const row = document.createElement("div");
       row.className = "series";
-      const others = xs.filter((_, j) => j !== i);
+      const others = labelling.filter((_, j) => j !== i);
       const choice = select(
         [
           ...(i === 0 ? [[index, "Row index"] as [string, string]] : []),
@@ -106,8 +108,8 @@ export class Panel {
           value === index
             ? change({ x: null })
             : labelled(
-                i < xs.length
-                  ? xs.map((x, k) => (k === i ? Number(value) : x))
+                i < labelling.length
+                  ? labelling.map((was, k) => (k === i ? Number(value) : was))
                   : [Number(value)],
               ),
       );
@@ -118,18 +120,18 @@ export class Panel {
         () => labelled(others),
       );
       // A bar has an x at least
-      remove.disabled = xs.length < 2;
+      remove.disabled = labelling.length < 2;
       row.append(choice, remove);
       return row;
     });
     // The first column neither labelling nor a series
     const free = xColumns(sheet, "bar").find(
-      (j) => !xs.includes(j) && !spec.y.includes(j),
+      (j) => !labelling.includes(j) && !spec.y.includes(j),
     );
     const addLabel = button(
       "codicon-add",
       "Add column",
-      () => free !== undefined && labelled([...xs, free]),
+      () => free !== undefined && labelled([...labelling, free]),
       true,
     );
     addLabel.disabled = spec.x === null || free === undefined;
@@ -191,11 +193,22 @@ export class Panel {
             : null,
       });
     });
-    // Made anew, the control changed keeps the focus, by its place
-    const controls = () => [
-      ...this.element.querySelectorAll("select, input, button"),
+    // Made anew, the control changed keeps the focus, by its place in its
+    // slot, else the nearest after it, or before, that's enabled, as one
+    // removed takes its place with it
+    const controls = (group: Element) => [
+      ...group.querySelectorAll<HTMLElement>("select, input, button"),
     ];
-    const focused = controls().findIndex((each) => each.matches(":focus"));
+    const groups = () => [...this.element.children];
+    const within = groups().findIndex((group) =>
+      group.matches(":focus-within"),
+    );
+    const focused =
+      within < 0
+        ? -1
+        : controls(groups()[within]).findIndex((each) =>
+            each.matches(":focus"),
+          );
     this.element.replaceChildren(
       slot("Chart", type),
       // How a line or a histogram is drawn, with its type, before the
@@ -208,9 +221,14 @@ export class Panel {
             slot("Y", ...series, add),
           ]),
     );
-    const now = controls();
-    if (focused >= 0) {
-      (now[Math.min(focused, now.length - 1)] as HTMLElement).focus();
+    const group = groups()[within];
+    if (group && focused >= 0) {
+      const now = controls(group);
+      const at = Math.min(focused, now.length - 1);
+      const enabled = (each: HTMLElement) => !each.matches(":disabled");
+      (
+        now.slice(at).find(enabled) ?? now.slice(0, at).reverse().find(enabled)
+      )?.focus();
     }
   }
 }
