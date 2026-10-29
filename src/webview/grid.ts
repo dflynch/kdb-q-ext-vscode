@@ -196,7 +196,6 @@ export class Grid {
       styleNonce: this.nonce,
       columnDefs: [index, ...columnDefs],
       rowData: Array.from({ length: sheet.rows }, (_, row) => ({ row })),
-      getRowId: ({ data }) => String(data.row),
       autoSizeStrategy: { type: "fitCellContents" },
       initialState: arranged as GridState,
       onStateUpdated: ({ sources, state }) => {
@@ -281,6 +280,7 @@ export class Grid {
         api.setFocusedCell(0, "0");
         return;
       }
+      // ag-grid's own id of a row, its place in rowData, which is the row's
       const index = api.getRowNode(String(cell[0]))?.rowIndex;
       if (typeof index !== "number") {
         return;
