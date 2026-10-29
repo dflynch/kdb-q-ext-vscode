@@ -22,8 +22,9 @@ import * as temporal from "./temporal";
 // it's full, so as not to format what would be dropped.
 
 // How much text to take: past as many lines, or a line as wide as width,
-// it's cut
-export type Bounds = { lines: number; width: number };
+// it's cut; and how many significant digits a float or a real is written
+// to, as q's \P: 1 to 17, or 0 for as many as each holds, 17 and 8
+export type Bounds = { lines: number; width: number; precision: number };
 
 class Text {
   private parts: string[] = [];
@@ -31,7 +32,7 @@ class Text {
   // The length of the last line
   private line = 0;
 
-  constructor(private size: Bounds) {}
+  constructor(readonly size: Bounds) {}
 
   get full(): boolean {
     return this.line > this.size.width || this.lines > this.size.lines;
@@ -123,40 +124,57 @@ function special(type: number, x: unknown): Special {
   return i < 0 ? undefined : (["null", "infinity", "-infinity"] as const)[i];
 }
 
-// A float as C's %.7g writes it, q's default \P 7: seven significant
-// digits, or as many as asked, trailing zeros dropped, and exponent form for
-// the very large and the very small. JavaScript rounds as C does except for
-// an exact tie, which C rounds to even: 1000.0625 is 1000.062.
-export function float(x: number, precision = 7): string {
+// A float as C's %g writes it to so many significant digits, as q's \P:
+// trailing zeros dropped, and exponent form for the very large and the very
+// small. JavaScript rounds as C does, from the float's exact value, but for
+// an exact tie, which C rounds to even: 1000.0625 is 1000.062 to seven.
+export function float(x: number, precision: number): string {
   if (x === 0) {
     return Object.is(x, -0) ? "-0" : "0";
   }
-  // Twenty digits after the first are past a double's precision, so a tie
-  // shows as a 5 then zeros
-  const [m, e] = Math.abs(x).toExponential(20).split("e");
-  const all = m.replace(".", "");
-  const rest = all.slice(precision);
-  const tie = /^50*$/.test(rest);
-  const up = rest[0] >= "5" && (!tie || Number(all[precision - 1]) % 2 === 1);
-  // As a bigint, as 16 or 17 digits can be past what a double holds
-  let digits = String(BigInt(all.slice(0, precision)) + (up ? 1n : 0n));
+  const size = Math.abs(x);
+  const [m, e] = size.toExponential(precision - 1).split("e");
+  let digits = m.replace(".", "");
   let exponent = Number(e);
-  if (digits.length > precision) {
-    digits = digits.slice(0, precision);
-    exponent += 1;
+  // A tie shows in twenty digits after the first as a 5 then zeros, but so
+  // does a float only near one, so it's told exactly
+  const [m20, e20] = size.toExponential(20).split("e");
+  const all = m20.replace(".", "");
+  if (
+    /^50*$/.test(all.slice(precision)) &&
+    Number(all[precision - 1]) % 2 === 0 &&
+    exactly(size).length === precision + 1
+  ) {
+    digits = all.slice(0, precision);
+    exponent = Number(e20);
   }
   const sign = x < 0 ? "-" : "";
   if (exponent < -4 || exponent >= precision) {
     const power = `${exponent < 0 ? "-" : "+"}${String(Math.abs(exponent)).padStart(2, "0")}`;
-    const mantissa = `${digits[0]}.${digits.slice(1)}`;
-    // q keeps the zeros of a tie it rounds down: 10541605 is 1.054160e+07
-    return `${sign}${tie && !up ? mantissa : trim(mantissa)}e${power}`;
+    return `${sign}${trim(`${digits[0]}.${digits.slice(1)}`)}e${power}`;
   }
   const point =
     exponent < 0
       ? `0.${"0".repeat(-exponent - 1)}${digits}`
       : `${digits.slice(0, exponent + 1)}.${digits.slice(exponent + 1)}`;
   return `${sign}${trim(point)}`;
+}
+
+// A positive float's significant digits, exactly, as its bits hold them: a
+// whole number times a power of 2, or, past the point, times 5s over 10s
+function exactly(x: number): string {
+  const view = new DataView(new ArrayBuffer(8));
+  view.setFloat64(0, x);
+  const bits = view.getBigUint64(0);
+  const biased = Number(bits >> 52n);
+  const fraction = bits & ((1n << 52n) - 1n);
+  const whole = biased ? fraction | (1n << 52n) : fraction;
+  const power = (biased || 1) - 1075;
+  const digits =
+    power >= 0
+      ? (whole << BigInt(power)).toString()
+      : (whole * 5n ** BigInt(-power)).toString();
+  return digits.replace(/0+$/, "");
 }
 
 function trim(digits: string): string {
@@ -217,7 +235,7 @@ export function element(vector: Vector, i: number): Atom {
 }
 
 // An ordinary value of an atom, without its type's suffix
-function plain(atom: Atom): string {
+function plain(atom: Atom, precision: number): string {
   switch (atom.type) {
     case -1:
     case -5:
@@ -229,8 +247,9 @@ function plain(atom: Atom): string {
     case -4:
       return hex(atom.value);
     case -8:
+      return float(atom.value, precision || 8);
     case -9:
-      return float(atom.value);
+      return float(atom.value, precision || 17);
     case -10:
       // Raw, as in a column, unless it can't be shown
       return atom.value >= 0x20 && atom.value < 0x7f
@@ -264,10 +283,10 @@ function infinity(type: number, which: "infinity" | "-infinity"): string {
 }
 
 // q's form of an atom
-function atom(a: Atom): string {
+function atom(a: Atom, precision: number): string {
   if (special(a.type, a.value)) {
     // A long and a float have no letter
-    return `${inVector(a)}${[-7, -9].includes(a.type) ? "" : letters[-a.type]}`;
+    return `${inVector(a, precision)}${[-7, -9].includes(a.type) ? "" : letters[-a.type]}`;
   }
   switch (a.type) {
     case -1:
@@ -279,9 +298,9 @@ function atom(a: Atom): string {
     case -6:
       return `${a.value}i`;
     case -8:
-      return `${float(a.value)}e`;
+      return `${plain(a, precision)}e`;
     case -9: {
-      const text = float(a.value);
+      const text = plain(a, precision);
       return /[.e]/.test(text) ? text : `${text}f`;
     }
     case -10:
@@ -291,39 +310,39 @@ function atom(a: Atom): string {
     case -13:
       return `${temporal.month(a.value)}m`;
   }
-  return plain(a);
+  return plain(a, precision);
 }
 
 // An element as q writes it among a vector's others: a null or infinity
 // without its type's letter, which goes once at the end of the vector
-function inVector(a: Atom): string {
+function inVector(a: Atom, precision: number): string {
   const which = special(a.type, a.value);
   if (which === "null") {
     return a.type === -9 ? "0n" : "0N";
   }
-  return which ? infinity(a.type, which) : plain(a);
+  return which ? infinity(a.type, which) : plain(a, precision);
 }
 
 // An element as the console shows it in a column: a null is blank, though a
 // null guid shows its zeros, and a char that can't be shown is escaped
-export function cell(vector: Vector, i: number): string {
+export function cell(vector: Vector, i: number, precision: number): string {
   const a = element(vector, i);
   const which = special(a.type, a.value);
   if (which === "null") {
     return "";
   }
-  return which ? infinity(a.type, which) : plain(a);
+  return which ? infinity(a.type, which) : plain(a, precision);
 }
 
 // An element as q's csv 0: writes it: as in a column, but a char as itself,
 // and a date with - between its parts, as ISO 8601 has it, a datetime with a
 // space before its time
-export function csvCell(vector: Vector, i: number): string {
+export function csvCell(vector: Vector, i: number, precision: number): string {
   const a = element(vector, i);
   if (a.type === -10) {
     return utf8.decode(Uint8Array.of(a.value));
   }
-  const text = cell(vector, i);
+  const text = cell(vector, i, precision);
   if (a.type < -15 || a.type > -12 || special(a.type, a.value)) {
     return text;
   }
@@ -351,7 +370,7 @@ function vector(v: Vector, text: Text): void {
     return;
   }
   if (n === 1 && v.type !== 10) {
-    text.put(`,${atom(element(v, 0))}`);
+    text.put(`,${atom(element(v, 0), text.size.precision)}`);
     return;
   }
   switch (v.type) {
@@ -385,7 +404,7 @@ function vector(v: Vector, text: Text): void {
   let shown = false;
   for (let i = 0; i < n && !text.full; i++) {
     const a = element(v, i);
-    const e = inVector(a);
+    const e = inVector(a, text.size.precision);
     ordinary ||= special(a.type, a.value) === undefined;
     shown ||= /[.enw]/.test(e);
     text.put(i ? ` ${e}` : e);
@@ -522,7 +541,7 @@ function fn(f: QFunction, text: Text): void {
 // Write a value in q's form
 function write(value: Value, text: Text): void {
   if (value.type < 0 && value.type >= -19) {
-    text.put(atom(value as Atom));
+    text.put(atom(value as Atom, text.size.precision));
     return;
   }
   switch (value.type) {

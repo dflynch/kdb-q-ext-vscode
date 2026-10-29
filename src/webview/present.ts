@@ -41,6 +41,6 @@ export function presented(
   value: Value,
   size: Size,
 ): { text: string; sheet?: Sheet } {
-  const table = sheet(value);
+  const table = sheet(value, size.precision);
   return { text: show(value, size), ...(table && { sheet: table }) };
 }

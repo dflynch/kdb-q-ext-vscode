@@ -5,7 +5,7 @@ import { type Sheet, sheet } from "../webview/table";
 
 // A sheet of a value from q's -8!
 function sheetOf(hex: string): Sheet {
-  const s = sheet(decode(Buffer.from(hex, "hex")));
+  const s = sheet(decode(Buffer.from(hex, "hex")), 7);
   assert.ok(s);
   return s;
 }

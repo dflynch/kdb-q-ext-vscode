@@ -28,15 +28,24 @@ const longs = (n: number): Vector => ({
   data: BigInt64Array.from({ length: n }, (_, i) => BigInt(i)),
 });
 
+// Where the fixtures, from q on macOS, keep the zeros of a tie rounded down
+// in exponent form: a quirk of macOS's C library, below about 1e15 only,
+// that C's %g and so q on Linux, where servers run, don't have. These are
+// written as C has them.
+const standard: Record<string, string> = {
+  ".corpus.float.tieExponent": "1.05416e+07",
+  ".corpus.float.realTieExponent": "1.2e+07e",
+};
+
 suite("console text", () => {
   // At the size q showed them, so the widest values are cut as q cuts them
   const [lines, width] = size;
   for (const f of fixtures) {
     test(`${f.name} as q shows it`, () => {
       // q ends the last line with a newline
-      const want = f.console.replace(/\n$/, "");
+      const want = standard[f.name] ?? f.console.replace(/\n$/, "");
       const value = decode(Buffer.from(f.bytes, "hex"));
-      assert.strictEqual(show(value, { lines, width }), want);
+      assert.strictEqual(show(value, { lines, width, precision: 7 }), want);
     });
   }
 
@@ -49,19 +58,25 @@ suite("console text", () => {
 
   test("a line wider than the width ends in ..", () => {
     assert.strictEqual(
-      show(longs(20), { lines: 10, width: 12 }),
+      show(longs(20), { lines: 10, width: 12, precision: 7 }),
       "0 1 2 3 4 ..",
     );
   });
 
   test("a line exactly as wide as the width isn't cut", () => {
-    assert.strictEqual(show(longs(6), { lines: 10, width: 11 }), "0 1 2 3 4 5");
+    assert.strictEqual(
+      show(longs(6), { lines: 10, width: 11, precision: 7 }),
+      "0 1 2 3 4 5",
+    );
   });
 
   test("lines past the limit become ..", () => {
-    assert.strictEqual(show(ragged, { lines: 3, width: 80 }), ",0\n0 1\n..");
     assert.strictEqual(
-      show(ragged, { lines: 4, width: 80 }),
+      show(ragged, { lines: 3, width: 80, precision: 7 }),
+      ",0\n0 1\n..",
+    );
+    assert.strictEqual(
+      show(ragged, { lines: 4, width: 80, precision: 7 }),
       ",0\n0 1\n0 1 2\n0 1 2 3",
     );
   });
@@ -72,16 +87,19 @@ suite("console text", () => {
       attribute: 0,
       items: [longs(1000), longs(1000)],
     };
-    assert.deepStrictEqual(show(rows, { lines: 10, width: 10 }).split("\n"), [
-      "0 1 2 3 ..",
-      "0 1 2 3 ..",
-    ]);
+    assert.deepStrictEqual(
+      show(rows, { lines: 10, width: 10, precision: 7 }).split("\n"),
+      ["0 1 2 3 ..", "0 1 2 3 .."],
+    );
   });
 
   test("a lambda is cut like any other value", () => {
     const source = `{[x] ${"x+".repeat(5000)}1}`;
     assert.strictEqual(
-      show({ type: 100, context: "", source }, { lines: 10, width: 10 }),
+      show(
+        { type: 100, context: "", source },
+        { lines: 10, width: 10, precision: 7 },
+      ),
       "{[x] x+x..",
     );
   });
@@ -101,7 +119,7 @@ suite("console text", () => {
 
   test("a multi-line lambda's lines count against the limit", () => {
     assert.strictEqual(
-      show(value("fn.multiLine"), { lines: 3, width: 10 }),
+      show(value("fn.multiLine"), { lines: 3, width: 10, precision: 7 }),
       ["{[t;n]", "  r:sele..", ".."].join("\n"),
     );
   });
@@ -125,14 +143,14 @@ suite("console text", () => {
 
   test("a table's rows past the limit become .., its header counted", () => {
     assert.deepStrictEqual(
-      show(table(2, 10), { lines: 5, width: 80 }).split("\n"),
+      show(table(2, 10), { lines: 5, width: 80, precision: 7 }).split("\n"),
       ["c0 c1", "-----", "0  0 ", "1  1 ", ".."],
     );
   });
 
   test("a table's columns stop at the width", () => {
     assert.deepStrictEqual(
-      show(table(1000, 2), { lines: 10, width: 12 }).split("\n"),
+      show(table(1000, 2), { lines: 10, width: 12, precision: 7 }).split("\n"),
       ["c0 c1 c2 c..", "----------..", "0  0  0  0..", "1  1  1  1.."],
     );
   });
@@ -209,12 +227,64 @@ suite("console text", () => {
       data: [symbols(["a", long])],
     };
     assert.strictEqual(
-      show(t, { lines: 10, width: 1000 }).split("\n")[3],
+      show(t, { lines: 10, width: 1000, precision: 7 }).split("\n")[3],
       long,
     );
   });
 
   test("an error shows as q signals it", () => {
     assert.strictEqual(show({ type: -128, message: "type" }), "'type");
+  });
+
+  test("floats and reals as q writes them at \\P", () => {
+    // q 5's own text for these at \P 3, 10 and 0
+    const floats: Vector = {
+      type: 9,
+      attribute: 0,
+      data: Float64Array.of(
+        1.0851234567890122 / 3,
+        123456789 / 3,
+        0.1 / 3,
+        1e-12 / 3,
+        1 / 3,
+      ),
+    };
+    const reals: Vector = {
+      type: 8,
+      attribute: 0,
+      data: Float32Array.of(1.0851234, 123456.78, 0.1),
+    };
+    const at = (value: Value, precision: number) =>
+      show(value, { lines: 10, width: 200, precision });
+    assert.strictEqual(at(floats, 3), "0.362 4.12e+07 0.0333 3.33e-13 0.333");
+    assert.strictEqual(
+      at(floats, 10),
+      "0.3617078189 41152263 0.03333333333 3.333333333e-13 0.3333333333",
+    );
+    assert.strictEqual(
+      at(floats, 0),
+      "0.36170781892967074 41152263 0.033333333333333333 3.3333333333333334e-13 0.33333333333333331",
+    );
+    assert.strictEqual(at(reals, 10), "1.08512342 123456.7812 0.1000000015e");
+    // As many as a real holds: 8, as q writes them
+    assert.strictEqual(at(reals, 0), "1.0851234 123456.78 0.1e");
+    // An atom too, and ties to even, as C rounds them
+    assert.strictEqual(at({ type: -9, value: 2.5 }, 1), "2f");
+  });
+
+  test("floats as C's %g writes them, exactly: ties to even, and nearly ties as they fall", () => {
+    const at = (x: number, precision: number) =>
+      show({ type: -9, value: x }, { lines: 10, width: 200, precision });
+    // Not quite ties, which a float's first twenty digits show as ties
+    assert.strictEqual(at(1.850364386107729e195, 0), "1.8503643861077291e+195");
+    assert.strictEqual(
+      at(-1.4960143432982087e-203, 0),
+      "-1.4960143432982087e-203",
+    );
+    assert.strictEqual(at(4.965075448558256e175, 0), "4.965075448558256e+175");
+    // Ties, to even, and trimmed: 25 is 2e+01
+    assert.strictEqual(at(25, 1), "2e+01");
+    assert.strictEqual(at(35, 1), "4e+01");
+    assert.strictEqual(at(1000.0625, 7), "1000.062");
   });
 });

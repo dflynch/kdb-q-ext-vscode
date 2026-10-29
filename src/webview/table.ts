@@ -44,12 +44,13 @@ export interface Sheet {
 // as its keys, pinned, then its values, as q's console lays it out, each
 // side a table's columns or a list as a key or a value column. An atom,
 // anything else, or an on-disk table, which only the server can read, is
-// shown only in the Console view.
-export function sheet(value: Value): Sheet | undefined {
+// shown only in the Console view. Floats and reals are written to the
+// precision given, as q's \P.
+export function sheet(value: Value, precision: number): Sheet | undefined {
   if (listed(value) && value.type !== 10) {
     return {
       rows: count(value) ?? 0,
-      columns: [column("value", value)],
+      columns: [column("value", value, precision)],
       keys: 0,
     };
   }
@@ -59,15 +60,17 @@ export function sheet(value: Value): Sheet | undefined {
     }
     return {
       rows: count(value) ?? 0,
-      columns: value.data.map((data, j) => column(value.columns[j], data)),
+      columns: value.data.map((data, j) =>
+        column(value.columns[j], data, precision),
+      ),
       keys: 0,
     };
   }
   if (value.type !== 99 && value.type !== 127) {
     return undefined;
   }
-  const k = side(value.keys, "key");
-  const v = side(value.values, "value");
+  const k = side(value.keys, "key", precision);
+  const v = side(value.values, "value", precision);
   return k && v
     ? {
         rows: k.rows,
@@ -79,12 +82,16 @@ export function sheet(value: Value): Sheet | undefined {
 
 // A dictionary's keys or values as columns: a table's own, or a list as one
 // column of that name
-function side(value: Value, name: string): Omit<Sheet, "keys"> | undefined {
+function side(
+  value: Value,
+  name: string,
+  precision: number,
+): Omit<Sheet, "keys"> | undefined {
   if (value.type === 98) {
-    return sheet(value);
+    return sheet(value, precision);
   }
   return listed(value)
-    ? { rows: count(value) ?? 0, columns: [column(name, value)] }
+    ? { rows: count(value) ?? 0, columns: [column(name, value, precision)] }
     : undefined;
 }
 
@@ -93,13 +100,14 @@ function listed(value: Value): value is Vector | List {
   return value.type >= 0 && value.type <= 19;
 }
 
-function column(name: string, data: Vector | List): Column {
+function column(name: string, data: Vector | List, precision: number): Column {
+  const bounds = { ...unbounded, precision };
   if (data.type !== 0) {
     return {
       name,
       type: data.type,
-      text: (row) => cell(data, row),
-      csv: (row) => csvCell(data, row),
+      text: (row) => cell(data, row, precision),
+      csv: (row) => csvCell(data, row, precision),
       value: (row) => element(data, row),
       vector: data,
       compare: order(data),
@@ -116,7 +124,7 @@ function column(name: string, data: Vector | List): Column {
     return {
       name,
       type: 0,
-      text: (row) => qText(string(row), unbounded),
+      text: (row) => qText(string(row), bounds),
       csv: (row) => decoded(textAt(strings, row)),
       value: string,
       compare: (a, b) => bytewise(textAt(strings, a), textAt(strings, b)),
@@ -130,7 +138,7 @@ function column(name: string, data: Vector | List): Column {
     const table = shape(items[row]);
     return table
       ? `${table.rows} × ${table.columns}`
-      : qText(items[row], unbounded);
+      : qText(items[row], bounds);
   };
   return {
     name,

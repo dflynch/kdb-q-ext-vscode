@@ -19,7 +19,7 @@ function value(name: string): Value {
 }
 
 function sheetOf(name: string): Sheet {
-  const s = sheet(value(name));
+  const s = sheet(value(name), 7);
   assert.ok(s, `no sheet for .corpus.${name}`);
   return s;
 }
@@ -92,6 +92,7 @@ suite("the Grid view's sheet", () => {
           "hex",
         ),
       ),
+      7,
     );
     assert.ok(rows);
     assert.deepStrictEqual(cells(rows), [
@@ -108,6 +109,7 @@ suite("the Grid view's sheet", () => {
           "hex",
         ),
       ),
+      7,
     );
     assert.ok(keyed);
     assert.deepStrictEqual(cells(keyed), [
@@ -133,29 +135,32 @@ suite("the Grid view's sheet", () => {
   });
 
   test("a table in a cell is its shape, rows × columns, a keyed table's keys among them", () => {
-    const s = sheet({
-      type: 98,
-      attribute: 0,
-      columns: ["t"],
-      data: [
-        {
-          type: 0,
-          attribute: 0,
-          items: [
-            value("table.trades"),
-            value("table.keyed"),
-            value("dict.simple"),
-            // ([]x:1 2)!`a`b: keyed by a table, but not a keyed table
-            decode(
-              Buffer.from(
-                "010000003a000000636200630b00010000007800000001000000070002000000010000000000000002000000000000000b000200000061006200",
-                "hex",
+    const s = sheet(
+      {
+        type: 98,
+        attribute: 0,
+        columns: ["t"],
+        data: [
+          {
+            type: 0,
+            attribute: 0,
+            items: [
+              value("table.trades"),
+              value("table.keyed"),
+              value("dict.simple"),
+              // ([]x:1 2)!`a`b: keyed by a table, but not a keyed table
+              decode(
+                Buffer.from(
+                  "010000003a000000636200630b00010000007800000001000000070002000000010000000000000002000000000000000b000200000061006200",
+                  "hex",
+                ),
               ),
-            ),
-          ],
-        },
-      ],
-    });
+            ],
+          },
+        ],
+      },
+      7,
+    );
     assert.ok(s);
     assert.deepStrictEqual(cells(s), [
       ["t"],
@@ -202,18 +207,21 @@ suite("the Grid view's sheet", () => {
       keys: table(rows, keys),
       values: table(rows, values),
     });
-    const s = sheet({
-      type: 0,
-      attribute: 0,
-      items: [
-        table(10, 1),
-        table(9, 2),
-        { type: -7, value: 5n },
-        keyed(9, 1, 1),
-        table(9, 1),
-        keyed(8, 2, 1),
-      ],
-    });
+    const s = sheet(
+      {
+        type: 0,
+        attribute: 0,
+        items: [
+          table(10, 1),
+          table(9, 2),
+          { type: -7, value: 5n },
+          keyed(9, 1, 1),
+          table(9, 1),
+          keyed(8, 2, 1),
+        ],
+      },
+      7,
+    );
     assert.ok(s);
     assert.deepStrictEqual(sorted(s, 0), [2, 4, 1, 0, 5, 3]);
   });
@@ -255,12 +263,15 @@ suite("the Grid view's sheet", () => {
       vector({ type: 7, data: BigInt64Array.of(3n, 4n, 5n) }),
     );
     const nested = value("table.trades");
-    const s = sheet({
-      type: 98,
-      attribute: 0,
-      columns: ["t"],
-      data: [{ type: 0, attribute: 0, items: [nested] }],
-    });
+    const s = sheet(
+      {
+        type: 98,
+        attribute: 0,
+        columns: ["t"],
+        data: [{ type: 0, attribute: 0, items: [nested] }],
+      },
+      7,
+    );
     assert.strictEqual(s?.columns[0].value(0), nested);
   });
 
@@ -278,18 +289,21 @@ suite("the Grid view's sheet", () => {
       sheetOf("display.matrix").columns[0].value(1),
       matrix.items[1],
     );
-    const longs = sheet(vector({ type: 7, data: BigInt64Array.of(3n, 4n) }));
+    const longs = sheet(vector({ type: 7, data: BigInt64Array.of(3n, 4n) }), 7);
     assert.deepStrictEqual(longs && cells(longs), [["value"], ["3"], ["4"]]);
   });
 
   test("what has no rows to show has none: an atom, a string", () => {
-    assert.strictEqual(sheet({ type: -7, value: 42n }), undefined);
+    assert.strictEqual(sheet({ type: -7, value: 42n }, 7), undefined);
     assert.strictEqual(
-      sheet({ type: 10, attribute: 0, data: new TextEncoder().encode("ab") }),
+      sheet(
+        { type: 10, attribute: 0, data: new TextEncoder().encode("ab") },
+        7,
+      ),
       undefined,
     );
     assert.strictEqual(
-      sheet({ type: 98, attribute: 0, columns: ["a"], reference: ":db/t" }),
+      sheet({ type: 98, attribute: 0, columns: ["a"], reference: ":db/t" }, 7),
       undefined,
     );
   });
@@ -309,12 +323,15 @@ suite("the Grid view's sheet", () => {
       type: 9,
       data: Float64Array.of(5, Number.NaN, -Infinity, Infinity, -1),
     });
-    const s = sheet({
-      type: 98,
-      attribute: 0,
-      columns: ["j", "f"],
-      data: [longs as Vector, floats as Vector],
-    });
+    const s = sheet(
+      {
+        type: 98,
+        attribute: 0,
+        columns: ["j", "f"],
+        data: [longs as Vector, floats as Vector],
+      },
+      7,
+    );
     assert.ok(s);
     assert.deepStrictEqual(sorted(s, 0), [1, 2, 4, 0, 3]);
     assert.deepStrictEqual(sorted(s, 1), [1, 2, 4, 0, 3]);
@@ -330,5 +347,28 @@ suite("the Grid view's sheet", () => {
     const strings = sheetOf("table.stringColumn");
     // "" < "ab" < ,"c"
     assert.deepStrictEqual(sorted(strings, 0), [2, 0, 1]);
+  });
+
+  test("writes floats and reals to the precision given, as q's \\P, for copying and CSV too", () => {
+    const s = sheet(
+      {
+        type: 98,
+        attribute: 0,
+        columns: ["f", "r"],
+        data: [
+          { type: 9, attribute: 0, data: Float64Array.of(1 / 3) },
+          { type: 8, attribute: 0, data: Float32Array.of(1 / 3) },
+        ],
+      },
+      3,
+    );
+    assert.ok(s);
+    assert.deepStrictEqual(
+      s.columns.map((c) => [c.text(0), c.csv?.(0)]),
+      [
+        ["0.333", "0.333"],
+        ["0.333", "0.333"],
+      ],
+    );
   });
 });

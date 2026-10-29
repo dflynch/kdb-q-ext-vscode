@@ -1,7 +1,7 @@
 import * as assert from "node:assert";
 import { defaultSize } from "../format/console";
 import { QError } from "../protection";
-import { sizeSetting, toView } from "../result";
+import { precisionSetting, sizeSetting, toView } from "../result";
 
 const message = Uint8Array.of(1, 2, 0, 0, 10, 0, 0, 0, 101, 0);
 
@@ -37,6 +37,22 @@ suite("result", () => {
         {
           size: defaultSize,
           problem: "the console size isn't two whole numbers from 10 to 2000",
+        },
+        JSON.stringify(wrong),
+      );
+    }
+  });
+
+  test("the precision is a whole number from 0 to 17, as q's \\P", () => {
+    assert.deepStrictEqual(precisionSetting(undefined), { precision: 7 });
+    assert.deepStrictEqual(precisionSetting(0), { precision: 0 });
+    assert.deepStrictEqual(precisionSetting(17), { precision: 17 });
+    for (const wrong of [-1, 18, 2.5, "7"]) {
+      assert.deepStrictEqual(
+        precisionSetting(wrong),
+        {
+          precision: 7,
+          problem: "the precision isn't a whole number from 0 to 17",
         },
         JSON.stringify(wrong),
       );
