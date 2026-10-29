@@ -8,8 +8,9 @@ export type ChartType = "line" | "bar" | "histogram" | "scatter";
 
 export type Spec = {
   type: ChartType;
-  // The x axis: a column, or null for each row's index. A histogram's
-  // values, and a scatter's x, which are never the index.
+  // The x axis: a column, or null for each row's index. A bar's first
+  // label, a histogram's values, and a scatter's x, which are never the
+  // index.
   x: number | null;
   // A bar's further columns, after its x, each bar labelled with its cells
   // in them all, as a keyed table's keys name its rows
@@ -79,8 +80,8 @@ export function yColumns(sheet: Sheet): number[] {
 }
 
 // The columns a type's x takes: a line's, a number or a time, as it's
-// drawn to scale; a bar's, any column, as each row's bar is labelled with
-// its cell; not the only number, which would leave no series. A
+// drawn to scale; a bar's, and its further labels, any column, as each
+// row's bar is labelled with its cells; not the only number, which would leave no series. A
 // histogram's, a number or a time, to count. A scatter's, a number, not the
 // only one.
 export function xColumns(sheet: Sheet, type: ChartType): number[] {
