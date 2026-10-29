@@ -205,15 +205,20 @@ export function scattered(sheet: Sheet, spec: Spec): Plotted {
   };
 }
 
-// A bar's: each row in order, labelled with its x as the grid shows it, or
-// its index, at 0, 1, 2 and on
+// A bar's: each row in order, labelled with its x and further labels as
+// the grid shows them, a space between, or its index, at 0, 1, 2 and on
 export function barred(sheet: Sheet, spec: Spec): Plotted {
   const ys = spec.y.map((j) => read(vectorOf(sheet, j)));
-  const x = spec.x === null ? undefined : columnOf(sheet, spec.x);
+  const labels =
+    spec.x === null
+      ? []
+      : [spec.x, ...spec.labels].map((j) => columnOf(sheet, j));
   return {
     x: Float64Array.from({ length: sheet.rows }, (_, i) => i),
     ys: ys.map(({ values }) => gapped(values)),
-    label: x ? (row) => x.text(row) : String,
+    label: labels.length
+      ? (row) => labels.map((column) => column.text(row)).join(" ")
+      : String,
     ...counted(ys),
   };
 }

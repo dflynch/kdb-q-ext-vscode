@@ -82,8 +82,61 @@ export class Panel {
       spec.x === null ? index : String(spec.x),
       (value) => change({ x: value === index ? null : Number(value) }),
     );
+    // A bar's x and further labels, each a column, offering those no other
+    // takes, and those a series has only for the x, which swaps them; the x
+    // the row's index too, which takes no others
+    const xs = spec.x === null ? [] : [spec.x, ...spec.labels];
+    const labelled = (to: number[]) =>
+      change({ x: to[0] ?? null, labels: to.slice(1) });
+    const labels = (spec.x === null ? [null] : xs).map((column, i) => {
+      const row = document.createElement("div");
+      row.className = "series";
+      const others = xs.filter((_, j) => j !== i);
+      const choice = select(
+        [
+          ...(i === 0 ? [[index, "Row index"] as [string, string]] : []),
+          ...xColumns(sheet, "bar")
+            .filter(
+              (j) => !others.includes(j) && (i === 0 || !spec.y.includes(j)),
+            )
+            .map(named),
+        ],
+        column === null ? index : String(column),
+        (value) =>
+          value === index
+            ? change({ x: null })
+            : labelled(
+                i < xs.length
+                  ? xs.map((x, k) => (k === i ? Number(value) : x))
+                  : [Number(value)],
+              ),
+      );
+      choice.ariaLabel = `X ${i + 1}`;
+      const remove = button(
+        "codicon-close",
+        `Remove ${column === null ? "Row index" : sheet.columns[column].name}`,
+        () => labelled(others),
+      );
+      // A bar has an x at least
+      remove.disabled = xs.length < 2;
+      row.append(choice, remove);
+      return row;
+    });
+    // The first column neither labelling nor a series
+    const free = xColumns(sheet, "bar").find(
+      (j) => !xs.includes(j) && !spec.y.includes(j),
+    );
+    const addLabel = button(
+      "codicon-add",
+      "Add column",
+      () => free !== undefined && labelled([...xs, free]),
+      true,
+    );
+    addLabel.disabled = spec.x === null || free === undefined;
     // A series each, offering the numbers neither the x nor another series
-    const ys = yColumns(sheet).filter((j) => j !== spec.x);
+    const ys = yColumns(sheet).filter(
+      (j) => j !== spec.x && !spec.labels.includes(j),
+    );
     const series = spec.y.map((column, i) => {
       const row = document.createElement("div");
       row.className = "series";
@@ -150,7 +203,10 @@ export class Panel {
       ...(spec.type === "line" ? [slot("Style", steps)] : []),
       ...(histogram
         ? [slot("Bins", bins), slot("Values", x)]
-        : [slot("X", x), slot("Y", ...series, add)]),
+        : [
+            spec.type === "bar" ? slot("X", ...labels, addLabel) : slot("X", x),
+            slot("Y", ...series, add),
+          ]),
     );
     const now = controls();
     if (focused >= 0) {

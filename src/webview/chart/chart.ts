@@ -65,6 +65,11 @@ export class Chart {
     // A short's, an int's or a long's, written as an integer
     const whole = x !== undefined && x.type >= 5 && x.type <= 7;
     const named = (j: number) => sheet.columns[j].name;
+    // The x's name, and a bar's further labels', a space between
+    const xNamed =
+      spec.x === null
+        ? undefined
+        : [spec.x, ...spec.labels].map(named).join(" ");
     // A cell at the cursor as the grid shows it, of the row a point is of
     const { rows } = plotted;
     const cell = (j: number, i: number) =>
@@ -196,7 +201,7 @@ export class Chart {
       },
       series: [
         {
-          label: x?.name ?? "Row index",
+          label: xNamed ?? "Row index",
           // Never a gap: a line's rows without an x aren't drawn
           value: (_, __, ___, i) =>
             i === null
@@ -348,7 +353,7 @@ export class Chart {
             ...axis,
             ...(whole ? counting : across),
             size: below,
-            label: x?.name,
+            label: xNamed,
             labelFont: font,
           },
           { ...axis, ...valued },
@@ -373,8 +378,8 @@ export class Chart {
     const drawn = { line: "Line", bar: "Bars", scatter: "Points" };
     this.plot.over.ariaLabel =
       spec.type === "histogram"
-        ? `Histogram of ${x?.name}`
-        : `${drawn[spec.type]} of ${spec.y.map(named).join(", ")} by ${x?.name ?? "row index"}`;
+        ? `Histogram of ${xNamed}`
+        : `${drawn[spec.type]} of ${spec.y.map(named).join(", ")} by ${xNamed ?? "row index"}`;
     this.fit();
     this.resized.observe(this.place);
     this.themed.observe(document.documentElement, {
