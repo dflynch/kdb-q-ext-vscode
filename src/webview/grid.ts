@@ -280,7 +280,6 @@ export class Grid {
         api.setFocusedCell(0, "0");
         return;
       }
-      // ag-grid's own id of a row, its place in rowData, which is the row's
       const index = api.getRowNode(String(cell[0]))?.rowIndex;
       if (typeof index !== "number") {
         return;
