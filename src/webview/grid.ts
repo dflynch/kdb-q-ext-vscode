@@ -598,9 +598,9 @@ export class Grid {
 }
 
 // The filter of a column of numbers or times, as ag-grid takes one: a
-// comparison, and a value typed or picked, or two for a range. Applied half
-// a second after the last change, as ag-grid's text filter is, so typing
-// doesn't filter at every key, or at once on Enter.
+// comparison, and a value typed or picked, or two for a range. Applied at
+// once on Enter, else half a second after the last change, as ag-grid's
+// text filter is, so typing doesn't filter at every key.
 class Comparing implements IFilterComp<Row> {
   private readonly gui = document.createElement("div");
   private readonly choice = document.createElement("select");
@@ -617,7 +617,7 @@ class Comparing implements IFilterComp<Row> {
     this.gui.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
         event.preventDefault();
-        this.apply(params);
+        this.applyNow(params);
       }
     });
     this.choice.ariaLabel = "Filtering option";
@@ -663,7 +663,7 @@ class Comparing implements IFilterComp<Row> {
     if (to) {
       to.value = (known && model?.filterTo) || "";
     }
-    this.applied();
+    this.take();
   }
 
   destroy() {
@@ -704,17 +704,17 @@ class Comparing implements IFilterComp<Row> {
 
   private edited(params: IFilterParams<Row>) {
     clearTimeout(this.timer);
-    this.timer = window.setTimeout(() => this.apply(params), 500);
+    this.timer = window.setTimeout(() => this.applyNow(params), 500);
   }
 
-  private apply(params: IFilterParams<Row>) {
+  private applyNow(params: IFilterParams<Row>) {
     clearTimeout(this.timer);
-    this.applied();
+    this.take();
     params.filterChangedCallback();
   }
 
-  // Applies what's typed or picked
-  private applied() {
+  // Takes what's typed or picked as what's applied
+  private take() {
     const [from, to] = this.inputs().map((input) => input.value);
     const condition: Condition = {
       type: this.choice.value as Comparison,
