@@ -285,7 +285,7 @@ Open Keyboard Shortcuts**.
 | `kdb-q-ext-vscode.consoleSize`    | `[1000, 1000]` | How much of a result to show, as lines then width            |
 | `kdb-q-ext-vscode.precision`      | `7`            | Significant digits of floats and reals, as `\P`; 0 for all   |
 | `kdb-q-ext-vscode.sizeLimit`      | `100`          | The largest result to take, in MB, uncompressed              |
-| `kdb-q-ext-vscode.rowLimit`       | `5000000`      | The most rows a result can have to be shown                  |
+| `kdb-q-ext-vscode.rowLimit`       | `5000000`      | The most rows a result, or a cell drilled into, can have     |
 
 `precision` works as q's `\P`: from 1 to 17 significant digits, or 0 for as
 many as each type holds, 17 for a float and 8 for a real. It applies wherever
@@ -298,9 +298,10 @@ closed. The extension holds the latest result as it arrived, and decodes it
 in the **kdb+/q** tab, and in each kept tab, which have about 4 GB of memory.
 The Grid takes about 250 bytes a row, whatever the columns, and a mixed
 list's items up to about 200 bytes more each, so a result, or a cell's value
-drilled into, of more rows than `rowLimit` is refused. A tab that runs out
-of memory, or crashes, turns grey, while VS Code and other extensions carry
-on. VS Code doesn't tell extensions when that happens, or let them restart
-it: **Developer: Reload Window** brings it back, but loses the latest result
-and closes kept tabs. A grey kept tab can only be closed. Kept tabs share one
-process, so when one turns grey, so do the rest.
+drilled into, of more rows than `rowLimit` is refused; like `precision`, it
+applies from the next run. A tab that runs out of memory, or crashes, turns
+grey, while VS Code and other extensions carry on. VS Code doesn't tell
+extensions when that happens, or let them restart it: **Developer: Reload
+Window** brings it back, but loses the latest result and closes kept tabs. A
+grey kept tab can only be closed. Kept tabs share one process, so when one
+turns grey, so do the rest.

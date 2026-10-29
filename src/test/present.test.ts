@@ -1,4 +1,8 @@
 import * as assert from "node:assert";
+import { readFileSync } from "node:fs";
+import * as path from "node:path";
+import { decode } from "../codec/decode";
+import { Attribute, type Value } from "../codec/types";
 import { defaultSize, type Size } from "../format/console";
 import { present, presented } from "../webview/present";
 
@@ -16,6 +20,19 @@ function til(n: number): Uint8Array {
 }
 
 const bytes = (hex: string) => Buffer.from(hex, "hex");
+
+const { values: fixtures } = JSON.parse(
+  readFileSync(
+    path.join(__dirname, "../../test/fixtures/corpus.ipc.json"),
+    "utf8",
+  ),
+) as { values: { name: string; bytes: string }[] };
+
+function fixture(name: string): Value {
+  const found = fixtures.find((f) => f.name === `.corpus.${name}`);
+  assert.ok(found, `no fixture .corpus.${name}`);
+  return decode(bytes(found.bytes));
+}
 
 // A response as the extension posts it
 const result = (message: Uint8Array, wrapped = false, size = defaultSize) => ({
@@ -89,18 +106,23 @@ suite("the Console view", () => {
     });
     assert.strictEqual(present(result(til(3), false, limited)).sheet?.rows, 3);
     // A cell's value drilled into too, and an atom, which has no rows
-    const value = {
+    const longs: Value = {
       type: 7,
-      attribute: 0,
+      attribute: Attribute.None,
       data: BigInt64Array.of(1n, 2n, 3n, 4n),
-    } as const;
-    assert.deepStrictEqual(presented(value as never, limited), {
+    };
+    assert.deepStrictEqual(presented(longs, limited), {
       text: "'row limit: the result exceeds 3 rows",
     });
-    assert.strictEqual(
-      presented({ type: -7, value: 5n } as never, limited).text,
-      "5",
-    );
+    assert.strictEqual(presented({ type: -7, value: 5n }, limited).text, "5");
+    // A keyed table's rows, or a dictionary's, are its keys'
+    const one = { ...defaultSize, rowLimit: 1 };
+    for (const name of ["table.multiKeyed", "dict.simple"]) {
+      assert.deepStrictEqual(presented(fixture(name), one), {
+        text: "'row limit: the result exceeds 1 rows",
+      });
+      assert.ok(presented(fixture(name), { ...one, rowLimit: 3 }).sheet);
+    }
   });
 
   test("a result that can't be decoded shows the decoder's error", () => {
