@@ -5,10 +5,14 @@ import {
   type ColDef,
   ColumnApiModule,
   ColumnAutoSizeModule,
+  CustomFilterModule,
   createGrid,
   type GridApi,
   type GridState,
   GridStateModule,
+  type IDoesFilterPassParams,
+  type IFilterComp,
+  type IFilterParams,
   ModuleRegistry,
   RenderApiModule,
   RowApiModule,
@@ -17,6 +21,14 @@ import {
   themeQuartz,
 } from "ag-grid-community";
 import type { Arrangement, Step } from "../messages";
+import {
+  type Comparison,
+  type Condition,
+  comparable,
+  comparisons,
+  field,
+  passing,
+} from "./filter";
 import {
   contains,
   moved,
@@ -37,6 +49,8 @@ ModuleRegistry.registerModules([
   ClientSideRowModelApiModule,
   ColumnApiModule,
   ColumnAutoSizeModule,
+  // For a column of numbers or times, compared as q compares them
+  CustomFilterModule,
   // For how the grid is arranged, for a kept tab or a remade view
   GridStateModule,
   // For showing which cells are selected
@@ -168,8 +182,13 @@ export class Grid {
             this.isSelected(node.rowIndex, column.getColId()),
         },
         comparator: (a, b) => column.compare(a ?? 0, b ?? 0),
-        filter: "agTextColumnFilter",
-        filterValueGetter: ({ data }) => (data ? column.text(data.row) : ""),
+        ...(comparable(column.type)
+          ? { filter: Comparing, filterParams: { sheetColumn: column } }
+          : {
+              filter: "agTextColumnFilter",
+              filterValueGetter: ({ data }) =>
+                data ? column.text(data.row) : "",
+            }),
       }),
     );
     this.api = createGrid<Row>(this.place, {
@@ -575,6 +594,121 @@ export class Grid {
       event.stopPropagation();
       this.select(selection);
     }
+  }
+}
+
+// The filter of a column of numbers or times, as ag-grid takes one: a
+// comparison, and a value typed or picked, or two for a range. Applied half
+// a second after the last change, as ag-grid's text filter is, so typing
+// doesn't filter at every key.
+class Comparing implements IFilterComp<Row> {
+  private readonly form = document.createElement("form");
+  private readonly choice = document.createElement("select");
+  private readonly values = document.createElement("div");
+  private column!: Column;
+  private test?: (row: number) => boolean;
+  private timer?: number;
+
+  init(params: IFilterParams<Row> & { sheetColumn: Column }) {
+    this.column = params.sheetColumn;
+    this.form.className = "comparison";
+    this.form.addEventListener("submit", (event) => event.preventDefault());
+    this.choice.ariaLabel = "Filtering option";
+    for (const [type, label] of comparisons) {
+      this.choice.append(new Option(label, type));
+    }
+    this.choice.addEventListener("change", () => {
+      this.fields();
+      this.edited(params);
+    });
+    this.values.addEventListener("input", () => this.edited(params));
+    this.form.append(this.choice, this.values);
+    this.fields();
+  }
+
+  getGui() {
+    return this.form;
+  }
+
+  afterGuiAttached() {
+    this.inputs()[0]?.focus();
+  }
+
+  isFilterActive() {
+    return this.test !== undefined;
+  }
+
+  doesFilterPass({ data }: IDoesFilterPassParams<Row>) {
+    return this.test?.(data.row) ?? true;
+  }
+
+  // What it's set to, or none when it filters nothing
+  getModel(): Condition | null {
+    const [from, to] = this.inputs().map((input) => input.value);
+    const condition: Condition = {
+      type: this.choice.value as Comparison,
+      filter: from,
+      ...(to === undefined ? {} : { filterTo: to }),
+    };
+    return passing(this.column, condition) ? condition : null;
+  }
+
+  setModel(model: Condition | null) {
+    clearTimeout(this.timer);
+    const known = comparisons.some(([type]) => type === model?.type);
+    this.choice.value = known && model ? model.type : "equals";
+    this.fields();
+    const [from, to] = this.inputs();
+    from.value = (known && model?.filter) || "";
+    if (to) {
+      to.value = (known && model?.filterTo) || "";
+    }
+    this.applied();
+  }
+
+  // An input for each value the comparison takes, as the column's values
+  // are given, but typed for Contains; keeping what's there where it's the
+  // same kind of value
+  private fields() {
+    const range = this.choice.value === "inRange";
+    const was = this.inputs();
+    const given =
+      this.choice.value === "contains"
+        ? { type: "text" }
+        : field(this.column.type);
+    const inputs = (range ? ["From", "To"] : ["Filter value"]).map(
+      (label, i) => {
+        const input = document.createElement("input");
+        input.type = given.type;
+        if (given.step) {
+          input.step = given.step;
+        }
+        input.ariaLabel = label;
+        input.placeholder = range ? label : "Filter…";
+        if (was[0]?.type === given.type) {
+          input.value = was[i]?.value ?? "";
+        }
+        return input;
+      },
+    );
+    this.values.replaceChildren(...inputs);
+  }
+
+  private inputs(): HTMLInputElement[] {
+    return [...this.values.querySelectorAll("input")];
+  }
+
+  private edited(params: IFilterParams<Row>) {
+    clearTimeout(this.timer);
+    this.timer = window.setTimeout(() => {
+      this.applied();
+      params.filterChangedCallback();
+    }, 500);
+  }
+
+  private applied() {
+    const condition = this.getModel();
+    this.test = condition ? passing(this.column, condition) : undefined;
   }
 }
 

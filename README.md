@@ -142,8 +142,14 @@ hover; a keyed table's symbol has its keys at the left. At the left is each
 row's index in the result, from 0. Click a header to sort, by q's order,
 with nulls first, or the index's to put the rows back as they came; tables
 in cells sort by their shapes, after any other values. A column's filter
-matches the text shown. Beside the tabs is the result's size, such as
-`312 of 1000000 rows, 5 columns` while filtered.
+matches the text shown; a column of numbers or times also compares, as q
+does: equals, less than, greater than, between and the rest, nulls smaller
+than any value, and floats, reals and datetimes equal within q's
+tolerance. Numbers and timespans are typed as q writes them, such as
+`1.085` or `0D00:00:00.000001500`; other times are picked, to the
+millisecond, and compared exactly, nanoseconds and all. Beside the tabs is
+the result's size, such as `312 of 1000000 rows, 5 columns` while
+filtered.
 
 Double-click a cell, or press Enter on it, to see its value as a result of
 its own: a table or a list in a cell in the Grid, a long string in full in

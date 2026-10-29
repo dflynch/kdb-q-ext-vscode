@@ -220,6 +220,20 @@ body {
   background-color: var(--vscode-editor-selectionBackground);
 }
 
+/* A column of numbers or times filtered: a comparison, then a value or two,
+   as ag-grid's own filter lays them out, in VS Code's dropdown and input */
+.comparison,
+.comparison div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.comparison {
+  min-width: 200px;
+  padding: 8px;
+}
+
 /* The chart, filling the rest, its settings at the right */
 .charts {
   display: flex;
@@ -288,7 +302,9 @@ body {
 }
 
 .settings select,
-.settings input {
+.settings input,
+.comparison select,
+.comparison input {
   flex: 1;
   min-width: 0;
   padding: 2px 4px;
@@ -299,14 +315,16 @@ body {
   font: inherit;
 }
 
-/* A number typed, as VS Code's inputs */
-.settings input {
+/* A value typed, as VS Code's inputs */
+.settings input,
+.comparison input {
   border-color: var(--vscode-input-border, transparent);
   background-color: var(--vscode-input-background);
   color: var(--vscode-input-foreground);
 }
 
-.settings input::placeholder {
+.settings input::placeholder,
+.comparison input::placeholder {
   color: var(--vscode-input-placeholderForeground);
 }
 
@@ -334,8 +352,16 @@ body {
 
 .settings select:focus-visible,
 .settings input:focus-visible,
+.comparison select:focus-visible,
+.comparison input:focus-visible,
 .settings button:focus-visible,
 .tabs .toggle:focus-visible {
   outline: 1px solid var(--vscode-focusBorder);
   outline-offset: -1px;
+}
+
+/* The pickers' own icons and calendars, dark in a dark theme */
+.vscode-dark .comparison input,
+.vscode-high-contrast:not(.vscode-high-contrast-light) .comparison input {
+  color-scheme: dark;
 }

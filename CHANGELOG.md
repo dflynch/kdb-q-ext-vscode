@@ -15,8 +15,9 @@ All notable changes to the extension are documented in this file.
   which sends the whole file as one query, and shows the result in the
   **kdb+/q** tab of the bottom panel as q's console prints it, and a
   table, keyed table, dictionary or list in a grid too, with each row's
-  index, sorting and filters, and a cell's value, double-clicked, as a
-  result of its own
+  index, sorting, filters of the text shown, or of numbers and times
+  compared as q compares them, typed as q writes them or picked, and a
+  cell's value, double-clicked, as a result of its own
 - **kdb+/q: Run Selected Text on Server**, which sends the selection, or
   the current line, the same way
 - **kdb+/q: Keep Result**, also the pin in the **kdb+/q** tab's title
