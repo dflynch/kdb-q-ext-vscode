@@ -70,12 +70,14 @@ export function field(type: number): { type: string; step?: string } {
 type Q = null | bigint | number;
 
 // Which rows a condition lets through, by their index in the result; none
-// while there's nothing to compare with, when it filters nothing
+// while there's nothing to compare with, when it filters nothing, as when
+// only spaces are typed for a value
 export function passing(
   column: Column,
   { type, filter, filterTo }: Condition,
 ): ((row: number) => boolean) | undefined {
-  if (!filter || (type === "inRange" && !filterTo)) {
+  const blank = (text?: string) => !(type === "contains" ? text : text?.trim());
+  if (blank(filter) || (type === "inRange" && blank(filterTo))) {
     return undefined;
   }
   if (type === "contains") {
@@ -213,7 +215,8 @@ function number(text: string): Q | undefined {
       return minus ? undefined : null;
     }
     const sign = minus ? -1 : 1;
-    if (letter === "w" || suffix === "e" || suffix === "f") {
+    // 0w a float's, but 0wh, 0wi and 0wj an integer's, as q reads them
+    if ((letter === "w" && !suffix) || suffix === "e" || suffix === "f") {
       return sign * Number.POSITIVE_INFINITY;
     }
     const most = {

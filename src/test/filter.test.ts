@@ -90,6 +90,9 @@ suite("the Grid's filters of numbers and times", () => {
     assert.strictEqual(read("-0Wh", 5), -32767n);
     assert.strictEqual(read("0Wi", 6), 2147483647n);
     assert.strictEqual(read("0w", 9), Number.POSITIVE_INFINITY);
+    // An integer's suffix makes 0w an integer's, as q reads it
+    assert.strictEqual(read("0wj", 7), 2n ** 63n - 1n);
+    assert.strictEqual(read("-0wh", 5), -32767n);
     assert.strictEqual(read("-0We", 8), Number.NEGATIVE_INFINITY);
     for (const typo of ["", "abc", "1.2.3", "1ef", "-0N", "0x10", "1,000"]) {
       assert.strictEqual(read(typo, 9), undefined, typo);
@@ -286,6 +289,10 @@ suite("the Grid's filters of numbers and times", () => {
     const longs = columnOf(vector(7, new BigInt64Array([1n, 2n])));
     assert.strictEqual(rows(longs, "equals", ""), undefined);
     assert.strictEqual(rows(longs, "inRange", "1"), undefined);
+    // Only spaces typed for a value are nothing, but are text to contain
+    assert.strictEqual(rows(longs, "equals", "  "), undefined);
+    assert.strictEqual(rows(longs, "inRange", "1", " "), undefined);
+    assert.deepStrictEqual(rows(longs, "contains", " "), []);
     assert.deepStrictEqual(rows(longs, "equals", "1x"), []);
     assert.deepStrictEqual(rows(longs, "inRange", "1", "2x"), []);
   });

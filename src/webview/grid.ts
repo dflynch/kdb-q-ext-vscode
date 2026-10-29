@@ -600,19 +600,26 @@ export class Grid {
 // The filter of a column of numbers or times, as ag-grid takes one: a
 // comparison, and a value typed or picked, or two for a range. Applied half
 // a second after the last change, as ag-grid's text filter is, so typing
-// doesn't filter at every key.
+// doesn't filter at every key, or at once on Enter.
 class Comparing implements IFilterComp<Row> {
-  private readonly form = document.createElement("form");
+  private readonly gui = document.createElement("div");
   private readonly choice = document.createElement("select");
   private readonly values = document.createElement("div");
   private column!: Column;
+  // What's applied, none when it filters nothing, and the rows it passes
+  private condition: Condition | null = null;
   private test?: (row: number) => boolean;
   private timer?: number;
 
   init(params: IFilterParams<Row> & { sheetColumn: Column }) {
     this.column = params.sheetColumn;
-    this.form.className = "comparison";
-    this.form.addEventListener("submit", (event) => event.preventDefault());
+    this.gui.className = "comparison";
+    this.gui.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        this.apply(params);
+      }
+    });
     this.choice.ariaLabel = "Filtering option";
     for (const [type, label] of comparisons) {
       this.choice.append(new Option(label, type));
@@ -622,12 +629,12 @@ class Comparing implements IFilterComp<Row> {
       this.edited(params);
     });
     this.values.addEventListener("input", () => this.edited(params));
-    this.form.append(this.choice, this.values);
+    this.gui.append(this.choice, this.values);
     this.fields();
   }
 
   getGui() {
-    return this.form;
+    return this.gui;
   }
 
   afterGuiAttached() {
@@ -642,15 +649,8 @@ class Comparing implements IFilterComp<Row> {
     return this.test?.(data.row) ?? true;
   }
 
-  // What it's set to, or none when it filters nothing
   getModel(): Condition | null {
-    const [from, to] = this.inputs().map((input) => input.value);
-    const condition: Condition = {
-      type: this.choice.value as Comparison,
-      filter: from,
-      ...(to === undefined ? {} : { filterTo: to }),
-    };
-    return passing(this.column, condition) ? condition : null;
+    return this.condition;
   }
 
   setModel(model: Condition | null) {
@@ -664,6 +664,10 @@ class Comparing implements IFilterComp<Row> {
       to.value = (known && model?.filterTo) || "";
     }
     this.applied();
+  }
+
+  destroy() {
+    clearTimeout(this.timer);
   }
 
   // An input for each value the comparison takes, as the column's values
@@ -700,15 +704,25 @@ class Comparing implements IFilterComp<Row> {
 
   private edited(params: IFilterParams<Row>) {
     clearTimeout(this.timer);
-    this.timer = window.setTimeout(() => {
-      this.applied();
-      params.filterChangedCallback();
-    }, 500);
+    this.timer = window.setTimeout(() => this.apply(params), 500);
   }
 
+  private apply(params: IFilterParams<Row>) {
+    clearTimeout(this.timer);
+    this.applied();
+    params.filterChangedCallback();
+  }
+
+  // Applies what's typed or picked
   private applied() {
-    const condition = this.getModel();
-    this.test = condition ? passing(this.column, condition) : undefined;
+    const [from, to] = this.inputs().map((input) => input.value);
+    const condition: Condition = {
+      type: this.choice.value as Comparison,
+      filter: from,
+      ...(to === undefined ? {} : { filterTo: to }),
+    };
+    this.test = passing(this.column, condition);
+    this.condition = this.test ? condition : null;
   }
 }
 

@@ -143,11 +143,13 @@ row's index in the result, from 0. Click a header to sort, by q's order,
 with nulls first, or the index's to put the rows back as they came; tables
 in cells sort by their shapes, after any other values. A column's filter
 matches the text shown; a column of numbers or times also compares, as q
-does: equals, less than, greater than, between and the rest, nulls smaller
-than any value, and floats, reals and datetimes equal within q's
-tolerance. Numbers and timespans are typed as q writes them, such as
-`1.085` or `0D00:00:00.000001500`; other times are picked, to the
-millisecond, and compared exactly, nanoseconds and all. Beside the tabs is
+does: equals, less than, greater than, between and the rest, with nulls
+smaller than any value. Numbers and timespans are typed as q writes them,
+such as `1.085` or `0D00:00:00.000001500`, and a real as `1.1e`, as q
+doesn't count the float `1.1` equal to it. Other times are picked, to the
+millisecond, a time of day within a day. Floats, reals and datetimes are
+equal within q's tolerance, and the rest exactly, so a timestamp of
+`09:30:00.000000001` doesn't equal `09:30` picked. Beside the tabs is
 the result's size, such as `312 of 1000000 rows, 5 columns` while
 filtered.
 
