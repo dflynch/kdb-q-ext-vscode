@@ -196,7 +196,6 @@ export class Grid {
       styleNonce: this.nonce,
       columnDefs: [index, ...columnDefs],
       rowData: Array.from({ length: sheet.rows }, (_, row) => ({ row })),
-      getRowId: ({ data }) => String(data.row),
       autoSizeStrategy: { type: "fitCellContents" },
       initialState: arranged as GridState,
       onStateUpdated: ({ sources, state }) => {
