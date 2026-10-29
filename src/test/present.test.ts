@@ -35,12 +35,11 @@ function fixture(name: string): Value {
 }
 
 // A response as the extension posts it
-const result = (message: Uint8Array, wrapped = false, size = defaultSize) => ({
-  type: "result" as const,
-  message,
-  wrapped,
-  size: size as Size,
-});
+const result = (
+  message: Uint8Array,
+  wrapped = false,
+  size: Size = defaultSize,
+) => ({ type: "result" as const, message, wrapped, size });
 
 suite("the Console view", () => {
   test("til makes what q's -8! does", () => {

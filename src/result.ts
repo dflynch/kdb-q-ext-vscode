@@ -60,13 +60,13 @@ export function rowLimitSetting(setting: unknown): {
   problem?: string;
 } {
   if (setting === undefined) {
-    return { rowLimit: defaultSize.rowLimit as number };
+    return { rowLimit: defaultSize.rowLimit };
   }
   if (Number.isInteger(setting) && (setting as number) >= 1) {
     return { rowLimit: setting as number };
   }
   return {
-    rowLimit: defaultSize.rowLimit as number,
+    rowLimit: defaultSize.rowLimit,
     problem: "the row limit isn't a whole number from 1",
   };
 }
