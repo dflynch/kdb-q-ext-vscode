@@ -381,9 +381,15 @@
         },
         "kdb-q-ext-vscode.sizeLimit": {
           "type": "number",
-          "default": 10,
+          "default": 100,
           "exclusiveMinimum": 0,
-          "markdownDescription": "The largest result to take, in megabytes, uncompressed. A larger one is refused and the connection closed. The extension holds the latest result as it arrived, and decodes it in the **kdb+/q** tab, where some results take up to 60 times their size: a tab that runs out of memory goes blank, while VS Code and other extensions carry on."
+          "markdownDescription": "The largest result to take, in megabytes, as q sends it, uncompressed. A larger one is refused before it's read, and the connection closed."
+        },
+        "kdb-q-ext-vscode.rowLimit": {
+          "type": "integer",
+          "default": 5000000,
+          "minimum": 1,
+          "markdownDescription": "The most rows a result, or a cell's value drilled into, can have to be shown; one with more is refused. The **kdb+/q** tab, and each kept tab, has about 4 GB of memory, and its Grid takes about 250 bytes a row, whatever the columns, and a mixed list's items up to about 200 bytes more each. A tab that runs out turns grey, while VS Code and other extensions carry on."
         }
       }
     }

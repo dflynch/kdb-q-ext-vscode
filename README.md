@@ -22,8 +22,9 @@ Quirk never edits a query: it won't wrap it to fetch extra metadata, or add
 a row limit to it. With [protected evaluation](#protected-evaluation) on, the
 text is sent beside the function that traps its errors, unchanged; turn it
 off and a gateway that only allows listed calls sees exactly what you typed.
-Row limits only change what the grid shows. A result over the size limit,
-`sizeLimit`, is refused, and the connection closed.
+A result over the size limit, `sizeLimit`, is refused before it's read, and
+the connection closed; one of more rows than `rowLimit` is refused once it's
+read.
 
 ### Out of scope
 
@@ -283,7 +284,8 @@ Open Keyboard Shortcuts**.
 | `kdb-q-ext-vscode.connectTimeout` | `2000`         | How long to wait to connect and log in, in ms; 0 waits       |
 | `kdb-q-ext-vscode.consoleSize`    | `[1000, 1000]` | How much of a result to show, as lines then width            |
 | `kdb-q-ext-vscode.precision`      | `7`            | Significant digits of floats and reals, as `\P`; 0 for all   |
-| `kdb-q-ext-vscode.sizeLimit`      | `10`           | The largest result to take, in MB, uncompressed              |
+| `kdb-q-ext-vscode.sizeLimit`      | `100`          | The largest result to take, in MB, uncompressed              |
+| `kdb-q-ext-vscode.rowLimit`       | `5000000`      | The most rows a result, or a cell drilled into, can have     |
 
 `precision` works as q's `\P`: from 1 to 17 significant digits, or 0 for as
 many as each type holds, 17 for a float and 8 for a real. It applies wherever
@@ -291,11 +293,15 @@ a result's floats and reals are written: the Console, the Grid, Copy, Export
 to CSV and the Chart's values at the cursor. Like `\P`, it applies from the
 next run; a result already shown, or kept, stays as it was.
 
-A result over `sizeLimit` is refused and the connection closed. The extension
-holds the latest result as it arrived, and decodes it in the **kdb+/q** tab,
-where some results take up to 60 times their size, and in each kept tab.
-One that runs out of memory, or crashes, turns grey, while VS Code and other
-extensions carry on. VS Code doesn't tell extensions when that happens, or
-let them restart it: **Developer: Reload Window** brings it back, but loses
-the latest result and closes kept tabs. A grey kept tab can only be closed.
-Kept tabs share one process, so when one turns grey, so do the rest.
+A result over `sizeLimit` is refused before it's read, and the connection
+closed. The extension holds the latest result as it arrived, and decodes it
+in the **kdb+/q** tab, and in each kept tab, which have about 4 GB of memory.
+The Grid takes about 250 bytes a row, whatever the columns, and a mixed
+list's items up to about 200 bytes more each, so a result, or a cell's value
+drilled into, of more rows than `rowLimit` is refused; like `precision`, it
+applies from the next run. A tab that runs out of memory, or crashes, turns
+grey, while VS Code and other extensions carry on. VS Code doesn't tell
+extensions when that happens, or let them restart it: **Developer: Reload
+Window** brings it back, but loses the latest result and closes kept tabs. A
+grey kept tab can only be closed. Kept tabs share one process, so when one
+turns grey, so do the rest.

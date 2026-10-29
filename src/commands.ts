@@ -6,7 +6,13 @@ import type { Connections } from "./connections";
 import { credentials, type Sources } from "./credentials";
 import type { Size } from "./format/console";
 import { quickInput } from "./quickInput";
-import { type Outcome, precisionSetting, sizeSetting, toView } from "./result";
+import {
+  type Outcome,
+  precisionSetting,
+  rowLimitSetting,
+  sizeSetting,
+  toView,
+} from "./result";
 import type { Results } from "./resultView";
 import * as servers from "./servers";
 import * as statements from "./statements";
@@ -45,19 +51,21 @@ export function runSelectedText(editor: vscode.TextEditor) {
   }
 }
 
-// The console size and the precision, with any problem in them shown
+// The console size, the precision and the row limit, with any problem in
+// them shown
 function consoleSize(): Size {
   const config = vscode.workspace.getConfiguration("kdb-q-ext-vscode");
   const { size, problem } = sizeSetting(config.get("consoleSize"));
   const digits = precisionSetting(config.get("precision"));
-  for (const wrong of [problem, digits.problem]) {
+  const rows = rowLimitSetting(config.get("rowLimit"));
+  for (const wrong of [problem, digits.problem, rows.problem]) {
     if (wrong) {
       vscode.window.showWarningMessage(
         `kdb+/q: Using the default, as ${wrong}.`,
       );
     }
   }
-  return { ...size, precision: digits.precision };
+  return { ...size, precision: digits.precision, rowLimit: rows.rowLimit };
 }
 
 // Run the whole file, saved or not, on the active connection, as selecting

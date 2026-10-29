@@ -36,11 +36,21 @@ export function present(message: ToView): {
 }
 
 // A value as the Console view shows it, and as a sheet for the Grid view if
-// it has one: a result, or a cell's value drilled into
+// it has one: a result, or a cell's value drilled into. One of more rows
+// than the row limit is refused, as the Grid's memory goes by its rows.
 export function presented(
   value: Value,
   size: Size,
 ): { text: string; sheet?: Sheet } {
   const table = sheet(value, size.precision);
+  if (table && size.rowLimit !== undefined && table.rows > size.rowLimit) {
+    return {
+      text: errorText(
+        new Error(`row limit: the result exceeds ${size.rowLimit} rows`, {
+          cause: `${table.rows} rows`,
+        }),
+      ),
+    };
+  }
   return { text: show(value, size), ...(table && { sheet: table }) };
 }
