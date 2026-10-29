@@ -265,7 +265,7 @@ suite("servers", () => {
       host: "localhost",
       port: 5000,
       timeout: 2000,
-      limit: 10e6,
+      limit: 100e6,
       protect: true,
     });
     assert.deepStrictEqual(
@@ -280,7 +280,7 @@ suite("servers", () => {
         user: "admin",
         password: "pw",
         timeout: 500,
-        limit: 10e6,
+        limit: 100e6,
         protect: true,
       },
     );

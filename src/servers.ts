@@ -49,7 +49,7 @@ export type Defaults = {
   limit: number;
 };
 
-export const defaults: Defaults = { timeout: 2000, limit: 10e6 };
+export const defaults: Defaults = { timeout: 2000, limit: 100e6 };
 
 const fields = new Set([
   "host",

@@ -352,7 +352,8 @@ suite("connection", () => {
       connection.query("x"),
       (error) =>
         error instanceof Error &&
-        error.message === "result too big" &&
+        error.message ===
+          "size limit: the result exceeds 0.000016 MB before deserialization" &&
         error.cause === "17 bytes, over the limit of 16",
     );
     await server.closed;
@@ -377,7 +378,8 @@ suite("connection", () => {
       connection.query("x"),
       (error) =>
         error instanceof Error &&
-        error.message === "result too big" &&
+        error.message ===
+          `size limit: the result exceeds ${(uncompressed - 1) / 1e6} MB before deserialization` &&
         error.cause ===
           `${uncompressed} bytes, over the limit of ${uncompressed - 1}`,
     );

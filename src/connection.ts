@@ -4,6 +4,7 @@ import { getSystemErrorMap, getSystemErrorMessage } from "node:util";
 import { encode } from "./codec/encode";
 import { badmsg } from "./codec/errors";
 import { wrapper } from "./protection";
+import { defaults } from "./servers";
 import type { Secure } from "./tls";
 
 export type Server = {
@@ -56,14 +57,16 @@ function oserror(
   return new Error(`${word}. OS reports: ${text}`, { cause });
 }
 
-// A result over the limit. The Result view's webview decodes results, and
-// its heap, about 4 GB, is capped: a general list decodes to up to about 60
-// times its size, so results are refused well before. Refusing closes the
-// connection, which stops the server sending the rest.
+// A result over the size limit, in bytes as q sends it, said in megabytes
+// as set. Refusing closes the connection, which stops the server sending
+// the rest.
 function tooBig(size: number, limit: number): Error {
-  return new Error("result too big", {
-    cause: `${size} bytes, over the limit of ${limit}`,
-  });
+  return new Error(
+    `size limit: the result exceeds ${limit / 1e6} MB before deserialization`,
+    {
+      cause: `${size} bytes, over the limit of ${limit}`,
+    },
+  );
 }
 
 const what = ["async message", "sync message", "response"];
@@ -180,7 +183,7 @@ export class Connection {
         resolve(
           new Connection(
             socket,
-            server.limit ?? 10e6,
+            server.limit ?? defaults.limit,
             server.protect ?? false,
             chunk.subarray(1),
           ),

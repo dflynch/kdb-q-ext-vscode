@@ -1,6 +1,6 @@
 import * as assert from "node:assert";
 import { defaultSize, type Size } from "../format/console";
-import { present } from "../webview/present";
+import { present, presented } from "../webview/present";
 
 // q's -8! of til n
 function til(n: number): Uint8Array {
@@ -82,6 +82,27 @@ suite("the Console view", () => {
     });
   });
 
+  test("a result of more rows than the row limit is refused, and one at it shown", () => {
+    const limited = { ...defaultSize, rowLimit: 3 };
+    assert.deepStrictEqual(present(result(til(4), false, limited)), {
+      text: "'row limit: the result exceeds 3 rows",
+    });
+    assert.strictEqual(present(result(til(3), false, limited)).sheet?.rows, 3);
+    // A cell's value drilled into too, and an atom, which has no rows
+    const value = {
+      type: 7,
+      attribute: 0,
+      data: BigInt64Array.of(1n, 2n, 3n, 4n),
+    } as const;
+    assert.deepStrictEqual(presented(value as never, limited), {
+      text: "'row limit: the result exceeds 3 rows",
+    });
+    assert.strictEqual(
+      presented({ type: -7, value: 5n } as never, limited).text,
+      "5",
+    );
+  });
+
   test("a result that can't be decoded shows the decoder's error", () => {
     assert.deepStrictEqual(present(result(til(3).subarray(0, 20))), {
       text: "'badmsg",
@@ -90,8 +111,8 @@ suite("the Console view", () => {
 
   test("an error of the extension's, as it gave it", () => {
     assert.deepStrictEqual(
-      present({ type: "error", text: "'result too big" }),
-      { text: "'result too big" },
+      present({ type: "error", text: "'query cancelled" }),
+      { text: "'query cancelled" },
     );
   });
 });

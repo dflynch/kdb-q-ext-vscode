@@ -52,6 +52,25 @@ export function precisionSetting(setting: unknown): {
   };
 }
 
+// The most rows a result, or a cell's value drilled into, can have to be
+// shown: a whole number from 1. The problem is said for one that's wrong,
+// and the default used.
+export function rowLimitSetting(setting: unknown): {
+  rowLimit: number;
+  problem?: string;
+} {
+  if (setting === undefined) {
+    return { rowLimit: defaultSize.rowLimit as number };
+  }
+  if (Number.isInteger(setting) && (setting as number) >= 1) {
+    return { rowLimit: setting as number };
+  }
+  return {
+    rowLimit: defaultSize.rowLimit as number,
+    problem: "the row limit isn't a whole number from 1",
+  };
+}
+
 // What to show for a query in the Result view: its response, for the
 // webview to decode and show at the console size, or the extension's own
 // error as the q console shows errors

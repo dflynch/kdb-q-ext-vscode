@@ -16,8 +16,9 @@ import { type Bounds, cell, qText } from "./text";
 // does, though not leaving room for a prompt: \c 25 80 shows 23 lines of 79.
 // Laying out stops there, so a value costs only what's shown. A cell in a
 // table, a matrix or a dictionary is cut at cell, where it's given, unlike
-// in q, so that one long one can't widen every line of its column.
-export type Size = Bounds & { cell?: number };
+// in q, so that one long one can't widen every line of its column. A value
+// of more rows than rowLimit, where it's given, isn't shown at all.
+export type Size = Bounds & { cell?: number; rowLimit?: number };
 
 // How much of a value to show: far more than q's \c, as the panel scrolls.
 // A value with more lines shows the first 999 and then .., and a wider line
@@ -27,6 +28,7 @@ export const defaultSize: Size = {
   width: 1000,
   cell: 256,
   precision: 7,
+  rowLimit: 5_000_000,
 };
 
 // A value as the q console shows it
