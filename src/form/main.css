@@ -193,6 +193,11 @@ input[type="checkbox"]:checked::before {
   margin-top: 6px;
 }
 
+code {
+  color: var(--vscode-textPreformat-foreground);
+  font-family: var(--vscode-editor-font-family);
+}
+
 /* At the end, left-aligned as VS Code's own forms have them */
 .buttons {
   display: flex;

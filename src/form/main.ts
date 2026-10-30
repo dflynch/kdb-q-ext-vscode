@@ -122,9 +122,12 @@ const timeout = text("timeout");
 const tls = tick("tls", "Use TLS");
 // Where TLS gets its certificates, under its tick once it's ticked
 const tlsNote = element("div", "note-under description");
-const protect = tick(
-  "protect",
-  "Use protected evaluation so that an error returns its backtrace (switch it off when the server enforces an allowlist)",
+const protect = tick("protect", "Use protected evaluation");
+const protectNote = element("div", "note-under description");
+protectNote.append(
+  "Wraps the query using ",
+  element("code", undefined, ".Q.trp"),
+  " so that an error returns its backtrace (may be blocked by a server that enforces an allowlist)",
 );
 const auth = choice("auth", [
   ["none", "None"],
@@ -157,7 +160,7 @@ const rows = {
   user: setting("User", [], user),
   auth: setting("Authentication", [], auth, authMeaning),
   password: setting("Password", [], password),
-  options: setting("Options", [], tls.wrap, tlsNote, protect.wrap),
+  options: setting("Options", [], tls.wrap, tlsNote, protect.wrap, protectNote),
   timeout: setting("Timeout", [], timeout),
   target: setting("Save to", [], target, targetMeaning),
 };
