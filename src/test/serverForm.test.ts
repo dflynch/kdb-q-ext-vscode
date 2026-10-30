@@ -537,11 +537,17 @@ suite("editServer and removeServer", () => {
   const warn = window.showWarningMessage;
   let warned: unknown[][] = [];
   let answer: string | undefined;
+  let offered: vscode.QuickPickItem[] = [];
 
   setup(() => {
     warned = [];
-    // The first server offered is picked
-    window.showQuickPick = async (items: { label: string }[]) => items[0];
+    // The first server offered is picked, past its folders
+    window.showQuickPick = async (items: vscode.QuickPickItem[]) => {
+      offered = items;
+      return items.find(
+        (item) => item.kind !== vscode.QuickPickItemKind.Separator,
+      );
+    };
     window.showWarningMessage = async (...args: unknown[]) => {
       warned.push(args);
       return answer;
@@ -575,6 +581,38 @@ suite("editServer and removeServer", () => {
     }
   });
 
+  test("servers are offered by their own names, under their folders", async () => {
+    await setUser({
+      Prod: { trades: { TP: { host: "kdb1", port: 1, user: "admin" } } },
+      local: { host: "localhost", port: 5000 },
+    });
+    const forms = new ServerForms(
+      extension,
+      secrets({}),
+      connections,
+      nowhere,
+      tabs().panels,
+    );
+    try {
+      await editServer(forms);
+      assert.deepStrictEqual(
+        offered.map(({ label, kind, description }) => [
+          label,
+          kind === vscode.QuickPickItemKind.Separator,
+          description,
+        ]),
+        [
+          ["Prod › trades", true, undefined],
+          ["TP", false, "Prod › trades · admin@kdb1:1"],
+          ["", true, undefined],
+          ["local", false, "localhost:5000"],
+        ],
+      );
+    } finally {
+      forms.dispose();
+    }
+  });
+
   test("Remove, once confirmed, removes the server and forgets its password", async () => {
     await setUser({
       Prod: { TP: { host: "kdb1", port: 1, auth: "store" } },
@@ -596,7 +634,7 @@ suite("editServer and removeServer", () => {
       forms.edit("Prod/TP");
       answer = undefined;
       await removeServer(secrets(kept), connections, forms);
-      assert.strictEqual(warned[0][0], "Remove Prod/TP?");
+      assert.strictEqual(warned[0][0], "Remove Prod › TP?");
       assert.deepStrictEqual(warned[0][1], {
         modal: true,
         detail: "It's removed from your user settings.",

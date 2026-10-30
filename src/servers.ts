@@ -56,6 +56,12 @@ const fields = new Set([
   "auth",
 ]);
 
+// A server's name as it's shown: its folders' names and its own, as a
+// breadcrumb, Prod › trades › TP
+export function shown(name: string): string {
+  return name.split("/").join(" › ");
+}
+
 // A Marketplace extension ID, publisher.name
 export const extensionId = /^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9-]*$/i;
 

@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import type { Connection } from "./connection";
 import type { Connections, State } from "./connections";
-import { authExtension, type Definition } from "./servers";
+import { authExtension, type Definition, shown } from "./servers";
 
 // How long a query took, in whole milliseconds, as \t gives
 export type Timing = {
@@ -130,11 +130,11 @@ export function showStatus(
     const ended = last.get();
     const timing =
       !busy && ended?.name === active?.name ? ended?.timing : undefined;
-    item.text = `$(${icon}) ${active?.name ?? "kdb+/q"}${timing ? `  $(watch) ${took(timing)}` : ""}`;
+    item.text = `$(${icon}) ${active ? shown(active.name) : "kdb+/q"}${timing ? `  $(watch) ${took(timing)}` : ""}`;
     // The icon says the state, so screen readers are told it in words
     item.accessibilityInformation = {
       label: active
-        ? `kdb+/q: ${active.name}, ${busy ? "running a query" : describe(active.state)}${timing ? `, last query ${took(timing)}` : ""}`
+        ? `kdb+/q: ${shown(active.name)}, ${busy ? "running a query" : describe(active.state)}${timing ? `, last query ${took(timing)}` : ""}`
         : "kdb+/q: not connected",
     };
     item.tooltip = server
@@ -160,7 +160,7 @@ export function showStatus(
     update();
     if (lost) {
       vscode.window.showWarningMessage(
-        `kdb+/q: ${lost.name}: ${lost.reason.message}`,
+        `kdb+/q: ${shown(lost.name)}: ${lost.reason.message}`,
       );
     }
   });

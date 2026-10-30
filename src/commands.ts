@@ -293,15 +293,30 @@ async function pickServer(
     }
     return undefined;
   }
-  const picked = await vscode.window.showQuickPick(
-    defined.map((server) => ({
-      label: server.name,
-      description: `${server.user ? `${server.user}@` : ""}${server.host}:${server.port}`,
+  // Each server by its own name, under its folders, which are in its
+  // description too, so that typing a folder's name finds its servers
+  const items: (vscode.QuickPickItem & { server?: servers.Definition })[] = [];
+  let last = "";
+  for (const server of defined) {
+    const path = server.name.split("/");
+    const folder = path.slice(0, -1).join(" › ");
+    if (folder !== last || (items.length === 0 && folder !== "")) {
+      items.push({ label: folder, kind: vscode.QuickPickItemKind.Separator });
+      last = folder;
+    }
+    const login = `${server.user ? `${server.user}@` : ""}${server.host}:${server.port}`;
+    items.push({
+      label: path.at(-1) ?? server.name,
+      description: folder === "" ? login : `${folder} · ${login}`,
       detail: detail?.(server),
       server,
-    })),
-    { title, placeHolder: "Server" },
-  );
+    });
+  }
+  const picked = await vscode.window.showQuickPick(items, {
+    title,
+    placeHolder: "Server",
+    matchOnDescription: true,
+  });
   return picked?.server;
 }
 
@@ -329,7 +344,7 @@ export async function removeServer(
   const scopes = scopesOf(server.name);
   const remove = "Remove";
   const choice = await vscode.window.showWarningMessage(
-    `Remove ${server.name}?`,
+    `Remove ${servers.shown(server.name)}?`,
     {
       modal: true,
       detail: `It's removed from your ${scopes.join(" and ")} settings.`,
@@ -521,7 +536,7 @@ async function connectTo(
     await connections.connect(server);
   } catch (error) {
     vscode.window.showErrorMessage(
-      `kdb+/q: ${server.name}: ${(error as Error).message}`,
+      `kdb+/q: ${servers.shown(server.name)}: ${(error as Error).message}`,
     );
   }
 }
