@@ -1,4 +1,5 @@
 import * as assert from "node:assert";
+import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { clearPassphrase, setPassphrase } from "../commands";
@@ -31,7 +32,9 @@ suite("certificate passphrase", () => {
   const inform = window.showInformationMessage;
   const ask = window.showInputBox;
   let told: string[] = [];
-  const key = path.join(path.sep, "certs", "client.key");
+  // From ~, which is a path on every system
+  const key = "~/certs/client.key";
+  const kept = `passphrase:${path.join(os.homedir(), "certs", "client.key")}`;
 
   setup(() => {
     told = [];
@@ -53,24 +56,24 @@ suite("certificate passphrase", () => {
   });
 
   test("is kept and cleared under the key's file, with no server picked", async () => {
-    await set({ tlsCertFile: "/certs/client.pem", tlsKeyFile: key });
-    const kept: Record<string, string> = {};
-    await setPassphrase(secrets(kept));
-    assert.deepStrictEqual(kept, { [`passphrase:${key}`]: "secret" });
-    await clearPassphrase(secrets(kept));
-    assert.deepStrictEqual(kept, {});
+    await set({ tlsCertFile: "~/certs/client.pem", tlsKeyFile: key });
+    const stored: Record<string, string> = {};
+    await setPassphrase(secrets(stored));
+    assert.deepStrictEqual(stored, { [kept]: "secret" });
+    await clearPassphrase(secrets(stored));
+    assert.deepStrictEqual(stored, {});
     assert.deepStrictEqual(told, []);
   });
 
   test("a wrong CA doesn't stop it being kept", async () => {
     await set({
       tlsCaFile: "ca.pem",
-      tlsCertFile: "/certs/client.pem",
+      tlsCertFile: "~/certs/client.pem",
       tlsKeyFile: key,
     });
-    const kept: Record<string, string> = {};
-    await setPassphrase(secrets(kept));
-    assert.deepStrictEqual(kept, { [`passphrase:${key}`]: "secret" });
+    const stored: Record<string, string> = {};
+    await setPassphrase(secrets(stored));
+    assert.deepStrictEqual(stored, { [kept]: "secret" });
   });
 
   test("without a key file, says why", async () => {
