@@ -4,7 +4,7 @@
 
 body {
   box-sizing: border-box;
-  max-width: 720px;
+  max-width: 640px;
   margin: 0;
   padding: 12px 24px 24px;
   color: var(--vscode-foreground);
@@ -45,26 +45,41 @@ h1 {
   flex: 1;
 }
 
-/* A setting: its name in bold, what it does, then its box */
+/* A setting: its name in bold, its box, then what it does */
 .setting {
-  padding: 12px 14px 14px;
-  margin: 0 -14px;
-  border-left: 2px solid transparent;
+  padding: 6px 0;
 }
 
-.setting.invalid {
-  border-left-color: var(--vscode-inputValidation-errorBorder);
+/* Settings side by side, wrapping when narrow */
+.line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 16px;
+}
+
+.line > .setting {
+  flex: 1 1 220px;
+}
+
+/* Half the line, alone on it or not */
+.line > .setting.half {
+  flex: 0 1 calc(50% - 8px);
+  min-width: 220px;
+}
+
+.line > .setting.narrow {
+  flex: 0 0 130px;
 }
 
 .label {
   font-weight: 600;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   color: var(--vscode-settings-headerForeground);
 }
 
 .description {
   color: var(--vscode-descriptionForeground);
-  margin-bottom: 8px;
+  margin-top: 4px;
 }
 
 .description:empty {
@@ -91,10 +106,10 @@ a:hover {
 }
 
 input[type="text"],
-input[type="password"] {
+input[type="password"],
+select {
   box-sizing: border-box;
   width: 100%;
-  max-width: 420px;
   padding: 4px 6px;
   color: var(
     --vscode-settings-textInputForeground,
@@ -117,6 +132,12 @@ input::placeholder {
   color: var(--vscode-input-placeholderForeground);
 }
 
+select {
+  color: var(--vscode-settings-dropdownForeground);
+  background: var(--vscode-settings-dropdownBackground);
+  border-color: var(--vscode-settings-dropdownBorder);
+}
+
 .invalid input[type="text"],
 .invalid input[type="password"] {
   border-color: var(--vscode-inputValidation-errorBorder);
@@ -130,8 +151,7 @@ button:focus-visible {
 }
 
 /* Drawn in the checkbox colours, as the Settings editor draws its own */
-input[type="checkbox"],
-input[type="radio"] {
+input[type="checkbox"] {
   appearance: none;
   display: grid;
   flex: none;
@@ -141,15 +161,8 @@ input[type="radio"] {
   margin: 0 8px 0 0;
   background: var(--vscode-checkbox-background);
   border: 1px solid var(--vscode-checkbox-border);
-  cursor: pointer;
-}
-
-input[type="checkbox"] {
   border-radius: 3px;
-}
-
-input[type="radio"] {
-  border-radius: 50%;
+  cursor: pointer;
 }
 
 input[type="checkbox"]:checked::before {
@@ -162,35 +175,20 @@ input[type="checkbox"]:checked::before {
   transform: rotate(-45deg);
 }
 
-input[type="radio"]:checked::before {
-  content: "";
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--vscode-checkbox-foreground);
-}
-
-.tick .description {
-  margin: 0;
-}
-
-.tick,
-.radio {
+/* A tick box with what it does beside it, one under another */
+.tick {
   display: flex;
   align-items: flex-start;
-  gap: 2px;
   line-height: 18px;
   cursor: pointer;
 }
 
-.radios {
-  display: grid;
-  gap: 6px;
+.tick + .tick {
+  margin-top: 6px;
 }
 
-/* What a choice means, beside it */
-.radio .description {
-  margin: 0 0 0 8px;
+.tick .description {
+  margin: 0;
 }
 
 /* At the end, left-aligned as VS Code's own forms have them */

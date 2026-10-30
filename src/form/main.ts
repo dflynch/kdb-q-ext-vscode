@@ -61,7 +61,7 @@ const note = element("p", "note", "Changes apply at the next connect.");
 const banner = element("div", "banner");
 banner.role = "status";
 
-// A setting: its name, what it does, its box or boxes, and its problem
+// A setting: its name, its box or boxes, what it does, and its problem
 function setting(
   label: string,
   description: (string | Node)[],
@@ -73,7 +73,7 @@ function setting(
   about.append(...description);
   const problem = element("div", "problem");
   problem.role = "alert";
-  row.append(name, about, ...controls, problem);
+  row.append(name, ...controls, about, problem);
   return { row, about, problem };
 }
 
@@ -98,26 +98,16 @@ function tick(id: Field, ...label: (string | Node)[]) {
   return { box, wrap };
 }
 
-// Radio buttons, each with what it means
-function radios(group: string, choices: [string, string, string | Node][]) {
-  const wrap = element("div", "radios");
-  wrap.role = "radiogroup";
-  const buttons = new Map<string, HTMLInputElement>();
-  const notes = new Map<string, HTMLElement>();
-  for (const [value, label, about] of choices) {
-    const radio = element("input");
-    radio.type = "radio";
-    radio.name = group;
-    radio.value = value;
-    const option = element("label", "radio");
-    const said = element("span", "description");
-    said.append(about);
-    option.append(radio, element("span", undefined, label), said);
-    wrap.append(option);
-    buttons.set(value, radio);
-    notes.set(value, said);
+// A dropdown, as the Settings editor has for a choice
+function choice(id: Field, options: [string, string][]) {
+  const select = element("select");
+  select.id = id;
+  for (const [value, label] of options) {
+    const option = element("option", undefined, label);
+    option.value = value;
+    select.append(option);
   }
-  return { wrap, buttons, notes };
+  return select;
 }
 
 const name = text("name");
@@ -126,45 +116,62 @@ host.placeholder = "localhost";
 const port = text("port");
 port.placeholder = "5000";
 const user = text("user");
+user.placeholder = "Optional";
 const password = text("password", "password");
 const timeout = text("timeout");
 const tls = tick(
   "tls",
-  "Connect with TLS, with the files in the ",
+  "TLS, with the files in the ",
   link("TLS settings", "tls"),
-  ".",
 );
 const protect = tick(
   "protect",
-  "Run each query under .Q.trp, so that an error comes back with its backtrace. Turn it off when the server enforces an allowlist.",
+  "Protected evaluation, so that an error comes back with its backtrace: off when the server enforces an allowlist",
 );
-const auth = radios("auth", [
-  ["none", "None", "No password"],
-  ["store", "Stored password", "Kept in VS Code's secure storage"],
-  ["prompt", "Ask each time", "Never kept"],
-  ["extension", "Extension", ""],
+const auth = choice("auth", [
+  ["none", "None"],
+  ["store", "Stored password"],
+  ["prompt", "Ask each time"],
+  ["extension", "Extension"],
 ]);
-const target = radios("target", [
-  ["user", "User settings", "All your workspaces"],
-  [
-    "workspace",
-    "Workspace settings",
-    "This workspace, for anyone who opens it",
-  ],
+const target = choice("target", [
+  ["user", "User settings"],
+  ["workspace", "Workspace settings"],
 ]);
 
-const rows = {
-  name: setting("Name", ["Unique in its folder"], name),
-  host: setting("Host", ["A name or an address"], host),
-  port: setting("Port", ["From 1 to 65535"], port),
-  user: setting("User", ["Optional"], user),
-  auth: setting("Authentication", [], auth.wrap),
-  password: setting("Password", [], password),
-  tls: setting("TLS", [], tls.wrap),
-  protect: setting("Protected evaluation", [], protect.wrap),
-  timeout: setting("Connection timeout", [], timeout),
-  target: setting("Save to", [], target.wrap),
+// What each choice means, under its dropdown; the extension's once the
+// form knows it
+const meanings: Record<string, (string | Node)[]> = {
+  none: ["No password"],
+  store: ["Kept in VS Code's secure storage"],
+  prompt: ["Asked for at each connect, never kept"],
+  extension: [],
+  user: ["All your workspaces"],
+  workspace: ["This workspace, for anyone who opens it"],
 };
+const authMeaning = element("div", "meaning description");
+const targetMeaning = element("div", "meaning description");
+
+const rows = {
+  name: setting("Name", [], name),
+  host: setting("Host", [], host),
+  port: setting("Port", [], port),
+  user: setting("User", [], user),
+  auth: setting("Authentication", [], auth, authMeaning),
+  password: setting("Password", [], password),
+  options: setting("Options", [], tls.wrap, protect.wrap),
+  timeout: setting("Connection timeout", [], timeout),
+  target: setting("Save to", [], target, targetMeaning),
+};
+rows.port.row.classList.add("narrow");
+rows.timeout.row.classList.add("half");
+
+// Settings side by side
+function line(...settings: { row: HTMLElement }[]) {
+  const div = element("div", "line");
+  div.append(...settings.map((setting) => setting.row));
+  return div;
+}
 
 const save = element("button", undefined, "Save");
 const test = element("button", "secondary", "Test");
@@ -183,25 +190,31 @@ buttons.append(
 
 const form = element("form");
 form.noValidate = true;
-form.append(...Object.values(rows).map((row) => row.row), buttons);
+form.append(
+  rows.name.row,
+  line(rows.host, rows.port),
+  line(rows.user, rows.auth),
+  rows.password.row,
+  rows.options.row,
+  line(rows.timeout, rows.target),
+  buttons,
+);
 document.body.append(title, where, note, banner, form);
 form.hidden = true;
 
 // The form as typed
 function typed(): Form {
-  const chosen = (group: Map<string, HTMLInputElement>) =>
-    [...group].find(([, radio]) => radio.checked)?.[0];
   return {
     name: name.value,
     host: host.value,
     port: port.value,
     user: user.value,
-    auth: (chosen(auth.buttons) ?? "none") as Form["auth"],
+    auth: auth.value as Form["auth"],
     password: password.value,
     tls: tls.box.checked,
     protect: protect.box.checked,
     timeout: timeout.value,
-    target: (chosen(target.buttons) ?? "user") as Form["target"],
+    target: target.value as Form["target"],
   };
 }
 
@@ -214,12 +227,8 @@ function fill(form: Form) {
   timeout.value = form.timeout;
   tls.box.checked = form.tls;
   protect.box.checked = form.protect;
-  for (const [value, radio] of auth.buttons) {
-    radio.checked = value === form.auth;
-  }
-  for (const [value, radio] of target.buttons) {
-    radio.checked = value === form.target;
-  }
+  auth.value = form.auth;
+  target.value = form.target;
 }
 
 function changed(): boolean {
@@ -237,19 +246,20 @@ function update(): boolean {
   }
   const form = typed();
   const found = problems(form, context, stored);
-  for (const [field, row] of Object.entries(rows) as [
-    Field,
-    (typeof rows)[Field],
-  ][]) {
-    const problem = left.has(field) ? found[field] : undefined;
+  for (const [field, row] of Object.entries(rows)) {
+    const problem = left.has(field as Field)
+      ? found[field as Field]
+      : undefined;
     row.problem.textContent = problem ?? "";
     row.row.classList.toggle("invalid", problem !== undefined);
   }
+  authMeaning.replaceChildren(...meanings[form.auth]);
+  targetMeaning.replaceChildren(...meanings[form.target]);
   rows.password.row.hidden = form.auth !== "store";
   password.placeholder = stored ? "Stored" : "";
   rows.password.about.textContent = stored
-    ? "Stored for this user, host and port. Type another to replace it."
-    : "Kept in VS Code's secure storage for this user, host and port, never in settings.";
+    ? "Stored for this user, host and port: type another to replace it"
+    : "For this user, host and port";
   return Object.keys(found).length === 0;
 }
 
@@ -296,14 +306,11 @@ function show(message: Extract<ToForm, { type: "load" }>) {
   where.hidden = folder.length === 0;
   note.hidden = !message.context.connected;
   rows.target.row.hidden = editing !== undefined || !workspaceOpen;
-  rows.timeout.about.textContent = `How long to wait to connect and log in, in milliseconds; 0 waits as long as it takes. Empty for the connect timeout setting, ${ms === 0 ? "none" : `${ms} ms`}.`;
+  rows.timeout.about.textContent = `In ms, 0 for none; empty for ${ms === 0 ? "none" : `${ms} ms`}`;
   timeout.placeholder = String(ms);
-  const extension = auth.notes.get("extension");
-  extension?.replaceChildren(
-    ...(authExtension
-      ? [`From ${authExtension}, the `, link("auth extension", "authExtension")]
-      : ["Set the ", link("auth extension", "authExtension"), " first"]),
-  );
+  meanings.extension = authExtension
+    ? [`From ${authExtension}, the `, link("auth extension", "authExtension")]
+    : ["Set the ", link("auth extension", "authExtension"), " first"];
   update();
 }
 
