@@ -13,7 +13,6 @@ import { definitions } from "../servers";
 const context: Context = {
   folder: [],
   taken: ["old"],
-  timeout: 2000,
   workspaceOpen: false,
   tlsFiles: [],
   connected: false,
@@ -65,6 +64,22 @@ suite("the server form's fields", () => {
       port: 5010,
       user: "admin",
     });
+  });
+
+  test("a timeout's filled in, and written only when it isn't the default", () => {
+    assert.strictEqual(blank().timeout, "2000");
+    assert.strictEqual(
+      fromSetting("s", { host: "h", port: 1 }, false).timeout,
+      "2000",
+    );
+    assert.strictEqual(toSetting(prod).timeout, undefined);
+    assert.strictEqual(toSetting({ ...prod, timeout: "0" }).timeout, 0);
+    assert.deepStrictEqual(
+      problems({ ...prod, timeout: " " }, context, false),
+      {
+        timeout: "A whole number of milliseconds",
+      },
+    );
   });
 
   test("a server's setting round trips through the form", () => {

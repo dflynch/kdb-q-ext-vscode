@@ -340,35 +340,23 @@ suite("servers", () => {
       definitions({ local: { host: "h", port: 1, timeout: 0 } }).servers,
       [{ name: "local", host: "h", port: 1, timeout: 0 }],
     );
-    assert.strictEqual(settings(0, undefined).defaults.timeout, 0);
   });
 
-  test("the connect timeout and the size limit", () => {
-    assert.deepStrictEqual(settings(undefined, undefined), {
-      defaults,
-      problems: [],
-    });
-    assert.deepStrictEqual(settings(500, 2.5), {
-      defaults: { timeout: 500, limit: 2500000 },
+  test("the size limit", () => {
+    assert.deepStrictEqual(settings(undefined), { defaults, problems: [] });
+    assert.deepStrictEqual(settings(2.5), {
+      defaults: { limit: 2500000 },
       problems: [],
     });
   });
 
   test("a wrong setting is a problem, and its default is used", () => {
-    assert.deepStrictEqual(settings(-1, 0), {
-      defaults,
-      problems: [
-        "the connect timeout isn't a whole number of milliseconds",
-        "the size limit isn't a positive number of megabytes",
-      ],
-    });
-    assert.deepStrictEqual(settings(1.5, "10"), {
-      defaults,
-      problems: [
-        "the connect timeout isn't a whole number of milliseconds",
-        "the size limit isn't a positive number of megabytes",
-      ],
-    });
+    for (const wrong of [0, "10"]) {
+      assert.deepStrictEqual(settings(wrong), {
+        defaults,
+        problems: ["the size limit isn't a positive number of megabytes"],
+      });
+    }
   });
 
   test("a password is kept for where it's sent, not the server's name", () => {

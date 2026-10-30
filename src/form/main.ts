@@ -125,9 +125,9 @@ const tlsNote = element("div", "note-under description");
 const protect = tick("protect", "Use protected evaluation");
 const protectNote = element("div", "note-under description");
 protectNote.append(
-  "Wraps the query using ",
+  "Wrap with ",
   element("code", undefined, ".Q.trp"),
-  " so that an error returns its backtrace (may be blocked by a server that enforces an allowlist)",
+  " so that an error returns a backtrace (may be blocked by a server that enforces an allowlist)",
 );
 const auth = choice("auth", [
   ["none", "None"],
@@ -161,7 +161,13 @@ const rows = {
   auth: setting("Authentication", [], auth, authMeaning),
   password: setting("Password", [], password),
   options: setting("Options", [], tls.wrap, tlsNote, protect.wrap, protectNote),
-  timeout: setting("Timeout", [], timeout),
+  timeout: setting(
+    "Timeout",
+    [
+      "How long to wait for a connection, in milliseconds (0 waits as long as it takes)",
+    ],
+    timeout,
+  ),
   target: setting("Save to", [], target, targetMeaning),
 };
 rows.timeout.row.classList.add("half");
@@ -299,13 +305,7 @@ function show(message: Extract<ToForm, { type: "load" }>) {
   });
   left.clear();
   fill(message.form);
-  const {
-    editing,
-    folder,
-    timeout: ms,
-    authExtension,
-    workspaceOpen,
-  } = message.context;
+  const { editing, folder, authExtension, workspaceOpen } = message.context;
   title.textContent =
     editing === undefined ? "Add Server" : `Edit ${message.form.name}`;
   where.textContent = folder.length > 0 ? `In ${folder.join(" › ")}` : "";
@@ -313,8 +313,6 @@ function show(message: Extract<ToForm, { type: "load" }>) {
   note.hidden = !message.context.connected;
   rows.target.row.hidden = editing !== undefined || !workspaceOpen;
   json.hidden = editing === undefined;
-  rows.timeout.about.textContent = `In ms, 0 for none; empty for ${ms === 0 ? "none" : `${ms} ms`}`;
-  timeout.placeholder = String(ms);
   const files = message.context.tlsFiles;
   tlsNote.replaceChildren(
     ...(files.length === 0

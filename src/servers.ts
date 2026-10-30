@@ -1,4 +1,5 @@
 import type { Server } from "./connection";
+import { connectTimeout } from "./form/fields";
 import { passwordProblem, userProblem } from "./login";
 import type { Secure } from "./tls";
 
@@ -11,8 +12,8 @@ export type Definition = {
   host: string;
   port: number;
   user?: string;
-  // Overrides the connect timeout for this server, in milliseconds, or 0 to
-  // wait as long as it takes
+  // How long to wait to connect and log in, in milliseconds, or 0 to wait
+  // as long as it takes; connectTimeout unless given
   timeout?: number;
   // Whether to evaluate queries protected, so that an error comes back with
   // its backtrace: on unless false, as a server that enforces an allowlist
@@ -37,13 +38,11 @@ export type Credentials = { user?: string; password?: string };
 
 // The settings a connection uses, besides the server's own
 export type Defaults = {
-  // In milliseconds
-  timeout: number;
   // In bytes
   limit: number;
 };
 
-export const defaults: Defaults = { timeout: 2000, limit: 100e6 };
+export const defaults: Defaults = { limit: 100e6 };
 
 const fields = new Set([
   "host",
@@ -264,21 +263,13 @@ export function authExtension(setting: unknown): {
     : { problem: "the auth extension isn't an extension ID" };
 }
 
-// The connect timeout and the size limit, with the problem said for one
-// that's wrong and its default used
-export function settings(
-  timeout: unknown,
-  megabytes: unknown,
-): { defaults: Defaults; problems: string[] } {
+// The size limit, with the problem said if it's wrong and its default used
+export function settings(megabytes: unknown): {
+  defaults: Defaults;
+  problems: string[];
+} {
   const problems: string[] = [];
   let result = { ...defaults };
-  if (timeout !== undefined) {
-    if (isTimeout(timeout)) {
-      result = { ...result, timeout };
-    } else {
-      problems.push("the connect timeout isn't a whole number of milliseconds");
-    }
-  }
   if (megabytes !== undefined) {
     if (typeof megabytes === "number" && megabytes > 0) {
       result = { ...result, limit: Math.round(megabytes * 1e6) };
@@ -318,7 +309,7 @@ export function credentialsProblem(value: unknown): string | undefined {
 export function server(
   definition: Definition,
   { user = definition.user, password }: Credentials,
-  { timeout, limit }: Defaults,
+  { limit }: Defaults,
   tls?: Secure,
 ): Server {
   return {
@@ -326,7 +317,7 @@ export function server(
     port: definition.port,
     ...(user === undefined ? {} : { user }),
     ...(password === undefined ? {} : { password }),
-    timeout: definition.timeout ?? timeout,
+    timeout: definition.timeout ?? connectTimeout,
     limit,
     protect: definition.protect ?? true,
     ...(tls === undefined ? {} : { tls }),

@@ -99,7 +99,7 @@ settings file it's in:
   `SSL_KEY_FILE`). Paths are absolute or start with `~/`. An encrypted key's
   passphrase is kept by **kdb+/q: Set Certificate Passphrase**
 - **`timeout`** is how long to wait to connect and log in, in milliseconds,
-  overriding `connectTimeout`; 0 waits as long as it takes, as `hopen` does
+  2000 unless given; 0 waits as long as it takes, as `hopen` does
 
 #### Protected evaluation
 
@@ -312,18 +312,17 @@ Open Keyboard Shortcuts**.
 
 ## Settings
 
-| Setting                           | Default        | What it does                                                 |
-| --------------------------------- | -------------- | ------------------------------------------------------------ |
-| `kdb-q-ext-vscode.servers`        | `{}`           | The servers to connect to, by name (see [Servers](#servers)) |
-| `kdb-q-ext-vscode.authExtension`  | `""`           | The extension that gives credentials, as `publisher.name`    |
-| `kdb-q-ext-vscode.connectTimeout` | `2000`         | How long to wait to connect and log in, in ms; 0 waits       |
-| `kdb-q-ext-vscode.tlsCaFile`      | `""`           | A CA certificate to trust for TLS, as `SSL_CA_CERT_FILE`     |
-| `kdb-q-ext-vscode.tlsCertFile`    | `""`           | A client certificate for TLS, as `SSL_CERT_FILE`             |
-| `kdb-q-ext-vscode.tlsKeyFile`     | `""`           | The client certificate's key, as `SSL_KEY_FILE`              |
-| `kdb-q-ext-vscode.consoleSize`    | `[1000, 1000]` | How much of a result to show, as lines then width            |
-| `kdb-q-ext-vscode.precision`      | `7`            | Significant digits of floats and reals, as `\P`; 0 for all   |
-| `kdb-q-ext-vscode.sizeLimit`      | `100`          | The largest result to take, in MB, uncompressed              |
-| `kdb-q-ext-vscode.rowLimit`       | `5000000`      | The most rows a result, or a cell drilled into, can have     |
+| Setting                          | Default        | What it does                                                 |
+| -------------------------------- | -------------- | ------------------------------------------------------------ |
+| `kdb-q-ext-vscode.servers`       | `{}`           | The servers to connect to, by name (see [Servers](#servers)) |
+| `kdb-q-ext-vscode.authExtension` | `""`           | The extension that gives credentials, as `publisher.name`    |
+| `kdb-q-ext-vscode.tlsCaFile`     | `""`           | A CA certificate to trust for TLS, as `SSL_CA_CERT_FILE`     |
+| `kdb-q-ext-vscode.tlsCertFile`   | `""`           | A client certificate for TLS, as `SSL_CERT_FILE`             |
+| `kdb-q-ext-vscode.tlsKeyFile`    | `""`           | The client certificate's key, as `SSL_KEY_FILE`              |
+| `kdb-q-ext-vscode.consoleSize`   | `[1000, 1000]` | How much of a result to show, as lines then width            |
+| `kdb-q-ext-vscode.precision`     | `7`            | Significant digits of floats and reals, as `\P`; 0 for all   |
+| `kdb-q-ext-vscode.sizeLimit`     | `100`          | The largest result to take, in MB, uncompressed              |
+| `kdb-q-ext-vscode.rowLimit`      | `5000000`      | The most rows a result, or a cell drilled into, can have     |
 
 `precision` works as q's `\P`: from 1 to 17 significant digits, or 0 for as
 many as each type holds, 17 for a float and 8 for a real. It applies wherever

@@ -252,8 +252,6 @@ export class ServerForms implements vscode.Disposable {
       taken: servers.isObject(folder)
         ? Object.keys(folder).filter((name) => name !== own)
         : [],
-      timeout: servers.settings(config().get("connectTimeout"), undefined)
-        .defaults.timeout,
       workspaceOpen: vscode.workspace.workspaceFolders !== undefined,
       ...(typeof authExtension === "string" && authExtension !== ""
         ? { authExtension }

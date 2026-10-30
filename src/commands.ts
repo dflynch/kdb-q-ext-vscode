@@ -429,13 +429,10 @@ export async function clearPassphrase(secrets: vscode.SecretStorage) {
   }
 }
 
-// The connect timeout and the size limit, with any problems in them shown
+// The size limit, with any problem in it shown
 export function connectionDefaults(): servers.Defaults {
   const config = vscode.workspace.getConfiguration("kdb-q-ext-vscode");
-  const { defaults, problems } = servers.settings(
-    config.get("connectTimeout"),
-    config.get("sizeLimit"),
-  );
+  const { defaults, problems } = servers.settings(config.get("sizeLimit"));
   if (problems.length > 0) {
     vscode.window.showWarningMessage(
       `kdb+/q: Using the default, as ${problems.join(" and ")}.`,

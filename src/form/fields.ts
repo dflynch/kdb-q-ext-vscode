@@ -18,7 +18,7 @@ export type Form = {
   password: string;
   tls: boolean;
   protect: boolean;
-  // In milliseconds, or empty for the connect timeout setting's
+  // In milliseconds, 0 to wait as long as it takes
   timeout: string;
   // The settings a server added is saved to; one edited stays where it is
   target: "user" | "workspace";
@@ -35,8 +35,6 @@ export type Context = {
   editing?: string;
   // The names of the rest of the folder's servers and folders
   taken: string[];
-  // The connect timeout setting, in milliseconds
-  timeout: number;
   // Whether there's a workspace to save a server to
   workspaceOpen: boolean;
   // The authExtension setting, as written
@@ -47,6 +45,10 @@ export type Context = {
   // connect
   connected: boolean;
 };
+
+// How long a server waits to connect and log in, in milliseconds, unless
+// it gives its own. Here, as the form has it too.
+export const connectTimeout = 2000;
 
 // The form for a server to add: protected evaluation on, as a server has
 // it by default
@@ -60,7 +62,7 @@ export function blank(): Form {
     password: "",
     tls: false,
     protect: true,
-    timeout: "",
+    timeout: String(connectTimeout),
     target: "user",
   };
 }
@@ -88,7 +90,7 @@ export function fromSetting(
     auth: value.auth ?? (stored ? "store" : "none"),
     tls: value.tls ?? false,
     protect: value.protect ?? true,
-    timeout: value.timeout === undefined ? "" : String(value.timeout),
+    timeout: String(value.timeout ?? connectTimeout),
   };
 }
 
@@ -141,7 +143,7 @@ export function problems(
       found.password = "Can't contain a 0 byte";
     }
   }
-  if (form.timeout.trim() !== "" && timeout(form.timeout) === undefined) {
+  if (timeout(form.timeout) === undefined) {
     found.timeout = "A whole number of milliseconds";
   }
   return found;
@@ -161,7 +163,7 @@ export function toSetting(form: Form): Record<string, unknown> {
       : {}),
     ...(form.tls ? { tls: true } : {}),
     ...(form.protect ? {} : { protect: false }),
-    ...(ms === undefined ? {} : { timeout: ms }),
+    ...(ms === undefined || ms === connectTimeout ? {} : { timeout: ms }),
   };
 }
 
