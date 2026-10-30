@@ -180,14 +180,10 @@ const test = element("button", "secondary", "Test");
 const tested = element("span", "tested");
 tested.role = "status";
 const cancel = element("button", "secondary", "Cancel");
+// For a server already saved: there's nothing of an added one there yet
+const json = link("Edit in settings.json", "servers");
 const buttons = element("div", "buttons");
-buttons.append(
-  save,
-  test,
-  cancel,
-  link("Edit in settings.json", "servers"),
-  tested,
-);
+buttons.append(save, test, cancel, json, tested);
 
 const form = element("form");
 form.noValidate = true;
@@ -308,6 +304,7 @@ function show(message: Extract<ToForm, { type: "load" }>) {
   where.hidden = folder.length === 0;
   note.hidden = !message.context.connected;
   rows.target.row.hidden = editing !== undefined || !workspaceOpen;
+  json.hidden = editing === undefined;
   rows.timeout.about.textContent = `In ms, 0 for none; empty for ${ms === 0 ? "none" : `${ms} ms`}`;
   timeout.placeholder = String(ms);
   meanings.extension = authExtension
