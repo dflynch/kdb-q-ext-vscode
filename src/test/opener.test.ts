@@ -68,6 +68,23 @@ suite("opener", () => {
     fake.stop();
   });
 
+  test("a password typed in the server form, in place of the one kept", async () => {
+    const fake = await serve();
+    const server: Definition = {
+      name: "local",
+      host: "127.0.0.1",
+      port: fake.port,
+      user: "admin",
+    };
+    const open = opener(
+      secrets({ [`password:admin@127.0.0.1:${fake.port}`]: "pw" }),
+    );
+    const connection = await open(server, "typed");
+    assert.strictEqual(await fake.login, "admin:typed");
+    connection?.close();
+    fake.stop();
+  });
+
   test("connects with TLS, with the client certificate's kept passphrase", async () => {
     const fake = await serve({
       cert: readFileSync(fixture("server.pem")),

@@ -136,10 +136,10 @@ const tls = tick(
 );
 const protect = tick(
   "protect",
-  "Run each query under .Q.trp, so that an error comes back with its backtrace. Turn it off for a server whose .z.pg is customised, such as a gateway.",
+  "Run each query under .Q.trp, so that an error comes back with its backtrace. Turn it off when the server enforces an allowlist.",
 );
 const auth = radios("auth", [
-  ["none", "None", "The user alone"],
+  ["none", "None", "User only"],
   ["store", "Stored password", "Kept in VS Code's secure storage"],
   ["prompt", "Ask each time", "Never kept"],
   ["extension", "Extension", ""],
@@ -167,14 +167,18 @@ const rows = {
 };
 
 const save = element("button", undefined, "Save");
-const saveAndConnect = element("button", "secondary", "Save and Connect");
+const test = element("button", "secondary", "Test");
+// How a test went, beside the buttons
+const tested = element("span", "tested");
+tested.role = "status";
 const cancel = element("button", "secondary", "Cancel");
 const buttons = element("div", "buttons");
 buttons.append(
   save,
-  saveAndConnect,
+  test,
   cancel,
   link("Edit in settings.json", "servers"),
+  tested,
 );
 
 const form = element("form");
@@ -266,7 +270,8 @@ function show(message: Extract<ToForm, { type: "load" }>) {
   pending = undefined;
   banner.hidden = true;
   save.disabled = false;
-  saveAndConnect.disabled = false;
+  test.disabled = false;
+  tested.textContent = "";
   form.hidden = false;
   loaded = message.form;
   context = message.context;
@@ -333,7 +338,12 @@ window.addEventListener("message", (event: MessageEvent<ToForm>) => {
     case "gone":
       warn(`${context?.editing} is no longer in the settings.`);
       save.disabled = true;
-      saveAndConnect.disabled = true;
+      test.disabled = true;
+      break;
+    case "tested":
+      test.disabled = false;
+      tested.className = message.ok ? "tested" : "tested failed";
+      tested.textContent = message.text;
       break;
     case "stored":
       if (JSON.stringify(message.login) === asked) {
@@ -361,23 +371,29 @@ form.addEventListener("focusout", (event) => {
   }
 });
 
-// Save, once every problem's shown and there are none
-function submit(connect: boolean) {
+// Save or test, once every problem's shown and there are none
+function submit(type: "save" | "test") {
   for (const field of Object.keys(rows) as Field[]) {
     left.add(field);
   }
-  if (update() && !save.disabled) {
-    vscode.postMessage({ type: "save", form: typed(), connect });
+  if (!update() || save.disabled) {
+    return;
   }
+  if (type === "test") {
+    test.disabled = true;
+    tested.className = "tested";
+    tested.textContent = "Connecting…";
+  }
+  vscode.postMessage({ type, form: typed() });
 }
 
 // Enter in a box saves, as a form submits
 form.addEventListener("submit", (event) => {
   event.preventDefault();
-  submit(false);
+  submit("save");
 });
-saveAndConnect.type = "button";
-saveAndConnect.addEventListener("click", () => submit(true));
+test.type = "button";
+test.addEventListener("click", () => submit("test"));
 cancel.type = "button";
 cancel.addEventListener("click", () => vscode.postMessage({ type: "cancel" }));
 

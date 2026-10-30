@@ -5,7 +5,7 @@ import type { Connection } from "../connection";
 import { Connections } from "../connections";
 import { blank, type Form, type FromForm, type ToForm } from "../form/fields";
 import type { Panels } from "../resultView";
-import { formType, ServerForms } from "../serverForm";
+import { formType, type Opener, ServerForms } from "../serverForm";
 
 const extension = vscode.Uri.file("/extension");
 
@@ -97,6 +97,11 @@ function secrets(kept: Record<string, string>): vscode.SecretStorage {
   } as unknown as vscode.SecretStorage;
 }
 
+// An opener that's never used
+const nowhere: Opener = async () => {
+  throw new Error("not opened");
+};
+
 const config = () => vscode.workspace.getConfiguration("kdb-q-ext-vscode");
 const user = () => config().inspect("servers")?.globalValue;
 const setUser = (value: unknown) =>
@@ -121,9 +126,15 @@ suite("the server form", () => {
     await setUser(undefined);
   });
 
-  function open(kept: Record<string, string> = {}) {
+  function open(kept: Record<string, string> = {}, opener = nowhere) {
     const { made, panels } = tabs();
-    forms = new ServerForms(extension, secrets(kept), connections, panels);
+    forms = new ServerForms(
+      extension,
+      secrets(kept),
+      connections,
+      opener,
+      panels,
+    );
     return { made, forms };
   }
 
@@ -152,7 +163,6 @@ suite("the server form", () => {
     made[0].say({
       type: "save",
       form: { ...prod, name: " TP " },
-      connect: false,
     });
     await made[0].closing;
     assert.deepStrictEqual(user(), {
@@ -200,7 +210,6 @@ suite("the server form", () => {
     made[0].say({
       type: "save",
       form: { ...form, name: "live" },
-      connect: false,
     });
     await made[0].closing;
     assert.deepStrictEqual(Object.keys(user() as object), ["a", "live", "c"]);
@@ -221,7 +230,6 @@ suite("the server form", () => {
     made[0].say({
       type: "save",
       form: { ...form, host: "kdb2.example.com", password: "other" },
-      connect: false,
     });
     await made[0].closing;
     // copy still gets the first
@@ -234,7 +242,6 @@ suite("the server form", () => {
     made[1].say({
       type: "save",
       form: { ...second.form, auth: "prompt" },
-      connect: false,
     });
     await made[1].closing;
     assert.deepStrictEqual(kept, {
@@ -251,7 +258,6 @@ suite("the server form", () => {
     made[0].say({
       type: "save",
       form: { ...form, auth: "none" },
-      connect: false,
     });
     await made[0].closing;
     assert.deepStrictEqual(kept, {});
@@ -324,7 +330,6 @@ suite("the server form", () => {
       made[0].say({
         type: "save",
         form: { ...prod, name: "old" },
-        connect: false,
       });
       while (errors.length === 0) {
         await new Promise((resolve) => setTimeout(resolve, 10));
@@ -337,6 +342,66 @@ suite("the server form", () => {
     ]);
     assert.strictEqual(made[0].closed, false);
     assert.deepStrictEqual(user(), { old: { host: "kdb0", port: 1 } });
+  });
+
+  test("Test connects as the form has the server, and closes again", async () => {
+    const opened: unknown[][] = [];
+    let closed = 0;
+    let answer: "open" | "cancel" | Error = "open";
+    const { made, forms } = open({}, async (server, password) => {
+      opened.push([server, password]);
+      if (answer instanceof Error) {
+        throw answer;
+      }
+      return answer === "cancel" ? undefined : { close: () => closed++ };
+    });
+    forms.add(["Prod"]);
+    await made[0].loaded();
+    const tried = async (form: Form) => {
+      const next = made[0].next();
+      made[0].say({ type: "test", form });
+      return next;
+    };
+    assert.deepStrictEqual(await tried({ ...prod, name: "TP" }), {
+      type: "tested",
+      ok: true,
+      text: "Connected to kdb1.example.com:5010",
+    });
+    assert.deepStrictEqual(opened, [
+      [
+        {
+          name: "Prod/TP",
+          host: "kdb1.example.com",
+          port: 5010,
+          user: "admin",
+        },
+        "secret",
+      ],
+    ]);
+    assert.strictEqual(closed, 1);
+    // A password's only given to store one
+    await tried({ ...prod, auth: "prompt" });
+    assert.strictEqual(opened[1][1], undefined);
+    answer = new Error("hop. OS reports: Connection refused");
+    assert.deepStrictEqual(await tried(prod), {
+      type: "tested",
+      ok: false,
+      text: "hop. OS reports: Connection refused",
+    });
+    answer = "cancel";
+    assert.deepStrictEqual(await tried(prod), {
+      type: "tested",
+      ok: false,
+      text: "Cancelled",
+    });
+    assert.deepStrictEqual(await tried({ ...prod, port: "" }), {
+      type: "tested",
+      ok: false,
+      text: "not tested, as port: From 1 to 65535",
+    });
+    // Nothing's written
+    assert.strictEqual(user(), undefined);
+    assert.strictEqual(made[0].closed, false);
   });
 
   test("Cancel closes the form", async () => {
@@ -374,7 +439,13 @@ suite("editServer and removeServer", () => {
   test("Edit opens the form of the server picked", async () => {
     await setUser({ Prod: { TP: { host: "kdb1", port: 1 } } });
     const { made, panels } = tabs();
-    const forms = new ServerForms(extension, secrets({}), connections, panels);
+    const forms = new ServerForms(
+      extension,
+      secrets({}),
+      connections,
+      nowhere,
+      panels,
+    );
     try {
       await editServer(forms);
       assert.deepStrictEqual(
@@ -400,6 +471,7 @@ suite("editServer and removeServer", () => {
       extension,
       secrets(kept),
       connections,
+      nowhere,
       panels,
     );
     try {

@@ -469,16 +469,21 @@ export function sources(secrets: vscode.SecretStorage): Sources {
 
 // A connection to a server as its settings define it, with its password or
 // credentials and its TLS files got at each connect, so that a token is
-// fresh. Undefined if the user cancels being asked for a password.
+// fresh, or a password typed in the server form, to test it before it's
+// stored. Undefined if the user cancels being asked for a password.
 export function opener(secrets: vscode.SecretStorage) {
-  return async (definition: servers.Definition) => {
+  return async (definition: servers.Definition, typed?: string) => {
     // Checked first, so that no password is asked for, nor an extension
     // asked, for a connect that would fail
     const tlsSettings = definition.tls ? tlsFiles() : undefined;
     if (tlsSettings?.problem) {
       throw new Error(`invalid TLS settings: ${tlsSettings.problem}`);
     }
-    const given = await credentials(definition, sources(secrets));
+    const from = sources(secrets);
+    const given = await credentials(
+      definition,
+      typed === undefined ? from : { ...from, stored: async () => typed },
+    );
     if (given === undefined) {
       return undefined;
     }
@@ -507,7 +512,7 @@ export async function connect(connections: Connections<Connection>) {
   }
 }
 
-export async function connectTo(
+async function connectTo(
   connections: Connections<Connection>,
   server: servers.Definition,
 ) {

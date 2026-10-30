@@ -201,8 +201,17 @@ input[type="radio"]:checked::before {
   margin-top: 16px;
 }
 
-.buttons a {
+.buttons a,
+.tested {
   margin-left: 8px;
+}
+
+.tested {
+  color: var(--vscode-descriptionForeground);
+}
+
+.tested.failed {
+  color: var(--vscode-errorForeground);
 }
 
 button {

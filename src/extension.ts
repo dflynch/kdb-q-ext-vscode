@@ -7,13 +7,15 @@ import { ServerForms } from "./serverForm";
 import { showStatus } from "./status";
 
 export function activate(context: vscode.ExtensionContext) {
-  const connections = new Connections(commands.opener(context.secrets));
+  const open = commands.opener(context.secrets);
+  const connections = new Connections(open);
   const results = new ResultView(context.extensionUri);
   const status = showStatus(connections);
   const forms = new ServerForms(
     context.extensionUri,
     context.secrets,
     connections,
+    open,
   );
   context.subscriptions.push(
     status,

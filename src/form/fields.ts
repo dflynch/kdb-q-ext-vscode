@@ -168,19 +168,21 @@ export type Login = { user: string; host: string; port: string };
 
 // To the form: the form to show, what it needs to know, and whether a
 // password is stored for its login, again whenever the settings change; that
-// a server edited is no longer in the settings; or whether a password is
-// stored for a login typed
+// a server edited is no longer in the settings; whether a password is
+// stored for a login typed; or how a test of the server went
 export type ToForm =
   | { type: "load"; form: Form; context: Context; stored: boolean }
   | { type: "gone" }
-  | { type: "stored"; login: Login; stored: boolean };
+  | { type: "stored"; login: Login; stored: boolean }
+  | { type: "tested"; ok: boolean; text: string };
 
 // From the form: it's ready for its form; a login typed, to say whether a
-// password is stored for it; the form to save, connecting after or not;
+// password is stored for it; the form to save, or to test by connecting;
 // cancel; or a setting to open
 export type FromForm =
   | { type: "ready" }
   | { type: "lookup"; login: Login }
-  | { type: "save"; form: Form; connect: boolean }
+  | { type: "save"; form: Form }
+  | { type: "test"; form: Form }
   | { type: "cancel" }
   | { type: "open"; setting: "servers" | "authExtension" | "tls" };

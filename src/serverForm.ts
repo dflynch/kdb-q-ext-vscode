@@ -1,6 +1,5 @@
 import { randomBytes } from "node:crypto";
 import * as vscode from "vscode";
-import { connectTo } from "./commands";
 import type { Connection } from "./connection";
 import type { Connections } from "./connections";
 import {
@@ -23,6 +22,14 @@ export const formType = "kdb-q-ext-vscode.serverForm";
 
 // The settings a server's in, as VS Code names them
 type Scope = "user" | "workspace";
+
+// Opens a connection to a server, with a password typed in place of the
+// one stored, if one's given: the extension's opener, or a stand-in for
+// tests. Undefined if asking for a password was cancelled.
+export type Opener = (
+  server: servers.Definition,
+  password?: string,
+) => Promise<{ close(): void } | undefined>;
 
 // A form open in a tab: for a server to add to a folder, or for one to
 // edit, by its name as it was
@@ -121,6 +128,7 @@ export class ServerForms implements vscode.Disposable {
     private readonly extensionUri: vscode.Uri,
     private readonly secrets: vscode.SecretStorage,
     private readonly connections: Connections<Connection>,
+    private readonly opener: Opener,
     private readonly panels: Panels = vscode.window.createWebviewPanel,
   ) {
     // Each form shows the settings as they are, or keeps what's typed and
@@ -208,7 +216,12 @@ export class ServerForms implements vscode.Disposable {
           stored: await this.stored(keyFor(message.login)),
         });
       case "save":
-        return this.save(open, message.form, message.connect);
+        return this.save(open, message.form);
+      case "test":
+        return post({
+          type: "tested",
+          ...(await this.test(open, message.form)),
+        });
       case "cancel":
         return open.panel.dispose();
       case "open":
@@ -272,10 +285,9 @@ export class ServerForms implements vscode.Disposable {
     return post({ type: "load", form, context, stored });
   }
 
-  // Write the server where it's written, or for one added, where it's to
-  // go; keep its password, and forget the one it had if no other server
-  // gets it; then close the form, and connect if asked
-  private async save(open: Open, form: Form, connect: boolean) {
+  // The server the form makes, by its path, and its setting, read back as
+  // connecting reads it; refused with the problems the form has
+  private async checked(open: Open, form: Form, refused: string) {
     const context = this.context(open);
     const login = { user: form.user, host: form.host, port: form.port };
     const found = problems(form, context, await this.stored(keyFor(login)));
@@ -283,18 +295,55 @@ export class ServerForms implements vscode.Disposable {
       ([field, problem]) => `${field}: ${problem}`,
     );
     if (wrong.length > 0) {
-      throw new Error(`not saved, as ${wrong.join("; ")}`);
+      throw new Error(`${refused}, as ${wrong.join("; ")}`);
     }
     const name = form.name.trim();
     const path = [...open.folder, name];
     const value = toSetting(form);
-    // Read back as connecting reads it
     const read = servers.definitions({ [name]: value });
     const [checked] = read.servers;
     if (checked === undefined) {
       throw new Error(read.problems.join("; "));
     }
     const definition = { ...checked, name: path.join("/") };
+    return { context, path, value, definition };
+  }
+
+  // Open a connection as the form has the server, and close it again,
+  // saying how it went: with the password typed, if one is
+  private async test(
+    open: Open,
+    form: Form,
+  ): Promise<{ ok: boolean; text: string }> {
+    try {
+      const { definition } = await this.checked(open, form, "not tested");
+      const typed =
+        form.auth === "store" && form.password !== ""
+          ? form.password
+          : undefined;
+      const link = await this.opener(definition, typed);
+      if (link === undefined) {
+        return { ok: false, text: "Cancelled" };
+      }
+      link.close();
+      return {
+        ok: true,
+        text: `Connected to ${definition.host}:${definition.port}`,
+      };
+    } catch (error) {
+      return { ok: false, text: (error as Error).message };
+    }
+  }
+
+  // Write the server where it's written, or for one added, where it's to
+  // go; keep its password, and forget the one it had if no other server
+  // gets it; then close the form
+  private async save(open: Open, form: Form) {
+    const { context, path, value, definition } = await this.checked(
+      open,
+      form,
+      "not saved",
+    );
     const before = this.editing(open);
     const scope: Scope =
       open.editing === undefined
@@ -319,9 +368,6 @@ export class ServerForms implements vscode.Disposable {
     }
     await forget(this.secrets, unused, definition.name);
     open.panel.dispose();
-    if (connect) {
-      await connectTo(this.connections, definition);
-    }
   }
 
   // A setting the form refers to: the servers in settings.json, where they
