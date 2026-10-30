@@ -161,11 +161,7 @@ const rows = {
   auth: setting("Authentication", [], auth, authMeaning),
   password: setting("Password", [], password),
   options: setting("Options", [], tls.wrap, tlsNote, protect.wrap, protectNote),
-  timeout: setting(
-    "Timeout",
-    ["Milliseconds to wait to connect, empty for no limit"],
-    timeout,
-  ),
+  timeout: setting("Connection timeout", ["Milliseconds"], timeout),
   target: setting("Save to", [], target, targetMeaning),
 };
 rows.timeout.row.classList.add("half");
