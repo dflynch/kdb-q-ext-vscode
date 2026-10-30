@@ -33,11 +33,11 @@ export type Opener = (
 ) => Promise<{ close(): void } | undefined>;
 
 // A form open in a tab: for a server to add to a folder, or for one to
-// edit, by its name as it was
+// edit, by its path as it was
 type Open = {
   panel: vscode.WebviewPanel;
   folder: string[];
-  editing?: string;
+  editing?: string[];
   // Aborted as the tab closes, stopping a test
   closing: AbortController;
   // Whether it's being saved, so that it's neither saved again nor told
@@ -58,8 +58,7 @@ function scopes(): Record<Scope, unknown> {
 
 // The scopes a server's written in: a server in both has their fields
 // merged, the workspace's over the user's
-export function scopesOf(name: string): Scope[] {
-  const path = name.split("/");
+export function scopesOf(path: string[]): Scope[] {
   const written = scopes();
   return (["user", "workspace"] as const).filter(
     (scope) => servers.at(written[scope], path) !== undefined,
@@ -90,19 +89,20 @@ export async function write(
   );
 }
 
-// Delete the passwords no server other than the one named still gets from
-// secure storage: several servers with the same user, host and port share
-// one
+// Delete the passwords no server other than the one at the path given still
+// gets from secure storage: several servers with the same user, host and
+// port share one
 export async function forget(
   secrets: vscode.SecretStorage,
   keys: Iterable<string>,
-  except?: string,
+  except?: string[],
 ) {
   const { servers: defined } = servers.definitions(config().get("servers"));
+  const skipped = except && servers.id(except);
   for (const key of keys) {
     const used = defined.some(
       (server) =>
-        server.name !== except &&
+        servers.id(server.path) !== skipped &&
         server.auth === "store" &&
         servers.secretKey(server) === key,
     );
@@ -119,7 +119,6 @@ function keyFor(login: Login): string | undefined {
   return at === undefined || login.host.trim() === ""
     ? undefined
     : servers.secretKey({
-        name: "",
         host: login.host.trim(),
         port: at,
         ...(login.user.trim() === "" ? {} : { user: login.user.trim() }),
@@ -156,19 +155,18 @@ export class ServerForms implements vscode.Disposable {
     this.show("", { folder }, "Add Server");
   }
 
-  // The form to edit a server, by its name
-  edit(name: string) {
-    const path = name.split("/");
+  // The form to edit a server, by its path
+  edit(path: string[]) {
     this.show(
-      name,
-      { folder: path.slice(0, -1), editing: name },
+      servers.id(path),
+      { folder: path.slice(0, -1), editing: path },
       `Edit ${path.at(-1)}`,
     );
   }
 
   // Close a server's form, as when it's removed
-  close(name: string) {
-    this.forms.get(name)?.panel.dispose();
+  close(path: string[]) {
+    this.forms.get(servers.id(path))?.panel.dispose();
   }
 
   dispose() {
@@ -259,7 +257,7 @@ export class ServerForms implements vscode.Disposable {
   private context(open: Open): Context {
     const setting = config().get("servers");
     const folder = servers.at(setting, open.folder);
-    const own = open.editing?.split("/").at(-1);
+    const own = open.editing?.at(-1);
     const authExtension = config().get("authExtension");
     const { files } = tls.files(
       config().get("tlsCaFile"),
@@ -268,7 +266,7 @@ export class ServerForms implements vscode.Disposable {
     );
     return {
       folder: open.folder,
-      ...(open.editing === undefined ? {} : { editing: open.editing }),
+      ...(own === undefined ? {} : { editing: own }),
       scopes: open.editing === undefined ? [] : scopesOf(open.editing),
       taken: servers.isObject(folder)
         ? Object.keys(folder).filter((name) => name !== own)
@@ -280,15 +278,16 @@ export class ServerForms implements vscode.Disposable {
       tlsFiles: Object.values(files).map((file) => path.basename(file)),
       connected:
         open.editing !== undefined &&
-        this.connections.state(open.editing) !== undefined,
+        this.connections.state(servers.id(open.editing)) !== undefined,
     };
   }
 
   // The server edited, as the settings define it now
   private editing(open: Open): servers.Definition | undefined {
+    const id = open.editing && servers.id(open.editing);
     return servers
       .definitions(config().get("servers"))
-      .servers.find((server) => server.name === open.editing);
+      .servers.find((server) => servers.id(server.path) === id);
   }
 
   // Post the form as the settings have it: blank for a server to add, or
@@ -316,7 +315,7 @@ export class ServerForms implements vscode.Disposable {
       return { type: "gone" };
     }
     const stored = await this.stored(servers.secretKey(server));
-    const form = fromSetting(server.name.split("/").at(-1) ?? "", server);
+    const form = fromSetting(server.path.at(-1) ?? "", server);
     return { type: "load", form, context, stored };
   }
 
@@ -345,9 +344,9 @@ export class ServerForms implements vscode.Disposable {
     const read = servers.definitions({ [name]: value });
     const [checked] = read.servers;
     if (checked === undefined) {
-      throw new Error(read.problems.join("; "));
+      throw new Error(read.problems.map(({ problem }) => problem).join("; "));
     }
-    const definition = { ...checked, name: path.join("/") };
+    const definition = { ...checked, path };
     return { context, path, value, definition };
   }
 
@@ -421,20 +420,21 @@ export class ServerForms implements vscode.Disposable {
           : "user";
       await write(scope, path, value);
     } else {
-      const old = open.editing.split("/");
+      const old = open.editing;
       const from = old.at(-1);
-      const written = scopesOf(open.editing);
+      const renamed = servers.id(old) !== servers.id(path);
+      const written = scopesOf(old);
       // Its fields are written where they win; anywhere else it's only
       // renamed, keeping what's written there
       const scope = written.at(-1) ?? "user";
       for (const other of written.filter((each) => each !== scope)) {
-        if (open.editing !== definition.name) {
+        if (renamed) {
           await write(other, path, servers.at(scopes()[other], old), from);
         }
       }
       await write(scope, path, value, from);
-      if (open.editing !== definition.name) {
-        this.connections.disconnect(open.editing);
+      if (renamed) {
+        this.connections.disconnect(servers.id(old));
       }
     }
     const unused = new Set<string>();
@@ -444,7 +444,7 @@ export class ServerForms implements vscode.Disposable {
     if (form.auth === "store") {
       unused.delete(key);
     }
-    await forget(this.secrets, unused, definition.name);
+    await forget(this.secrets, unused, path);
   }
 
   // A setting the form refers to: the servers, or the TLS files, in

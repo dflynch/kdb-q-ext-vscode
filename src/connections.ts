@@ -1,4 +1,4 @@
-import type { Definition } from "./servers";
+import { type Definition, id } from "./servers";
 
 // What the open connections need of one, so that tests can stand in for it
 export interface Link {
@@ -14,7 +14,7 @@ export type State =
 
 // What's changed: a connection's state, or which is active. A connection
 // that closed without being disconnected says why.
-export type Change = { lost?: { name: string; reason: Error } };
+export type Change = { lost?: { server: Definition; reason: Error } };
 
 type Entry<L> = {
   server: Definition;
@@ -25,7 +25,7 @@ type Entry<L> = {
   abort?: AbortController;
 };
 
-// The connections open, by their server's name, and the one that's active,
+// The connections open, by their server's id, and the one that's active,
 // which queries go to. A connection that closes, however it does, stays
 // until it's disconnected, with the reason, so that it can be told.
 export class Connections<L extends Link> {
@@ -47,29 +47,29 @@ export class Connections<L extends Link> {
     return () => this.listeners.delete(listener);
   }
 
-  get active(): { name: string; state: State } | undefined {
+  get active(): { id: string; state: State } | undefined {
     const entry = this.current && this.entries.get(this.current);
     return entry && this.current
-      ? { name: this.current, state: entry.state }
+      ? { id: this.current, state: entry.state }
       : undefined;
   }
 
-  state(name: string): State | undefined {
-    return this.entries.get(name)?.state;
+  state(id: string): State | undefined {
+    return this.entries.get(id)?.state;
   }
 
-  // The names of the connections, whatever their state
-  get names(): string[] {
-    return [...this.entries.keys()];
+  // The servers connected to, whatever their state, as their settings
+  // defined them then
+  get servers(): Definition[] {
+    return [...this.entries.values()].map((entry) => entry.server);
   }
 
-  // The server as its settings defined it when it was connected to
-  server(name: string): Definition | undefined {
-    return this.entries.get(name)?.server;
+  server(id: string): Definition | undefined {
+    return this.entries.get(id)?.server;
   }
 
-  link(name: string): L | undefined {
-    const entry = this.entries.get(name);
+  link(id: string): L | undefined {
+    const entry = this.entries.get(id);
     return entry?.state.kind === "open" ? entry.link : undefined;
   }
 
@@ -78,19 +78,20 @@ export class Connections<L extends Link> {
   // and thrown. Connecting while it's connecting waits for the same
   // outcome.
   async connect(server: Definition): Promise<L | undefined> {
-    const existing = this.entries.get(server.name);
+    const key = id(server.path);
+    const existing = this.entries.get(key);
     if (existing?.state.kind === "open") {
-      this.activate(server.name);
+      this.activate(key);
       return existing.link;
     }
     if (existing?.opening) {
-      this.activate(server.name);
+      this.activate(key);
       return existing.opening;
     }
     const entry: Entry<L> = { server, state: { kind: "connecting" } };
-    this.entries.set(server.name, entry);
+    this.entries.set(key, entry);
     const before = this.current;
-    this.current = server.name;
+    this.current = key;
     entry.opening = this.opened(entry, before);
     this.emit({});
     return entry.opening;
@@ -103,13 +104,14 @@ export class Connections<L extends Link> {
     before: string | undefined,
   ): Promise<L | undefined> {
     const { server } = entry;
+    const key = id(server.path);
     const abort = new AbortController();
     entry.abort = abort;
     let link: L | undefined;
     try {
       link = await this.open(server, { signal: abort.signal });
     } catch (error) {
-      if (this.entries.get(server.name) !== entry) {
+      if (this.entries.get(key) !== entry) {
         // Disconnected while connecting, as it failed: no one's waiting to
         // be told
         return undefined;
@@ -119,7 +121,7 @@ export class Connections<L extends Link> {
       this.emit({});
       throw error;
     }
-    if (this.entries.get(server.name) !== entry) {
+    if (this.entries.get(key) !== entry) {
       // Disconnected while connecting
       link?.close();
       return undefined;
@@ -127,7 +129,7 @@ export class Connections<L extends Link> {
     entry.opening = undefined;
     entry.abort = undefined;
     if (link === undefined) {
-      this.entries.delete(server.name);
+      this.entries.delete(key);
       this.current = before;
       this.emit({});
       return undefined;
@@ -137,22 +139,22 @@ export class Connections<L extends Link> {
     this.emit({});
     const opened = link;
     opened.closed.then((reason) => {
-      if (this.entries.get(server.name)?.link === opened) {
+      if (this.entries.get(key)?.link === opened) {
         entry.state = { kind: "closed", reason };
-        this.emit({ lost: { name: server.name, reason } });
+        this.emit({ lost: { server, reason } });
       }
     });
     return link;
   }
 
   // Close a connection and forget it
-  disconnect(name: string): void {
-    const entry = this.entries.get(name);
+  disconnect(id: string): void {
+    const entry = this.entries.get(id);
     if (!entry) {
       return;
     }
-    this.entries.delete(name);
-    if (this.current === name) {
+    this.entries.delete(id);
+    if (this.current === id) {
       this.current = undefined;
     }
     entry.abort?.abort();
@@ -162,14 +164,14 @@ export class Connections<L extends Link> {
 
   // Close them all, as the extension stops
   dispose(): void {
-    for (const name of this.names) {
-      this.disconnect(name);
+    for (const id of [...this.entries.keys()]) {
+      this.disconnect(id);
     }
   }
 
-  private activate(name: string): void {
-    if (this.current !== name) {
-      this.current = name;
+  private activate(id: string): void {
+    if (this.current !== id) {
+      this.current = id;
       this.emit({});
     }
   }

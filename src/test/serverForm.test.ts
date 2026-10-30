@@ -6,6 +6,7 @@ import { Connections } from "../connections";
 import { blank, type Form, type FromForm, type ToForm } from "../form/fields";
 import type { Panels } from "../resultView";
 import { formType, type Opener, ServerForms } from "../serverForm";
+import type * as servers from "../servers";
 
 const extension = vscode.Uri.file("/extension");
 
@@ -216,7 +217,7 @@ suite("the server form", () => {
     const { made, forms } = open({
       "password:admin@kdb1.example.com:5010": "secret",
     });
-    forms.edit("Prod/TP");
+    forms.edit(["Prod", "TP"]);
     assert.strictEqual(made[0].title, "Edit TP");
     const loaded = await made[0].loaded();
     assert.deepStrictEqual(loaded.form, {
@@ -225,7 +226,7 @@ suite("the server form", () => {
       password: "",
     });
     assert.strictEqual(loaded.stored, true);
-    assert.strictEqual(loaded.context.editing, "Prod/TP");
+    assert.strictEqual(loaded.context.editing, "TP");
     assert.deepStrictEqual(loaded.context.scopes, ["user"]);
   });
 
@@ -237,7 +238,7 @@ suite("the server form", () => {
     });
     const kept = { "password:admin@kdb1.example.com:5010": "secret" };
     const { made, forms } = open(kept);
-    forms.edit("prod");
+    forms.edit(["prod"]);
     const { form, context } = await made[0].loaded();
     // Its own name isn't taken
     assert.deepStrictEqual(context.taken, ["a", "c"]);
@@ -258,13 +259,13 @@ suite("the server form", () => {
     const connected = new Connections<Connection>(
       async () => link as unknown as Connection,
     );
-    await connected.connect({ name: "prod", host: "kdb1", port: 1 });
+    await connected.connect({ path: ["prod"], host: "kdb1", port: 1 });
     const { made, forms } = open({}, nowhere, connected);
-    forms.edit("prod");
+    forms.edit(["prod"]);
     const { form } = await made[0].loaded();
     made[0].say({ type: "save", form: { ...form, name: "live" } });
     await made[0].closing;
-    assert.deepStrictEqual(connected.names, []);
+    assert.deepStrictEqual(connected.servers, []);
   });
 
   test("a form's saved once, however often Save is pressed", async () => {
@@ -300,7 +301,7 @@ suite("the server form", () => {
     await setUser({ prod: { host: "kdb1", port: 1 } });
     const global = vscode.ConfigurationTarget.Global;
     const { made, forms } = open();
-    forms.edit("prod");
+    forms.edit(["prod"]);
     await made[0].loaded();
     const next = made[0].next();
     try {
@@ -328,7 +329,7 @@ suite("the server form", () => {
       "password:admin@kdb1.example.com:5010": "secret",
     };
     const { made, forms } = open(kept);
-    forms.edit("prod");
+    forms.edit(["prod"]);
     const { form } = await made[0].loaded();
     made[0].say({
       type: "save",
@@ -340,7 +341,7 @@ suite("the server form", () => {
       "password:admin@kdb1.example.com:5010": "secret",
       "password:admin@kdb2.example.com:5010": "other",
     });
-    forms.edit("copy");
+    forms.edit(["copy"]);
     const second = await made[1].loaded();
     made[1].say({
       type: "save",
@@ -356,7 +357,7 @@ suite("the server form", () => {
     await setUser({ prod: { host: "kdb1", port: 1, auth: "store" } });
     const kept: Record<string, string> = { "password:@kdb1:1": "secret" };
     const { made, forms } = open(kept);
-    forms.edit("prod");
+    forms.edit(["prod"]);
     const { form } = await made[0].loaded();
     made[0].say({
       type: "save",
@@ -371,7 +372,7 @@ suite("the server form", () => {
     await setUser({ a: login, b: login });
     const kept: Record<string, string> = { "password:@kdb1:1": "secret" };
     const { made, forms } = open(kept);
-    forms.edit("a");
+    forms.edit(["a"]);
     const { form } = await made[0].loaded();
     made[0].say({ type: "save", form: { ...form, auth: "none" } });
     await made[0].closing;
@@ -381,7 +382,7 @@ suite("the server form", () => {
       host: "kdb1",
       port: 1,
     });
-    forms.edit("a");
+    forms.edit(["a"]);
     assert.strictEqual((await made[1].loaded()).form.auth, "none");
   });
 
@@ -423,7 +424,7 @@ suite("the server form", () => {
   test("a form is loaded again as the settings change, or told its server's gone", async () => {
     await setUser({ prod: { host: "kdb1", port: 1 } });
     const { made, forms } = open();
-    forms.edit("prod");
+    forms.edit(["prod"]);
     await made[0].loaded();
     let next = made[0].next();
     await setUser({ prod: { host: "kdb2", port: 1 } });
@@ -480,7 +481,7 @@ suite("the server form", () => {
     assert.deepStrictEqual(opened, [
       [
         {
-          name: "Prod/TP",
+          path: ["Prod", "TP"],
           host: "kdb1.example.com",
           port: 5010,
           user: "admin",
@@ -513,9 +514,9 @@ suite("the server form", () => {
     // A test needs no name: one missing or taken connects as test
     answer = "open";
     await tried({ ...prod, name: "" });
-    assert.strictEqual(
-      (opened[opened.length - 1][0] as { name: string }).name,
-      "Prod/test",
+    assert.deepStrictEqual(
+      (opened[opened.length - 1][0] as servers.Definition).path,
+      ["Prod", "test"],
     );
     // Nothing's written
     assert.strictEqual(user(), undefined);
@@ -631,7 +632,7 @@ suite("editServer and removeServer", () => {
       panels,
     );
     try {
-      forms.edit("Prod/TP");
+      forms.edit(["Prod", "TP"]);
       answer = undefined;
       await removeServer(secrets(kept), connections, forms);
       assert.strictEqual(warned[0][0], "Remove Prod › TP?");

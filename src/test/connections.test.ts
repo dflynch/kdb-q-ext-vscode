@@ -1,6 +1,6 @@
 import * as assert from "node:assert";
 import { type Change, Connections, type Link } from "../connections";
-import type { Definition } from "../servers";
+import { type Definition, id } from "../servers";
 
 // A stand-in connection, which closes when told to or when the server does
 class Fake implements Link {
@@ -20,8 +20,8 @@ class Fake implements Link {
   }
 }
 
-const prod: Definition = { name: "prod", host: "kdb1", port: 5010 };
-const dev: Definition = { name: "dev", host: "kdb2", port: 5011 };
+const prod: Definition = { path: ["prod"], host: "kdb1", port: 5010 };
+const dev: Definition = { path: ["dev"], host: "kdb2", port: 5011 };
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
 // Connections whose opening is the test's to settle
@@ -48,28 +48,28 @@ suite("connections", () => {
     const { all, opening } = connections();
     const connected = all.connect(prod);
     assert.deepStrictEqual(all.active, {
-      name: "prod",
+      id: id(["prod"]),
       state: { kind: "connecting" },
     });
     const link = new Fake();
     opening[0].resolve(link);
     assert.strictEqual(await connected, link);
     assert.deepStrictEqual(all.active, {
-      name: "prod",
+      id: id(["prod"]),
       state: { kind: "open" },
     });
-    assert.strictEqual(all.link("prod"), link);
+    assert.strictEqual(all.link(id(["prod"])), link);
   });
 
   test("a connection keeps the server it was made to", async () => {
     const { all, opening } = connections();
     const connected = all.connect(prod);
-    assert.strictEqual(all.server("prod"), prod);
+    assert.strictEqual(all.server(id(["prod"])), prod);
     opening[0].resolve(new Fake());
     await connected;
-    assert.strictEqual(all.server("prod"), prod);
-    all.disconnect("prod");
-    assert.strictEqual(all.server("prod"), undefined);
+    assert.strictEqual(all.server(id(["prod"])), prod);
+    all.disconnect(id(["prod"]));
+    assert.strictEqual(all.server(id(["prod"])), undefined);
   });
 
   test("connecting to one that's open only makes it active", async () => {
@@ -80,9 +80,9 @@ suite("connections", () => {
     const second = all.connect(dev);
     opening[1].resolve(new Fake());
     await second;
-    assert.strictEqual(all.active?.name, "dev");
+    assert.strictEqual(all.active?.id, id(["dev"]));
     await all.connect(prod);
-    assert.strictEqual(all.active?.name, "prod");
+    assert.strictEqual(all.active?.id, id(["prod"]));
     assert.strictEqual(opening.length, 2);
   });
 
@@ -102,10 +102,10 @@ suite("connections", () => {
     const connected = all.connect(prod);
     opening[0].reject(new Error("access"));
     await assert.rejects(connected, { message: "access" });
-    const state = all.state("prod");
+    const state = all.state(id(["prod"]));
     assert.ok(state?.kind === "closed");
     assert.strictEqual(state.reason.message, "access");
-    assert.strictEqual(all.link("prod"), undefined);
+    assert.strictEqual(all.link(id(["prod"])), undefined);
   });
 
   test("a closed connection is opened again", async () => {
@@ -117,7 +117,7 @@ suite("connections", () => {
     const link = new Fake();
     opening[1].resolve(link);
     assert.strictEqual(await second, link);
-    assert.strictEqual(all.state("prod")?.kind, "open");
+    assert.strictEqual(all.state(id(["prod"]))?.kind, "open");
   });
 
   test("cancelling forgets the server and puts back the active one", async () => {
@@ -128,8 +128,8 @@ suite("connections", () => {
     const second = all.connect(prod);
     opening[1].resolve(undefined);
     assert.strictEqual(await second, undefined);
-    assert.strictEqual(all.state("prod"), undefined);
-    assert.strictEqual(all.active?.name, "dev");
+    assert.strictEqual(all.state(id(["prod"])), undefined);
+    assert.strictEqual(all.active?.id, id(["dev"]));
   });
 
   test("a connection the server closes stays, with the reason, and is told", async () => {
@@ -144,7 +144,7 @@ suite("connections", () => {
       kind: "closed",
       reason: new Error("connection closed unexpectedly"),
     });
-    assert.strictEqual(changes.at(-1)?.lost?.name, "prod");
+    assert.strictEqual(changes.at(-1)?.lost?.server, prod);
   });
 
   test("disconnecting closes and forgets it, and isn't told as lost", async () => {
@@ -153,23 +153,23 @@ suite("connections", () => {
     const link = new Fake();
     opening[0].resolve(link);
     await connected;
-    all.disconnect("prod");
+    all.disconnect(id(["prod"]));
     await tick();
     assert.strictEqual(link.closedBy, "us");
     assert.strictEqual(all.active, undefined);
-    assert.deepStrictEqual(all.names, []);
+    assert.deepStrictEqual(all.servers, []);
     assert.ok(changes.every((change) => !change.lost));
   });
 
   test("disconnecting while connecting closes the connection once it opens", async () => {
     const { all, opening } = connections();
     const connected = all.connect(prod);
-    all.disconnect("prod");
+    all.disconnect(id(["prod"]));
     const link = new Fake();
     opening[0].resolve(link);
     assert.strictEqual(await connected, undefined);
     assert.strictEqual(link.closedBy, "us");
-    assert.deepStrictEqual(all.names, []);
+    assert.deepStrictEqual(all.servers, []);
   });
 
   test("disconnecting while connecting stops it, quietly", async () => {
@@ -178,13 +178,13 @@ suite("connections", () => {
     // Connecting again waits for the same outcome
     const again = all.connect(prod);
     assert.strictEqual(opening[0].signal.aborted, false);
-    all.disconnect("prod");
+    all.disconnect(id(["prod"]));
     assert.strictEqual(opening[0].signal.aborted, true);
     opening[0].resolve(undefined);
     assert.strictEqual(await connected, undefined);
     assert.strictEqual(await again, undefined);
     assert.strictEqual(opening.length, 1);
-    assert.deepStrictEqual(all.names, []);
+    assert.deepStrictEqual(all.servers, []);
     assert.strictEqual(all.active, undefined);
     assert.ok(changes.every((change) => !change.lost));
   });
@@ -203,6 +203,6 @@ suite("connections", () => {
       links.map((link) => link.closedBy),
       ["us", "us"],
     );
-    assert.deepStrictEqual(all.names, []);
+    assert.deepStrictEqual(all.servers, []);
   });
 });

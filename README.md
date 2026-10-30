@@ -72,10 +72,10 @@ settings file it's in:
 
 - **Folders** group servers, to any depth. A server has fields; a folder
   has none of its own, holding only servers and folders, or nothing. A
-  server is named by its path, such as `Prod/trades/TP`, so the same name
-  can be used in different folders, and no name can contain `/`. A folder
-  in your user settings and one of the same name in the workspace's are
-  shown as one folder. For example:
+  server is shown with its folders, as `Prod › trades › TP`, and the same
+  name can be used in different folders. A folder in your user settings
+  and one of the same name in the workspace's are shown as one folder. For
+  example:
 
   ```json
   "kdb-q-ext-vscode.servers": {
@@ -127,8 +127,9 @@ extension is asked at every connect, so a token is always fresh.
 
 The extension exports `credentials(request)`, which returns, or resolves
 to, `{ user?, password }`; a user it gives replaces the server's. The
-request is `{ name, host, port, user? }`, where `name` is the server's path,
-such as `Prod/trades/TP`, for anything the extension keeps by server.
+request is `{ path, host, port, user? }`, where `path` is the server's
+folders and its own name, such as `["Prod", "trades", "TP"]`, for anything
+the extension keeps by server.
 
 ### Connecting
 

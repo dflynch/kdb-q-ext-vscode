@@ -6,6 +6,7 @@ import {
   at,
   authExtension,
   credentialsProblem,
+  type Definition,
   defaults,
   definitions,
   put,
@@ -24,13 +25,13 @@ suite("servers", () => {
       {
         servers: [
           {
-            name: "prod",
+            path: ["prod"],
             host: "kdb1",
             port: 5010,
             user: "admin",
             timeout: 500,
           },
-          { name: "local", host: "localhost", port: 5000 },
+          { path: ["local"], host: "localhost", port: 5000 },
         ],
         folders: [],
         problems: [],
@@ -74,7 +75,7 @@ suite("servers", () => {
     assert.deepStrictEqual(definitions([{ host: "h", port: 1 }]), {
       servers: [],
       folders: [],
-      problems: ["the servers setting isn't an object"],
+      problems: [{ path: [], problem: "the servers setting isn't an object" }],
     });
   });
 
@@ -96,22 +97,25 @@ suite("servers", () => {
       "": { host: "h", port: 1 },
       ok: { host: "h", port: 1 },
     });
-    assert.deepStrictEqual(servers, [{ name: "ok", host: "h", port: 1 }]);
+    assert.deepStrictEqual(servers, [{ path: ["ok"], host: "h", port: 1 }]);
     assert.deepStrictEqual(problems, [
-      "a: the port isn't a port number",
-      "b: the port isn't a port number",
-      "c: the port isn't a port number",
-      "d: no host",
-      "e: no host",
-      "f: the user can't contain : or a 0 byte",
-      "g: the user can't contain : or a 0 byte",
-      "h: the timeout isn't a whole number of milliseconds",
-      "h2: protect is true or false",
-      "t1: tls is true or false",
-      "t2: tls is true or false",
-      "i: unknown field usr",
-      "j: not a server or a folder",
-      '"": a name can\'t be empty',
+      { path: ["a"], problem: "the port isn't a port number" },
+      { path: ["b"], problem: "the port isn't a port number" },
+      { path: ["c"], problem: "the port isn't a port number" },
+      { path: ["d"], problem: "no host" },
+      { path: ["e"], problem: "no host" },
+      { path: ["f"], problem: "the user can't contain : or a 0 byte" },
+      { path: ["g"], problem: "the user can't contain : or a 0 byte" },
+      {
+        path: ["h"],
+        problem: "the timeout isn't a whole number of milliseconds",
+      },
+      { path: ["h2"], problem: "protect is true or false" },
+      { path: ["t1"], problem: "tls is true or false" },
+      { path: ["t2"], problem: "tls is true or false" },
+      { path: ["i"], problem: "unknown field usr" },
+      { path: ["j"], problem: "not a server or a folder" },
+      { path: [""], problem: "a name can't be empty" },
     ]);
   });
 
@@ -127,15 +131,24 @@ suite("servers", () => {
     });
     // "none" is read as no auth
     assert.deepStrictEqual(servers, [
-      { name: "none", host: "h", port: 1 },
-      { name: "kept", host: "h", port: 1, auth: "store" },
-      { name: "otp", host: "h", port: 1, auth: "prompt" },
-      { name: "sso", host: "h", port: 1, auth: "extension" },
+      { path: ["none"], host: "h", port: 1 },
+      { path: ["kept"], host: "h", port: 1, auth: "store" },
+      { path: ["otp"], host: "h", port: 1, auth: "prompt" },
+      { path: ["sso"], host: "h", port: 1, auth: "extension" },
     ]);
     assert.deepStrictEqual(problems, [
-      'a: auth is "none", "store", "prompt" or "extension"',
-      'b: auth is "none", "store", "prompt" or "extension"',
-      'c: auth is "none", "store", "prompt" or "extension"',
+      {
+        path: ["a"],
+        problem: 'auth is "none", "store", "prompt" or "extension"',
+      },
+      {
+        path: ["b"],
+        problem: 'auth is "none", "store", "prompt" or "extension"',
+      },
+      {
+        path: ["c"],
+        problem: 'auth is "none", "store", "prompt" or "extension"',
+      },
     ]);
   });
 
@@ -152,12 +165,12 @@ suite("servers", () => {
       }),
       {
         servers: [
-          { name: "Dev/TP", host: "dev", port: 5010 },
-          { name: "Dev/trades/RDB", host: "dev", port: 5011 },
-          { name: "Prod/TP", host: "prod", port: 5010 },
-          { name: "local", host: "localhost", port: 5000 },
+          { path: ["Dev", "TP"], host: "dev", port: 5010 },
+          { path: ["Dev", "trades", "RDB"], host: "dev", port: 5011 },
+          { path: ["Prod", "TP"], host: "prod", port: 5010 },
+          { path: ["local"], host: "localhost", port: 5000 },
         ],
-        folders: ["Dev", "Dev/trades", "Prod", "UAT"],
+        folders: [["Dev"], ["Dev", "trades"], ["Prod"], ["UAT"]],
         problems: [],
       },
     );
@@ -185,10 +198,10 @@ suite("servers", () => {
       servers.propertyNames,
     );
     const names = new RegExp(servers.propertyNames.pattern);
-    for (const name of ["TP", "Prod trades", "a.b"]) {
+    for (const name of ["TP", "Prod trades", "a.b", "fx/spot"]) {
       assert.ok(names.test(name), name);
     }
-    for (const name of ["", " ", "a/b"]) {
+    for (const name of ["", " "]) {
       assert.ok(!names.test(name), name);
     }
   });
@@ -199,6 +212,7 @@ suite("servers", () => {
         Dev: {
           // A misspelt host makes a server with an unknown field
           TP: { hots: "dev", port: 5010 },
+          // Any name will do, but an empty one
           "a/b": { host: "dev", port: 1 },
           trades: { " ": { host: "dev", port: 1 }, "": {} },
           HDB: { host: "dev", port: 5012 },
@@ -210,16 +224,18 @@ suite("servers", () => {
         stray: "gw:1",
       }),
       {
-        servers: [{ name: "Dev/HDB", host: "dev", port: 5012 }],
-        folders: ["Dev", "Dev/trades"],
+        servers: [
+          { path: ["Dev", "a/b"], host: "dev", port: 1 },
+          { path: ["Dev", "HDB"], host: "dev", port: 5012 },
+        ],
+        folders: [["Dev"], ["Dev", "trades"]],
         problems: [
-          "Dev/TP: unknown field hots",
-          "Dev/a/b: a name can't contain /",
-          "Dev/trades/ : a name can't be empty",
-          'Dev/trades/"": a name can\'t be empty',
-          "UAT: unknown fields TP, RDB",
-          "gw: tls is true or false",
-          "stray: not a server or a folder",
+          { path: ["Dev", "TP"], problem: "unknown field hots" },
+          { path: ["Dev", "trades", " "], problem: "a name can't be empty" },
+          { path: ["Dev", "trades", ""], problem: "a name can't be empty" },
+          { path: ["UAT"], problem: "unknown fields TP, RDB" },
+          { path: ["gw"], problem: "tls is true or false" },
+          { path: ["stray"], problem: "not a server or a folder" },
         ],
       },
     );
@@ -294,8 +310,8 @@ suite("servers", () => {
   test("any name can be put, as the settings can hold it", () => {
     const put1 = put({}, ["__proto__", "constructor"], { host: "h", port: 1 });
     assert.deepStrictEqual(
-      definitions(put1).servers.map((s) => s.name),
-      ["__proto__/constructor"],
+      definitions(put1).servers.map((s) => s.path),
+      [["__proto__", "constructor"]],
     );
   });
 
@@ -314,7 +330,7 @@ suite("servers", () => {
   });
 
   test("an extension's user replaces the server's", () => {
-    const prod = { name: "prod", host: "h", port: 1, user: "admin" };
+    const prod = { path: ["prod"], host: "h", port: 1, user: "admin" };
     assert.strictEqual(server(prod, {}, defaults).user, "admin");
     assert.strictEqual(
       server(prod, { user: "token", password: "jwt" }, defaults).user,
@@ -343,7 +359,7 @@ suite("servers", () => {
   test("a timeout of 0 waits as long as it takes", () => {
     assert.deepStrictEqual(
       definitions({ local: { host: "h", port: 1, timeout: 0 } }).servers,
-      [{ name: "local", host: "h", port: 1, timeout: 0 }],
+      [{ path: ["local"], host: "h", port: 1, timeout: 0 }],
     );
   });
 
@@ -365,12 +381,15 @@ suite("servers", () => {
   });
 
   test("a password is kept for where it's sent, not the server's name", () => {
-    const prod = { name: "prod", host: "KDB1", port: 5010, user: "admin" };
+    const prod: Definition = {
+      path: ["prod"],
+      host: "KDB1",
+      port: 5010,
+      user: "admin",
+    };
+    const renamed: Definition = { ...prod, path: ["renamed"] };
     assert.strictEqual(secretKey(prod), "password:admin@kdb1:5010");
-    assert.strictEqual(
-      secretKey({ ...prod, name: "renamed" }),
-      secretKey(prod),
-    );
+    assert.strictEqual(secretKey(renamed), secretKey(prod));
     assert.notStrictEqual(
       secretKey({ ...prod, host: "kdb2" }),
       secretKey(prod),
@@ -378,7 +397,7 @@ suite("servers", () => {
     assert.notStrictEqual(secretKey({ ...prod, port: 5011 }), secretKey(prod));
     assert.notStrictEqual(secretKey({ ...prod, user: "al" }), secretKey(prod));
     assert.strictEqual(
-      secretKey({ name: "local", host: "localhost", port: 5000 }),
+      secretKey({ host: "localhost", port: 5000 }),
       "password:@localhost:5000",
     );
   });
@@ -392,7 +411,7 @@ suite("servers", () => {
   });
 
   test("a server's timeout is its own, with none unless given", () => {
-    const local = { name: "local", host: "localhost", port: 5000 };
+    const local = { path: ["local"], host: "localhost", port: 5000 };
     assert.deepStrictEqual(server(local, {}, defaults), {
       host: "localhost",
       port: 5000,

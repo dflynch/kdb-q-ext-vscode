@@ -123,8 +123,6 @@ export function problems(
   const name = form.name.trim();
   if (name === "") {
     found.name = "Required";
-  } else if (name.includes("/")) {
-    found.name = "Can't contain /";
   } else if (context.taken.includes(name)) {
     found.name = `${name} already exists`;
   }

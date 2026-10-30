@@ -150,9 +150,11 @@ suite("the server form's fields", () => {
         password: "Required",
       },
     );
-    assert.deepStrictEqual(problems({ ...prod, name: "a/b" }, context, false), {
-      name: "Can't contain /",
-    });
+    // Any name will do, as the setting nests folders rather than naming them
+    assert.deepStrictEqual(
+      problems({ ...prod, name: "fx/spot" }, context, false),
+      {},
+    );
     // An IPv6 address has colons too, but more than one
     assert.deepStrictEqual(
       problems({ ...prod, host: "fe80::1" }, context, false),

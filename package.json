@@ -268,8 +268,8 @@
           "default": {},
           "markdownDescription": "The kdb+ processes to connect to, by name, in folders to any depth if you like: a server has fields, and a folder has none of its own, holding only servers and folders, or nothing. Add one with **kdb+/q: Add Server**. Passwords aren't kept here: set one with **kdb+/q: Set Server Password**, which keeps it in VS Code's secure storage for the user, host and port, or have it come from elsewhere with `auth`.",
           "propertyNames": {
-            "pattern": "^[^/]*[^/\\s][^/]*$",
-            "patternErrorMessage": "A name that isn't empty and has no /"
+            "pattern": "\\S",
+            "patternErrorMessage": "A name that isn't empty"
           },
           "additionalProperties": {
             "anyOf": [

@@ -110,20 +110,21 @@ async function run(
   // pick one, as Connect does. Whatever opens it says if that fails.
   const active = connections.active;
   const opening =
-    active?.state.kind === "connecting" && connections.server(active.name);
+    active?.state.kind === "connecting" && connections.server(active.id);
   if (opening) {
     await connections.connect(opening).catch(() => undefined);
   } else if (active?.state.kind !== "open") {
     await connect(connections);
   }
-  const name = connections.active?.name;
-  const link = name && connections.link(name);
-  if (!name || !link) {
+  const id = connections.active?.id;
+  const server = id && connections.server(id);
+  const link = id && connections.link(id);
+  if (!server || !link) {
     return;
   }
   const size = consoleSize();
   await results.reveal();
-  const ended = status.running(name);
+  const ended = status.running(id);
   const outcome: Outcome = await link.query(query).then(
     (result) => ({ result }),
     (error: Error) => ({ error }),
@@ -133,7 +134,7 @@ async function run(
   );
   // The server's time is known once the webview has decoded the response
   results
-    .show(toView(outcome, size), { query, server: name })
+    .show(toView(outcome, size), { query, server: servers.shown(server.path) })
     .then((execution) => {
       if (execution !== undefined) {
         executed(execution);
@@ -256,7 +257,7 @@ export function definitions(): servers.Definition[] {
   const { servers: defined, problems } = servers.definitions(setting);
   if (problems.length > 0) {
     vscode.window.showWarningMessage(
-      `kdb+/q: Left out of the servers setting: ${problems.join("; ")}.`,
+      `kdb+/q: Left out of the servers setting: ${problems.map(({ path, problem }) => `${servers.shown(path)}: ${problem}`).join("; ")}.`,
     );
   }
   return defined;
@@ -298,15 +299,14 @@ async function pickServer(
   const items: (vscode.QuickPickItem & { server?: servers.Definition })[] = [];
   let last = "";
   for (const server of defined) {
-    const path = server.name.split("/");
-    const folder = path.slice(0, -1).join(" › ");
+    const folder = servers.shown(server.path.slice(0, -1));
     if (folder !== last || (items.length === 0 && folder !== "")) {
       items.push({ label: folder, kind: vscode.QuickPickItemKind.Separator });
       last = folder;
     }
     const login = `${server.user ? `${server.user}@` : ""}${server.host}:${server.port}`;
     items.push({
-      label: path.at(-1) ?? server.name,
+      label: server.path.at(-1) ?? "",
       description: folder === "" ? login : `${folder} · ${login}`,
       detail: detail?.(server),
       server,
@@ -324,7 +324,7 @@ async function pickServer(
 export async function editServer(forms: ServerForms) {
   const server = await pickServer("kdb+/q: Edit Server");
   if (server) {
-    forms.edit(server.name);
+    forms.edit(server.path);
   }
 }
 
@@ -341,10 +341,10 @@ export async function removeServer(
   if (!server) {
     return;
   }
-  const scopes = scopesOf(server.name);
+  const scopes = scopesOf(server.path);
   const remove = "Remove";
   const choice = await vscode.window.showWarningMessage(
-    `Remove ${servers.shown(server.name)}?`,
+    `Remove ${servers.shown(server.path)}?`,
     {
       modal: true,
       detail: `It's removed from your ${scopes.join(" and ")} settings.`,
@@ -355,10 +355,10 @@ export async function removeServer(
     return;
   }
   for (const scope of scopes) {
-    await write(scope, server.name.split("/"), undefined);
+    await write(scope, server.path, undefined);
   }
-  forms.close(server.name);
-  connections.disconnect(server.name);
+  forms.close(server.path);
+  connections.disconnect(servers.id(server.path));
   if (server.auth === "store") {
     await forget(secrets, [servers.secretKey(server)]);
   }
@@ -518,8 +518,9 @@ export function opener(secrets: vscode.SecretStorage) {
 export async function connect(connections: Connections<Connection>) {
   const server = await pickServer("kdb+/q: Connect to Server", {
     detail: (server) => {
-      const state = connections.state(server.name);
-      const active = connections.active?.name === server.name;
+      const id = servers.id(server.path);
+      const state = connections.state(id);
+      const active = connections.active?.id === id;
       return state && `${active ? "Active, " : ""}${describe(state)}`;
     },
   });
@@ -536,7 +537,7 @@ async function connectTo(
     await connections.connect(server);
   } catch (error) {
     vscode.window.showErrorMessage(
-      `kdb+/q: ${servers.shown(server.name)}: ${(error as Error).message}`,
+      `kdb+/q: ${servers.shown(server.path)}: ${(error as Error).message}`,
     );
   }
 }
@@ -586,19 +587,27 @@ export async function showServerMenu() {
 
 // Close a connection: the only one, or one picked
 export async function disconnect(connections: Connections<Connection>) {
-  const names = connections.names;
-  if (names.length === 0) {
+  const connected = connections.servers;
+  if (connected.length === 0) {
     vscode.window.showInformationMessage("kdb+/q: No server is connected.");
     return;
   }
-  const name =
-    names.length === 1
-      ? names[0]
-      : await vscode.window.showQuickPick(names, {
-          title: "kdb+/q: Disconnect from Server",
-          placeHolder: "Server",
-        });
-  if (name) {
-    connections.disconnect(name);
+  const server =
+    connected.length === 1
+      ? connected[0]
+      : (
+          await vscode.window.showQuickPick(
+            connected.map((server) => ({
+              label: servers.shown(server.path),
+              server,
+            })),
+            {
+              title: "kdb+/q: Disconnect from Server",
+              placeHolder: "Server",
+            },
+          )
+        )?.server;
+  if (server) {
+    connections.disconnect(servers.id(server.path));
   }
 }

@@ -390,7 +390,9 @@ window.addEventListener("message", (event: MessageEvent<ToForm>) => {
       }
       break;
     case "gone":
-      warn(`${context?.editing} is no longer in the settings.`);
+      warn(
+        `${[...(context?.folder ?? []), context?.editing].join(" › ")} is no longer in the settings.`,
+      );
       save.disabled = true;
       test.disabled = true;
       break;

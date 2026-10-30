@@ -7,7 +7,7 @@ import {
 import type { Definition } from "../servers";
 
 const prod: Definition = {
-  name: "prod",
+  path: ["prod"],
   host: "kdb1",
   port: 5010,
   user: "admin",
@@ -107,7 +107,7 @@ suite("credentials", () => {
     assert.deepStrictEqual(ids, ["acme.kdb-auth"]);
     assert.deepStrictEqual(requests, [
       {
-        name: "prod",
+        path: ["prod"],
         host: "kdb1",
         port: 5010,
         user: "admin",

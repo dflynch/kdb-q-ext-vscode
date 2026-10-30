@@ -11,9 +11,9 @@ import {
 // or resolves to, the credentials to log in with: { user?, password }. A user
 // it gives replaces the server's.
 export type CredentialsRequest = {
-  // The server's path, its folders' names and its own joined by /, such as
-  // Prod/trades/TP
-  name: string;
+  // The folders the server's in, outermost first, then its own name, such
+  // as ["Prod", "trades", "TP"]
+  path: string[];
   host: string;
   port: number;
   user?: string;
@@ -71,7 +71,7 @@ export async function credentials(
     });
   }
   const request: CredentialsRequest = {
-    name: server.name,
+    path: server.path,
     host: server.host,
     port: server.port,
     ...(server.user === undefined ? {} : { user: server.user }),

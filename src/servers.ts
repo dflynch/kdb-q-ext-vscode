@@ -6,9 +6,8 @@ import type { Secure } from "./tls";
 // A server as the settings define it: everything but the password, which is
 // kept in VS Code's secure storage, never in a settings file
 export type Definition = {
-  // Its own name after the folders it's in, joined by /, which no name in
-  // the setting can contain
-  name: string;
+  // The folders it's in, outermost first, then its own name
+  path: string[];
   host: string;
   port: number;
   user?: string;
@@ -58,9 +57,20 @@ const fields = new Set([
 
 // A server's name as it's shown: its folders' names and its own, as a
 // breadcrumb, Prod › trades › TP
-export function shown(name: string): string {
-  return name.split("/").join(" › ");
+export function shown(path: string[]): string {
+  return path.join(" › ");
 }
+
+// What a server's known by inside the extension, for its connection and its
+// form: its path, as no name in it can be mistaken for part of another.
+// Never shown.
+export function id(path: string[]): string {
+  return JSON.stringify(path);
+}
+
+// A problem in the servers setting, at the path of what has it: empty for
+// the setting itself
+export type Problem = { path: string[]; problem: string };
 
 // A Marketplace extension ID, publisher.name
 export const extensionId = /^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9-]*$/i;
@@ -84,12 +94,12 @@ function isTimeout(value: unknown): value is number {
 // was misspelt.
 export function definitions(setting: unknown): {
   servers: Definition[];
-  folders: string[];
-  problems: string[];
+  folders: string[][];
+  problems: Problem[];
 } {
   const servers: Definition[] = [];
-  const folders: string[] = [];
-  const problems: string[] = [];
+  const folders: string[][] = [];
+  const problems: Problem[] = [];
   if (setting === undefined || setting === null) {
     return { servers, folders, problems };
   }
@@ -97,27 +107,27 @@ export function definitions(setting: unknown): {
     return {
       servers,
       folders,
-      problems: ["the servers setting isn't an object"],
+      problems: [{ path: [], problem: "the servers setting isn't an object" }],
     };
   }
-  const read = (folder: Record<string, unknown>, at: string) => {
+  const read = (folder: Record<string, unknown>, at: string[]) => {
     for (const [key, value] of Object.entries(folder)) {
-      const name = at + key;
+      const path = [...at, key];
       const problem = nameProblem(key) ?? check(value);
       if (problem) {
-        problems.push(`${at}${key || '""'}: ${problem}`);
+        problems.push({ path, problem });
         continue;
       }
       const object = value as Record<string, unknown>;
       if (isFolder(object)) {
-        folders.push(name);
-        read(object, `${name}/`);
+        folders.push(path);
+        read(object, path);
       } else {
-        servers.push(definition(name, object));
+        servers.push(definition(path, object));
       }
     }
   };
-  read(setting, "");
+  read(setting, []);
   return { servers, folders, problems };
 }
 
@@ -188,23 +198,22 @@ function isFolder(value: Record<string, unknown>): boolean {
   return Object.values(value).every(isObject);
 }
 
-// A server's or a folder's name: / joins the names in a path
+// A server's or a folder's name
 function nameProblem(name: string): string | undefined {
-  return name.trim() === ""
-    ? "a name can't be empty"
-    : name.includes("/")
-      ? "a name can't contain /"
-      : undefined;
+  return name.trim() === "" ? "a name can't be empty" : undefined;
 }
 
 // A server as checked
-function definition(name: string, value: Record<string, unknown>): Definition {
+function definition(
+  path: string[],
+  value: Record<string, unknown>,
+): Definition {
   const { host, port, user, timeout, protect, tls, auth } = value as Omit<
     Definition,
-    "name"
+    "path"
   >;
   return {
-    name,
+    path,
     host,
     port,
     ...(user === undefined ? {} : { user }),
@@ -296,7 +305,9 @@ export function settings(megabytes: unknown): {
 // Where a server's password is kept. Keyed by where it's sent, not by the
 // server's name, so that a password is never sent to a host other than the
 // one it was given for, if a server's host is changed
-export function secretKey(server: Definition): string {
+export function secretKey(
+  server: Pick<Definition, "user" | "host" | "port">,
+): string {
   return `password:${server.user ?? ""}@${server.host.toLowerCase()}:${server.port}`;
 }
 
