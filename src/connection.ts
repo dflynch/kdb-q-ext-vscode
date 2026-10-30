@@ -12,8 +12,8 @@ export type Server = {
   port: number;
   user?: string;
   password?: string;
-  // How long to wait for the server to connect and log in, in milliseconds,
-  // or 0 to wait as long as it takes, as hopen does
+  // How long to wait for the server to connect and log in, in milliseconds;
+  // unset or 0 waits as long as it takes, as hopen does
   timeout?: number;
   // The largest result to take, in bytes, uncompressed
   limit?: number;
@@ -117,9 +117,23 @@ export class Connection {
 
   // Connect and log in. The server answers the login with one byte, the
   // protocol version it agrees to, or closes the connection to refuse it.
-  // Failures are q's errors for hopen.
-  static open(server: Server): Promise<Connection> {
+  // Failures are q's errors for hopen. Aborting the signal closes the
+  // socket, however far it's got, and gives undefined: a cancel isn't a
+  // failure.
+  static open(server: Server): Promise<Connection>;
+  static open(
+    server: Server,
+    signal?: AbortSignal,
+  ): Promise<Connection | undefined>;
+  static open(
+    server: Server,
+    signal?: AbortSignal,
+  ): Promise<Connection | undefined> {
     return new Promise((resolve, reject) => {
+      if (signal?.aborted) {
+        resolve(undefined);
+        return;
+      }
       const socket = server.tls
         ? tls.connect({ host: server.host, port: server.port, ...server.tls })
         : net.connect(server.port, server.host);
@@ -135,11 +149,10 @@ export class Connection {
       socket.setNoDelay(true);
       // A deadline for connecting and logging in together; the socket's own
       // timeout would restart with every write and read
-      const timeout = server.timeout ?? 2000;
-      const timer =
-        timeout === 0
-          ? undefined
-          : setTimeout(() => fail(new Error("timeout")), timeout);
+      const timeout = server.timeout;
+      const timer = timeout
+        ? setTimeout(() => fail(new Error("timeout")), timeout)
+        : undefined;
       const login = () => {
         phase = "login";
         // Version 3: compression, timestamps, timespans and GUIDs
@@ -192,6 +205,7 @@ export class Connection {
       // Only the listeners added here: the socket has Node's own too
       const done = () => {
         clearTimeout(timer);
+        signal?.removeEventListener("abort", aborted);
         socket.off("connect", tcp);
         socket.off(connected, login);
         socket.off("error", error);
@@ -203,6 +217,12 @@ export class Connection {
         socket.destroy();
         reject(reason);
       };
+      const aborted = () => {
+        done();
+        socket.destroy();
+        resolve(undefined);
+      };
+      signal?.addEventListener("abort", aborted, { once: true });
       socket.once("connect", tcp);
       socket.once(connected, login);
       socket.once("error", error);

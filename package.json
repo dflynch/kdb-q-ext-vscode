@@ -85,6 +85,16 @@
         "title": "Add Server"
       },
       {
+        "command": "kdb-q-ext-vscode.editServer",
+        "category": "kdb+/q",
+        "title": "Edit Server"
+      },
+      {
+        "command": "kdb-q-ext-vscode.removeServer",
+        "category": "kdb+/q",
+        "title": "Remove Server"
+      },
+      {
         "command": "kdb-q-ext-vscode.keepResult",
         "category": "kdb+/q",
         "title": "Keep Result",
@@ -258,8 +268,8 @@
           "default": {},
           "markdownDescription": "The kdb+ processes to connect to, by name, in folders to any depth if you like: a server has fields, and a folder has none of its own, holding only servers and folders, or nothing. Add one with **kdb+/q: Add Server**. Passwords aren't kept here: set one with **kdb+/q: Set Server Password**, which keeps it in VS Code's secure storage for the user, host and port, or have it come from elsewhere with `auth`.",
           "propertyNames": {
-            "pattern": "^[^/]*[^/\\s][^/]*$",
-            "patternErrorMessage": "A name that isn't empty and has no /"
+            "pattern": "\\S",
+            "patternErrorMessage": "A name that isn't empty"
           },
           "additionalProperties": {
             "anyOf": [
@@ -290,12 +300,13 @@
                   "timeout": {
                     "type": "integer",
                     "minimum": 0,
-                    "description": "How long to wait to connect and log in, in milliseconds, overriding the connect timeout. 0 waits as long as it takes, as hopen does."
+                    "maximum": 2147483647,
+                    "description": "How long to wait to connect and log in, in milliseconds. Without one, it waits as long as it takes."
                   },
                   "protect": {
                     "type": "boolean",
                     "default": true,
-                    "markdownDescription": "Run each query under `.Q.trp`, so that an error comes back with its backtrace and its full text. The query is sent as written, as a list with the function that traps it, for q's default `.z.pg` to evaluate. Turn this off for a server whose `.z.pg` is customised or only takes strings, such as a gateway."
+                    "markdownDescription": "Run each query under `.Q.trp`, so that an error comes back with its backtrace and its full text. The query is sent as written, as a list with the function that traps it, for q's default `.z.pg` to evaluate. Turn this off when the server enforces an allowlist: the query is then sent as a string."
                   },
                   "tls": {
                     "type": "boolean",
@@ -303,14 +314,18 @@
                   },
                   "auth": {
                     "enum": [
+                      "none",
+                      "store",
                       "prompt",
                       "extension"
                     ],
                     "enumDescriptions": [
+                      "No password, as with no auth.",
+                      "The password kept in VS Code's secure storage for the user, host and port.",
                       "Ask for the password at every connect, and don't keep it.",
                       "Ask the extension in kdb-q-ext-vscode.authExtension for the credentials at every connect."
                     ],
-                    "markdownDescription": "Where the password comes from, when it isn't the one kept by **kdb+/q: Set Server Password**: `\"prompt\"` asks for it at every connect and doesn't keep it, where a password can't be stored or changes too often to keep; `\"extension\"` asks the extension in `#kdb-q-ext-vscode.authExtension#` at every connect, for a firm's own sign-on."
+                    "markdownDescription": "Where the password comes from; none without one. `\"store\"` is the one kept in VS Code's secure storage for the user, host and port, by the server form or **kdb+/q: Set Server Password**; `\"prompt\"` asks for it at every connect and doesn't keep it, where a password can't be stored or changes too often to keep; `\"extension\"` asks the extension in `#kdb-q-ext-vscode.authExtension#` at every connect, for a firm's own sign-on."
                   }
                 }
               },
@@ -354,12 +369,6 @@
           "pattern": "^$|^(\\/|\\\\\\\\|[A-Za-z]:[\\\\/]|~[\\\\/])",
           "patternErrorMessage": "An absolute path, or one from ~/",
           "markdownDescription": "The client certificate's key in PEM, as q's `SSL_KEY_FILE`. An encrypted key's passphrase is kept by **kdb+/q: Set Certificate Passphrase**."
-        },
-        "kdb-q-ext-vscode.connectTimeout": {
-          "type": "integer",
-          "default": 2000,
-          "minimum": 0,
-          "markdownDescription": "How long to wait for a server to connect and log in, in milliseconds, as `hopen` takes. 0 waits as long as it takes, as `hopen` does without one."
         },
         "kdb-q-ext-vscode.consoleSize": {
           "type": "array",

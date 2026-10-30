@@ -1,6 +1,7 @@
-// Bundles the extension for VS Code's Node host and the Result view's
-// script for its webview, which can't load from node_modules. tsc checks the
-// types and builds the tests; this only bundles.
+// Bundles the extension for VS Code's Node host, and the scripts of the
+// Result view's and the server form's webviews, which can't load from
+// node_modules. tsc checks the types and builds the tests; this only
+// bundles.
 //   node esbuild.mjs               a development build, with source maps
 //   node esbuild.mjs --production  minified, without source maps
 //   node esbuild.mjs --watch       rebuilds on change, for F5
@@ -55,6 +56,9 @@ const contexts = await Promise.all([
     entryPoints: [
       { in: "src/webview/main.ts", out: "webview" },
       { in: "src/webview/main.css", out: "webview" },
+      // dist/form.js and dist/form.css, the server form's
+      { in: "src/form/main.ts", out: "form" },
+      { in: "src/form/main.css", out: "form" },
     ],
     outdir: "dist",
     // codicon.css's font, beside it

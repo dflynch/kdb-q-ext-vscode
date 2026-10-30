@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import type { Connection } from "./connection";
 import type { Connections, State } from "./connections";
-import { authExtension, type Definition } from "./servers";
+import { authExtension, type Definition, shown } from "./servers";
 
 // How long a query took, in whole milliseconds, as \t gives
 export type Timing = {
@@ -19,7 +19,7 @@ export type Timing = {
 // if another query's timing has replaced this one's.
 export type Status = {
   running(
-    name: string,
+    id: string,
   ): (roundtrip: number | undefined) => (execution: number) => void;
 };
 
@@ -43,21 +43,21 @@ export function took(timing: Timing): string {
     : `${timing.execution} ms (${timing.roundtrip} ms roundtrip)`;
 }
 
-// The last query's timing, and the server it ran on. A query that ended
+// The last query's timing, and the server it ran on, by its id. A query that ended
 // without a response leaves none. Its server time comes after it ends, once
 // the Result view has read the response, and is dropped if another query has
 // ended since, or the timing was cleared. changed is called when a timing
 // arrives.
 export function lastTiming(changed: () => void) {
-  let last: { name: string; timing: Timing } | undefined;
+  let last: { id: string; timing: Timing } | undefined;
   return {
     get: () => last,
     clear: () => {
       last = undefined;
     },
-    ended: (name: string, roundtrip: number | undefined) => {
+    ended: (id: string, roundtrip: number | undefined) => {
       const ended: typeof last =
-        roundtrip === undefined ? undefined : { name, timing: { roundtrip } };
+        roundtrip === undefined ? undefined : { id, timing: { roundtrip } };
       last = ended;
       changed();
       return (execution: number) => {
@@ -77,18 +77,15 @@ export function details(server: Definition, setting?: unknown): string[] {
   const extension = authExtension(setting);
   const auth =
     server.auth === undefined
-      ? "Stored password"
-      : server.auth === "prompt"
-        ? "Ask each time"
-        : extension.problem
-          ? `Extension ${JSON.stringify(setting)} (invalid)`
-          : `Extension ${extension.id ?? "not set"}`;
-  const timeout =
-    server.timeout === undefined
-      ? "Default"
-      : server.timeout === 0
-        ? "None"
-        : `${server.timeout} ms`;
+      ? "None"
+      : server.auth === "store"
+        ? "Stored password"
+        : server.auth === "prompt"
+          ? "Ask each time"
+          : extension.problem
+            ? `Extension ${JSON.stringify(setting)} (invalid)`
+            : `Extension ${extension.id ?? "not set"}`;
+  const timeout = server.timeout ? `${server.timeout} ms` : "None";
   return [
     `Host: ${server.host}:${server.port}`,
     ...(server.user ? [`User: ${server.user}`] : []),
@@ -121,9 +118,9 @@ export function showStatus(
   const running = new Map<string, number>();
   const update = () => {
     const active = connections.active;
-    const server = active && connections.server(active.name);
+    const server = active && connections.server(active.id);
     const busy =
-      active?.state.kind === "open" && (running.get(active.name) ?? 0) > 0;
+      active?.state.kind === "open" && (running.get(active.id) ?? 0) > 0;
     const icon =
       active?.state.kind === "connecting" || busy
         ? "loading~spin"
@@ -132,12 +129,12 @@ export function showStatus(
           : "debug-disconnect";
     const ended = last.get();
     const timing =
-      !busy && ended?.name === active?.name ? ended?.timing : undefined;
-    item.text = `$(${icon}) ${active?.name ?? "kdb+/q"}${timing ? `  $(watch) ${took(timing)}` : ""}`;
+      !busy && ended?.id === active?.id ? ended?.timing : undefined;
+    item.text = `$(${icon}) ${server ? shown(server.path) : "kdb+/q"}${timing ? `  $(watch) ${took(timing)}` : ""}`;
     // The icon says the state, so screen readers are told it in words
     item.accessibilityInformation = {
-      label: active
-        ? `kdb+/q: ${active.name}, ${busy ? "running a query" : describe(active.state)}${timing ? `, last query ${took(timing)}` : ""}`
+      label: server
+        ? `kdb+/q: ${shown(server.path)}, ${busy ? "running a query" : describe(active.state)}${timing ? `, last query ${took(timing)}` : ""}`
         : "kdb+/q: not connected",
     };
     item.tooltip = server
@@ -157,23 +154,23 @@ export function showStatus(
   item.show();
   const stop = connections.onChange(({ lost }) => {
     const ended = last.get();
-    if (ended && connections.state(ended.name)?.kind !== "open") {
+    if (ended && connections.state(ended.id)?.kind !== "open") {
       last.clear();
     }
     update();
     if (lost) {
       vscode.window.showWarningMessage(
-        `kdb+/q: ${lost.name}: ${lost.reason.message}`,
+        `kdb+/q: ${shown(lost.server.path)}: ${lost.reason.message}`,
       );
     }
   });
   return {
-    running: (name) => {
-      running.set(name, (running.get(name) ?? 0) + 1);
+    running: (id) => {
+      running.set(id, (running.get(id) ?? 0) + 1);
       update();
       return (roundtrip) => {
-        running.set(name, (running.get(name) ?? 0) - 1);
-        return last.ended(name, roundtrip);
+        running.set(id, (running.get(id) ?? 0) - 1);
+        return last.ended(id, roundtrip);
       };
     },
     dispose: () => {

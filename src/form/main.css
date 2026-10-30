@@ -1,0 +1,258 @@
+/* Bundled into dist/form.css. Laid out as the Settings editor lays out its
+   settings, with colours and fonts only from VS Code's own variables, so
+   every theme, high contrast included, styles the form */
+
+body {
+  box-sizing: border-box;
+  max-width: 640px;
+  margin: 0;
+  padding: 12px 24px 24px;
+  color: var(--vscode-foreground);
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  background: var(--vscode-editor-background);
+}
+
+h1 {
+  margin: 8px 0 4px;
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.where,
+.note {
+  margin: 0 0 4px;
+  color: var(--vscode-descriptionForeground);
+}
+
+[hidden] {
+  /* biome-ignore lint/complexity/noImportantStyles: a hidden row, button or note stays hidden whatever lays it out */
+  display: none !important;
+}
+
+/* What changed elsewhere, with a button to load it */
+.banner {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 12px 0;
+  padding: 6px 10px;
+  border: 1px solid var(--vscode-inputValidation-warningBorder);
+  background: var(--vscode-inputValidation-warningBackground);
+}
+
+.banner span {
+  flex: 1;
+}
+
+/* A setting: its name in bold, its box, then what it does */
+.setting {
+  padding: 6px 0;
+}
+
+/* Settings side by side, wrapping when narrow */
+.line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 16px;
+}
+
+.line > .setting {
+  flex: 1 1 220px;
+}
+
+/* Half the line, alone on it or not */
+.line > .setting.half {
+  flex: 0 1 calc(50% - 8px);
+  min-width: 220px;
+}
+
+.label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--vscode-settings-headerForeground);
+}
+
+.description {
+  color: var(--vscode-descriptionForeground);
+  margin-top: 4px;
+}
+
+.description:empty {
+  display: none;
+}
+
+.problem {
+  color: var(--vscode-errorForeground);
+  margin-top: 4px;
+}
+
+.problem:empty {
+  display: none;
+}
+
+a {
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--vscode-textLink-activeForeground);
+  text-decoration: underline;
+}
+
+input[type="text"],
+input[type="password"],
+select {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 4px 6px;
+  color: var(
+    --vscode-settings-textInputForeground,
+    var(--vscode-input-foreground)
+  );
+  font: inherit;
+  background: var(
+    --vscode-settings-textInputBackground,
+    var(--vscode-input-background)
+  );
+  border: 1px solid
+    var(
+      --vscode-settings-textInputBorder,
+      var(--vscode-input-border, transparent)
+    );
+  border-radius: 2px;
+}
+
+input::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+
+select {
+  color: var(--vscode-settings-dropdownForeground);
+  background: var(--vscode-settings-dropdownBackground);
+  border-color: var(--vscode-settings-dropdownBorder);
+}
+
+.invalid input[type="text"],
+.invalid input[type="password"],
+.invalid select {
+  border-color: var(--vscode-inputValidation-errorBorder);
+}
+
+input:focus,
+a:focus-visible,
+button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+/* Drawn in the checkbox colours, as the Settings editor draws its own */
+input[type="checkbox"] {
+  appearance: none;
+  display: grid;
+  flex: none;
+  place-content: center;
+  width: 16px;
+  height: 16px;
+  margin: 0 8px 0 0;
+  background: var(--vscode-checkbox-background);
+  border: 1px solid var(--vscode-checkbox-border);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+input[type="checkbox"]:checked::before {
+  content: "";
+  width: 8px;
+  height: 4px;
+  margin-top: -2px;
+  border: solid var(--vscode-checkbox-foreground);
+  border-width: 0 0 2px 2px;
+  transform: rotate(-45deg);
+}
+
+/* A tick box with what it does beside it, one under another, in the
+   foreground colour so that a note under it reads as less */
+.tick {
+  display: flex;
+  align-items: flex-start;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.tick + .tick {
+  margin-top: 6px;
+}
+
+/* Under a tick, in line with what the tick says */
+.note-under {
+  margin: 2px 0 0 24px;
+}
+
+.note-under + .tick {
+  margin-top: 6px;
+}
+
+code {
+  color: var(--vscode-textPreformat-foreground);
+  font-family: var(--vscode-editor-font-family);
+}
+
+/* At the end, left-aligned as VS Code's own forms have them */
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.buttons a {
+  margin-left: 8px;
+}
+
+.tested {
+  margin-top: 8px;
+}
+
+.tested:empty {
+  display: none;
+}
+
+.tested {
+  color: var(--vscode-descriptionForeground);
+}
+
+.tested.failed {
+  color: var(--vscode-errorForeground);
+}
+
+button {
+  padding: 4px 14px;
+  color: var(--vscode-button-foreground);
+  font: inherit;
+  background: var(--vscode-button-background);
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+button.secondary {
+  color: var(--vscode-button-secondaryForeground);
+  background: var(--vscode-button-secondaryBackground);
+}
+
+button.secondary:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

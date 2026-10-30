@@ -19,12 +19,12 @@ suite("status", () => {
     const last = lastTiming(() => changes++);
     const executed = last.ended("prod", 5);
     assert.deepStrictEqual(last.get(), {
-      name: "prod",
+      id: "prod",
       timing: { roundtrip: 5 },
     });
     executed(3);
     assert.deepStrictEqual(last.get(), {
-      name: "prod",
+      id: "prod",
       timing: { roundtrip: 5, execution: 3 },
     });
     assert.strictEqual(changes, 2);
@@ -37,7 +37,7 @@ suite("status", () => {
     last.ended("dev", 6);
     first(3);
     assert.deepStrictEqual(last.get(), {
-      name: "dev",
+      id: "dev",
       timing: { roundtrip: 6 },
     });
     assert.strictEqual(changes, 2);
@@ -72,10 +72,11 @@ suite("status", () => {
   test("a server's settings, a line each", () => {
     assert.deepStrictEqual(
       details({
-        name: "prod",
+        path: ["prod"],
         host: "kdb1",
         port: 5010,
         user: "admin",
+        auth: "store",
         timeout: 500,
         tls: true,
       }),
@@ -90,7 +91,7 @@ suite("status", () => {
     );
     assert.deepStrictEqual(
       details({
-        name: "gw",
+        path: ["gw"],
         host: "gw",
         port: 5000,
         auth: "prompt",
@@ -108,7 +109,7 @@ suite("status", () => {
 
   test("the auth extension is named as its setting gives it", () => {
     const sso: Definition = {
-      name: "sso",
+      path: ["sso"],
       host: "kdb2",
       port: 5000,
       auth: "extension",
@@ -121,7 +122,7 @@ suite("status", () => {
         'Authentication: Extension "kdb-auth" (invalid)',
       ),
     );
-    assert.ok(lines.includes("Connection timeout: Default"));
+    assert.ok(lines.includes("Connection timeout: None"));
   });
 
   test("the server menu names each command as the palette does", () => {

@@ -50,8 +50,11 @@ read.
 
 ### Servers
 
-Add a server with **kdb+/q: Add Server**, which asks for each setting and
-saves it to your user or workspace settings, or write it in `settings.json`:
+Add a server with **kdb+/q: Add Server**, which opens a form for its
+settings and saves them to your user or workspace settings, or write it in
+`settings.json`. **Edit Server** opens the same form for a server, where a
+password can be stored too, and **Remove Server** removes one, from every
+settings file it's in:
 
 ```json
 "kdb-q-ext-vscode.servers": {
@@ -69,10 +72,10 @@ saves it to your user or workspace settings, or write it in `settings.json`:
 
 - **Folders** group servers, to any depth. A server has fields; a folder
   has none of its own, holding only servers and folders, or nothing. A
-  server is named by its path, such as `Prod/trades/TP`, so the same name
-  can be used in different folders, and no name can contain `/`. A folder
-  in your user settings and one of the same name in the workspace's are
-  shown as one folder. For example:
+  server is shown with its folders, as `Prod › trades › TP`, and the same
+  name can be used in different folders. A folder in your user settings
+  and one of the same name in the workspace's are shown as one folder. For
+  example:
 
   ```json
   "kdb-q-ext-vscode.servers": {
@@ -84,27 +87,30 @@ saves it to your user or workspace settings, or write it in `settings.json`:
   }
   ```
 
-- **Passwords** aren't kept in settings. **kdb+/q: Set Server Password**
-  keeps one in VS Code's secure storage, for the user, host and port, and
-  **Clear Server Password** removes it. `"auth": "prompt"` asks for it at
-  every connect instead, and never keeps it
+- **Passwords** aren't kept in settings. A server with no `auth` sends
+  none. `"auth": "store"` sends the one the form, or **kdb+/q: Set Server
+  Password**, keeps in VS Code's secure storage for the user, host and
+  port, and **Clear Server Password** removes it. One no server uses any
+  more, once a server's edited or removed, is removed too. `"auth":
+  "prompt"` asks for it at every connect instead, and never keeps it
 - **`tls`** is `true` to connect with TLS. The files it needs besides the
   system's are set once for every server, as q takes them for the whole
   process: `tlsCaFile` to trust (q's `SSL_CA_CERT_FILE`), and a client
   certificate as `tlsCertFile` and `tlsKeyFile` in PEM (`SSL_CERT_FILE`,
   `SSL_KEY_FILE`). Paths are absolute or start with `~/`. An encrypted key's
   passphrase is kept by **kdb+/q: Set Certificate Passphrase**
-- **`timeout`** is how long to wait to connect and log in, in milliseconds,
-  overriding `connectTimeout`; 0 waits as long as it takes, as `hopen` does
+- **`timeout`** is how long to wait to connect and log in, in milliseconds;
+  without one, it waits as long as it takes. A server added in the form
+  starts with 2000
 
 #### Protected evaluation
 
 On by default, each query runs under `.Q.trp`, so an error comes back with
 its backtrace, and the status bar can show the server's time running it.
-Turn it off with `"protect": false` for a server whose `.z.pg` is customised
-or only takes strings, such as a gateway: the query is then sent as a
-string. An error protected evaluation should have caught, or a response it
-didn't give, comes with a hint to turn it off.
+Turn it off with `"protect": false` when the server enforces an allowlist:
+the query is then sent as a string. An error protected evaluation should
+have caught, or a response it didn't give, comes with a hint to turn it
+off.
 
 #### Sign-on from another extension
 
@@ -121,8 +127,9 @@ extension is asked at every connect, so a token is always fresh.
 
 The extension exports `credentials(request)`, which returns, or resolves
 to, `{ user?, password }`; a user it gives replaces the server's. The
-request is `{ name, host, port, user? }`, where `name` is the server's path,
-such as `Prod/trades/TP`, for anything the extension keeps by server.
+request is `{ path, host, port, user? }`, where `path` is the server's
+folders and its own name, such as `["Prod", "trades", "TP"]`, for anything
+the extension keeps by server.
 
 ### Connecting
 
@@ -292,6 +299,8 @@ server commands on the status bar's.
 | kdb+/q: Connect to Server             |                  |
 | kdb+/q: Disconnect from Server        |                  |
 | kdb+/q: Add Server                    |                  |
+| kdb+/q: Edit Server                   |                  |
+| kdb+/q: Remove Server                 |                  |
 | kdb+/q: Open Settings                 |                  |
 | kdb+/q: Set Server Password           |                  |
 | kdb+/q: Clear Server Password         |                  |
@@ -306,18 +315,17 @@ Open Keyboard Shortcuts**.
 
 ## Settings
 
-| Setting                           | Default        | What it does                                                 |
-| --------------------------------- | -------------- | ------------------------------------------------------------ |
-| `kdb-q-ext-vscode.servers`        | `{}`           | The servers to connect to, by name (see [Servers](#servers)) |
-| `kdb-q-ext-vscode.authExtension`  | `""`           | The extension that gives credentials, as `publisher.name`    |
-| `kdb-q-ext-vscode.connectTimeout` | `2000`         | How long to wait to connect and log in, in ms; 0 waits       |
-| `kdb-q-ext-vscode.tlsCaFile`      | `""`           | A CA certificate to trust for TLS, as `SSL_CA_CERT_FILE`     |
-| `kdb-q-ext-vscode.tlsCertFile`    | `""`           | A client certificate for TLS, as `SSL_CERT_FILE`             |
-| `kdb-q-ext-vscode.tlsKeyFile`     | `""`           | The client certificate's key, as `SSL_KEY_FILE`              |
-| `kdb-q-ext-vscode.consoleSize`    | `[1000, 1000]` | How much of a result to show, as lines then width            |
-| `kdb-q-ext-vscode.precision`      | `7`            | Significant digits of floats and reals, as `\P`; 0 for all   |
-| `kdb-q-ext-vscode.sizeLimit`      | `100`          | The largest result to take, in MB, uncompressed              |
-| `kdb-q-ext-vscode.rowLimit`       | `5000000`      | The most rows a result, or a cell drilled into, can have     |
+| Setting                          | Default        | What it does                                                 |
+| -------------------------------- | -------------- | ------------------------------------------------------------ |
+| `kdb-q-ext-vscode.servers`       | `{}`           | The servers to connect to, by name (see [Servers](#servers)) |
+| `kdb-q-ext-vscode.authExtension` | `""`           | The extension that gives credentials, as `publisher.name`    |
+| `kdb-q-ext-vscode.tlsCaFile`     | `""`           | A CA certificate to trust for TLS, as `SSL_CA_CERT_FILE`     |
+| `kdb-q-ext-vscode.tlsCertFile`   | `""`           | A client certificate for TLS, as `SSL_CERT_FILE`             |
+| `kdb-q-ext-vscode.tlsKeyFile`    | `""`           | The client certificate's key, as `SSL_KEY_FILE`              |
+| `kdb-q-ext-vscode.consoleSize`   | `[1000, 1000]` | How much of a result to show, as lines then width            |
+| `kdb-q-ext-vscode.precision`     | `7`            | Significant digits of floats and reals, as `\P`; 0 for all   |
+| `kdb-q-ext-vscode.sizeLimit`     | `100`          | The largest result to take, in MB, uncompressed              |
+| `kdb-q-ext-vscode.rowLimit`      | `5000000`      | The most rows a result, or a cell drilled into, can have     |
 
 `precision` works as q's `\P`: from 1 to 17 significant digits, or 0 for as
 many as each type holds, 17 for a float and 8 for a real. It applies wherever
