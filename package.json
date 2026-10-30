@@ -300,8 +300,7 @@
                   "timeout": {
                     "type": "integer",
                     "minimum": 0,
-                    "default": 2000,
-                    "description": "How long to wait to connect and log in, in milliseconds: 2000 unless given. 0 waits as long as it takes, as hopen does."
+                    "description": "How long to wait to connect and log in, in milliseconds. Unset or 0 waits as long as it takes, as hopen does."
                   },
                   "protect": {
                     "type": "boolean",

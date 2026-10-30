@@ -1,5 +1,4 @@
 import type { Server } from "./connection";
-import { connectTimeout } from "./form/fields";
 import { passwordProblem, userProblem } from "./login";
 import type { Secure } from "./tls";
 
@@ -12,8 +11,8 @@ export type Definition = {
   host: string;
   port: number;
   user?: string;
-  // How long to wait to connect and log in, in milliseconds, or 0 to wait
-  // as long as it takes; connectTimeout unless given
+  // How long to wait to connect and log in, in milliseconds; unset or 0
+  // waits as long as it takes, as hopen does
   timeout?: number;
   // Whether to evaluate queries protected, so that an error comes back with
   // its backtrace: on unless false, as a server that enforces an allowlist
@@ -317,7 +316,9 @@ export function server(
     port: definition.port,
     ...(user === undefined ? {} : { user }),
     ...(password === undefined ? {} : { password }),
-    timeout: definition.timeout ?? connectTimeout,
+    ...(definition.timeout === undefined
+      ? {}
+      : { timeout: definition.timeout }),
     limit,
     protect: definition.protect ?? true,
     ...(tls === undefined ? {} : { tls }),

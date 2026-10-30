@@ -1,7 +1,6 @@
 import * as vscode from "vscode";
 import type { Connection } from "./connection";
 import type { Connections, State } from "./connections";
-import { connectTimeout } from "./form/fields";
 import { authExtension, type Definition } from "./servers";
 
 // How long a query took, in whole milliseconds, as \t gives
@@ -84,8 +83,7 @@ export function details(server: Definition, setting?: unknown): string[] {
         : extension.problem
           ? `Extension ${JSON.stringify(setting)} (invalid)`
           : `Extension ${extension.id ?? "not set"}`;
-  const ms = server.timeout ?? connectTimeout;
-  const timeout = ms === 0 ? "None" : `${ms} ms`;
+  const timeout = server.timeout ? `${server.timeout} ms` : "None";
   return [
     `Host: ${server.host}:${server.port}`,
     ...(server.user ? [`User: ${server.user}`] : []),

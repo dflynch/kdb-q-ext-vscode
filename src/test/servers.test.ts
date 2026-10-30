@@ -386,12 +386,11 @@ suite("servers", () => {
     );
   });
 
-  test("a server's own timeout overrides the default", () => {
+  test("a server's timeout is its own, with none unless given", () => {
     const local = { name: "local", host: "localhost", port: 5000 };
     assert.deepStrictEqual(server(local, {}, defaults), {
       host: "localhost",
       port: 5000,
-      timeout: 2000,
       limit: 100e6,
       protect: true,
     });

@@ -46,8 +46,7 @@ export type Context = {
   connected: boolean;
 };
 
-// How long a server waits to connect and log in, in milliseconds, unless
-// it gives its own. Here, as the form has it too.
+// The timeout a server added starts with, in milliseconds
 export const connectTimeout = 2000;
 
 // The form for a server to add: protected evaluation on, as a server has
@@ -90,7 +89,7 @@ export function fromSetting(
     auth: value.auth ?? (stored ? "store" : "none"),
     tls: value.tls ?? false,
     protect: value.protect ?? true,
-    timeout: value.timeout === 0 ? "" : String(value.timeout ?? connectTimeout),
+    timeout: value.timeout === undefined ? "" : String(value.timeout),
   };
 }
 
@@ -100,11 +99,9 @@ export function port(text: string): number | undefined {
   return port >= 1 && port <= 65535 ? port : undefined;
 }
 
-// A timeout as typed: a whole number of milliseconds, or empty for none,
-// which the setting has as 0, as hopen does
+// A timeout as typed: a whole number of milliseconds, or empty for none
 function timeout(text: string): number | undefined {
-  const ms = text.trim();
-  return ms === "" ? 0 : /^\d+$/.test(ms) ? Number(ms) : undefined;
+  return /^\d+$/.test(text.trim()) ? Number(text) : undefined;
 }
 
 // The problem with each field that has one, under it in the form. A
@@ -145,7 +142,7 @@ export function problems(
       found.password = "Can't contain a 0 byte";
     }
   }
-  if (timeout(form.timeout) === undefined) {
+  if (form.timeout.trim() !== "" && timeout(form.timeout) === undefined) {
     found.timeout = "A whole number of milliseconds";
   }
   return found;
@@ -165,7 +162,7 @@ export function toSetting(form: Form): Record<string, unknown> {
       : {}),
     ...(form.tls ? { tls: true } : {}),
     ...(form.protect ? {} : { protect: false }),
-    ...(ms === undefined || ms === connectTimeout ? {} : { timeout: ms }),
+    ...(ms === undefined ? {} : { timeout: ms }),
   };
 }
 

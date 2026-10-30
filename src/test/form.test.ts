@@ -26,13 +26,15 @@ const prod: Form = {
   user: "admin",
   auth: "store",
   password: "secret",
+  timeout: "",
 };
 
 suite("the server form's fields", () => {
-  test("a server added starts with protected evaluation on, and no TLS", () => {
+  test("a server added starts with protected evaluation on, no TLS, and a timeout", () => {
     assert.deepStrictEqual(toSetting({ ...blank(), host: "h", port: "1" }), {
       host: "h",
       port: 1,
+      timeout: 2000,
     });
   });
 
@@ -46,7 +48,7 @@ suite("the server form's fields", () => {
         auth: "prompt",
         tls: true,
         protect: false,
-        timeout: "",
+        timeout: "0",
       }),
       {
         host: "gw.example.com",
@@ -66,19 +68,13 @@ suite("the server form's fields", () => {
     });
   });
 
-  test("a timeout's filled in, and written only when it isn't the default", () => {
+  test("a server added starts with a 2000 ms timeout, and an empty one waits as long as it takes", () => {
     assert.strictEqual(blank().timeout, "2000");
     assert.strictEqual(
       fromSetting("s", { host: "h", port: 1 }, false).timeout,
-      "2000",
-    );
-    assert.strictEqual(toSetting(prod).timeout, undefined);
-    // Empty waits as long as it takes, which the setting has as 0
-    assert.strictEqual(toSetting({ ...prod, timeout: " " }).timeout, 0);
-    assert.strictEqual(
-      fromSetting("s", { host: "h", port: 1, timeout: 0 }, false).timeout,
       "",
     );
+    assert.strictEqual(toSetting({ ...prod, timeout: " " }).timeout, undefined);
     assert.deepStrictEqual(
       problems({ ...prod, timeout: "" }, context, false),
       {},

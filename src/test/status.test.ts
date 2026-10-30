@@ -121,7 +121,7 @@ suite("status", () => {
         'Authentication: Extension "kdb-auth" (invalid)',
       ),
     );
-    assert.ok(lines.includes("Connection timeout: 2000 ms"));
+    assert.ok(lines.includes("Connection timeout: None"));
   });
 
   test("the server menu names each command as the palette does", () => {

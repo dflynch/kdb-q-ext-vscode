@@ -12,8 +12,8 @@ export type Server = {
   port: number;
   user?: string;
   password?: string;
-  // How long to wait for the server to connect and log in, in milliseconds,
-  // or 0 to wait as long as it takes, as hopen does
+  // How long to wait for the server to connect and log in, in milliseconds;
+  // unset or 0 waits as long as it takes, as hopen does
   timeout?: number;
   // The largest result to take, in bytes, uncompressed
   limit?: number;
@@ -149,11 +149,10 @@ export class Connection {
       socket.setNoDelay(true);
       // A deadline for connecting and logging in together; the socket's own
       // timeout would restart with every write and read
-      const timeout = server.timeout ?? 2000;
-      const timer =
-        timeout === 0
-          ? undefined
-          : setTimeout(() => fail(new Error("timeout")), timeout);
+      const timeout = server.timeout;
+      const timer = timeout
+        ? setTimeout(() => fail(new Error("timeout")), timeout)
+        : undefined;
       const login = () => {
         phase = "login";
         // Version 3: compression, timestamps, timespans and GUIDs

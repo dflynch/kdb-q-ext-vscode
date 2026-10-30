@@ -98,8 +98,9 @@ settings file it's in:
   certificate as `tlsCertFile` and `tlsKeyFile` in PEM (`SSL_CERT_FILE`,
   `SSL_KEY_FILE`). Paths are absolute or start with `~/`. An encrypted key's
   passphrase is kept by **kdb+/q: Set Certificate Passphrase**
-- **`timeout`** is how long to wait to connect and log in, in milliseconds,
-  2000 unless given; 0 waits as long as it takes, as `hopen` does
+- **`timeout`** is how long to wait to connect and log in, in milliseconds;
+  unset or 0 waits as long as it takes, as `hopen` does. A server added in
+  the form starts with 2000
 
 #### Protected evaluation
 

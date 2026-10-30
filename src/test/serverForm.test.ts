@@ -115,6 +115,7 @@ const prod: Form = {
   user: "admin",
   auth: "store",
   password: "secret",
+  timeout: "",
 };
 
 suite("the server form", () => {
