@@ -25,43 +25,40 @@ export function resolve(file: string): string {
   return /^~[\\/]/.test(file) ? path.join(os.homedir(), file.slice(2)) : file;
 }
 
-// A file's path as written in the settings: from ~ if it's in the home
-// directory, so that a workspace's settings serve whoever opens it
-export function home(file: string): string {
-  const relative = path.relative(os.homedir(), file);
-  return relative !== "" &&
-    relative.split(path.sep)[0] !== ".." &&
-    !path.isAbsolute(relative)
-    ? `~${path.sep}${relative}`
-    : file;
-}
-
 // The TLS files as their settings give them, an empty one unset; with the
-// problem said for one that's wrong
+// problem said for any that's wrong, and the rest kept, so that a wrong CA
+// doesn't hide the key a passphrase is kept under
 export function files(
   ca: unknown,
   cert: unknown,
   key: unknown,
 ): { files: Files; problem?: string } {
-  const given = Object.entries({ ca, cert, key }).filter(
-    ([, file]) => file !== undefined && file !== null && file !== "",
-  );
-  if (
-    given.some(([, file]) => typeof file !== "string" || !filePath.test(file))
-  ) {
+  const settings = { ca: "tlsCaFile", cert: "tlsCertFile", key: "tlsKeyFile" };
+  const files: Files = {};
+  const wrong: string[] = [];
+  for (const [field, file] of Object.entries({ ca, cert, key })) {
+    if (file === undefined || file === null || file === "") {
+      continue;
+    }
+    if (typeof file === "string" && filePath.test(file)) {
+      files[field as keyof Files] = file;
+    } else {
+      wrong.push(settings[field as keyof Files]);
+    }
+  }
+  if (wrong.length > 0) {
     return {
-      files: {},
-      problem: "TLS file paths are absolute or start with ~/",
+      files,
+      problem: `${wrong.join(", ")}: not an absolute path or one from ~/`,
     };
   }
-  const files = Object.fromEntries(given) as Files;
   return (files.cert === undefined) !== (files.key === undefined)
-    ? { files, problem: "TLS certificate and key files go together" }
+    ? { files, problem: "tlsCertFile and tlsKeyFile go together" }
     : { files };
 }
 
 // Where the client certificate's passphrase is kept: under its key's file,
-// so that it isn't used for another key. None without a certificate.
+// so that it isn't used for another key. None without a key file.
 export function passphraseKey(files: Files): string | undefined {
   return files.key === undefined
     ? undefined

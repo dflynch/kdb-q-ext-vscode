@@ -108,25 +108,34 @@ suite("opener", () => {
     }
   });
 
-  test("TLS settings that are wrong fail the connect", async () => {
+  test("TLS settings that are wrong fail the connect, before credentials are asked for", async () => {
     const config = vscode.workspace.getConfiguration("kdb-q-ext-vscode");
     await config.update(
       "tlsCertFile",
       fixture("client.pem"),
       vscode.ConfigurationTarget.Global,
     );
+    const window = vscode.window as unknown as Record<string, unknown>;
+    const ask = window.showInputBox;
+    let asked = false;
+    window.showInputBox = async () => {
+      asked = true;
+      return "pw";
+    };
     try {
       const server: Definition = {
         name: "secure",
         host: "localhost",
         port: 1,
         tls: true,
+        auth: "prompt",
       };
       await assert.rejects(opener(secrets({}))(server), {
-        message: "invalid TLS settings",
-        cause: "TLS certificate and key files go together",
+        message: "invalid TLS settings: tlsCertFile and tlsKeyFile go together",
       });
+      assert.strictEqual(asked, false);
     } finally {
+      window.showInputBox = ask;
       await config.update(
         "tlsCertFile",
         undefined,

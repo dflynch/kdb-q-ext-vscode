@@ -11,7 +11,6 @@ import {
   authorities,
   filePath,
   files,
-  home,
   passphraseKey,
   read as readTls,
   resolve,
@@ -267,17 +266,18 @@ suite("tls", () => {
     assert.deepStrictEqual(files(undefined, "/c.pem", "~/k.pem"), {
       files: { cert: "/c.pem", key: "~/k.pem" },
     });
-    assert.deepStrictEqual(files("ca.pem", "", ""), {
-      files: {},
-      problem: "TLS file paths are absolute or start with ~/",
+    // The rest are kept, as a passphrase is kept under the key
+    assert.deepStrictEqual(files("ca.pem", "/c.pem", 1), {
+      files: { cert: "/c.pem" },
+      problem: "tlsCaFile, tlsKeyFile: not an absolute path or one from ~/",
     });
     assert.deepStrictEqual(
       files("", "/c.pem", "").problem,
-      "TLS certificate and key files go together",
+      "tlsCertFile and tlsKeyFile go together",
     );
     assert.deepStrictEqual(
       files("", "", "/k.pem").problem,
-      "TLS certificate and key files go together",
+      "tlsCertFile and tlsKeyFile go together",
     );
   });
 
@@ -285,22 +285,6 @@ suite("tls", () => {
     assert.strictEqual(resolve("~/a.pem"), path.join(os.homedir(), "a.pem"));
     assert.strictEqual(resolve("~\\a.pem"), path.join(os.homedir(), "a.pem"));
     assert.strictEqual(resolve("/a/~/b.pem"), "/a/~/b.pem");
-  });
-
-  test("a file in the home directory is written from ~", () => {
-    const at = (...parts: string[]) => path.join(os.homedir(), ...parts);
-    assert.strictEqual(
-      home(at("certs", "a.pem")),
-      `~${path.sep}certs${path.sep}a.pem`,
-    );
-    assert.strictEqual(
-      home(at("..a", "b.pem")),
-      `~${path.sep}..a${path.sep}b.pem`,
-    );
-    assert.strictEqual(resolve(home(at("a.pem"))), at("a.pem"));
-    const outside = path.join(path.parse(os.homedir()).root, "etc", "a.pem");
-    assert.strictEqual(home(outside), outside);
-    assert.strictEqual(home(os.homedir()), os.homedir());
   });
 
   test("a passphrase is kept under its key's file", () => {

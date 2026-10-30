@@ -417,12 +417,26 @@ function tlsFiles() {
   );
 }
 
+// Where the passphrase of the client certificate's key is kept, or
+// undefined, saying why, if there's no key file to keep it under
+function passphraseFor(): string | undefined {
+  const { files, problem } = tlsFiles();
+  const key = passphraseKey(files);
+  if (!key) {
+    vscode.window.showInformationMessage(
+      problem
+        ? `kdb+/q: invalid TLS settings: ${problem}`
+        : "kdb+/q: No TLS key file is set.",
+    );
+  }
+  return key;
+}
+
 // Keep the passphrase of the client certificate's key in VS Code's secure
 // storage, under the key's file
 export async function setPassphrase(secrets: vscode.SecretStorage) {
-  const key = passphraseKey(tlsFiles().files);
+  const key = passphraseFor();
   if (!key) {
-    vscode.window.showInformationMessage("kdb+/q: No TLS key file is set.");
     return;
   }
   const passphrase = await vscode.window.showInputBox({
@@ -436,12 +450,10 @@ export async function setPassphrase(secrets: vscode.SecretStorage) {
 }
 
 export async function clearPassphrase(secrets: vscode.SecretStorage) {
-  const key = passphraseKey(tlsFiles().files);
-  if (!key) {
-    vscode.window.showInformationMessage("kdb+/q: No TLS key file is set.");
-    return;
+  const key = passphraseFor();
+  if (key) {
+    await secrets.delete(key);
   }
-  await secrets.delete(key);
 }
 
 // The connect timeout and the size limit, with any problems in them shown
@@ -487,18 +499,20 @@ export function sources(secrets: vscode.SecretStorage): Sources {
 // fresh. Undefined if the user cancels being asked for a password.
 export function opener(secrets: vscode.SecretStorage) {
   return async (definition: servers.Definition) => {
+    // Checked first, so that no password is asked for, nor an extension
+    // asked, for a connect that would fail
+    const tlsSettings = definition.tls ? tlsFiles() : undefined;
+    if (tlsSettings?.problem) {
+      throw new Error(`invalid TLS settings: ${tlsSettings.problem}`);
+    }
     const given = await credentials(definition, sources(secrets));
     if (given === undefined) {
       return undefined;
     }
     let tls: Secure | undefined;
-    if (definition.tls) {
-      const { files, problem } = tlsFiles();
-      if (problem) {
-        throw new Error("invalid TLS settings", { cause: problem });
-      }
-      const key = passphraseKey(files);
-      tls = await secure(files, key && (await secrets.get(key)));
+    if (tlsSettings) {
+      const key = passphraseKey(tlsSettings.files);
+      tls = await secure(tlsSettings.files, key && (await secrets.get(key)));
     }
     return Connection.open(
       servers.server(definition, given, connectionDefaults(), tls),

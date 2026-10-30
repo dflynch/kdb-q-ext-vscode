@@ -41,8 +41,8 @@ export type Context = {
   workspaceOpen: boolean;
 };
 
-// A server to add: its name, its setting as written, any password and
-// passphrase to keep in secure storage, and the settings it's saved to
+// A server to add: its name, its setting as written, any password to keep
+// in secure storage, and the settings it's saved to
 export type Adding = {
   name: string;
   value: Record<string, unknown>;
@@ -172,7 +172,11 @@ function options(timeout: number): Step {
     kind: "tick",
     placeholder: "Options",
     choices: [
-      { id: "tls", label: "TLS", description: "with the TLS settings' files" },
+      {
+        id: "tls",
+        label: "TLS",
+        description: "with the files in the TLS settings",
+      },
       {
         id: "protect",
         label: "Protected evaluation",

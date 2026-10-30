@@ -8,8 +8,9 @@ import {
 } from "./adding";
 
 // Show a quick input until it's answered, gone back from or hidden, with a
-// Back button after the first step. It's kept when focus moves elsewhere.
-// Disposing it disposes its listeners.
+// Back button after the first step. It's kept when focus moves elsewhere,
+// so that a host or a password can be copied from another window without
+// losing the answers given. Disposing it disposes its listeners.
 function show<T>(
   input: vscode.InputBox | vscode.QuickPick<vscode.QuickPickItem>,
   title: string,
