@@ -79,7 +79,7 @@ suite("opener", () => {
     const open = opener(
       secrets({ [`password:admin@127.0.0.1:${fake.port}`]: "pw" }),
     );
-    const connection = await open(server, "typed");
+    const connection = await open(server, { typed: "typed" });
     assert.strictEqual(await fake.login, "admin:typed");
     connection?.close();
     fake.stop();

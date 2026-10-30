@@ -469,7 +469,10 @@ export function sources(secrets: vscode.SecretStorage): Sources {
 // fresh, or a password typed in the server form, to test it before it's
 // stored. Undefined if the user cancels being asked for a password.
 export function opener(secrets: vscode.SecretStorage) {
-  return async (definition: servers.Definition, typed?: string) => {
+  return async (
+    definition: servers.Definition,
+    { signal, typed }: { signal?: AbortSignal; typed?: string } = {},
+  ) => {
     // Checked first, so that no password is asked for, nor an extension
     // asked, for a connect that would fail
     const tlsSettings = definition.tls ? tlsFiles() : undefined;
@@ -491,6 +494,7 @@ export function opener(secrets: vscode.SecretStorage) {
     }
     return Connection.open(
       servers.server(definition, given, connectionDefaults(), tls),
+      signal,
     );
   };
 }

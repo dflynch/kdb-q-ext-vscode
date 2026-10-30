@@ -28,13 +28,14 @@ const tick = () => new Promise((resolve) => setImmediate(resolve));
 function connections() {
   const opening: {
     server: Definition;
+    signal: AbortSignal;
     resolve: (link: Fake | undefined) => void;
     reject: (error: Error) => void;
   }[] = [];
   const all = new Connections<Fake>(
-    (server) =>
+    (server, { signal }) =>
       new Promise((resolve, reject) =>
-        opening.push({ server, resolve, reject }),
+        opening.push({ server, signal, resolve, reject }),
       ),
   );
   const changes: Change[] = [];
@@ -169,6 +170,19 @@ suite("connections", () => {
     assert.strictEqual(await connected, undefined);
     assert.strictEqual(link.closedBy, "us");
     assert.deepStrictEqual(all.names, []);
+  });
+
+  test("disconnecting while connecting stops it, and its failure isn't thrown", async () => {
+    const { all, opening, changes } = connections();
+    const connected = all.connect(prod);
+    assert.strictEqual(opening[0].signal.aborted, false);
+    all.disconnect("prod");
+    assert.strictEqual(opening[0].signal.aborted, true);
+    opening[0].reject(new Error("cancelled"));
+    assert.strictEqual(await connected, undefined);
+    assert.deepStrictEqual(all.names, []);
+    assert.strictEqual(all.active, undefined);
+    assert.ok(changes.every((change) => !change.lost));
   });
 
   test("disposing closes them all", async () => {

@@ -364,8 +364,8 @@ suite("the server form", () => {
     const opened: unknown[][] = [];
     let closed = 0;
     let answer: "open" | "cancel" | Error = "open";
-    const { made, forms } = open({}, async (server, password) => {
-      opened.push([server, password]);
+    const { made, forms } = open({}, async (server, options) => {
+      opened.push([server, options?.typed]);
       if (answer instanceof Error) {
         throw answer;
       }

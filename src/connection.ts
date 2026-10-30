@@ -117,9 +117,14 @@ export class Connection {
 
   // Connect and log in. The server answers the login with one byte, the
   // protocol version it agrees to, or closes the connection to refuse it.
-  // Failures are q's errors for hopen.
-  static open(server: Server): Promise<Connection> {
+  // Failures are q's errors for hopen. Aborting the signal closes the
+  // socket, however far it's got.
+  static open(server: Server, signal?: AbortSignal): Promise<Connection> {
     return new Promise((resolve, reject) => {
+      if (signal?.aborted) {
+        reject(new Error("cancelled"));
+        return;
+      }
       const socket = server.tls
         ? tls.connect({ host: server.host, port: server.port, ...server.tls })
         : net.connect(server.port, server.host);
@@ -192,6 +197,7 @@ export class Connection {
       // Only the listeners added here: the socket has Node's own too
       const done = () => {
         clearTimeout(timer);
+        signal?.removeEventListener("abort", aborted);
         socket.off("connect", tcp);
         socket.off(connected, login);
         socket.off("error", error);
@@ -203,6 +209,8 @@ export class Connection {
         socket.destroy();
         reject(reason);
       };
+      const aborted = () => fail(new Error("cancelled"));
+      signal?.addEventListener("abort", aborted, { once: true });
       socket.once("connect", tcp);
       socket.once(connected, login);
       socket.once("error", error);

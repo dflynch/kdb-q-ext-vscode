@@ -21,6 +21,8 @@ type Entry<L> = {
   state: State;
   link?: L;
   opening?: Promise<L | undefined>;
+  // Aborted by a disconnect while opening
+  abort?: AbortController;
 };
 
 // The connections open, by their server's name, and the one that's active,
@@ -32,8 +34,13 @@ export class Connections<L extends Link> {
   private listeners = new Set<(change: Change) => void>();
 
   // open gives a connection to a server, or undefined if the user cancels,
-  // such as when asked for a password
-  constructor(private open: (server: Definition) => Promise<L | undefined>) {}
+  // such as when asked for a password; it stops when the signal's aborted
+  constructor(
+    private open: (
+      server: Definition,
+      options: { signal: AbortSignal },
+    ) => Promise<L | undefined>,
+  ) {}
 
   onChange(listener: (change: Change) => void): () => void {
     this.listeners.add(listener);
@@ -80,20 +87,23 @@ export class Connections<L extends Link> {
       return existing.opening;
     }
     const before = this.current;
-    const entry: Entry<L> = { server, state: { kind: "connecting" } };
+    const abort = new AbortController();
+    const entry: Entry<L> = { server, state: { kind: "connecting" }, abort };
     this.entries.set(server.name, entry);
     this.current = server.name;
-    entry.opening = this.open(server);
+    entry.opening = this.open(server, { signal: abort.signal });
     this.emit({});
     let link: L | undefined;
     try {
       link = await entry.opening;
     } catch (error) {
-      if (this.entries.get(server.name) === entry) {
-        entry.opening = undefined;
-        entry.state = { kind: "closed", reason: error as Error };
-        this.emit({});
+      if (this.entries.get(server.name) !== entry) {
+        // Disconnected while connecting, which stopped it
+        return undefined;
       }
+      entry.opening = undefined;
+      entry.state = { kind: "closed", reason: error as Error };
+      this.emit({});
       throw error;
     }
     if (this.entries.get(server.name) !== entry) {
@@ -102,6 +112,7 @@ export class Connections<L extends Link> {
       return undefined;
     }
     entry.opening = undefined;
+    entry.abort = undefined;
     if (link === undefined) {
       this.entries.delete(server.name);
       this.current = before;
@@ -131,6 +142,7 @@ export class Connections<L extends Link> {
     if (this.current === name) {
       this.current = undefined;
     }
+    entry.abort?.abort();
     entry.link?.close();
     this.emit({});
   }

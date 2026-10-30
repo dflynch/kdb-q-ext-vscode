@@ -30,7 +30,7 @@ type Scope = "user" | "workspace";
 // tests. Undefined if asking for a password was cancelled.
 export type Opener = (
   server: servers.Definition,
-  password?: string,
+  options?: { typed?: string },
 ) => Promise<{ close(): void } | undefined>;
 
 // A form open in a tab: for a server to add to a folder, or for one to
@@ -327,7 +327,7 @@ export class ServerForms implements vscode.Disposable {
         form.auth === "store" && form.password !== ""
           ? form.password
           : undefined;
-      const link = await this.opener(definition, typed);
+      const link = await this.opener(definition, { typed });
       if (link === undefined) {
         return { ok: false, text: "Cancelled" };
       }
