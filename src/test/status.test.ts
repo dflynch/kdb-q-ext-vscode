@@ -116,6 +116,11 @@ suite("status", () => {
     const lines = details(sso, "acme.kdb-auth");
     assert.ok(lines.includes("Authentication: Extension acme.kdb-auth"));
     assert.ok(details(sso).includes("Authentication: Extension not set"));
+    assert.ok(
+      details(sso, "kdb-auth").includes(
+        'Authentication: Extension "kdb-auth" (invalid)',
+      ),
+    );
     assert.ok(!lines.join("\n").includes("secret"));
     assert.ok(lines.includes("Connection timeout: Default"));
   });
