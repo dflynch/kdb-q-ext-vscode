@@ -171,7 +171,8 @@ input[type="checkbox"]:checked::before {
   transform: rotate(-45deg);
 }
 
-/* A tick box with what it does beside it, one under another */
+/* A tick box with what it does beside it, one under another, in the
+   foreground colour so that a note under it reads as less */
 .tick {
   display: flex;
   align-items: flex-start;
@@ -181,10 +182,6 @@ input[type="checkbox"]:checked::before {
 
 .tick + .tick {
   margin-top: 6px;
-}
-
-.tick .description {
-  margin: 0;
 }
 
 /* Under a tick, in line with what the tick says */

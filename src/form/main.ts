@@ -91,7 +91,7 @@ function tick(id: Field, ...label: (string | Node)[]) {
   const box = element("input");
   box.id = id;
   box.type = "checkbox";
-  const said = element("span", "description");
+  const said = element("span");
   said.append(...label);
   const wrap = element("label", "tick");
   wrap.append(box, said);
