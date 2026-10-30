@@ -1,7 +1,7 @@
 {
-  // The webview's script, and the codec, the formatter, the messages and
-  // protected evaluation it shares with the extension, mustn't use Node:
-  // this checks them without Node's types
+  // The webviews' scripts, and the codec, the formatter, the messages, the
+  // login checks and protected evaluation they share with the extension,
+  // mustn't use Node: this checks them without Node's types
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "types": [],
@@ -10,7 +10,9 @@
   },
   "include": [
     "src/codec",
+    "src/form",
     "src/format",
+    "src/login.ts",
     "src/messages.ts",
     "src/protection.ts",
     "src/webview"

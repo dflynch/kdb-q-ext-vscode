@@ -3,14 +3,21 @@ import * as commands from "./commands";
 import { Connections } from "./connections";
 import { exporting, saveCsv } from "./exporting";
 import { ResultView, registerResultView } from "./resultView";
+import { ServerForms } from "./serverForm";
 import { showStatus } from "./status";
 
 export function activate(context: vscode.ExtensionContext) {
   const connections = new Connections(commands.opener(context.secrets));
   const results = new ResultView(context.extensionUri);
   const status = showStatus(connections);
+  const forms = new ServerForms(
+    context.extensionUri,
+    context.secrets,
+    connections,
+  );
   context.subscriptions.push(
     status,
+    forms,
     connections,
     registerResultView(results),
     vscode.commands.registerCommand("kdb-q-ext-vscode.keepResult", () =>
@@ -75,7 +82,13 @@ export function activate(context: vscode.ExtensionContext) {
       },
     ),
     vscode.commands.registerCommand("kdb-q-ext-vscode.addServer", () =>
-      commands.addServer(context.secrets, connections),
+      forms.add(),
+    ),
+    vscode.commands.registerCommand("kdb-q-ext-vscode.editServer", () =>
+      commands.editServer(forms),
+    ),
+    vscode.commands.registerCommand("kdb-q-ext-vscode.removeServer", () =>
+      commands.removeServer(context.secrets, connections, forms),
     ),
     vscode.commands.registerCommand("kdb-q-ext-vscode.setPassword", () =>
       commands.setPassword(context.secrets),

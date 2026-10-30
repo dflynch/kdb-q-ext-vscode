@@ -1,4 +1,5 @@
 import type { Server } from "./connection";
+import { passwordProblem, userProblem } from "./login";
 import type { Secure } from "./tls";
 
 // A server as the settings define it: everything but the password, which is
@@ -117,6 +118,62 @@ export function definitions(setting: unknown): {
 // servers are
 export function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+// What's at a path in the setting, or undefined if nothing is
+export function at(setting: unknown, path: string[]): unknown {
+  return path.reduce<unknown>(
+    (folder, key) =>
+      isObject(folder) && Object.hasOwn(folder, key) ? folder[key] : undefined,
+    setting,
+  );
+}
+
+// The setting with a value put at a path, or what's there deleted for
+// undefined, the setting given left as it was. Renamed from another name
+// in the same folder, it takes that one's place among the rest; otherwise
+// it keeps its own, or goes last. Folders missing on the way are made.
+export function put(
+  setting: Record<string, unknown>,
+  path: string[],
+  value: unknown,
+  from?: string,
+): Record<string, unknown> {
+  const [key, ...rest] = path;
+  if (rest.length > 0) {
+    const folder = at(setting, [key]);
+    return replaced(
+      setting,
+      key,
+      key,
+      put(isObject(folder) ? folder : {}, rest, value, from),
+    );
+  }
+  return replaced(setting, from ?? key, key, value);
+}
+
+// An object with one key replaced by another, in its place
+function replaced(
+  object: Record<string, unknown>,
+  old: string,
+  key: string,
+  value: unknown,
+): Record<string, unknown> {
+  const entries = new Map<string, unknown>();
+  for (const [k, v] of Object.entries(object)) {
+    if (k === old) {
+      entries.set(key, value);
+    } else if (k !== key) {
+      entries.set(k, v);
+    }
+  }
+  if (!entries.has(key)) {
+    entries.set(key, value);
+  }
+  if (value === undefined) {
+    entries.delete(key);
+  }
+  return Object.fromEntries(entries);
 }
 
 // An object holding only objects, or nothing
@@ -239,11 +296,6 @@ export function secretKey(server: Definition): string {
   return `password:${server.user ?? ""}@${server.host.toLowerCase()}:${server.port}`;
 }
 
-// A user q can take: the login is user:password, ending at a 0 byte
-export function userProblem(user: string): boolean {
-  return /[:\0]/.test(user);
-}
-
 // Credentials as an extension gave them, checked as the setting is: they
 // come from code that isn't ours
 export function credentialsProblem(value: unknown): string | undefined {
@@ -258,13 +310,6 @@ export function credentialsProblem(value: unknown): string | undefined {
     return "no password";
   }
   return passwordProblem(password);
-}
-
-// A password q can take: the login ends at a 0 byte
-export function passwordProblem(password: string): string | undefined {
-  return password.includes("\0")
-    ? "a password can't contain a 0 byte"
-    : undefined;
 }
 
 // What a connection needs, with the TLS options read from the TLS

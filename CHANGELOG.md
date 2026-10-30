@@ -6,7 +6,8 @@ All notable changes to the extension are documented in this file.
 
 ### Added
 
-- Servers, defined in settings or by **kdb+/q: Add Server**, in folders to
+- Servers, added and edited in a form, **kdb+/q: Add Server** and **Edit
+  Server**, or in settings, and removed by **Remove Server**, in folders to
   any depth if you like, with TLS, passwords kept in VS Code's secure
   storage, asked for at every connect, or given by another extension, and
   protected evaluation

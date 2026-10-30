@@ -50,8 +50,11 @@ read.
 
 ### Servers
 
-Add a server with **kdb+/q: Add Server**, which asks for each setting and
-saves it to your user or workspace settings, or write it in `settings.json`:
+Add a server with **kdb+/q: Add Server**, which opens a form for its
+settings and saves them to your user or workspace settings, or write it in
+`settings.json`. **Edit Server** opens the same form for a server, where a
+password can be stored too, and **Remove Server** removes one, from every
+settings file it's in:
 
 ```json
 "kdb-q-ext-vscode.servers": {
@@ -84,10 +87,11 @@ saves it to your user or workspace settings, or write it in `settings.json`:
   }
   ```
 
-- **Passwords** aren't kept in settings. **kdb+/q: Set Server Password**
-  keeps one in VS Code's secure storage, for the user, host and port, and
-  **Clear Server Password** removes it. `"auth": "prompt"` asks for it at
-  every connect instead, and never keeps it
+- **Passwords** aren't kept in settings. The form, or **kdb+/q: Set Server
+  Password**, keeps one in VS Code's secure storage, for the user, host and
+  port, and **Clear Server Password** removes it. One no server uses any
+  more, once a server's edited or removed, is removed too. `"auth":
+  "prompt"` asks for it at every connect instead, and never keeps it
 - **`tls`** is `true` to connect with TLS. The files it needs besides the
   system's are set once for every server, as q takes them for the whole
   process: `tlsCaFile` to trust (q's `SSL_CA_CERT_FILE`), and a client
@@ -292,6 +296,8 @@ server commands on the status bar's.
 | kdb+/q: Connect to Server             |                  |
 | kdb+/q: Disconnect from Server        |                  |
 | kdb+/q: Add Server                    |                  |
+| kdb+/q: Edit Server                   |                  |
+| kdb+/q: Remove Server                 |                  |
 | kdb+/q: Open Settings                 |                  |
 | kdb+/q: Set Server Password           |                  |
 | kdb+/q: Clear Server Password         |                  |

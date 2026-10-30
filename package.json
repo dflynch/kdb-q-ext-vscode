@@ -85,6 +85,16 @@
         "title": "Add Server"
       },
       {
+        "command": "kdb-q-ext-vscode.editServer",
+        "category": "kdb+/q",
+        "title": "Edit Server"
+      },
+      {
+        "command": "kdb-q-ext-vscode.removeServer",
+        "category": "kdb+/q",
+        "title": "Remove Server"
+      },
+      {
         "command": "kdb-q-ext-vscode.keepResult",
         "category": "kdb+/q",
         "title": "Keep Result",

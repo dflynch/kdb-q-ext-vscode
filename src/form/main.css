@@ -1,0 +1,234 @@
+/* Bundled into dist/form.css. Laid out as the Settings editor lays out its
+   settings, with colours and fonts only from VS Code's own variables, so
+   every theme, high contrast included, styles the form */
+
+body {
+  box-sizing: border-box;
+  max-width: 720px;
+  margin: 0;
+  padding: 12px 24px 24px;
+  color: var(--vscode-foreground);
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  background: var(--vscode-editor-background);
+}
+
+h1 {
+  margin: 8px 0 4px;
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.where,
+.note {
+  margin: 0 0 4px;
+  color: var(--vscode-descriptionForeground);
+}
+
+[hidden] {
+  /* biome-ignore lint/complexity/noImportantStyles: a hidden row, button or note stays hidden whatever lays it out */
+  display: none !important;
+}
+
+/* What changed elsewhere, with a button to load it */
+.banner {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 12px 0;
+  padding: 6px 10px;
+  border: 1px solid var(--vscode-inputValidation-warningBorder);
+  background: var(--vscode-inputValidation-warningBackground);
+}
+
+.banner span {
+  flex: 1;
+}
+
+/* A setting: its name in bold, what it does, then its box */
+.setting {
+  padding: 12px 14px 14px;
+  margin: 0 -14px;
+  border-left: 2px solid transparent;
+}
+
+.setting.invalid {
+  border-left-color: var(--vscode-inputValidation-errorBorder);
+}
+
+.label {
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--vscode-settings-headerForeground);
+}
+
+.description {
+  color: var(--vscode-descriptionForeground);
+  margin-bottom: 8px;
+}
+
+.description:empty {
+  display: none;
+}
+
+.problem {
+  color: var(--vscode-errorForeground);
+  margin-top: 4px;
+}
+
+.problem:empty {
+  display: none;
+}
+
+a {
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--vscode-textLink-activeForeground);
+  text-decoration: underline;
+}
+
+input[type="text"],
+input[type="password"] {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 420px;
+  padding: 4px 6px;
+  color: var(
+    --vscode-settings-textInputForeground,
+    var(--vscode-input-foreground)
+  );
+  font: inherit;
+  background: var(
+    --vscode-settings-textInputBackground,
+    var(--vscode-input-background)
+  );
+  border: 1px solid
+    var(
+      --vscode-settings-textInputBorder,
+      var(--vscode-input-border, transparent)
+    );
+  border-radius: 2px;
+}
+
+input::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+
+.invalid input[type="text"],
+.invalid input[type="password"] {
+  border-color: var(--vscode-inputValidation-errorBorder);
+}
+
+input:focus,
+a:focus-visible,
+button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+/* Drawn in the checkbox colours, as the Settings editor draws its own */
+input[type="checkbox"],
+input[type="radio"] {
+  appearance: none;
+  display: grid;
+  flex: none;
+  place-content: center;
+  width: 16px;
+  height: 16px;
+  margin: 0 8px 0 0;
+  background: var(--vscode-checkbox-background);
+  border: 1px solid var(--vscode-checkbox-border);
+  cursor: pointer;
+}
+
+input[type="checkbox"] {
+  border-radius: 3px;
+}
+
+input[type="radio"] {
+  border-radius: 50%;
+}
+
+input[type="checkbox"]:checked::before {
+  content: "";
+  width: 8px;
+  height: 4px;
+  margin-top: -2px;
+  border: solid var(--vscode-checkbox-foreground);
+  border-width: 0 0 2px 2px;
+  transform: rotate(-45deg);
+}
+
+input[type="radio"]:checked::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--vscode-checkbox-foreground);
+}
+
+.tick .description {
+  margin: 0;
+}
+
+.tick,
+.radio {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.radios {
+  display: grid;
+  gap: 6px;
+}
+
+/* What a choice means, beside it */
+.radio .description {
+  margin: 0 0 0 8px;
+}
+
+/* At the end, left-aligned as VS Code's own forms have them */
+.buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.buttons a {
+  margin-left: 8px;
+}
+
+button {
+  padding: 4px 14px;
+  color: var(--vscode-button-foreground);
+  font: inherit;
+  background: var(--vscode-button-background);
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+button.secondary {
+  color: var(--vscode-button-secondaryForeground);
+  background: var(--vscode-button-secondaryBackground);
+}
+
+button.secondary:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

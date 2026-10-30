@@ -1,11 +1,10 @@
 import * as vscode from "vscode";
-import { type Asker, add } from "./adding";
 import * as comments from "./comments";
 import { Connection } from "./connection";
 import type { Connections } from "./connections";
 import { credentials, type Sources } from "./credentials";
 import type { Size } from "./format/console";
-import { quickInput } from "./quickInput";
+import { passwordProblem } from "./login";
 import {
   type Outcome,
   precisionSetting,
@@ -14,6 +13,8 @@ import {
   toView,
 } from "./result";
 import type { Results } from "./resultView";
+import type { ServerForms } from "./serverForm";
+import { forget, scopesOf, write } from "./serverForm";
 import * as servers from "./servers";
 import * as statements from "./statements";
 import { describe, type Status } from "./status";
@@ -304,69 +305,47 @@ async function pickServer(
   return picked?.server;
 }
 
-// Add a server to the user's or the workspace's settings, asking for each of
-// its settings. settings.json can be opened at the setting once it's added.
-export async function addServer(
+// Edit a server picked, in its form
+export async function editServer(forms: ServerForms) {
+  const server = await pickServer("kdb+/q: Edit Server");
+  if (server) {
+    forms.edit(server.name);
+  }
+}
+
+// Remove a server picked, once confirmed, from every scope it's written in,
+// as one left in the user's settings would still be there. Its connection
+// is closed, its form too, and its password forgotten if no other server
+// gets it.
+export async function removeServer(
   secrets: vscode.SecretStorage,
   connections: Connections<Connection>,
-  ask: Asker = quickInput("kdb+/q: Add Server"),
+  forms: ServerForms,
 ) {
-  const config = vscode.workspace.getConfiguration("kdb-q-ext-vscode");
-  const inspected = config.inspect("servers");
-  const scopes = {
-    user: inspected?.globalValue ?? {},
-    workspace: inspected?.workspaceValue ?? {},
-  };
-  // Checked before asking, rather than refusing once everything's answered
-  if (!servers.isObject(scopes.user) || !servers.isObject(scopes.workspace)) {
-    vscode.window.showErrorMessage(
-      "kdb+/q: The servers setting isn't an object, so a server can't be added to it.",
-    );
+  const server = await pickServer("kdb+/q: Remove Server");
+  if (!server) {
     return;
   }
-  const adding = await add(ask, {
-    taken: Object.keys({ ...scopes.user, ...scopes.workspace }),
-    timeout: connectionDefaults().timeout,
-    workspaceOpen: vscode.workspace.workspaceFolders !== undefined,
-  });
-  if (adding === undefined) {
+  const scopes = scopesOf(server.name);
+  const remove = "Remove";
+  const choice = await vscode.window.showWarningMessage(
+    `Remove ${server.name}?`,
+    {
+      modal: true,
+      detail: `It's removed from your ${scopes.join(" and ")} settings.`,
+    },
+    remove,
+  );
+  if (choice !== remove) {
     return;
   }
-  const { name, value, password, target } = adding;
-  // Read back as connecting reads it
-  const read = servers.definitions({ [name]: value });
-  const [definition] = read.servers;
-  if (definition === undefined) {
-    throw new Error(`kdb+/q: ${read.problems.join("; ")}`);
+  for (const scope of scopes) {
+    await write(scope, server.name.split("/"), undefined);
   }
-  await config.update(
-    "servers",
-    { ...scopes[target], [name]: value },
-    target === "workspace"
-      ? vscode.ConfigurationTarget.Workspace
-      : vscode.ConfigurationTarget.Global,
-  );
-  if (password !== undefined) {
-    await secrets.store(servers.secretKey(definition), password);
-  }
-  const connect = "Connect";
-  const edit = "Open settings.json";
-  const choice = await vscode.window.showInformationMessage(
-    `kdb+/q: Added ${name}.`,
-    connect,
-    edit,
-  );
-  if (choice === connect) {
-    await connectTo(connections, definition);
-  } else if (choice === edit) {
-    // The Settings editor can't edit an object; a query naming a setting
-    // reveals it in the file
-    await vscode.commands.executeCommand(
-      target === "workspace"
-        ? "workbench.action.openWorkspaceSettingsFile"
-        : "workbench.action.openSettingsJson",
-      { query: "kdb-q-ext-vscode.servers" },
-    );
+  forms.close(server.name);
+  connections.disconnect(server.name);
+  if (server.auth === undefined) {
+    await forget(secrets, [servers.secretKey(server)]);
   }
 }
 
@@ -385,7 +364,7 @@ export async function setPassword(secrets: vscode.SecretStorage) {
     title,
     prompt: "Password",
     password: true,
-    validateInput: servers.passwordProblem,
+    validateInput: passwordProblem,
   });
   if (password === undefined) {
     return;
@@ -475,7 +454,7 @@ export function sources(secrets: vscode.SecretStorage): Sources {
         prompt: "Password",
         password: true,
         ignoreFocusOut: true,
-        validateInput: servers.passwordProblem,
+        validateInput: passwordProblem,
       }),
     authExtension: () =>
       vscode.workspace
@@ -528,7 +507,7 @@ export async function connect(connections: Connections<Connection>) {
   }
 }
 
-async function connectTo(
+export async function connectTo(
   connections: Connections<Connection>,
   server: servers.Definition,
 ) {
@@ -554,6 +533,8 @@ export const serverMenu: { group: string; commands: [string, string][] }[] = [
     group: "Servers",
     commands: [
       ["kdb-q-ext-vscode.addServer", "Add Server"],
+      ["kdb-q-ext-vscode.editServer", "Edit Server"],
+      ["kdb-q-ext-vscode.removeServer", "Remove Server"],
       ["kdb-q-ext-vscode.openSettings", "Open Settings"],
     ],
   },

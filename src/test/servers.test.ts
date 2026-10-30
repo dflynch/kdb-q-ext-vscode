@@ -1,12 +1,14 @@
 import * as assert from "node:assert";
 import { readFileSync } from "node:fs";
 import * as path from "node:path";
+import { passwordProblem } from "../login";
 import {
+  at,
   authExtension,
   credentialsProblem,
   defaults,
   definitions,
-  passwordProblem,
+  put,
   secretKey,
   server,
   settings,
@@ -215,6 +217,80 @@ suite("servers", () => {
           "stray: not a server or a folder",
         ],
       },
+    );
+  });
+
+  test("what's at a path, or undefined", () => {
+    const setting = { Prod: { trades: { TP: { host: "h", port: 1 } } } };
+    assert.deepStrictEqual(at(setting, ["Prod", "trades", "TP"]), {
+      host: "h",
+      port: 1,
+    });
+    assert.strictEqual(at(setting, ["Prod", "TP"]), undefined);
+    assert.strictEqual(
+      at(setting, ["Prod", "trades", "TP", "host", "x"]),
+      undefined,
+    );
+    assert.strictEqual(at(setting, ["constructor"]), undefined);
+    assert.strictEqual(at(undefined, ["Prod"]), undefined);
+  });
+
+  test("a server put at a path, beside the rest, the setting left as it was", () => {
+    const setting = { Dev: { TP: { host: "dev", port: 1 } }, local: {} };
+    const server = { host: "prod", port: 2 };
+    assert.deepStrictEqual(put(setting, ["Prod", "trades", "TP"], server), {
+      Dev: { TP: { host: "dev", port: 1 } },
+      local: {},
+      Prod: { trades: { TP: server } },
+    });
+    assert.deepStrictEqual(put(setting, ["Dev", "RDB"], server), {
+      Dev: { TP: { host: "dev", port: 1 }, RDB: server },
+      local: {},
+    });
+    assert.deepStrictEqual(setting, {
+      Dev: { TP: { host: "dev", port: 1 } },
+      local: {},
+    });
+  });
+
+  test("a server replaced, renamed in its place, or deleted", () => {
+    const setting = {
+      a: { host: "a", port: 1 },
+      b: { host: "b", port: 1 },
+      c: { host: "c", port: 1 },
+    };
+    const server = { host: "x", port: 2 };
+    assert.deepStrictEqual(Object.entries(put(setting, ["b"], server)), [
+      ["a", setting.a],
+      ["b", server],
+      ["c", setting.c],
+    ]);
+    assert.deepStrictEqual(
+      Object.entries(put(setting, ["renamed"], server, "b")),
+      [
+        ["a", setting.a],
+        ["renamed", server],
+        ["c", setting.c],
+      ],
+    );
+    assert.deepStrictEqual(put(setting, ["b"], undefined), {
+      a: setting.a,
+      c: setting.c,
+    });
+    // A folder emptied stays, as an empty folder
+    assert.deepStrictEqual(
+      put({ Dev: { TP: server } }, ["Dev", "TP"], undefined),
+      {
+        Dev: {},
+      },
+    );
+  });
+
+  test("any name can be put, as the settings can hold it", () => {
+    const put1 = put({}, ["__proto__", "constructor"], { host: "h", port: 1 });
+    assert.deepStrictEqual(
+      definitions(put1).servers.map((s) => s.name),
+      ["__proto__/constructor"],
     );
   });
 
