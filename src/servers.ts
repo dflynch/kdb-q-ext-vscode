@@ -68,9 +68,25 @@ export function id(path: string[]): string {
   return JSON.stringify(path);
 }
 
-// A problem in the servers setting, at the path of what has it: empty for
-// the setting itself
+// A problem in the servers setting, at the path of what has it, empty for
+// the setting itself, said of it: isn't a server or a folder
 export type Problem = { path: string[]; problem: string };
+
+// A problem as a clause, with what has it by its path: Dev › rdb isn't a
+// server or a folder
+export function said({ path, problem }: Problem): string {
+  const own = path.at(-1);
+  const folder = path.slice(0, -1);
+  const what =
+    own === undefined
+      ? "the setting"
+      : own.trim() !== ""
+        ? shown(path)
+        : folder.length > 0
+          ? `an entry in ${shown(folder)}`
+          : "an entry";
+  return `${what} ${problem}`;
+}
 
 // A Marketplace extension ID, publisher.name
 export const extensionId = /^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9-]*$/i;
@@ -107,7 +123,7 @@ export function definitions(setting: unknown): {
     return {
       servers,
       folders,
-      problems: [{ path: [], problem: "the servers setting isn't an object" }],
+      problems: [{ path: [], problem: "isn't an object" }],
     };
   }
   const read = (folder: Record<string, unknown>, at: string[]) => {
@@ -200,7 +216,7 @@ function isFolder(value: Record<string, unknown>): boolean {
 
 // A server's or a folder's name
 function nameProblem(name: string): string | undefined {
-  return name.trim() === "" ? "a name can't be empty" : undefined;
+  return name.trim() === "" ? "has no name" : undefined;
 }
 
 // A server as checked
@@ -228,45 +244,47 @@ function definition(
 // server nor a folder
 function check(value: unknown): string | undefined {
   if (!isObject(value)) {
-    return "not a server or a folder";
+    return "isn't a server or a folder";
   }
   if (isFolder(value)) {
     return undefined;
   }
   const unknown = Object.keys(value).filter((key) => !fields.has(key));
   if (unknown.length > 0) {
-    return `unknown ${unknown.length === 1 ? "field" : "fields"} ${unknown.join(", ")}`;
+    return unknown.length === 1
+      ? `has an unknown field, ${unknown[0]}`
+      : `has unknown fields, ${unknown.join(", ")}`;
   }
   const { host, port, user, timeout, protect, tls, auth } = value as Record<
     string,
     unknown
   >;
   if (typeof host !== "string" || host.trim() === "") {
-    return "no host";
+    return "has no host";
   }
   if (!isCount(port) || port > 65535) {
-    return "the port isn't a port number";
+    return "has a port that isn't from 1 to 65535";
   }
   // q takes the login as user:password, ending at a 0 byte
   if (user !== undefined && (typeof user !== "string" || userProblem(user))) {
-    return "the user can't contain : or a 0 byte";
+    return "has a user with a : or a 0 byte";
   }
   if (timeout !== undefined && !isTimeout(timeout)) {
     return isCount(timeout)
-      ? `the timeout is over ${longestTimeout} ms`
-      : "the timeout isn't a whole number of milliseconds";
+      ? `has a timeout over ${longestTimeout} ms`
+      : "has a timeout that isn't a whole number of milliseconds";
   }
   if (protect !== undefined && typeof protect !== "boolean") {
-    return "protect is true or false";
+    return "has a protect that isn't true or false";
   }
   if (tls !== undefined && typeof tls !== "boolean") {
-    return "tls is true or false";
+    return "has a tls that isn't true or false";
   }
   if (
     auth !== undefined &&
     !["none", "store", "prompt", "extension"].includes(auth as string)
   ) {
-    return 'auth is "none", "store", "prompt" or "extension"';
+    return 'has an auth that isn\'t "none", "store", "prompt" or "extension"';
   }
   return undefined;
 }

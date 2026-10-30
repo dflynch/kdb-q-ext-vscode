@@ -89,6 +89,27 @@ export async function write(
   );
 }
 
+// The servers setting in a scope's settings.json, where it can be edited as
+// written: the Settings editor can't edit an object, and a query naming a
+// setting reveals it in the file
+export async function openServers(scope: Scope) {
+  await vscode.commands.executeCommand(
+    scope === "workspace"
+      ? "workbench.action.openWorkspaceSettingsFile"
+      : "workbench.action.openSettingsJson",
+    { revealSetting: { key: "kdb-q-ext-vscode.servers" } },
+  );
+}
+
+// The scope whose servers setting has a problem, the workspace's first, as
+// it wins
+export function troubled(): Scope {
+  const written = scopes();
+  return servers.definitions(written.workspace).problems.length > 0
+    ? "workspace"
+    : "user";
+}
+
 // Delete the passwords no server other than the one at the path given still
 // gets from secure storage: several servers with the same user, host and
 // port share one
@@ -344,7 +365,7 @@ export class ServerForms implements vscode.Disposable {
     const read = servers.definitions({ [name]: value });
     const [checked] = read.servers;
     if (checked === undefined) {
-      throw new Error(read.problems.map(({ problem }) => problem).join("; "));
+      throw new Error(read.problems.map(servers.said).join("; "));
     }
     const definition = { ...checked, path };
     return { context, path, value, definition };
@@ -471,15 +492,8 @@ export class ServerForms implements vscode.Disposable {
       );
       return;
     }
-    const scope =
-      open.editing === undefined ? "user" : scopesOf(open.editing).at(-1);
-    // The Settings editor can't edit an object; a query naming a setting
-    // reveals it in the file
-    await vscode.commands.executeCommand(
-      scope === "workspace"
-        ? "workbench.action.openWorkspaceSettingsFile"
-        : "workbench.action.openSettingsJson",
-      { revealSetting: { key: "kdb-q-ext-vscode.servers" } },
+    await openServers(
+      (open.editing && scopesOf(open.editing).at(-1)) ?? "user",
     );
   }
 }

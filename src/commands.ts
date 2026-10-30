@@ -14,11 +14,42 @@ import {
 } from "./result";
 import type { Results } from "./resultView";
 import type { ServerForms } from "./serverForm";
-import { forget, scopesOf, write } from "./serverForm";
+import { forget, openServers, scopesOf, troubled, write } from "./serverForm";
 import * as servers from "./servers";
 import * as statements from "./statements";
 import { describe, type Status } from "./status";
 import { files, passphraseKey, type Secure, secure } from "./tls";
+import { Told } from "./told";
+
+const told = new Told();
+
+// Warn of the problems found in a setting that haven't been told, said by
+// the message given, with a button to open the setting
+function warn(
+  setting: string,
+  problems: string[],
+  message: (news: string[]) => string,
+) {
+  const news = told.news(setting, problems);
+  if (news.length === 0) {
+    return;
+  }
+  const open = "Open Settings";
+  vscode.window
+    .showWarningMessage(`kdb+/q: ${message(news)}`, open)
+    .then((choice) => {
+      if (choice !== open) {
+        return;
+      }
+      if (setting === "servers") {
+        return openServers(troubled());
+      }
+      return vscode.commands.executeCommand(
+        "workbench.action.openSettings",
+        `kdb-q-ext-vscode.${setting}`,
+      );
+    });
+}
 
 // Send the selected text, or the current line, to the active terminal one
 // statement at a time. With several selections, each is sent in turn from the
@@ -53,18 +84,22 @@ export function runSelectedText(editor: vscode.TextEditor) {
 }
 
 // The console size, the precision and the row limit, with any problem in
-// them shown
+// them told
 function consoleSize(): Size {
   const config = vscode.workspace.getConfiguration("kdb-q-ext-vscode");
   const { size, problem } = sizeSetting(config.get("consoleSize"));
   const digits = precisionSetting(config.get("precision"));
   const rows = rowLimitSetting(config.get("rowLimit"));
-  for (const wrong of [problem, digits.problem, rows.problem]) {
-    if (wrong) {
-      vscode.window.showWarningMessage(
-        `kdb+/q: Using the default, as ${wrong}.`,
-      );
-    }
+  for (const [setting, wrong] of [
+    ["consoleSize", problem],
+    ["precision", digits.problem],
+    ["rowLimit", rows.problem],
+  ] as const) {
+    warn(
+      setting,
+      wrong ? [wrong] : [],
+      ([news]) => `Using the default, as ${news}.`,
+    );
   }
   return { ...size, precision: digits.precision, rowLimit: rows.rowLimit };
 }
@@ -249,17 +284,18 @@ export async function toggleBlockComment(editor: vscode.TextEditor) {
   }
 }
 
-// The servers in the settings, with any problems in them shown
+// The servers in the settings, with any problems in them told: what has
+// one is skipped
 export function definitions(): servers.Definition[] {
   const setting = vscode.workspace
     .getConfiguration("kdb-q-ext-vscode")
     .get("servers");
   const { servers: defined, problems } = servers.definitions(setting);
-  if (problems.length > 0) {
-    vscode.window.showWarningMessage(
-      `kdb+/q: Left out of the servers setting: ${problems.map(({ path, problem }) => `${servers.shown(path)}: ${problem}`).join("; ")}.`,
-    );
-  }
+  warn("servers", problems.map(servers.said), (news) =>
+    problems.some(({ path }) => path.length === 0)
+      ? "The servers setting is skipped, as it isn't an object."
+      : `Skipped in the servers setting: ${news.join("; ")}.`,
+  );
   return defined;
 }
 
@@ -444,15 +480,15 @@ export async function clearPassphrase(secrets: vscode.SecretStorage) {
   }
 }
 
-// The size limit, with any problem in it shown
+// The size limit, with any problem in it told
 export function connectionDefaults(): servers.Defaults {
   const config = vscode.workspace.getConfiguration("kdb-q-ext-vscode");
   const { defaults, problems } = servers.settings(config.get("sizeLimit"));
-  if (problems.length > 0) {
-    vscode.window.showWarningMessage(
-      `kdb+/q: Using the default, as ${problems.join(" and ")}.`,
-    );
-  }
+  warn(
+    "sizeLimit",
+    problems,
+    (news) => `Using the default, as ${news.join(" and ")}.`,
+  );
   return defaults;
 }
 

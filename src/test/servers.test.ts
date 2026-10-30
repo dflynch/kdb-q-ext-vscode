@@ -10,6 +10,7 @@ import {
   defaults,
   definitions,
   put,
+  said,
   secretKey,
   server,
   settings,
@@ -75,7 +76,7 @@ suite("servers", () => {
     assert.deepStrictEqual(definitions([{ host: "h", port: 1 }]), {
       servers: [],
       folders: [],
-      problems: [{ path: [], problem: "the servers setting isn't an object" }],
+      problems: [{ path: [], problem: "isn't an object" }],
     });
   });
 
@@ -99,23 +100,23 @@ suite("servers", () => {
     });
     assert.deepStrictEqual(servers, [{ path: ["ok"], host: "h", port: 1 }]);
     assert.deepStrictEqual(problems, [
-      { path: ["a"], problem: "the port isn't a port number" },
-      { path: ["b"], problem: "the port isn't a port number" },
-      { path: ["c"], problem: "the port isn't a port number" },
-      { path: ["d"], problem: "no host" },
-      { path: ["e"], problem: "no host" },
-      { path: ["f"], problem: "the user can't contain : or a 0 byte" },
-      { path: ["g"], problem: "the user can't contain : or a 0 byte" },
+      { path: ["a"], problem: "has a port that isn't from 1 to 65535" },
+      { path: ["b"], problem: "has a port that isn't from 1 to 65535" },
+      { path: ["c"], problem: "has a port that isn't from 1 to 65535" },
+      { path: ["d"], problem: "has no host" },
+      { path: ["e"], problem: "has no host" },
+      { path: ["f"], problem: "has a user with a : or a 0 byte" },
+      { path: ["g"], problem: "has a user with a : or a 0 byte" },
       {
         path: ["h"],
-        problem: "the timeout isn't a whole number of milliseconds",
+        problem: "has a timeout that isn't a whole number of milliseconds",
       },
-      { path: ["h2"], problem: "protect is true or false" },
-      { path: ["t1"], problem: "tls is true or false" },
-      { path: ["t2"], problem: "tls is true or false" },
-      { path: ["i"], problem: "unknown field usr" },
-      { path: ["j"], problem: "not a server or a folder" },
-      { path: [""], problem: "a name can't be empty" },
+      { path: ["h2"], problem: "has a protect that isn't true or false" },
+      { path: ["t1"], problem: "has a tls that isn't true or false" },
+      { path: ["t2"], problem: "has a tls that isn't true or false" },
+      { path: ["i"], problem: "has an unknown field, usr" },
+      { path: ["j"], problem: "isn't a server or a folder" },
+      { path: [""], problem: "has no name" },
     ]);
   });
 
@@ -139,15 +140,18 @@ suite("servers", () => {
     assert.deepStrictEqual(problems, [
       {
         path: ["a"],
-        problem: 'auth is "none", "store", "prompt" or "extension"',
+        problem:
+          'has an auth that isn\'t "none", "store", "prompt" or "extension"',
       },
       {
         path: ["b"],
-        problem: 'auth is "none", "store", "prompt" or "extension"',
+        problem:
+          'has an auth that isn\'t "none", "store", "prompt" or "extension"',
       },
       {
         path: ["c"],
-        problem: 'auth is "none", "store", "prompt" or "extension"',
+        problem:
+          'has an auth that isn\'t "none", "store", "prompt" or "extension"',
       },
     ]);
   });
@@ -230,14 +234,34 @@ suite("servers", () => {
         ],
         folders: [["Dev"], ["Dev", "trades"]],
         problems: [
-          { path: ["Dev", "TP"], problem: "unknown field hots" },
-          { path: ["Dev", "trades", " "], problem: "a name can't be empty" },
-          { path: ["Dev", "trades", ""], problem: "a name can't be empty" },
-          { path: ["UAT"], problem: "unknown fields TP, RDB" },
-          { path: ["gw"], problem: "tls is true or false" },
-          { path: ["stray"], problem: "not a server or a folder" },
+          { path: ["Dev", "TP"], problem: "has an unknown field, hots" },
+          { path: ["Dev", "trades", " "], problem: "has no name" },
+          { path: ["Dev", "trades", ""], problem: "has no name" },
+          { path: ["UAT"], problem: "has unknown fields, TP, RDB" },
+          { path: ["gw"], problem: "has a tls that isn't true or false" },
+          { path: ["stray"], problem: "isn't a server or a folder" },
         ],
       },
+    );
+  });
+
+  test("a problem's said of what has it, by its path", () => {
+    const problem = "isn't a server or a folder";
+    assert.strictEqual(
+      said({ path: ["Dev", "rdb"], problem }),
+      "Dev › rdb isn't a server or a folder",
+    );
+    assert.strictEqual(
+      said({ path: ["Dev", " "], problem: "has no name" }),
+      "an entry in Dev has no name",
+    );
+    assert.strictEqual(
+      said({ path: [""], problem: "has no name" }),
+      "an entry has no name",
+    );
+    assert.strictEqual(
+      said({ path: [], problem: "isn't an object" }),
+      "the setting isn't an object",
     );
   });
 
