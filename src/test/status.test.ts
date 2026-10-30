@@ -106,14 +106,14 @@ suite("status", () => {
     );
   });
 
-  test("an extension is named, but not the fields it's given", () => {
+  test("the auth extension is said, but not the fields it's given", () => {
     const lines = details({
       name: "sso",
       host: "kdb2",
       port: 5000,
-      auth: { extension: "acme.kdb-auth", fields: { token: "secret" } },
+      auth: { fields: { token: "secret" } },
     });
-    assert.ok(lines.includes("Authentication: Extension acme.kdb-auth"));
+    assert.ok(lines.includes("Authentication: Auth extension"));
     assert.ok(!lines.join("\n").includes("secret"));
     assert.ok(lines.includes("Connection timeout: Default"));
   });

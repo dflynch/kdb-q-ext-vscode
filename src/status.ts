@@ -72,15 +72,14 @@ export function lastTiming(changed: () => void) {
 }
 
 // A server's settings, a line each, all but secrets: where the password
-// comes from, not what it is, and an extension's name, not the fields it's
-// given
+// comes from, not what it is, and not the fields the auth extension is given
 export function details(server: Definition): string[] {
   const auth =
     server.auth === undefined
       ? "Stored password"
       : server.auth === "prompt"
         ? "Ask each time"
-        : `Extension ${server.auth.extension}`;
+        : "Auth extension";
   const tls =
     server.tls === undefined
       ? "Off"

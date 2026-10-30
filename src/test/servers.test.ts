@@ -1,5 +1,6 @@
 import * as assert from "node:assert";
 import {
+  authExtension,
   credentialsProblem,
   defaults,
   definitions,
@@ -127,46 +128,53 @@ suite("servers", () => {
     ]);
   });
 
-  test("auth is a prompt, or an extension given the rest of it", () => {
+  test("auth is a prompt, or the auth extension given any fields", () => {
     assert.deepStrictEqual(
       definitions({
         otp: { host: "h", port: 1, auth: "prompt" },
-        sso: {
-          host: "h",
-          port: 1,
-          auth: { extension: "acme.kdb-auth", realm: "EXAMPLE.COM" },
-        },
+        sso: { host: "h", port: 1, auth: "extension" },
+        kerberos: { host: "h", port: 1, auth: { realm: "EXAMPLE.COM" } },
       }).servers,
       [
         { name: "otp", host: "h", port: 1, auth: "prompt" },
+        { name: "sso", host: "h", port: 1, auth: { fields: {} } },
         {
-          name: "sso",
+          name: "kerberos",
           host: "h",
           port: 1,
-          auth: {
-            extension: "acme.kdb-auth",
-            fields: { realm: "EXAMPLE.COM" },
-          },
+          auth: { fields: { realm: "EXAMPLE.COM" } },
         },
       ],
     );
   });
 
-  test("auth that's neither is a problem", () => {
+  test("auth that's none of them is a problem", () => {
     assert.deepStrictEqual(
       definitions({
         a: { host: "h", port: 1, auth: "stored" },
-        b: { host: "h", port: 1, auth: { realm: "EXAMPLE.COM" } },
-        c: { host: "h", port: 1, auth: { extension: "kdb-auth" } },
-        d: { host: "h", port: 1, auth: ["prompt"] },
+        b: { host: "h", port: 1, auth: ["prompt"] },
+        c: { host: "h", port: 1, auth: null },
       }).problems,
       [
-        'a: auth is "prompt" or names an extension',
-        "b: auth's extension isn't an extension ID",
-        "c: auth's extension isn't an extension ID",
-        'd: auth is "prompt" or names an extension',
+        'a: auth is "prompt", "extension" or the extension\'s fields',
+        'b: auth is "prompt", "extension" or the extension\'s fields',
+        'c: auth is "prompt", "extension" or the extension\'s fields',
       ],
     );
+  });
+
+  test("the auth extension is an extension ID, or unset", () => {
+    assert.deepStrictEqual(authExtension("acme.kdb-auth"), {
+      id: "acme.kdb-auth",
+    });
+    assert.deepStrictEqual(authExtension(undefined), {});
+    assert.deepStrictEqual(authExtension(""), {});
+    assert.deepStrictEqual(authExtension("kdb-auth"), {
+      problem: "the auth extension isn't an extension ID",
+    });
+    assert.deepStrictEqual(authExtension(1), {
+      problem: "the auth extension isn't an extension ID",
+    });
   });
 
   test("an extension's user replaces the server's", () => {

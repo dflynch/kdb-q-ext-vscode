@@ -23,15 +23,13 @@ export type Definition = {
 };
 
 // A password asked for at every connect and never kept, where a firm doesn't
-// allow one to be stored or it changes too often to keep; or one an extension
-// gives, for a firm's own sign-on: a Kerberos ticket or
-// an access token, say, which the server checks in .z.pw. The setting names
-// the extension, so no other extension is given the server's login by
-// taking a name agreed in advance. The rest of the setting goes to it as it
-// is.
-export type Auth =
-  | "prompt"
-  | { extension: string; fields: Record<string, unknown> };
+// allow one to be stored or it changes too often to keep; or one the auth
+// extension gives, for a firm's own sign-on: a Kerberos ticket or an access
+// token, say, which the server checks in .z.pw. The authExtension setting
+// names the extension, once for every server, so no other extension is given
+// a server's login by taking a name agreed in advance. A server's fields for
+// it go to it as they are: "extension" is the same as no fields.
+export type Auth = "prompt" | { fields: Record<string, unknown> };
 
 // The files TLS can need besides the system's: a CA to trust as well as the
 // system's, and a client certificate, as a certificate and its key, or both
@@ -99,7 +97,10 @@ export function definitions(setting: unknown): {
     const { host, port, user, timeout, protect, tls, auth } = value as Omit<
       Definition,
       "name" | "tls" | "auth"
-    > & { tls?: boolean | Tls; auth?: "prompt" | Record<string, unknown> };
+    > & {
+      tls?: boolean | Tls;
+      auth?: "prompt" | "extension" | Record<string, unknown>;
+    };
     servers.push({
       name,
       host,
@@ -183,25 +184,33 @@ function tlsProblem(tls: unknown): string | undefined {
 }
 
 function authProblem(auth: unknown): string | undefined {
-  if (auth === "prompt") {
-    return undefined;
-  }
-  if (typeof auth !== "object" || auth === null || Array.isArray(auth)) {
-    return 'auth is "prompt" or names an extension';
-  }
-  const { extension } = auth as Record<string, unknown>;
-  if (typeof extension !== "string" || !extensionId.test(extension)) {
-    return "auth's extension isn't an extension ID";
-  }
-  return undefined;
+  return auth === "prompt" ||
+    auth === "extension" ||
+    (typeof auth === "object" && auth !== null && !Array.isArray(auth))
+    ? undefined
+    : 'auth is "prompt", "extension" or the extension\'s fields';
 }
 
-function readAuth(auth: "prompt" | Record<string, unknown>): Auth {
-  if (auth === "prompt") {
-    return auth;
+function readAuth(
+  auth: "prompt" | "extension" | Record<string, unknown>,
+): Auth {
+  return auth === "prompt"
+    ? auth
+    : { fields: auth === "extension" ? {} : auth };
+}
+
+// The auth extension's ID, as its setting gives it, or undefined if it's
+// unset; with the problem said for one that isn't an ID
+export function authExtension(setting: unknown): {
+  id?: string;
+  problem?: string;
+} {
+  if (setting === undefined || setting === null || setting === "") {
+    return {};
   }
-  const { extension, ...fields } = auth;
-  return { extension: extension as string, fields };
+  return typeof setting === "string" && extensionId.test(setting)
+    ? { id: setting }
+    : { problem: "the auth extension isn't an extension ID" };
 }
 
 // The connect timeout and the size limit, with the problem said for one

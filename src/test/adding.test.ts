@@ -128,7 +128,7 @@ suite("adding a server", () => {
     });
   });
 
-  test("asking each time, or an extension named, its fields left out", async () => {
+  test("asking each time, or the auth extension, its fields left out", async () => {
     const prompt = scripted([
       "otp",
       "kdb1",
@@ -149,13 +149,12 @@ suite("adding a server", () => {
       "5000",
       "",
       "extension",
-      "acme.kdb-auth",
       ["protect", "timeout"],
     ]);
     assert.deepStrictEqual((await add(sso, context))?.value, {
       host: "kdb2",
       port: 5000,
-      auth: { extension: "acme.kdb-auth" },
+      auth: "extension",
       timeout: 2000,
     });
   });
@@ -420,7 +419,6 @@ suite("addServer", () => {
         "5000",
         "",
         "extension",
-        "acme.kdb-auth",
         ["protect", "timeout"],
       ]),
     );

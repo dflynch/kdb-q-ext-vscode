@@ -61,7 +61,6 @@ type State = {
   user?: string;
   login?: string;
   password?: string;
-  extension?: string;
   options?: string[];
   files?: string[];
   form?: string;
@@ -212,16 +211,6 @@ const password: Step = (state) => ({
   take: (password) => ({ password }),
 });
 
-const extension: Step = (state) => ({
-  kind: "input",
-  prompt: "Extension ID",
-  placeholder: "publisher.name",
-  value: state.extension,
-  validate: (text) =>
-    servers.extensionId.test(text.trim()) ? undefined : "publisher.name",
-  take: (extension) => ({ extension: extension.trim() }),
-});
-
 function options(timeout: number): Step {
   return (state) => ({
     kind: "tick",
@@ -304,7 +293,6 @@ function plan(state: State, context: Context): Step[] {
     user,
     login,
     ...(state.login === "store" ? [password] : []),
-    ...(state.login === "extension" ? [extension] : []),
     options(context.timeout),
     ...(to.tls ? [files] : []),
     ...(to.ca ? [file("ca", "CA certificate (PEM)", pem)] : []),
@@ -391,7 +379,7 @@ function adding(state: State, context: Context): Adding {
     state.login === "prompt"
       ? "prompt"
       : state.login === "extension"
-        ? { extension: state.extension }
+        ? "extension"
         : undefined;
   return {
     name: state.name as string,

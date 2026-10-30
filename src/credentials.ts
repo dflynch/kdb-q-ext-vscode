@@ -1,4 +1,5 @@
 import {
+  authExtension,
   type Credentials,
   credentialsProblem,
   type Definition,
@@ -14,7 +15,7 @@ export type CredentialsRequest = {
   host: string;
   port: number;
   user?: string;
-  // The server's auth setting besides the extension's ID
+  // The server's fields for the extension, from its auth setting
   fields: Record<string, unknown>;
 };
 
@@ -24,6 +25,8 @@ export type Sources = {
   stored: (key: string) => PromiseLike<string | undefined>;
   // A password typed in, or undefined if the user cancels
   ask: (server: Definition) => PromiseLike<string | undefined>;
+  // The authExtension setting, as it's written
+  authExtension: () => unknown;
   // An installed extension's exports, activating it if it isn't yet, or
   // undefined if it isn't installed
   extension: (id: string) => PromiseLike<unknown>;
@@ -44,16 +47,21 @@ export async function credentials(
     const password = await sources.ask(server);
     return password === undefined ? undefined : { password };
   }
-  const exports = await sources.extension(auth.extension);
+  const { id, problem: invalid } = authExtension(sources.authExtension());
+  if (invalid) {
+    throw new Error("invalid auth extension", { cause: invalid });
+  }
+  if (id === undefined) {
+    throw new Error("auth extension not set");
+  }
+  const exports = await sources.extension(id);
   if (exports === undefined) {
-    throw new Error("auth extension not installed", {
-      cause: auth.extension,
-    });
+    throw new Error("auth extension not installed", { cause: id });
   }
   const provide = (exports as { credentials?: unknown } | null)?.credentials;
   if (typeof provide !== "function") {
     throw new Error("auth extension gives no credentials", {
-      cause: `${auth.extension} exports no credentials function`,
+      cause: `${id} exports no credentials function`,
     });
   }
   const request: CredentialsRequest = {
@@ -72,7 +80,7 @@ export async function credentials(
   const problem = credentialsProblem(given);
   if (problem) {
     throw new Error("malformed credentials from auth extension", {
-      cause: `${auth.extension}: ${problem}`,
+      cause: `${id}: ${problem}`,
     });
   }
   const { user, password } = given as Credentials;
