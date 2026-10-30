@@ -154,10 +154,10 @@ const target = radios("target", [
 ]);
 
 const rows = {
-  name: setting("Name", ["Unique in its folder."], name),
-  host: setting("Host", ["A name or an address."], host),
-  port: setting("Port", ["From 1 to 65535."], port),
-  user: setting("User", ["Optional."], user),
+  name: setting("Name", ["Unique in its folder"], name),
+  host: setting("Host", ["A name or an address"], host),
+  port: setting("Port", ["From 1 to 65535"], port),
+  user: setting("User", ["Optional"], user),
   auth: setting("Authentication", [], auth.wrap),
   password: setting("Password", [], password),
   tls: setting("TLS", [], tls.wrap),
