@@ -17,7 +17,7 @@ import type { Results } from "./resultView";
 import * as servers from "./servers";
 import * as statements from "./statements";
 import { describe, type Status } from "./status";
-import { passphraseKey, secure } from "./tls";
+import { files, passphraseKey, type Secure, secure } from "./tls";
 
 // Send the selected text, or the current line, to the active terminal one
 // statement at a time. With several selections, each is sent in turn from the
@@ -338,7 +338,7 @@ export async function addServer(
   if (adding === undefined) {
     return;
   }
-  const { name, value, password, passphrase, target } = adding;
+  const { name, value, password, target } = adding;
   // Read back as connecting reads it
   const read = servers.definitions({ [name]: value });
   const [definition] = read.servers;
@@ -354,10 +354,6 @@ export async function addServer(
   );
   if (password !== undefined) {
     await secrets.store(servers.secretKey(definition), password);
-  }
-  const key = passphraseKey(definition.tls);
-  if (key && passphrase !== undefined) {
-    await secrets.store(key, passphrase);
   }
   const connect = "Connect";
   const edit = "Open settings.json";
@@ -411,23 +407,40 @@ export async function clearPassword(secrets: vscode.SecretStorage) {
   }
 }
 
-// The servers with a client certificate, which can need a passphrase
-const certified = {
-  test: (server: servers.Definition) => passphraseKey(server.tls) !== undefined,
-  none: "No server has a client certificate in its tls setting.",
-};
+// The TLS files in the settings, read at each connect
+function tlsFiles() {
+  const config = vscode.workspace.getConfiguration("kdb-q-ext-vscode");
+  return files(
+    config.get("tlsCaFile"),
+    config.get("tlsCertFile"),
+    config.get("tlsKeyFile"),
+  );
+}
 
-// Keep the passphrase of a server's client certificate in VS Code's secure
-// storage, under the certificate's file
+// Where the passphrase of the client certificate's key is kept, or
+// undefined, saying why, if there's no key file to keep it under
+function passphraseFor(): string | undefined {
+  const { files, problem } = tlsFiles();
+  const key = passphraseKey(files);
+  if (!key) {
+    vscode.window.showInformationMessage(
+      problem
+        ? `kdb+/q: invalid TLS settings: ${problem}`
+        : "kdb+/q: No TLS key file is set.",
+    );
+  }
+  return key;
+}
+
+// Keep the passphrase of the client certificate's key in VS Code's secure
+// storage, under the key's file
 export async function setPassphrase(secrets: vscode.SecretStorage) {
-  const title = "kdb+/q: Set Certificate Passphrase";
-  const server = await pickServer(title, certified);
-  const key = passphraseKey(server?.tls);
+  const key = passphraseFor();
   if (!key) {
     return;
   }
   const passphrase = await vscode.window.showInputBox({
-    title,
+    title: "kdb+/q: Set Certificate Passphrase",
     prompt: "Passphrase for client certificate",
     password: true,
   });
@@ -437,11 +450,7 @@ export async function setPassphrase(secrets: vscode.SecretStorage) {
 }
 
 export async function clearPassphrase(secrets: vscode.SecretStorage) {
-  const server = await pickServer(
-    "kdb+/q: Clear Certificate Passphrase",
-    certified,
-  );
-  const key = passphraseKey(server?.tls);
+  const key = passphraseFor();
   if (key) {
     await secrets.delete(key);
   }
@@ -490,14 +499,21 @@ export function sources(secrets: vscode.SecretStorage): Sources {
 // fresh. Undefined if the user cancels being asked for a password.
 export function opener(secrets: vscode.SecretStorage) {
   return async (definition: servers.Definition) => {
+    // Checked first, so that no password is asked for, nor an extension
+    // asked, for a connect that would fail
+    const tlsSettings = definition.tls ? tlsFiles() : undefined;
+    if (tlsSettings?.problem) {
+      throw new Error(`invalid TLS settings: ${tlsSettings.problem}`);
+    }
     const given = await credentials(definition, sources(secrets));
     if (given === undefined) {
       return undefined;
     }
-    const key = passphraseKey(definition.tls);
-    const tls =
-      definition.tls &&
-      (await secure(definition.tls, key && (await secrets.get(key))));
+    let tls: Secure | undefined;
+    if (tlsSettings) {
+      const key = passphraseKey(tlsSettings.files);
+      tls = await secure(tlsSettings.files, key && (await secrets.get(key)));
+    }
     return Connection.open(
       servers.server(definition, given, connectionDefaults(), tls),
     );

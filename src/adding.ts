@@ -1,5 +1,4 @@
 import * as servers from "./servers";
-import { filePath } from "./tls";
 
 // What a question can be answered with: its answer, back to the question
 // before, or undefined for a cancel
@@ -9,14 +8,13 @@ export type Reply<T> = T | typeof back | undefined;
 // Where a question is in the flow, for its title
 export type Placed = { step: number; total: number };
 
-// A box to type in, which can offer to browse for a file of the types given
+// A box to type in
 export type Input = {
   prompt: string;
   placeholder?: string;
   value?: string;
   password?: boolean;
   validate?: (text: string) => string | undefined;
-  browse?: Record<string, string[]>;
 };
 
 // A list to pick one from, or to tick any of, answered with their ids. What
@@ -43,13 +41,12 @@ export type Context = {
   workspaceOpen: boolean;
 };
 
-// A server to add: its name, its setting as written, any password and
-// passphrase to keep in secure storage, and the settings it's saved to
+// A server to add: its name, its setting as written, any password to keep
+// in secure storage, and the settings it's saved to
 export type Adding = {
   name: string;
   value: Record<string, unknown>;
   password?: string;
-  passphrase?: string;
   target: "user" | "workspace";
 };
 
@@ -62,13 +59,6 @@ type State = {
   login?: string;
   password?: string;
   options?: string[];
-  files?: string[];
-  form?: string;
-  ca?: string;
-  cert?: string;
-  key?: string;
-  pfx?: string;
-  passphrase?: string;
   target?: string;
 };
 
@@ -84,49 +74,15 @@ type Step = (state: State) => Question;
 // The options as first shown: on, as a server has them by default
 const optionsAtFirst = ["protect", "timeout"];
 
-// What the answers so far lead to, an option not answered yet counting as
-// first shown. Both the questions asked and the server made follow it, so
-// that an answer given before going back and choosing otherwise is dropped.
-function reached(state: State) {
-  const options = state.options ?? optionsAtFirst;
-  const tls = options.includes("tls");
-  const client = tls && (state.files ?? []).includes("client");
-  return {
-    tls,
-    ca: tls && (state.files ?? []).includes("ca"),
-    client,
-    pfx: client && state.form === "pfx",
-    pem: client && state.form !== "pfx",
-    protect: options.includes("protect"),
-    timeout: options.includes("timeout"),
-  };
+// The options chosen, or as first shown if not answered yet
+function chosen(state: State): string[] {
+  return state.options ?? optionsAtFirst;
 }
 
 // A port as typed
 export function port(text: string): number | undefined {
   const port = /^\d+$/.test(text.trim()) ? Number(text) : 0;
   return port >= 1 && port <= 65535 ? port : undefined;
-}
-
-const pem = { PEM: ["pem", "crt", "cer", "key"] };
-
-// A file's path, typed or browsed for
-function file(
-  key: "ca" | "cert" | "key" | "pfx",
-  prompt: string,
-  browse: Record<string, string[]>,
-): Step {
-  return (state) => ({
-    kind: "input",
-    prompt,
-    value: state[key],
-    validate: (text) =>
-      filePath.test(text.trim())
-        ? undefined
-        : "An absolute path, or one from ~/",
-    browse,
-    take: (path) => ({ [key]: path.trim() }),
-  });
 }
 
 function name(taken: string[]): Step {
@@ -216,7 +172,11 @@ function options(timeout: number): Step {
     kind: "tick",
     placeholder: "Options",
     choices: [
-      { id: "tls", label: "TLS" },
+      {
+        id: "tls",
+        label: "TLS",
+        description: "with the files in the TLS settings",
+      },
       {
         id: "protect",
         label: "Protected evaluation",
@@ -232,40 +192,6 @@ function options(timeout: number): Step {
     take: (options) => ({ options }),
   });
 }
-
-const files: Step = (state) => ({
-  kind: "tick",
-  placeholder: "TLS files (optional)",
-  choices: [
-    { id: "ca", label: "CA", description: "trusted besides the system's" },
-    {
-      id: "client",
-      label: "Client certificate",
-      description: "for a server that requires one",
-    },
-  ],
-  chosen: state.files,
-  take: (files) => ({ files }),
-});
-
-const form: Step = (state) => ({
-  kind: "pick",
-  placeholder: "Client certificate format",
-  choices: [
-    { id: "pem", label: "Certificate and key", description: "in PEM" },
-    { id: "pfx", label: "PKCS#12", description: ".p12 or .pfx" },
-  ],
-  chosen: state.form === undefined ? undefined : [state.form],
-  take: (form) => ({ form }),
-});
-
-const passphrase: Step = (state) => ({
-  kind: "input",
-  prompt: "Passphrase (optional)",
-  value: state.passphrase,
-  password: true,
-  take: (passphrase) => ({ passphrase }),
-});
 
 const target: Step = (state) => ({
   kind: "pick",
@@ -285,7 +211,6 @@ const target: Step = (state) => ({
 // The questions the answers so far lead to, in order. A question not
 // answered yet counts as first shown, so that the total is a fair guess.
 function plan(state: State, context: Context): Step[] {
-  const to = reached(state);
   return [
     name(context.taken),
     host,
@@ -294,16 +219,6 @@ function plan(state: State, context: Context): Step[] {
     login,
     ...(state.login === "store" ? [password] : []),
     options(context.timeout),
-    ...(to.tls ? [files] : []),
-    ...(to.ca ? [file("ca", "CA certificate (PEM)", pem)] : []),
-    ...(to.client ? [form] : []),
-    ...(to.pfx
-      ? [file("pfx", "PKCS#12 file", { "PKCS#12": ["p12", "pfx"] })]
-      : []),
-    ...(to.pem
-      ? [file("cert", "Certificate (PEM)", pem), file("key", "Key (PEM)", pem)]
-      : []),
-    ...(to.client ? [passphrase] : []),
     ...(context.workspaceOpen ? [target] : []),
   ];
 }
@@ -374,7 +289,7 @@ export async function add(
 // The server the answers make. Every answer the plan leads to is given. The
 // timeout is written, as the default if on, so that it's there to edit.
 function adding(state: State, context: Context): Adding {
-  const to = reached(state);
+  const options = chosen(state);
   const auth =
     state.login === "prompt"
       ? "prompt"
@@ -388,23 +303,11 @@ function adding(state: State, context: Context): Adding {
       port: port(state.port as string),
       ...(state.user ? { user: state.user } : {}),
       ...(auth === undefined ? {} : { auth }),
-      ...(to.tls
-        ? {
-            tls:
-              to.ca || to.client
-                ? {
-                    ...(to.ca ? { ca: state.ca } : {}),
-                    ...(to.pfx ? { pfx: state.pfx } : {}),
-                    ...(to.pem ? { cert: state.cert, key: state.key } : {}),
-                  }
-                : true,
-          }
-        : {}),
-      ...(to.protect ? {} : { protect: false }),
-      timeout: to.timeout ? context.timeout : 0,
+      ...(options.includes("tls") ? { tls: true } : {}),
+      ...(options.includes("protect") ? {} : { protect: false }),
+      timeout: options.includes("timeout") ? context.timeout : 0,
     },
     ...(state.login === "store" ? { password: state.password } : {}),
-    ...(to.client && state.passphrase ? { passphrase: state.passphrase } : {}),
     target: state.target === "workspace" ? "workspace" : "user",
   };
 }

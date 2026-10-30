@@ -6,11 +6,11 @@ import {
   type Placed,
   type Reply,
 } from "./adding";
-import { home } from "./tls";
 
 // Show a quick input until it's answered, gone back from or hidden, with a
 // Back button after the first step. It's kept when focus moves elsewhere,
-// as to a file dialog. Disposing it disposes its listeners.
+// so that a host or a password can be copied from another window without
+// losing the answers given. Disposing it disposes its listeners.
 function show<T>(
   input: vscode.InputBox | vscode.QuickPick<vscode.QuickPickItem>,
   title: string,
@@ -30,10 +30,7 @@ function show<T>(
     input.step = step;
     input.totalSteps = total;
     input.ignoreFocusOut = true;
-    input.buttons = [
-      ...(step > 1 ? [vscode.QuickInputButtons.Back] : []),
-      ...input.buttons,
-    ];
+    input.buttons = step > 1 ? [vscode.QuickInputButtons.Back] : [];
     listen(settle);
     input.onDidTriggerButton((button) => {
       if (button === vscode.QuickInputButtons.Back) {
@@ -84,12 +81,6 @@ export function quickInput(title: string): Asker {
       box.placeholder = question.placeholder;
       box.value = question.value ?? "";
       box.password = question.password ?? false;
-      const filters = question.browse;
-      const browse = {
-        iconPath: new vscode.ThemeIcon("folder-opened"),
-        tooltip: "Browse",
-      };
-      box.buttons = filters ? [browse] : [];
       const check = () => {
         box.validationMessage = question.validate?.(box.value);
         return box.validationMessage === undefined;
@@ -99,21 +90,6 @@ export function quickInput(title: string): Asker {
         box.onDidAccept(() => {
           if (check()) {
             settle(box.value);
-          }
-        });
-        box.onDidTriggerButton(async (button) => {
-          if (button !== browse || !filters) {
-            return;
-          }
-          const [picked] =
-            (await vscode.window.showOpenDialog({
-              title: `${title}: ${question.prompt}`,
-              openLabel: "Select",
-              filters,
-            })) ?? [];
-          if (picked) {
-            box.value = home(picked.fsPath);
-            check();
           }
         });
       });

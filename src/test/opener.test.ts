@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import * as net from "node:net";
 import * as path from "node:path";
 import * as tls from "node:tls";
-import type * as vscode from "vscode";
+import * as vscode from "vscode";
 import { opener } from "../commands";
 import type { Definition } from "../servers";
 import { passphraseKey } from "../tls";
@@ -76,20 +76,71 @@ suite("opener", () => {
       requestCert: true,
       rejectUnauthorized: true,
     });
-    const settings = {
-      ca: fixture("ca.pem"),
-      pfx: fixture("client.p12"),
+    const config = vscode.workspace.getConfiguration("kdb-q-ext-vscode");
+    const files = {
+      tlsCaFile: fixture("ca.pem"),
+      tlsCertFile: fixture("client.pem"),
+      tlsKeyFile: fixture("client.encrypted.key"),
     };
-    const server: Definition = {
-      name: "secure",
-      host: "localhost",
-      port: fake.port,
-      tls: settings,
+    for (const [setting, file] of Object.entries(files)) {
+      await config.update(setting, file, vscode.ConfigurationTarget.Global);
+    }
+    try {
+      const server: Definition = {
+        name: "secure",
+        host: "localhost",
+        port: fake.port,
+        tls: true,
+      };
+      const key = passphraseKey({ key: files.tlsKeyFile }) as string;
+      const connection = await opener(secrets({ [key]: "secret" }))(server);
+      assert.strictEqual(await fake.login, ":");
+      connection?.close();
+    } finally {
+      for (const setting of Object.keys(files)) {
+        await config.update(
+          setting,
+          undefined,
+          vscode.ConfigurationTarget.Global,
+        );
+      }
+      fake.stop();
+    }
+  });
+
+  test("TLS settings that are wrong fail the connect, before credentials are asked for", async () => {
+    const config = vscode.workspace.getConfiguration("kdb-q-ext-vscode");
+    await config.update(
+      "tlsCertFile",
+      fixture("client.pem"),
+      vscode.ConfigurationTarget.Global,
+    );
+    const window = vscode.window as unknown as Record<string, unknown>;
+    const ask = window.showInputBox;
+    let asked = false;
+    window.showInputBox = async () => {
+      asked = true;
+      return "pw";
     };
-    const key = passphraseKey(settings) as string;
-    const connection = await opener(secrets({ [key]: "secret" }))(server);
-    assert.strictEqual(await fake.login, ":");
-    connection?.close();
-    fake.stop();
+    try {
+      const server: Definition = {
+        name: "secure",
+        host: "localhost",
+        port: 1,
+        tls: true,
+        auth: "prompt",
+      };
+      await assert.rejects(opener(secrets({}))(server), {
+        message: "invalid TLS settings: tlsCertFile and tlsKeyFile go together",
+      });
+      assert.strictEqual(asked, false);
+    } finally {
+      window.showInputBox = ask;
+      await config.update(
+        "tlsCertFile",
+        undefined,
+        vscode.ConfigurationTarget.Global,
+      );
+    }
   });
 });
