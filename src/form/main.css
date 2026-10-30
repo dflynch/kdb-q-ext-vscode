@@ -187,6 +187,15 @@ input[type="checkbox"]:checked::before {
   margin: 0;
 }
 
+/* Under a tick, in line with what the tick says */
+.note-under {
+  margin: 2px 0 0 24px;
+}
+
+.note-under + .tick {
+  margin-top: 6px;
+}
+
 /* At the end, left-aligned as VS Code's own forms have them */
 .buttons {
   display: flex;

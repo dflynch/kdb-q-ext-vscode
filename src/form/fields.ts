@@ -41,6 +41,8 @@ export type Context = {
   workspaceOpen: boolean;
   // The authExtension setting, as written
   authExtension?: string;
+  // The TLS files set, by their file names, as the settings give them
+  tlsFiles: string[];
   // Whether the server's connected, so that changes wait for the next
   // connect
   connected: boolean;

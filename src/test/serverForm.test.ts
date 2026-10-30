@@ -152,6 +152,22 @@ suite("the server form", () => {
     assert.strictEqual(loaded.context.editing, undefined);
   });
 
+  test("the form's told the TLS files set, by their names", async () => {
+    const global = vscode.ConfigurationTarget.Global;
+    await config().update("tlsCaFile", "~/tls/ca.pem", global);
+    await config().update("tlsKeyFile", "", global);
+    try {
+      const { made, forms } = open();
+      forms.add();
+      assert.deepStrictEqual((await made[0].loaded()).context.tlsFiles, [
+        "ca.pem",
+      ]);
+    } finally {
+      await config().update("tlsCaFile", undefined, global);
+      await config().update("tlsKeyFile", undefined, global);
+    }
+  });
+
   test("a server added is written in its folder, and its password stored", async () => {
     await setUser({ old: { host: "kdb0", port: 1 }, Prod: {} });
     const kept: Record<string, string> = {};

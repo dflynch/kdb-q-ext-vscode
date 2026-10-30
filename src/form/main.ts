@@ -119,12 +119,9 @@ const user = text("user");
 user.placeholder = "Optional";
 const password = text("password", "password");
 const timeout = text("timeout");
-const tls = tick(
-  "tls",
-  "Use TLS (",
-  link("Edit certificates in settings.json", "tls"),
-  ")",
-);
+const tls = tick("tls", "Use TLS");
+// Where TLS gets its certificates, under its tick once it's ticked
+const tlsNote = element("div", "note-under description");
 const protect = tick(
   "protect",
   "Use protected evaluation so that an error returns its backtrace (switch it off when the server enforces an allowlist)",
@@ -160,7 +157,7 @@ const rows = {
   user: setting("User", [], user),
   auth: setting("Authentication", [], auth, authMeaning),
   password: setting("Password", [], password),
-  options: setting("Options", [], tls.wrap, protect.wrap),
+  options: setting("Options", [], tls.wrap, tlsNote, protect.wrap),
   timeout: setting("Timeout", [], timeout),
   target: setting("Save to", [], target, targetMeaning),
 };
@@ -254,6 +251,7 @@ function update(): boolean {
   authMeaning.replaceChildren(...meanings[form.auth]);
   targetMeaning.replaceChildren(...meanings[form.target]);
   rows.password.row.hidden = form.auth !== "store";
+  tlsNote.hidden = !form.tls;
   password.placeholder = stored ? "Stored" : "";
   rows.password.about.textContent = stored
     ? "Stored for this user, host and port: type another to replace it"
@@ -272,6 +270,13 @@ function lookup() {
     stored = false;
     vscode.postMessage({ type: "lookup", login });
   }
+}
+
+// Names as a list in words: a, b and c
+function listed(names: string[]): string {
+  return names.length < 2
+    ? names.join("")
+    : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 
 function show(message: Extract<ToForm, { type: "load" }>) {
@@ -307,6 +312,15 @@ function show(message: Extract<ToForm, { type: "load" }>) {
   json.hidden = editing === undefined;
   rows.timeout.about.textContent = `In ms, 0 for none; empty for ${ms === 0 ? "none" : `${ms} ms`}`;
   timeout.placeholder = String(ms);
+  const files = message.context.tlsFiles;
+  tlsNote.replaceChildren(
+    ...(files.length === 0
+      ? [
+          "Trusts your system's certificates. For a private CA or a client certificate, set them in ",
+          link("settings.json", "tls"),
+        ]
+      : [`Using ${listed(files)} from `, link("settings.json", "tls")]),
+  );
   meanings.extension = authExtension
     ? [`From ${authExtension}, the `, link("auth extension", "authExtension")]
     : ["Set the ", link("auth extension", "authExtension"), " first"];

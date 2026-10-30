@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import * as path from "node:path";
 import * as vscode from "vscode";
 import type { Connection } from "./connection";
 import type { Connections } from "./connections";
@@ -16,6 +17,7 @@ import {
 } from "./form/fields";
 import { type Panels, page } from "./resultView";
 import * as servers from "./servers";
+import * as tls from "./tls";
 
 // The server form's editor tab
 export const formType = "kdb-q-ext-vscode.serverForm";
@@ -239,6 +241,11 @@ export class ServerForms implements vscode.Disposable {
     const folder = servers.at(setting, open.folder);
     const own = open.editing?.split("/").at(-1);
     const authExtension = config().get("authExtension");
+    const { files } = tls.files(
+      config().get("tlsCaFile"),
+      config().get("tlsCertFile"),
+      config().get("tlsKeyFile"),
+    );
     return {
       folder: open.folder,
       ...(open.editing === undefined ? {} : { editing: open.editing }),
@@ -251,6 +258,7 @@ export class ServerForms implements vscode.Disposable {
       ...(typeof authExtension === "string" && authExtension !== ""
         ? { authExtension }
         : {}),
+      tlsFiles: Object.values(files).map((file) => path.basename(file)),
       connected:
         open.editing !== undefined &&
         this.connections.state(open.editing) !== undefined,

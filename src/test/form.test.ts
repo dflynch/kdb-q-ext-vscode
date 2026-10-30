@@ -15,6 +15,7 @@ const context: Context = {
   taken: ["old"],
   timeout: 2000,
   workspaceOpen: false,
+  tlsFiles: [],
   connected: false,
 };
 
