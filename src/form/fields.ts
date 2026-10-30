@@ -18,7 +18,7 @@ export type Form = {
   password: string;
   tls: boolean;
   protect: boolean;
-  // In milliseconds, 0 to wait as long as it takes
+  // In milliseconds, or empty to wait as long as it takes
   timeout: string;
   // The settings a server added is saved to; one edited stays where it is
   target: "user" | "workspace";
@@ -90,7 +90,7 @@ export function fromSetting(
     auth: value.auth ?? (stored ? "store" : "none"),
     tls: value.tls ?? false,
     protect: value.protect ?? true,
-    timeout: String(value.timeout ?? connectTimeout),
+    timeout: value.timeout === 0 ? "" : String(value.timeout ?? connectTimeout),
   };
 }
 
@@ -100,9 +100,11 @@ export function port(text: string): number | undefined {
   return port >= 1 && port <= 65535 ? port : undefined;
 }
 
-// A timeout as typed: a whole number of milliseconds, 0 for none
+// A timeout as typed: a whole number of milliseconds, or empty for none,
+// which the setting has as 0, as hopen does
 function timeout(text: string): number | undefined {
-  return /^\d+$/.test(text.trim()) ? Number(text) : undefined;
+  const ms = text.trim();
+  return ms === "" ? 0 : /^\d+$/.test(ms) ? Number(ms) : undefined;
 }
 
 // The problem with each field that has one, under it in the form. A

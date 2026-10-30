@@ -46,7 +46,7 @@ suite("the server form's fields", () => {
         auth: "prompt",
         tls: true,
         protect: false,
-        timeout: "0",
+        timeout: "",
       }),
       {
         host: "gw.example.com",
@@ -73,12 +73,15 @@ suite("the server form's fields", () => {
       "2000",
     );
     assert.strictEqual(toSetting(prod).timeout, undefined);
-    assert.strictEqual(toSetting({ ...prod, timeout: "0" }).timeout, 0);
+    // Empty waits as long as it takes, which the setting has as 0
+    assert.strictEqual(toSetting({ ...prod, timeout: " " }).timeout, 0);
+    assert.strictEqual(
+      fromSetting("s", { host: "h", port: 1, timeout: 0 }, false).timeout,
+      "",
+    );
     assert.deepStrictEqual(
-      problems({ ...prod, timeout: " " }, context, false),
-      {
-        timeout: "A whole number of milliseconds",
-      },
+      problems({ ...prod, timeout: "" }, context, false),
+      {},
     );
   });
 
@@ -87,6 +90,7 @@ suite("the server form's fields", () => {
       { host: "h", port: 1 },
       { host: "h", port: 1, user: "u", auth: "extension" as const },
       { host: "h", port: 1, tls: true, protect: false, timeout: 500 },
+      { host: "h", port: 1, timeout: 0 },
     ]) {
       assert.deepStrictEqual(
         toSetting(fromSetting("s", value, false)),
