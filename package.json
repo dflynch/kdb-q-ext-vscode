@@ -256,63 +256,75 @@
         "kdb-q-ext-vscode.servers": {
           "type": "object",
           "default": {},
-          "markdownDescription": "The kdb+ processes to connect to, by name: add one with **kdb+/q: Add Server**. Passwords aren't kept here: set one with **kdb+/q: Set Server Password**, which keeps it in VS Code's secure storage for the user, host and port, or have it come from elsewhere with `auth`.",
+          "markdownDescription": "The kdb+ processes to connect to, by name, in folders to any depth if you like: a server has fields, and a folder has none of its own, holding only servers and folders, or nothing. Add one with **kdb+/q: Add Server**. Passwords aren't kept here: set one with **kdb+/q: Set Server Password**, which keeps it in VS Code's secure storage for the user, host and port, or have it come from elsewhere with `auth`.",
+          "propertyNames": {
+            "pattern": "^[^/]*[^/\\s][^/]*$",
+            "patternErrorMessage": "A name that isn't empty and has no /"
+          },
           "additionalProperties": {
-            "type": "object",
-            "required": [
-              "host",
-              "port"
-            ],
-            "additionalProperties": false,
-            "properties": {
-              "host": {
-                "type": "string",
-                "minLength": 1,
-                "description": "The host name or address."
-              },
-              "port": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 65535,
-                "description": "The port."
-              },
-              "user": {
-                "type": "string",
-                "pattern": "^[^:\\u0000]*$",
-                "description": "The user to log in as."
-              },
-              "timeout": {
-                "type": "integer",
-                "minimum": 0,
-                "description": "How long to wait to connect and log in, in milliseconds, overriding the connect timeout. 0 waits as long as it takes, as hopen does."
-              },
-              "protect": {
-                "type": "boolean",
-                "default": true,
-                "markdownDescription": "Run each query under `.Q.trp`, so that an error comes back with its backtrace and its full text. The query is sent as written, as a list with the function that traps it, for q's default `.z.pg` to evaluate. Turn this off for a server whose `.z.pg` is customised or only takes strings, such as a gateway."
-              },
-              "tls": {
-                "type": "boolean",
-                "markdownDescription": "Connect with TLS, as `tcps://` in q. The server's certificate is checked against the system's CAs and Node's, and `#kdb-q-ext-vscode.tlsCaFile#` if set; `#kdb-q-ext-vscode.tlsCertFile#` and `#kdb-q-ext-vscode.tlsKeyFile#` give a client certificate, for a server that requires one."
-              },
-              "auth": {
-                "markdownDescription": "Where the password comes from, when it isn't the one kept by **kdb+/q: Set Server Password**: `\"prompt\"` asks for it at every connect and doesn't keep it, where a password can't be stored or changes too often to keep; `\"extension\"` asks the extension in `#kdb-q-ext-vscode.authExtension#` at every connect, for a firm's own sign-on. An object asks it too, and gives it the object's fields for this server.",
-                "oneOf": [
-                  {
-                    "const": "prompt",
-                    "description": "Ask for the password at every connect, and don't keep it."
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "host",
+                  "port"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "host": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The host name or address."
                   },
-                  {
-                    "const": "extension",
-                    "description": "Ask the auth extension for the credentials at every connect."
+                  "port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535,
+                    "description": "The port."
                   },
-                  {
-                    "type": "object",
-                    "description": "Ask the auth extension for the credentials at every connect, giving it these fields."
+                  "user": {
+                    "type": "string",
+                    "pattern": "^[^:\\u0000]*$",
+                    "description": "The user to log in as."
+                  },
+                  "timeout": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "How long to wait to connect and log in, in milliseconds, overriding the connect timeout. 0 waits as long as it takes, as hopen does."
+                  },
+                  "protect": {
+                    "type": "boolean",
+                    "default": true,
+                    "markdownDescription": "Run each query under `.Q.trp`, so that an error comes back with its backtrace and its full text. The query is sent as written, as a list with the function that traps it, for q's default `.z.pg` to evaluate. Turn this off for a server whose `.z.pg` is customised or only takes strings, such as a gateway."
+                  },
+                  "tls": {
+                    "type": "boolean",
+                    "markdownDescription": "Connect with TLS, as `tcps://` in q. The server's certificate is checked against the system's CAs and Node's, and `#kdb-q-ext-vscode.tlsCaFile#` if set; `#kdb-q-ext-vscode.tlsCertFile#` and `#kdb-q-ext-vscode.tlsKeyFile#` give a client certificate, for a server that requires one."
+                  },
+                  "auth": {
+                    "enum": [
+                      "prompt",
+                      "extension"
+                    ],
+                    "enumDescriptions": [
+                      "Ask for the password at every connect, and don't keep it.",
+                      "Ask the extension in kdb-q-ext-vscode.authExtension for the credentials at every connect."
+                    ],
+                    "markdownDescription": "Where the password comes from, when it isn't the one kept by **kdb+/q: Set Server Password**: `\"prompt\"` asks for it at every connect and doesn't keep it, where a password can't be stored or changes too often to keep; `\"extension\"` asks the extension in `#kdb-q-ext-vscode.authExtension#` at every connect, for a firm's own sign-on."
                   }
-                ]
+                }
+              },
+              {
+                "type": "object",
+                "description": "A folder of servers, and of folders.",
+                "propertyNames": {
+                  "$ref": "#/properties/kdb-q-ext-vscode.servers/propertyNames"
+                },
+                "additionalProperties": {
+                  "$ref": "#/properties/kdb-q-ext-vscode.servers/additionalProperties"
+                }
               }
-            }
+            ]
           }
         },
         "kdb-q-ext-vscode.authExtension": {
@@ -320,7 +332,7 @@
           "pattern": "^([a-zA-Z0-9][a-zA-Z0-9-]*\\.[a-zA-Z0-9][a-zA-Z0-9-]*)?$",
           "patternErrorMessage": "An extension ID: publisher.name",
           "default": "",
-          "markdownDescription": "The extension that gives the credentials for a firm's own sign-on, as `publisher.name`, for the servers whose `auth` is `\"extension\"` or that extension's fields. It exports `credentials(request)`."
+          "markdownDescription": "The extension that gives the credentials for a firm's own sign-on, as `publisher.name`, for the servers whose `auth` is `\"extension\"` It exports `credentials(request)`, given the server's name, its path such as `Prod/trades/TP`, and its host, port and user."
         },
         "kdb-q-ext-vscode.tlsCaFile": {
           "type": "string",

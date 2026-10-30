@@ -4,6 +4,8 @@ import type { Secure } from "./tls";
 // A server as the settings define it: everything but the password, which is
 // kept in VS Code's secure storage, never in a settings file
 export type Definition = {
+  // Its own name after the folders it's in, joined by /, which no name in
+  // the setting can contain
   name: string;
   host: string;
   port: number;
@@ -26,9 +28,8 @@ export type Definition = {
 // extension gives, for a firm's own sign-on: a Kerberos ticket or an access
 // token, say, which the server checks in .z.pw. The authExtension setting
 // names the extension, once for every server, so no other extension is given
-// a server's login by taking a name agreed in advance. A server's fields for
-// it go to it as they are: "extension" is the same as no fields.
-export type Auth = "prompt" | { fields: Record<string, unknown> };
+// a server's login by taking a name agreed in advance.
+export type Auth = "prompt" | "extension";
 
 // What a login is made of
 export type Credentials = { user?: string; password?: string };
@@ -65,54 +66,99 @@ function isTimeout(value: unknown): value is number {
   return value === 0 || isCount(value);
 }
 
-// The servers in the setting, in the order written. VS Code doesn't hold a
-// setting to its schema, so each is checked here too; one with a problem is
-// left out and the problem said, rather than connecting somewhere other than
-// meant, such as without a user whose name was misspelt.
+// The servers in the setting, in the order written, and the folders they're
+// in, empty ones too, for the Servers view to show. A server has fields and
+// a folder has none of its own, holding only servers and folders, or
+// nothing, so an object with any plain value is a server, and any other is
+// a folder. VS Code doesn't hold a setting to its schema, so each is checked
+// here too; one with a problem is left out and the problem said, rather than
+// connecting somewhere other than meant, such as without a user whose name
+// was misspelt.
 export function definitions(setting: unknown): {
   servers: Definition[];
+  folders: string[];
   problems: string[];
 } {
   const servers: Definition[] = [];
+  const folders: string[] = [];
   const problems: string[] = [];
   if (setting === undefined || setting === null) {
-    return { servers, problems };
+    return { servers, folders, problems };
   }
-  if (typeof setting !== "object" || Array.isArray(setting)) {
-    return { servers, problems: ["the servers setting isn't an object"] };
-  }
-  for (const [name, value] of Object.entries(setting)) {
-    const problem = check(name, value);
-    if (problem) {
-      problems.push(`${name || '""'}: ${problem}`);
-      continue;
-    }
-    const { host, port, user, timeout, protect, tls, auth } = value as Omit<
-      Definition,
-      "name" | "auth"
-    > & {
-      auth?: "prompt" | "extension" | Record<string, unknown>;
+  if (!isObject(setting)) {
+    return {
+      servers,
+      folders,
+      problems: ["the servers setting isn't an object"],
     };
-    servers.push({
-      name,
-      host,
-      port,
-      ...(user === undefined ? {} : { user }),
-      ...(timeout === undefined ? {} : { timeout }),
-      ...(protect === undefined ? {} : { protect }),
-      ...(tls ? { tls } : {}),
-      ...(auth === undefined ? {} : { auth: readAuth(auth) }),
-    });
   }
-  return { servers, problems };
+  const read = (folder: Record<string, unknown>, at: string) => {
+    for (const [key, value] of Object.entries(folder)) {
+      const name = at + key;
+      const problem = nameProblem(key) ?? check(value);
+      if (problem) {
+        problems.push(`${at}${key || '""'}: ${problem}`);
+        continue;
+      }
+      const object = value as Record<string, unknown>;
+      if (isFolder(object)) {
+        folders.push(name);
+        read(object, `${name}/`);
+      } else {
+        servers.push(definition(name, object));
+      }
+    }
+  };
+  read(setting, "");
+  return { servers, folders, problems };
 }
 
-function check(name: string, value: unknown): string | undefined {
-  if (name.trim() === "") {
-    return "a server needs a name";
+// Whether a value is an object, as the servers setting and its folders and
+// servers are
+export function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+// An object holding only objects, or nothing
+function isFolder(value: Record<string, unknown>): boolean {
+  return Object.values(value).every(isObject);
+}
+
+// A server's or a folder's name: / joins the names in a path
+function nameProblem(name: string): string | undefined {
+  return name.trim() === ""
+    ? "a name can't be empty"
+    : name.includes("/")
+      ? "a name can't contain /"
+      : undefined;
+}
+
+// A server as checked
+function definition(name: string, value: Record<string, unknown>): Definition {
+  const { host, port, user, timeout, protect, tls, auth } = value as Omit<
+    Definition,
+    "name"
+  >;
+  return {
+    name,
+    host,
+    port,
+    ...(user === undefined ? {} : { user }),
+    ...(timeout === undefined ? {} : { timeout }),
+    ...(protect === undefined ? {} : { protect }),
+    ...(tls ? { tls } : {}),
+    ...(auth === undefined ? {} : { auth }),
+  };
+}
+
+// A problem with a server, or with something in a folder that's neither a
+// server nor a folder
+function check(value: unknown): string | undefined {
+  if (!isObject(value)) {
+    return "not a server or a folder";
   }
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return "not an object";
+  if (isFolder(value)) {
+    return undefined;
   }
   const unknown = Object.keys(value).filter((key) => !fields.has(key));
   if (unknown.length > 0) {
@@ -141,23 +187,10 @@ function check(name: string, value: unknown): string | undefined {
   if (tls !== undefined && typeof tls !== "boolean") {
     return "tls is true or false";
   }
-  return auth === undefined ? undefined : authProblem(auth);
-}
-
-function authProblem(auth: unknown): string | undefined {
-  return auth === "prompt" ||
-    auth === "extension" ||
-    (typeof auth === "object" && auth !== null && !Array.isArray(auth))
-    ? undefined
-    : 'auth is "prompt", "extension" or the extension\'s fields';
-}
-
-function readAuth(
-  auth: "prompt" | "extension" | Record<string, unknown>,
-): Auth {
-  return auth === "prompt"
-    ? auth
-    : { fields: auth === "extension" ? {} : auth };
+  if (auth !== undefined && auth !== "prompt" && auth !== "extension") {
+    return 'auth is "prompt" or "extension"';
+  }
+  return undefined;
 }
 
 // The auth extension's ID, as its setting gives it, or undefined if it's

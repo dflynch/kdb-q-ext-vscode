@@ -11,12 +11,12 @@ import {
 // or resolves to, the credentials to log in with: { user?, password }. A user
 // it gives replaces the server's.
 export type CredentialsRequest = {
+  // The server's path, its folders' names and its own joined by /, such as
+  // Prod/trades/TP
   name: string;
   host: string;
   port: number;
   user?: string;
-  // The server's fields for the extension, from its auth setting
-  fields: Record<string, unknown>;
 };
 
 // Where credentials come from, so that tests can stand in for VS Code
@@ -69,7 +69,6 @@ export async function credentials(
     host: server.host,
     port: server.port,
     ...(server.user === undefined ? {} : { user: server.user }),
-    fields: structuredClone(auth.fields),
   };
   let given: unknown;
   try {

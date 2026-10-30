@@ -304,14 +304,8 @@ async function pickServer(
   return picked?.server;
 }
 
-// Whether a setting's value is an object, as the servers setting is
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 // Add a server to the user's or the workspace's settings, asking for each of
-// its settings but an extension's own, which go in settings.json. That can
-// be opened at the setting once it's added.
+// its settings. settings.json can be opened at the setting once it's added.
 export async function addServer(
   secrets: vscode.SecretStorage,
   connections: Connections<Connection>,
@@ -324,7 +318,7 @@ export async function addServer(
     workspace: inspected?.workspaceValue ?? {},
   };
   // Checked before asking, rather than refusing once everything's answered
-  if (!isObject(scopes.user) || !isObject(scopes.workspace)) {
+  if (!servers.isObject(scopes.user) || !servers.isObject(scopes.workspace)) {
     vscode.window.showErrorMessage(
       "kdb+/q: The servers setting isn't an object, so a server can't be added to it.",
     );
@@ -358,7 +352,7 @@ export async function addServer(
   const connect = "Connect";
   const edit = "Open settings.json";
   const choice = await vscode.window.showInformationMessage(
-    `kdb+/q: Added ${name}.${typeof definition.auth === "object" ? " Any fields its extension takes go in settings.json." : ""}`,
+    `kdb+/q: Added ${name}.`,
     connect,
     edit,
   );

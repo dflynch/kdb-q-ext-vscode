@@ -93,9 +93,11 @@ function name(taken: string[]): Step {
     validate: (text) =>
       text.trim() === ""
         ? "Required"
-        : taken.includes(text.trim())
-          ? `${text.trim()} already exists`
-          : undefined,
+        : text.includes("/")
+          ? "Can't contain /"
+          : taken.includes(text.trim())
+            ? `${text.trim()} already exists`
+            : undefined,
     take: (name) => ({ name: name.trim() }),
   });
 }

@@ -72,13 +72,10 @@ suite("credentials", () => {
     );
   });
 
-  test("an extension is asked with the server and its fields", async () => {
+  test("an extension is asked with the server", async () => {
     const requests: CredentialsRequest[] = [];
     const ids: string[] = [];
-    const sso: Definition = {
-      ...prod,
-      auth: { fields: { realm: "EXAMPLE.COM" } },
-    };
+    const sso: Definition = { ...prod, auth: "extension" };
     const extension = async (id: string) => {
       ids.push(id);
       return {
@@ -105,36 +102,20 @@ suite("credentials", () => {
         host: "kdb1",
         port: 5010,
         user: "admin",
-        fields: { realm: "EXAMPLE.COM" },
       },
     ]);
   });
 
   test("an extension can answer without a promise", async () => {
-    const sso: Definition = { ...prod, auth: { fields: {} } };
+    const sso: Definition = { ...prod, auth: "extension" };
     const extension = async () => ({ credentials: () => ({ password: "t" }) });
     assert.deepStrictEqual(await credentials(sso, signOn(extension)), {
       password: "t",
     });
   });
 
-  test("an extension can't change the fields the next connect gets", async () => {
-    const sso: Definition = {
-      ...prod,
-      auth: { fields: { scopes: ["kdb"] } },
-    };
-    const extension = async () => ({
-      credentials: (request: CredentialsRequest) => {
-        (request.fields.scopes as string[]).push("more");
-        return { password: "t" };
-      },
-    });
-    await credentials(sso, signOn(extension));
-    assert.deepStrictEqual(sso.auth, { fields: { scopes: ["kdb"] } });
-  });
-
   test("an auth extension unset or not an ID fails", async () => {
-    const sso: Definition = { ...prod, auth: { fields: {} } };
+    const sso: Definition = { ...prod, auth: "extension" };
     await rejects(
       credentials(sso, sources({ authExtension: () => undefined })),
       "auth extension not set",
@@ -148,7 +129,7 @@ suite("credentials", () => {
   });
 
   test("an extension that isn't there, or gives nothing usable, fails", async () => {
-    const sso: Definition = { ...prod, auth: { fields: {} } };
+    const sso: Definition = { ...prod, auth: "extension" };
     await rejects(
       credentials(
         sso,
@@ -184,7 +165,7 @@ suite("credentials", () => {
   });
 
   test("an extension's own error is kept as the cause", async () => {
-    const sso: Definition = { ...prod, auth: { fields: {} } };
+    const sso: Definition = { ...prod, auth: "extension" };
     const ticket = new Error("no Kerberos ticket");
     const extension = async () => ({
       credentials: async () => {
