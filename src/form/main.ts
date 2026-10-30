@@ -161,10 +161,11 @@ const rows = {
   auth: setting("Authentication", [], auth, authMeaning),
   password: setting("Password", [], password),
   options: setting("Options", [], tls.wrap, protect.wrap),
-  timeout: setting("Connection timeout", [], timeout),
+  timeout: setting("Timeout", [], timeout),
   target: setting("Save to", [], target, targetMeaning),
 };
 rows.timeout.row.classList.add("half");
+rows.target.row.classList.add("half");
 
 // Settings side by side
 function line(...settings: { row: HTMLElement }[]) {
@@ -195,8 +196,9 @@ form.append(
   line(rows.host, rows.port),
   line(rows.user, rows.auth),
   rows.password.row,
+  line(rows.timeout),
   rows.options.row,
-  line(rows.timeout, rows.target),
+  line(rows.target),
   buttons,
 );
 document.body.append(title, where, note, banner, form);
