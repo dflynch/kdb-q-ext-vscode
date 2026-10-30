@@ -106,8 +106,9 @@ settings file it's in:
 On by default, each query runs under `.Q.trp`, so an error comes back with
 its backtrace, and the status bar can show the server's time running it.
 Turn it off with `"protect": false` when the server enforces an allowlist:
-the query is then sent as a string. An error protected evaluation should have caught, or a response it
-didn't give, comes with a hint to turn it off.
+the query is then sent as a string. An error protected evaluation should
+have caught, or a response it didn't give, comes with a hint to turn it
+off.
 
 #### Sign-on from another extension
 
