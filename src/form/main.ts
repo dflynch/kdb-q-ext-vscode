@@ -127,7 +127,7 @@ const tls = tick(
 );
 const protect = tick(
   "protect",
-  "Protected evaluation, so that an error comes back with its backtrace: off when the server enforces an allowlist",
+  "Use protected evaluation so that an error returns its backtrace (switch it off when the server enforces an allowlist)",
 );
 const auth = choice("auth", [
   ["none", "None"],
