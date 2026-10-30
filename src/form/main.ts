@@ -139,7 +139,7 @@ const protect = tick(
   "Run each query under .Q.trp, so that an error comes back with its backtrace. Turn it off when the server enforces an allowlist.",
 );
 const auth = radios("auth", [
-  ["none", "None", "User only"],
+  ["none", "None", "No password"],
   ["store", "Stored password", "Kept in VS Code's secure storage"],
   ["prompt", "Ask each time", "Never kept"],
   ["extension", "Extension", ""],
