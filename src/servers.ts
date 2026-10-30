@@ -15,8 +15,8 @@ export type Definition = {
   // wait as long as it takes
   timeout?: number;
   // Whether to evaluate queries protected, so that an error comes back with
-  // its backtrace: on unless false, as a gateway whose .z.pg is customised
-  // may not evaluate it
+  // its backtrace: on unless false, as a server that enforces an allowlist
+  // won't evaluate it
   protect?: boolean;
   // Whether to connect with TLS, with the files in the TLS settings
   tls?: boolean;
