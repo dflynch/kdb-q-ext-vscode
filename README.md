@@ -67,6 +67,23 @@ saves it to your user or workspace settings, or write it in `settings.json`:
 }
 ```
 
+- **Folders** group servers, to any depth. A server has fields; a folder
+  has none of its own, holding only servers and folders, or nothing. A
+  server is named by its path, such as `Prod/trades/TP`, so the same name
+  can be used in different folders, and no name can contain `/`. A folder
+  in your user settings and one of the same name in the workspace's are
+  shown as one folder. For example:
+
+  ```json
+  "kdb-q-ext-vscode.servers": {
+    "Dev": { "TP": { "host": "localhost", "port": 5010 } },
+    "Prod": {
+      "trades": { "TP": { "host": "gw.example.com", "port": 5010 } }
+    },
+    "UAT": {}
+  }
+  ```
+
 - **Passwords** aren't kept in settings. **kdb+/q: Set Server Password**
   keeps one in VS Code's secure storage, for the user, host and port, and
   **Clear Server Password** removes it. `"auth": "prompt"` asks for it at
@@ -93,9 +110,7 @@ didn't give, comes with a hint to turn it off.
 
 For a firm's own sign-on, name the extension that gives credentials once,
 in `authExtension`, and set a server's `"auth"` to `"extension"`. That
-extension is asked at every connect, so a token is always fresh. A server
-that needs fields of its own, such as a realm, gives them as an object
-instead: `"auth": { "realm": "EXAMPLE.COM" }`.
+extension is asked at every connect, so a token is always fresh.
 
 ```json
 "kdb-q-ext-vscode.authExtension": "acme.kdb-auth",
@@ -106,8 +121,8 @@ instead: `"auth": { "realm": "EXAMPLE.COM" }`.
 
 The extension exports `credentials(request)`, which returns, or resolves
 to, `{ user?, password }`; a user it gives replaces the server's. The
-request is `{ name, host, port, user?, fields }`, where `fields` is the
-server's `auth` object, or empty for `"extension"`.
+request is `{ name, host, port, user? }`, where `name` is the server's path,
+such as `Prod/trades/TP`, for anything the extension keeps by server.
 
 ### Connecting
 

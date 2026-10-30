@@ -1,4 +1,6 @@
 import * as assert from "node:assert";
+import { readFileSync } from "node:fs";
+import * as path from "node:path";
 import {
   authExtension,
   credentialsProblem,
@@ -28,6 +30,7 @@ suite("servers", () => {
           },
           { name: "local", host: "localhost", port: 5000 },
         ],
+        folders: [],
         problems: [],
       },
     );
@@ -60,6 +63,7 @@ suite("servers", () => {
   test("no setting is no servers", () => {
     assert.deepStrictEqual(definitions(undefined), {
       servers: [],
+      folders: [],
       problems: [],
     });
   });
@@ -67,6 +71,7 @@ suite("servers", () => {
   test("a setting that isn't an object is a problem", () => {
     assert.deepStrictEqual(definitions([{ host: "h", port: 1 }]), {
       servers: [],
+      folders: [],
       problems: ["the servers setting isn't an object"],
     });
   });
@@ -103,43 +108,113 @@ suite("servers", () => {
       "t1: tls is true or false",
       "t2: tls is true or false",
       "i: unknown field usr",
-      "j: not an object",
-      '"": a server needs a name',
+      "j: not a server or a folder",
+      '"": a name can\'t be empty',
     ]);
   });
 
-  test("auth is a prompt, or the auth extension given any fields", () => {
+  test("auth is a prompt or the auth extension", () => {
+    const { servers, problems } = definitions({
+      otp: { host: "h", port: 1, auth: "prompt" },
+      sso: { host: "h", port: 1, auth: "extension" },
+      a: { host: "h", port: 1, auth: "stored" },
+      b: { host: "h", port: 1, auth: ["prompt"] },
+      c: { host: "h", port: 1, auth: null },
+    });
+    assert.deepStrictEqual(servers, [
+      { name: "otp", host: "h", port: 1, auth: "prompt" },
+      { name: "sso", host: "h", port: 1, auth: "extension" },
+    ]);
+    assert.deepStrictEqual(problems, [
+      'a: auth is "prompt" or "extension"',
+      'b: auth is "prompt" or "extension"',
+      'c: auth is "prompt" or "extension"',
+    ]);
+  });
+
+  test("folders hold servers and folders, to any depth, or nothing", () => {
     assert.deepStrictEqual(
       definitions({
-        otp: { host: "h", port: 1, auth: "prompt" },
-        sso: { host: "h", port: 1, auth: "extension" },
-        kerberos: { host: "h", port: 1, auth: { realm: "EXAMPLE.COM" } },
-      }).servers,
-      [
-        { name: "otp", host: "h", port: 1, auth: "prompt" },
-        { name: "sso", host: "h", port: 1, auth: { fields: {} } },
-        {
-          name: "kerberos",
-          host: "h",
-          port: 1,
-          auth: { fields: { realm: "EXAMPLE.COM" } },
+        Dev: {
+          TP: { host: "dev", port: 5010 },
+          trades: { RDB: { host: "dev", port: 5011 } },
         },
-      ],
+        Prod: { TP: { host: "prod", port: 5010 } },
+        local: { host: "localhost", port: 5000 },
+        UAT: {},
+      }),
+      {
+        servers: [
+          { name: "Dev/TP", host: "dev", port: 5010 },
+          { name: "Dev/trades/RDB", host: "dev", port: 5011 },
+          { name: "Prod/TP", host: "prod", port: 5010 },
+          { name: "local", host: "localhost", port: 5000 },
+        ],
+        folders: ["Dev", "Dev/trades", "Prod", "UAT"],
+        problems: [],
+      },
     );
   });
 
-  test("auth that's none of them is a problem", () => {
+  test("the schema's folders refer back to the servers setting", () => {
+    const configuration = JSON.parse(
+      readFileSync(path.join(__dirname, "../../package.json"), "utf8"),
+    ).contributes.configuration;
+    // VS Code's settings schema has each setting under properties, as the
+    // configuration contributed does
+    const resolve = (pointer: string) =>
+      pointer
+        .replace(/^#\//, "")
+        .split("/")
+        .reduce((at, part) => at?.[part], configuration);
+    const servers = configuration.properties["kdb-q-ext-vscode.servers"];
+    const [, folder] = servers.additionalProperties.anyOf;
+    assert.strictEqual(
+      resolve(folder.additionalProperties.$ref),
+      servers.additionalProperties,
+    );
+    assert.strictEqual(
+      resolve(folder.propertyNames.$ref),
+      servers.propertyNames,
+    );
+    const names = new RegExp(servers.propertyNames.pattern);
+    for (const name of ["TP", "Prod trades", "a.b"]) {
+      assert.ok(names.test(name), name);
+    }
+    for (const name of ["", " ", "a/b"]) {
+      assert.ok(!names.test(name), name);
+    }
+  });
+
+  test("a problem in a folder is said by its path", () => {
     assert.deepStrictEqual(
       definitions({
-        a: { host: "h", port: 1, auth: "stored" },
-        b: { host: "h", port: 1, auth: ["prompt"] },
-        c: { host: "h", port: 1, auth: null },
-      }).problems,
-      [
-        'a: auth is "prompt", "extension" or the extension\'s fields',
-        'b: auth is "prompt", "extension" or the extension\'s fields',
-        'c: auth is "prompt", "extension" or the extension\'s fields',
-      ],
+        Dev: {
+          // A misspelt host makes a server with an unknown field
+          TP: { hots: "dev", port: 5010 },
+          "a/b": { host: "dev", port: 1 },
+          trades: { " ": { host: "dev", port: 1 }, "": {} },
+          HDB: { host: "dev", port: 5012 },
+        },
+        // A value that isn't an object makes a server of what holds it
+        UAT: { TP: { host: "uat", port: 5010 }, RDB: "uat:5011" },
+        // An object in a server is said as its field
+        gw: { host: "gw", port: 1, tls: { ca: "/ca.pem" } },
+        stray: "gw:1",
+      }),
+      {
+        servers: [{ name: "Dev/HDB", host: "dev", port: 5012 }],
+        folders: ["Dev", "Dev/trades"],
+        problems: [
+          "Dev/TP: unknown field hots",
+          "Dev/a/b: a name can't contain /",
+          "Dev/trades/ : a name can't be empty",
+          'Dev/trades/"": a name can\'t be empty',
+          "UAT: unknown fields TP, RDB",
+          "gw: tls is true or false",
+          "stray: not a server or a folder",
+        ],
+      },
     );
   });
 

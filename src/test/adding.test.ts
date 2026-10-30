@@ -128,7 +128,7 @@ suite("adding a server", () => {
     });
   });
 
-  test("asking each time, or the auth extension, its fields left out", async () => {
+  test("asking each time, or the auth extension", async () => {
     const prompt = scripted([
       "otp",
       "kdb1",
@@ -226,7 +226,7 @@ suite("adding a server", () => {
   test("the checks: name, host, port, user and password", async () => {
     const problems: (string | undefined)[] = [];
     const tries: Record<string, string[]> = {
-      Name: ["old", " ", "prod"],
+      Name: ["old", " ", "Dev/TP", "prod"],
       Host: [" ", "kdb1:5000", "fe80::1", "kdb1"],
       "Port on kdb1": ["0", "65536", "5.5", "5000"],
       "User (optional)": ["a:b", ""],
@@ -246,6 +246,7 @@ suite("adding a server", () => {
     assert.deepStrictEqual(problems, [
       "old already exists",
       "Required",
+      "Can't contain /",
       undefined,
       "Required",
       "Port comes next",
@@ -337,22 +338,6 @@ suite("addServer", () => {
       "password:admin@kdb1.example.com:5010": "secret",
     });
     assert.deepStrictEqual(told, ["kdb+/q: Added prod."]);
-  });
-
-  test("says an extension's fields go in settings.json", async () => {
-    await addServer(
-      secrets({}),
-      connections,
-      scripted([
-        "sso",
-        "kdb2",
-        "5000",
-        "",
-        "extension",
-        ["protect", "timeout"],
-      ]),
-    );
-    assert.match(told[0], /fields its extension takes go in settings.json/);
   });
 
   test("a servers setting that isn't an object is said before asking", async () => {

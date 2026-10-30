@@ -6,9 +6,10 @@ All notable changes to the extension are documented in this file.
 
 ### Added
 
-- Servers, defined in settings or by **kdb+/q: Add Server**, with TLS,
-  passwords kept in VS Code's secure storage, asked for at every connect,
-  or given by another extension, and protected evaluation
+- Servers, defined in settings or by **kdb+/q: Add Server**, in folders to
+  any depth if you like, with TLS, passwords kept in VS Code's secure
+  storage, asked for at every connect, or given by another extension, and
+  protected evaluation
 - **kdb+/q: Connect to Server** and **Disconnect from Server**, with the
   active connection, and how long its last query took, in the status bar
 - **kdb+/q: Run File on Server**, also the ▶ in the editor's title bar,

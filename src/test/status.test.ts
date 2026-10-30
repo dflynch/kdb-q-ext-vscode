@@ -2,6 +2,7 @@ import * as assert from "node:assert";
 import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import { serverMenu } from "../commands";
+import type { Definition } from "../servers";
 import { describe, details, lastTiming, took } from "../status";
 
 suite("status", () => {
@@ -105,12 +106,12 @@ suite("status", () => {
     );
   });
 
-  test("the auth extension is named, but not the fields it's given", () => {
-    const sso = {
+  test("the auth extension is named as its setting gives it", () => {
+    const sso: Definition = {
       name: "sso",
       host: "kdb2",
       port: 5000,
-      auth: { fields: { token: "secret" } },
+      auth: "extension",
     };
     const lines = details(sso, "acme.kdb-auth");
     assert.ok(lines.includes("Authentication: Extension acme.kdb-auth"));
@@ -120,7 +121,6 @@ suite("status", () => {
         'Authentication: Extension "kdb-auth" (invalid)',
       ),
     );
-    assert.ok(!lines.join("\n").includes("secret"));
     assert.ok(lines.includes("Connection timeout: Default"));
   });
 
