@@ -305,7 +305,7 @@
                   "protect": {
                     "type": "boolean",
                     "default": true,
-                    "markdownDescription": "Run each query under `.Q.trp`, so that an error comes back with its backtrace and its full text. The query is sent as written, as a list with the function that traps it, for q's default `.z.pg` to evaluate. Turn this off for a server whose `.z.pg` is customised or only takes strings, such as a gateway."
+                    "markdownDescription": "Run each query under `.Q.trp`, so that an error comes back with its backtrace and its full text. The query is sent as written, as a list with the function that traps it, for q's default `.z.pg` to evaluate. Turn this off when the server enforces an allowlist: the query is then sent as a string."
                   },
                   "tls": {
                     "type": "boolean",
