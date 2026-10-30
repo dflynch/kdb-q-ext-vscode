@@ -16,7 +16,18 @@ const prod: Definition = {
 // Sources that fail the test if one is used that shouldn't be
 function sources(given: Partial<Sources>): Sources {
   const unused = () => assert.fail("an unexpected source was used");
-  return { stored: unused, ask: unused, extension: unused, ...given };
+  return {
+    stored: unused,
+    ask: unused,
+    authExtension: unused,
+    extension: unused,
+    ...given,
+  };
+}
+
+// Sources with the auth extension set to a.b, and its exports as given
+function signOn(extension: Sources["extension"]): Sources {
+  return sources({ authExtension: () => "a.b", extension });
 }
 
 async function rejects(
@@ -66,7 +77,7 @@ suite("credentials", () => {
     const ids: string[] = [];
     const sso: Definition = {
       ...prod,
-      auth: { extension: "acme.kdb-auth", fields: { realm: "EXAMPLE.COM" } },
+      auth: { fields: { realm: "EXAMPLE.COM" } },
     };
     const extension = async (id: string) => {
       ids.push(id);
@@ -77,10 +88,16 @@ suite("credentials", () => {
         },
       };
     };
-    assert.deepStrictEqual(await credentials(sso, sources({ extension })), {
-      user: "token",
-      password: "jwt",
-    });
+    assert.deepStrictEqual(
+      await credentials(
+        sso,
+        sources({ authExtension: () => "acme.kdb-auth", extension }),
+      ),
+      {
+        user: "token",
+        password: "jwt",
+      },
+    );
     assert.deepStrictEqual(ids, ["acme.kdb-auth"]);
     assert.deepStrictEqual(requests, [
       {
@@ -94,9 +111,9 @@ suite("credentials", () => {
   });
 
   test("an extension can answer without a promise", async () => {
-    const sso: Definition = { ...prod, auth: { extension: "a.b", fields: {} } };
+    const sso: Definition = { ...prod, auth: { fields: {} } };
     const extension = async () => ({ credentials: () => ({ password: "t" }) });
-    assert.deepStrictEqual(await credentials(sso, sources({ extension })), {
+    assert.deepStrictEqual(await credentials(sso, signOn(extension)), {
       password: "t",
     });
   });
@@ -104,7 +121,7 @@ suite("credentials", () => {
   test("an extension can't change the fields the next connect gets", async () => {
     const sso: Definition = {
       ...prod,
-      auth: { extension: "a.b", fields: { scopes: ["kdb"] } },
+      auth: { fields: { scopes: ["kdb"] } },
     };
     const extension = async () => ({
       credentials: (request: CredentialsRequest) => {
@@ -112,34 +129,54 @@ suite("credentials", () => {
         return { password: "t" };
       },
     });
-    await credentials(sso, sources({ extension }));
-    assert.deepStrictEqual(sso.auth, {
-      extension: "a.b",
-      fields: { scopes: ["kdb"] },
-    });
+    await credentials(sso, signOn(extension));
+    assert.deepStrictEqual(sso.auth, { fields: { scopes: ["kdb"] } });
+  });
+
+  test("an auth extension unset or not an ID fails", async () => {
+    const sso: Definition = { ...prod, auth: { fields: {} } };
+    await rejects(
+      credentials(sso, sources({ authExtension: () => undefined })),
+      "auth extension not set",
+      undefined,
+    );
+    await rejects(
+      credentials(sso, sources({ authExtension: () => "kdb-auth" })),
+      "invalid auth extension",
+      "the auth extension isn't an extension ID",
+    );
   });
 
   test("an extension that isn't there, or gives nothing usable, fails", async () => {
-    const sso: Definition = { ...prod, auth: { extension: "a.b", fields: {} } };
+    const sso: Definition = { ...prod, auth: { fields: {} } };
     await rejects(
-      credentials(sso, sources({ extension: async () => undefined })),
+      credentials(
+        sso,
+        signOn(async () => undefined),
+      ),
       "auth extension not installed",
       "a.b",
     );
     await rejects(
-      credentials(sso, sources({ extension: async () => ({}) })),
-      "auth extension gives no credentials",
-      "a.b exports no credentials function",
-    );
-    await rejects(
-      credentials(sso, sources({ extension: async () => null })),
+      credentials(
+        sso,
+        signOn(async () => ({})),
+      ),
       "auth extension gives no credentials",
       "a.b exports no credentials function",
     );
     await rejects(
       credentials(
         sso,
-        sources({ extension: async () => ({ credentials: () => "admin:pw" }) }),
+        signOn(async () => null),
+      ),
+      "auth extension gives no credentials",
+      "a.b exports no credentials function",
+    );
+    await rejects(
+      credentials(
+        sso,
+        signOn(async () => ({ credentials: () => "admin:pw" })),
       ),
       "malformed credentials from auth extension",
       "a.b: not an object",
@@ -147,7 +184,7 @@ suite("credentials", () => {
   });
 
   test("an extension's own error is kept as the cause", async () => {
-    const sso: Definition = { ...prod, auth: { extension: "a.b", fields: {} } };
+    const sso: Definition = { ...prod, auth: { fields: {} } };
     const ticket = new Error("no Kerberos ticket");
     const extension = async () => ({
       credentials: async () => {
@@ -155,7 +192,7 @@ suite("credentials", () => {
       },
     });
     await rejects(
-      credentials(sso, sources({ extension })),
+      credentials(sso, signOn(extension)),
       "auth extension failed",
       ticket,
     );

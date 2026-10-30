@@ -474,6 +474,10 @@ export function sources(secrets: vscode.SecretStorage): Sources {
         ignoreFocusOut: true,
         validateInput: servers.passwordProblem,
       }),
+    authExtension: () =>
+      vscode.workspace
+        .getConfiguration("kdb-q-ext-vscode")
+        .get("authExtension"),
     extension: async (id) => {
       const extension = vscode.extensions.getExtension(id);
       return extension === undefined ? undefined : await extension.activate();

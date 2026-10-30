@@ -326,30 +326,31 @@
                 ]
               },
               "auth": {
-                "markdownDescription": "Where the password comes from, when it isn't the one kept by **kdb+/q: Set Server Password**: `\"prompt\"` asks for it at every connect and doesn't keep it, where a password can't be stored or changes too often to keep; `{ \"extension\": \"publisher.name\", … }` asks that extension at every connect, for a firm's own sign-on. The rest of the object goes to the extension.",
+                "markdownDescription": "Where the password comes from, when it isn't the one kept by **kdb+/q: Set Server Password**: `\"prompt\"` asks for it at every connect and doesn't keep it, where a password can't be stored or changes too often to keep; `\"extension\"` asks the extension in `#kdb-q-ext-vscode.authExtension#` at every connect, for a firm's own sign-on. An object asks it too, and gives it the object's fields for this server.",
                 "oneOf": [
                   {
                     "const": "prompt",
                     "description": "Ask for the password at every connect, and don't keep it."
                   },
                   {
+                    "const": "extension",
+                    "description": "Ask the auth extension for the credentials at every connect."
+                  },
+                  {
                     "type": "object",
-                    "required": [
-                      "extension"
-                    ],
-                    "properties": {
-                      "extension": {
-                        "type": "string",
-                        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9-]*\\.[a-zA-Z0-9][a-zA-Z0-9-]*$",
-                        "description": "The ID of the extension that gives the credentials."
-                      }
-                    },
-                    "description": "Ask an extension for the credentials at every connect."
+                    "description": "Ask the auth extension for the credentials at every connect, giving it these fields."
                   }
                 ]
               }
             }
           }
+        },
+        "kdb-q-ext-vscode.authExtension": {
+          "type": "string",
+          "pattern": "^([a-zA-Z0-9][a-zA-Z0-9-]*\\.[a-zA-Z0-9][a-zA-Z0-9-]*)?$",
+          "patternErrorMessage": "An extension ID: publisher.name",
+          "default": "",
+          "markdownDescription": "The extension that gives the credentials for a firm's own sign-on, as `publisher.name`, for the servers whose `auth` is `\"extension\"` or that extension's fields. It exports `credentials(request)`."
         },
         "kdb-q-ext-vscode.connectTimeout": {
           "type": "integer",

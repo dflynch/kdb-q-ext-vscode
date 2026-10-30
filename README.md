@@ -89,12 +89,23 @@ didn't give, comes with a hint to turn it off.
 
 #### Sign-on from another extension
 
-For a firm's own sign-on, `"auth": { "extension": "publisher.name", … }`
-asks that extension for credentials at every connect, so a token is always
-fresh. The extension exports `credentials(request)`, which returns, or
-resolves to, `{ user?, password }`; a user it gives replaces the server's.
-The request is `{ name, host, port, user?, fields }`, where `fields` is the
-rest of the `auth` object.
+For a firm's own sign-on, name the extension that gives credentials once,
+in `authExtension`, and set a server's `"auth"` to `"extension"`. That
+extension is asked at every connect, so a token is always fresh. A server
+that needs fields of its own, such as a realm, gives them as an object
+instead: `"auth": { "realm": "EXAMPLE.COM" }`.
+
+```json
+"kdb-q-ext-vscode.authExtension": "acme.kdb-auth",
+"kdb-q-ext-vscode.servers": {
+  "gateway": { "host": "gw.example.com", "port": 6000, "auth": "extension" }
+}
+```
+
+The extension exports `credentials(request)`, which returns, or resolves
+to, `{ user?, password }`; a user it gives replaces the server's. The
+request is `{ name, host, port, user?, fields }`, where `fields` is the
+server's `auth` object, or empty for `"extension"`.
 
 ### Connecting
 
@@ -281,6 +292,7 @@ Open Keyboard Shortcuts**.
 | Setting                           | Default        | What it does                                                 |
 | --------------------------------- | -------------- | ------------------------------------------------------------ |
 | `kdb-q-ext-vscode.servers`        | `{}`           | The servers to connect to, by name (see [Servers](#servers)) |
+| `kdb-q-ext-vscode.authExtension`  | `""`           | The extension that gives credentials, as `publisher.name`    |
 | `kdb-q-ext-vscode.connectTimeout` | `2000`         | How long to wait to connect and log in, in ms; 0 waits       |
 | `kdb-q-ext-vscode.consoleSize`    | `[1000, 1000]` | How much of a result to show, as lines then width            |
 | `kdb-q-ext-vscode.precision`      | `7`            | Significant digits of floats and reals, as `\P`; 0 for all   |

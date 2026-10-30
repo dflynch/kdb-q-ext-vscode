@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import type { Connection } from "./connection";
 import type { Connections, State } from "./connections";
-import type { Definition } from "./servers";
+import { authExtension, type Definition } from "./servers";
 import { passphraseKey } from "./tls";
 
 // How long a query took, in whole milliseconds, as \t gives
@@ -72,15 +72,18 @@ export function lastTiming(changed: () => void) {
 }
 
 // A server's settings, a line each, all but secrets: where the password
-// comes from, not what it is, and an extension's name, not the fields it's
-// given
-export function details(server: Definition): string[] {
+// comes from, not what it is, and the auth extension, as its setting names
+// it, not the fields it's given
+export function details(server: Definition, setting?: unknown): string[] {
+  const extension = authExtension(setting);
   const auth =
     server.auth === undefined
       ? "Stored password"
       : server.auth === "prompt"
         ? "Ask each time"
-        : `Extension ${server.auth.extension}`;
+        : extension.problem
+          ? `Extension ${JSON.stringify(setting)} (invalid)`
+          : `Extension ${extension.id ?? "not set"}`;
   const tls =
     server.tls === undefined
       ? "Off"
@@ -145,7 +148,12 @@ export function showStatus(
         : "kdb+/q: not connected",
     };
     item.tooltip = server
-      ? details(server).join("\n")
+      ? details(
+          server,
+          vscode.workspace
+            .getConfiguration("kdb-q-ext-vscode")
+            .get("authExtension"),
+        ).join("\n")
       : "kdb+/q: Not connected";
     item.backgroundColor =
       active?.state.kind === "closed"
