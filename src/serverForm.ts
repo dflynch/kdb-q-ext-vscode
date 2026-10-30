@@ -12,6 +12,7 @@ import {
   type Login,
   port,
   problems,
+  type Scope,
   type ToForm,
   toSetting,
 } from "./form/fields";
@@ -22,15 +23,13 @@ import * as tls from "./tls";
 // The server form's editor tab
 export const formType = "kdb-q-ext-vscode.serverForm";
 
-// The settings a server's in, as VS Code names them
-type Scope = "user" | "workspace";
-
 // Opens a connection to a server, with a password typed in place of the
 // one stored, if one's given: the extension's opener, or a stand-in for
-// tests. Undefined if asking for a password was cancelled.
+// tests. Undefined if asking for a password was cancelled, or the signal's
+// aborted.
 export type Opener = (
   server: servers.Definition,
-  options?: { typed?: string },
+  options?: { typed?: string; signal?: AbortSignal },
 ) => Promise<{ close(): void } | undefined>;
 
 // A form open in a tab: for a server to add to a folder, or for one to
@@ -39,6 +38,14 @@ type Open = {
   panel: vscode.WebviewPanel;
   folder: string[];
   editing?: string;
+  // Aborted as the tab closes, stopping a test
+  closing: AbortController;
+  // Whether it's being saved, so that it's neither saved again nor told
+  // of the change its own save makes
+  saving?: boolean;
+  // The last load posted, so that a change to the settings that doesn't
+  // change it isn't posted again
+  loaded?: string;
 };
 
 const config = () => vscode.workspace.getConfiguration("kdb-q-ext-vscode");
@@ -171,7 +178,11 @@ export class ServerForms implements vscode.Disposable {
     }
   }
 
-  private show(id: string, of: Omit<Open, "panel">, title: string) {
+  private show(
+    id: string,
+    of: Pick<Open, "folder" | "editing">,
+    title: string,
+  ) {
     const shown = this.forms.get(id);
     if (shown) {
       shown.panel.reveal();
@@ -184,9 +195,10 @@ export class ServerForms implements vscode.Disposable {
       light: vscode.Uri.joinPath(this.extensionUri, "icons", "q-light.svg"),
       dark: vscode.Uri.joinPath(this.extensionUri, "icons", "q-dark.svg"),
     };
-    const open: Open = { panel, ...of };
+    const open: Open = { panel, ...of, closing: new AbortController() };
     this.forms.set(id, open);
     panel.onDidDispose(() => {
+      open.closing.abort();
       if (this.forms.get(id) === open) {
         this.forms.delete(id);
       }
@@ -207,9 +219,10 @@ export class ServerForms implements vscode.Disposable {
   }
 
   private async heard(open: Open, message: FromForm) {
-    const post = (message: ToForm) => open.panel.webview.postMessage(message);
+    const post = (message: ToForm) => this.post(open, message);
     switch (message.type) {
       case "ready":
+        open.loaded = undefined;
         return this.load(open);
       case "lookup":
         return post({
@@ -231,6 +244,13 @@ export class ServerForms implements vscode.Disposable {
     }
   }
 
+  // A tab that's closed is told nothing
+  private async post(open: Open, message: ToForm) {
+    if (!open.closing.signal.aborted) {
+      await open.panel.webview.postMessage(message);
+    }
+  }
+
   private async stored(key: string | undefined): Promise<boolean> {
     return key !== undefined && (await this.secrets.get(key)) !== undefined;
   }
@@ -249,6 +269,7 @@ export class ServerForms implements vscode.Disposable {
     return {
       folder: open.folder,
       ...(open.editing === undefined ? {} : { editing: open.editing }),
+      scopes: open.editing === undefined ? [] : scopesOf(open.editing),
       taken: servers.isObject(folder)
         ? Object.keys(folder).filter((name) => name !== own)
         : [],
@@ -271,16 +292,28 @@ export class ServerForms implements vscode.Disposable {
   }
 
   // Post the form as the settings have it: blank for a server to add, or
-  // the server edited, unless it's gone
+  // the server edited, unless it's gone. Not while it's saved, nor again
+  // when the change is to something else.
   private async load(open: Open) {
-    const post = (message: ToForm) => open.panel.webview.postMessage(message);
+    if (open.saving) {
+      return;
+    }
+    const message = await this.loading(open);
+    const json = JSON.stringify(message);
+    if (json !== open.loaded) {
+      open.loaded = json;
+      await this.post(open, message);
+    }
+  }
+
+  private async loading(open: Open): Promise<ToForm> {
     const context = this.context(open);
     if (open.editing === undefined) {
-      return post({ type: "load", form: blank(), context, stored: false });
+      return { type: "load", form: blank(), context, stored: false };
     }
     const server = this.editing(open);
     if (server === undefined) {
-      return post({ type: "gone" });
+      return { type: "gone" };
     }
     const stored = await this.stored(servers.secretKey(server));
     const form = fromSetting(
@@ -288,22 +321,29 @@ export class ServerForms implements vscode.Disposable {
       server,
       stored,
     );
-    return post({ type: "load", form, context, stored });
+    return { type: "load", form, context, stored };
   }
 
   // The server the form makes, by its path, and its setting, read back as
-  // connecting reads it; refused with the problems the form has
-  private async checked(open: Open, form: Form, refused: string) {
+  // connecting reads it; refused with the problems the form has. A test
+  // needs no name: one that's missing or wrong is called test.
+  private async checked(open: Open, form: Form, testing = false) {
     const context = this.context(open);
     const login = { user: form.user, host: form.host, port: form.port };
     const found = problems(form, context, await this.stored(keyFor(login)));
+    const named = found.name === undefined;
+    if (testing) {
+      delete found.name;
+    }
     const wrong = Object.entries(found).map(
       ([field, problem]) => `${field}: ${problem}`,
     );
     if (wrong.length > 0) {
-      throw new Error(`${refused}, as ${wrong.join("; ")}`);
+      throw new Error(
+        `${testing ? "not tested" : "not saved"}, as ${wrong.join("; ")}`,
+      );
     }
-    const name = form.name.trim();
+    const name = named ? form.name.trim() : "test";
     const path = [...open.folder, name];
     const value = toSetting(form);
     const read = servers.definitions({ [name]: value });
@@ -316,51 +356,90 @@ export class ServerForms implements vscode.Disposable {
   }
 
   // Open a connection as the form has the server, and close it again,
-  // saying how it went: with the password typed, if one is
+  // saying how it went: with the password typed, if one is. Closing the
+  // tab stops it.
   private async test(
     open: Open,
     form: Form,
   ): Promise<{ ok: boolean; text: string }> {
+    let checked: Awaited<ReturnType<typeof this.checked>>;
     try {
-      const { definition } = await this.checked(open, form, "not tested");
-      const typed =
-        form.auth === "store" && form.password !== ""
-          ? form.password
-          : undefined;
-      const link = await this.opener(definition, { typed });
+      checked = await this.checked(open, form, true);
+    } catch (error) {
+      return { ok: false, text: (error as Error).message };
+    }
+    const { definition } = checked;
+    const at = `${definition.host}:${definition.port}`;
+    const typed =
+      form.auth === "store" && form.password !== "" ? form.password : undefined;
+    try {
+      const link = await this.opener(definition, {
+        typed,
+        signal: open.closing.signal,
+      });
       if (link === undefined) {
         return { ok: false, text: "Cancelled" };
       }
       link.close();
-      return {
-        ok: true,
-        text: `Connected to ${definition.host}:${definition.port}`,
-      };
+      return { ok: true, text: `Connected to ${at}` };
     } catch (error) {
-      return { ok: false, text: (error as Error).message };
+      return { ok: false, text: `${at}: ${(error as Error).message}` };
     }
   }
 
-  // Write the server where it's written, or for one added, where it's to
-  // go; keep its password, and forget the one it had if no other server
-  // gets it; then close the form
+  // Save the form, once at a time, saying why if it can't be
   private async save(open: Open, form: Form) {
-    const { context, path, value, definition } = await this.checked(
-      open,
-      form,
-      "not saved",
-    );
+    if (open.saving) {
+      return;
+    }
+    open.saving = true;
+    try {
+      await this.saved(open, form);
+      open.panel.dispose();
+    } catch (error) {
+      open.saving = false;
+      await this.post(open, {
+        type: "unsaved",
+        text: (error as Error).message,
+      });
+      // Anything that changed meanwhile
+      await this.load(open);
+    }
+  }
+
+  // Keep the server's password, then write the server where it's written,
+  // or for one added, where it's to go; and forget the password it had if
+  // no other server gets it. A server renamed is renamed in every scope
+  // it's in, and its connection closed.
+  private async saved(open: Open, form: Form) {
+    const { context, path, value, definition } = await this.checked(open, form);
     const before = this.editing(open);
-    const scope: Scope =
-      open.editing === undefined
-        ? context.workspaceOpen && form.target === "workspace"
-          ? "workspace"
-          : "user"
-        : (scopesOf(open.editing).at(-1) ?? "user");
-    await write(scope, path, value, open.editing?.split("/").at(-1));
     const key = servers.secretKey(definition);
     if (form.auth === "store" && form.password !== "") {
       await this.secrets.store(key, form.password);
+    }
+    if (open.editing === undefined) {
+      const scope: Scope =
+        context.workspaceOpen && form.target === "workspace"
+          ? "workspace"
+          : "user";
+      await write(scope, path, value);
+    } else {
+      const old = open.editing.split("/");
+      const from = old.at(-1);
+      const written = scopesOf(open.editing);
+      // Its fields are written where they win; anywhere else it's only
+      // renamed, keeping what's written there
+      const scope = written.at(-1) ?? "user";
+      for (const other of written.filter((each) => each !== scope)) {
+        if (open.editing !== definition.name) {
+          await write(other, path, servers.at(scopes()[other], old), from);
+        }
+      }
+      await write(scope, path, value, from);
+      if (open.editing !== definition.name) {
+        this.connections.disconnect(open.editing);
+      }
     }
     const unused = new Set<string>();
     if (before !== undefined && before.auth === undefined) {
@@ -373,7 +452,6 @@ export class ServerForms implements vscode.Disposable {
       unused.delete(key);
     }
     await forget(this.secrets, unused, definition.name);
-    open.panel.dispose();
   }
 
   // A setting the form refers to: the servers, or the TLS files, in

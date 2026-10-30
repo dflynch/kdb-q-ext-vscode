@@ -26,6 +26,9 @@ export type Form = {
 
 export type Field = keyof Form;
 
+// The settings a server's written in, as VS Code names them
+export type Scope = "user" | "workspace";
+
 // What the form is for: a server to add to a folder, or one to edit, by its
 // name as it was, and what it needs to know of the rest
 export type Context = {
@@ -33,6 +36,8 @@ export type Context = {
   folder: string[];
   // The server's own name, when editing
   editing?: string;
+  // The settings it's written in, when editing
+  scopes: Scope[];
   // The names of the rest of the folder's servers and folders
   taken: string[];
   // Whether there's a workspace to save a server to
@@ -99,6 +104,9 @@ export function port(text: string): number | undefined {
   return port >= 1 && port <= 65535 ? port : undefined;
 }
 
+// The longest timeout a timer takes, in milliseconds: about 24 days
+export const longestTimeout = 2 ** 31 - 1;
+
 // A timeout as typed: a whole number of milliseconds, or empty for none
 function timeout(text: string): number | undefined {
   return /^\d+$/.test(text.trim()) ? Number(text) : undefined;
@@ -127,9 +135,11 @@ export function problems(
   } else if (/^[^:]+:\d+$/.test(host)) {
     // A host with :port after it is one typed with its port; an IPv6
     // address has colons too, but more than one
-    found.host = "Port comes next";
+    found.host = "Put the port in Port";
   }
-  if (port(form.port) === undefined) {
+  if (form.port.trim() === "") {
+    found.port = "Required";
+  } else if (port(form.port) === undefined) {
     found.port = "From 1 to 65535";
   }
   if (userProblem(form.user.trim())) {
@@ -142,8 +152,14 @@ export function problems(
       found.password = "Can't contain a 0 byte";
     }
   }
-  if (form.timeout.trim() !== "" && timeout(form.timeout) === undefined) {
+  if (form.auth === "extension" && context.authExtension === undefined) {
+    found.auth = "The auth extension isn't set";
+  }
+  const ms = timeout(form.timeout);
+  if (form.timeout.trim() !== "" && ms === undefined) {
     found.timeout = "A whole number of milliseconds";
+  } else if (ms !== undefined && ms > longestTimeout) {
+    found.timeout = `At most ${longestTimeout}`;
   }
   return found;
 }
@@ -172,12 +188,14 @@ export type Login = { user: string; host: string; port: string };
 // To the form: the form to show, what it needs to know, and whether a
 // password is stored for its login, again whenever the settings change; that
 // a server edited is no longer in the settings; whether a password is
-// stored for a login typed; or how a test of the server went
+// stored for a login typed; how a test of the server went; or why a save
+// failed
 export type ToForm =
   | { type: "load"; form: Form; context: Context; stored: boolean }
   | { type: "gone" }
   | { type: "stored"; login: Login; stored: boolean }
-  | { type: "tested"; ok: boolean; text: string };
+  | { type: "tested"; ok: boolean; text: string }
+  | { type: "unsaved"; text: string };
 
 // From the form: it's ready for its form; a login typed, to say whether a
 // password is stored for it; the form to save, or to test by connecting;

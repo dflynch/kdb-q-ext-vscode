@@ -1,4 +1,5 @@
 import type { Server } from "./connection";
+import { longestTimeout } from "./form/fields";
 import { passwordProblem, userProblem } from "./login";
 import type { Secure } from "./tls";
 
@@ -62,7 +63,7 @@ function isCount(value: unknown): value is number {
 
 // A timeout, in milliseconds: 0 waits as long as it takes, as hopen does
 function isTimeout(value: unknown): value is number {
-  return value === 0 || isCount(value);
+  return value === 0 || (isCount(value) && value <= longestTimeout);
 }
 
 // The servers in the setting, in the order written, and the folders they're
@@ -234,7 +235,9 @@ function check(value: unknown): string | undefined {
     return "the user can't contain : or a 0 byte";
   }
   if (timeout !== undefined && !isTimeout(timeout)) {
-    return "the timeout isn't a whole number of milliseconds";
+    return isCount(timeout)
+      ? `the timeout is over ${longestTimeout} ms`
+      : "the timeout isn't a whole number of milliseconds";
   }
   if (protect !== undefined && typeof protect !== "boolean") {
     return "protect is true or false";

@@ -61,20 +61,39 @@ const note = element("p", "note", "Changes apply at the next connect.");
 const banner = element("div", "banner");
 banner.role = "status";
 
-// A setting: its name, its box or boxes, what it does, and its problem
+// A setting: its name, its box or boxes, what it does, and its problem.
+// A setting with one box has its name as the box's label, and what's
+// under the box describes it, for a screen reader; one with tick boxes is
+// a group named by it.
 function setting(
   label: string,
   description: (string | Node)[],
   ...controls: HTMLElement[]
 ) {
   const row = element("div", "setting");
-  const name = element("div", "label", label);
+  const [first, ...under] = controls;
+  const field =
+    first instanceof HTMLInputElement || first instanceof HTMLSelectElement
+      ? first
+      : undefined;
+  const name = element("label", "label", label);
   const about = element("div", "description");
   about.append(...description);
   const problem = element("div", "problem");
-  problem.role = "alert";
   row.append(name, ...controls, about, problem);
-  return { row, about, problem };
+  if (field) {
+    name.htmlFor = field.id;
+    const notes = [...under, about, problem];
+    notes.forEach((note, i) => {
+      note.id = `${field.id}-${i}`;
+    });
+    field.setAttribute("aria-describedby", notes.map((n) => n.id).join(" "));
+  } else {
+    name.id = `${label.toLowerCase()}-label`;
+    row.role = "group";
+    row.setAttribute("aria-labelledby", name.id);
+  }
+  return { row, about, problem, field };
 }
 
 function text(id: Field, type = "text") {
@@ -112,13 +131,12 @@ function choice(id: Field, options: [string, string][]) {
 
 const name = text("name");
 const host = text("host");
-host.placeholder = "localhost";
 const port = text("port");
-port.placeholder = "5000";
 const user = text("user");
 user.placeholder = "Optional";
 const password = text("password", "password");
 const timeout = text("timeout");
+timeout.placeholder = "No limit";
 const tls = tick("tls", "Use TLS");
 // Where TLS gets its certificates, under its tick once it's ticked
 const tlsNote = element("div", "note-under description");
@@ -176,14 +194,14 @@ function line(...settings: { row: HTMLElement }[]) {
 
 const save = element("button", undefined, "Save");
 const test = element("button", "secondary", "Test");
-// How a test went, beside the buttons
-const tested = element("span", "tested");
-tested.role = "status";
 const cancel = element("button", "secondary", "Cancel");
 // For a server already saved: there's nothing of an added one there yet
 const json = link("Edit in settings.json", "servers");
 const buttons = element("div", "buttons");
-buttons.append(save, test, cancel, json, tested);
+buttons.append(save, test, cancel, json);
+// How a test went, or why a save failed, under the buttons
+const tested = element("div", "tested");
+tested.role = "status";
 
 const form = element("form");
 form.noValidate = true;
@@ -196,6 +214,7 @@ form.append(
   rows.options.row,
   line(rows.target),
   buttons,
+  tested,
 );
 document.body.append(title, where, note, banner, form);
 form.hidden = true;
@@ -236,11 +255,11 @@ function changed(): boolean {
 }
 
 // Show what depends on what's typed: the password box for a stored
-// password, and the problems of the fields left. Whether the form can be
-// saved.
-function update(): boolean {
+// password, and the problems of the fields left. The fields with problems,
+// shown or not.
+function update(): Field[] {
   if (!context) {
-    return false;
+    return ["name"];
   }
   const form = typed();
   const found = problems(form, context, stored);
@@ -250,6 +269,9 @@ function update(): boolean {
       : undefined;
     row.problem.textContent = problem ?? "";
     row.row.classList.toggle("invalid", problem !== undefined);
+    if (row.field) {
+      row.field.ariaInvalid = problem === undefined ? null : "true";
+    }
   }
   authMeaning.replaceChildren(...meanings[form.auth]);
   targetMeaning.replaceChildren(...meanings[form.target]);
@@ -259,7 +281,7 @@ function update(): boolean {
   rows.password.about.textContent = stored
     ? "Stored for this user, host and port: type another to replace it"
     : "For this user, host and port";
-  return Object.keys(found).length === 0;
+  return Object.keys(found) as Field[];
 }
 
 // Whether a password is stored for the login as typed, asked once it
@@ -283,6 +305,7 @@ function listed(names: string[]): string {
 }
 
 function show(message: Extract<ToForm, { type: "load" }>) {
+  const first = loaded === undefined;
   pending = undefined;
   banner.hidden = true;
   save.disabled = false;
@@ -299,11 +322,21 @@ function show(message: Extract<ToForm, { type: "load" }>) {
   });
   left.clear();
   fill(message.form);
-  const { editing, folder, authExtension, workspaceOpen } = message.context;
+  const { editing, folder, scopes, authExtension, workspaceOpen } =
+    message.context;
   title.textContent =
     editing === undefined ? "Add Server" : `Edit ${message.form.name}`;
-  where.textContent = folder.length > 0 ? `In ${folder.join(" › ")}` : "";
-  where.hidden = folder.length === 0;
+  // Its folders, and for one edited, the settings it's in
+  const places = [
+    ...(folder.length > 0 ? [folder.join(" › ")] : []),
+    ...(scopes.length > 0
+      ? [
+          `${listed(scopes.map((scope) => (scope === "user" ? "User" : "Workspace")))} settings`,
+        ]
+      : []),
+  ];
+  where.textContent = places.length > 0 ? `In ${places.join(", in ")}` : "";
+  where.hidden = places.length === 0;
   note.hidden = !message.context.connected;
   rows.target.row.hidden = editing !== undefined || !workspaceOpen;
   json.hidden = editing === undefined;
@@ -318,8 +351,11 @@ function show(message: Extract<ToForm, { type: "load" }>) {
   );
   meanings.extension = authExtension
     ? [`From ${authExtension}, the `, link("auth extension", "authExtension")]
-    : ["Set the ", link("auth extension", "authExtension"), " first"];
+    : ["From the ", link("auth extension", "authExtension"), " setting"];
   update();
+  if (first && editing === undefined) {
+    name.focus();
+  }
 }
 
 // A message saying why, with a button to load the settings as they are
@@ -345,7 +381,10 @@ window.addEventListener("message", (event: MessageEvent<ToForm>) => {
       // A form with changes keeps them until Reload
       if (changed()) {
         pending = message;
-        warn("The settings have changed.", "Reload");
+        warn(
+          "The settings have changed. Reloading discards your edits.",
+          "Reload",
+        );
       } else {
         show(message);
       }
@@ -360,6 +399,12 @@ window.addEventListener("message", (event: MessageEvent<ToForm>) => {
       tested.className = message.ok ? "tested" : "tested failed";
       tested.textContent = message.text;
       break;
+    case "unsaved":
+      save.disabled = false;
+      test.disabled = false;
+      tested.className = "tested failed";
+      tested.textContent = message.text;
+      break;
     case "stored":
       if (JSON.stringify(message.login) === asked) {
         stored = message.stored;
@@ -369,14 +414,19 @@ window.addEventListener("message", (event: MessageEvent<ToForm>) => {
   }
 });
 
-form.addEventListener("input", (event) => {
+// What a test or a save said no longer holds once the server's changed
+function changing(event: Event) {
   const id = (event.target as HTMLElement).id;
   if (id === "user" || id === "host" || id === "port") {
     lookup();
   }
+  if (!test.disabled) {
+    tested.textContent = "";
+  }
   update();
-});
-form.addEventListener("change", update);
+}
+form.addEventListener("input", changing);
+form.addEventListener("change", changing);
 // A field's problem shows once it's left, not while it's first typed
 form.addEventListener("focusout", (event) => {
   const id = (event.target as HTMLElement).id as Field;
@@ -386,18 +436,33 @@ form.addEventListener("focusout", (event) => {
   }
 });
 
-// Save or test, once every problem's shown and there are none
+// Save or test, once every problem's shown and there are none, or with
+// the first box that has one focused. A test needs no name.
 function submit(type: "save" | "test") {
-  for (const field of Object.keys(rows) as Field[]) {
-    left.add(field);
-  }
-  if (!update() || save.disabled) {
+  if (save.disabled) {
     return;
   }
+  const needed = (Object.keys(rows) as Field[]).filter(
+    (field) => type === "save" || (field !== "name" && field !== "target"),
+  );
+  for (const field of needed) {
+    left.add(field);
+  }
+  const wrong = update().filter((field) => needed.includes(field));
+  if (wrong.length > 0) {
+    const boxes = [...form.querySelectorAll("input, select")];
+    (
+      boxes.find((box) => wrong.includes(box.id as Field)) as HTMLElement
+    )?.focus();
+    return;
+  }
+  test.disabled = true;
+  tested.className = "tested";
   if (type === "test") {
-    test.disabled = true;
-    tested.className = "tested";
     tested.textContent = "Connecting…";
+  } else {
+    save.disabled = true;
+    tested.textContent = "";
   }
   vscode.postMessage({ type, form: typed() });
 }
@@ -411,5 +476,11 @@ test.type = "button";
 test.addEventListener("click", () => submit("test"));
 cancel.type = "button";
 cancel.addEventListener("click", () => vscode.postMessage({ type: "cancel" }));
+// Escape cancels, as in a dialog
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !event.defaultPrevented) {
+    vscode.postMessage({ type: "cancel" });
+  }
+});
 
 vscode.postMessage({ type: "ready" });

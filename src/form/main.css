@@ -68,6 +68,7 @@ h1 {
 }
 
 .label {
+  display: block;
   font-weight: 600;
   margin-bottom: 6px;
   color: var(--vscode-settings-headerForeground);
@@ -135,7 +136,8 @@ select {
 }
 
 .invalid input[type="text"],
-.invalid input[type="password"] {
+.invalid input[type="password"],
+.invalid select {
   border-color: var(--vscode-inputValidation-errorBorder);
 }
 
@@ -201,14 +203,22 @@ code {
 /* At the end, left-aligned as VS Code's own forms have them */
 .buttons {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   margin-top: 16px;
 }
 
-.buttons a,
-.tested {
+.buttons a {
   margin-left: 8px;
+}
+
+.tested {
+  margin-top: 8px;
+}
+
+.tested:empty {
+  display: none;
 }
 
 .tested {

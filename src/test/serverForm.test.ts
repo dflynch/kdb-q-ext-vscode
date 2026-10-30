@@ -127,12 +127,16 @@ suite("the server form", () => {
     await setUser(undefined);
   });
 
-  function open(kept: Record<string, string> = {}, opener = nowhere) {
+  function open(
+    kept: Record<string, string> = {},
+    opener = nowhere,
+    connected = connections,
+  ) {
     const { made, panels } = tabs();
     forms = new ServerForms(
       extension,
       secrets(kept),
-      connections,
+      connected,
       opener,
       panels,
     );
@@ -210,6 +214,7 @@ suite("the server form", () => {
     });
     assert.strictEqual(loaded.stored, true);
     assert.strictEqual(loaded.context.editing, "Prod/TP");
+    assert.deepStrictEqual(loaded.context.scopes, ["user"]);
   });
 
   test("a rename keeps the server's place, and its password", async () => {
@@ -233,6 +238,70 @@ suite("the server form", () => {
     assert.deepStrictEqual(kept, {
       "password:admin@kdb1.example.com:5010": "secret",
     });
+  });
+
+  test("a server renamed while it's connected is disconnected", async () => {
+    await setUser({ prod: { host: "kdb1", port: 1 } });
+    const link = { closed: new Promise<Error>(() => {}), close: () => {} };
+    const connected = new Connections<Connection>(
+      async () => link as unknown as Connection,
+    );
+    await connected.connect({ name: "prod", host: "kdb1", port: 1 });
+    const { made, forms } = open({}, nowhere, connected);
+    forms.edit("prod");
+    const { form } = await made[0].loaded();
+    made[0].say({ type: "save", form: { ...form, name: "live" } });
+    await made[0].closing;
+    assert.deepStrictEqual(connected.names, []);
+  });
+
+  test("a form's saved once, however often Save is pressed", async () => {
+    const { made, forms } = open();
+    forms.add();
+    await made[0].loaded();
+    made[0].say({ type: "save", form: prod });
+    made[0].say({ type: "save", form: prod });
+    await made[0].closing;
+    // The second would have found the first's server already there
+    assert.ok(made[0].posted.every((message) => message.type !== "unsaved"));
+    assert.deepStrictEqual(Object.keys(user() as object), ["prod"]);
+  });
+
+  test("closing the tab stops a test", async () => {
+    let signal: AbortSignal | undefined;
+    const { made, forms } = open({}, (_, options) => {
+      signal = options?.signal;
+      return new Promise(() => {});
+    });
+    forms.add();
+    await made[0].loaded();
+    made[0].say({ type: "test", form: prod });
+    while (signal === undefined) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.strictEqual(signal.aborted, false);
+    made[0].panel.dispose();
+    assert.strictEqual(signal.aborted, true);
+  });
+
+  test("a form isn't loaded again for a change to something else", async () => {
+    await setUser({ prod: { host: "kdb1", port: 1 } });
+    const global = vscode.ConfigurationTarget.Global;
+    const { made, forms } = open();
+    forms.edit("prod");
+    await made[0].loaded();
+    const next = made[0].next();
+    try {
+      await config().update("precision", 3, global);
+      await setUser({ prod: { host: "kdb2", port: 1 } });
+      // The first thing posted is the server's change
+      assert.strictEqual(
+        ((await next) as Extract<ToForm, { type: "load" }>).form.host,
+        "kdb2",
+      );
+    } finally {
+      await config().update("precision", undefined, global);
+    }
   });
 
   test("a password no server gets any more is forgotten, unless another does", async () => {
@@ -331,32 +400,20 @@ suite("the server form", () => {
     assert.deepStrictEqual(await next, { type: "gone" });
   });
 
-  test("a form with a problem isn't saved", async () => {
+  test("a form with a problem isn't saved, and says why", async () => {
     await setUser({ old: { host: "kdb0", port: 1 } });
-    const window = vscode.window as unknown as Record<string, unknown>;
-    const saved = window.showErrorMessage;
-    const errors: string[] = [];
-    window.showErrorMessage = async (message: string) => {
-      errors.push(message);
-      return undefined;
-    };
     const { made, forms } = open();
-    try {
-      forms.add();
-      await made[0].loaded();
-      made[0].say({
-        type: "save",
-        form: { ...prod, name: "old" },
-      });
-      while (errors.length === 0) {
-        await new Promise((resolve) => setTimeout(resolve, 10));
-      }
-    } finally {
-      window.showErrorMessage = saved;
-    }
-    assert.deepStrictEqual(errors, [
-      "kdb+/q: not saved, as name: old already exists",
-    ]);
+    forms.add();
+    await made[0].loaded();
+    const next = made[0].next();
+    made[0].say({
+      type: "save",
+      form: { ...prod, name: "old" },
+    });
+    assert.deepStrictEqual(await next, {
+      type: "unsaved",
+      text: "not saved, as name: old already exists",
+    });
     assert.strictEqual(made[0].closed, false);
     assert.deepStrictEqual(user(), { old: { host: "kdb0", port: 1 } });
   });
@@ -403,7 +460,7 @@ suite("the server form", () => {
     assert.deepStrictEqual(await tried(prod), {
       type: "tested",
       ok: false,
-      text: "hop. OS reports: Connection refused",
+      text: "kdb1.example.com:5010: hop. OS reports: Connection refused",
     });
     answer = "cancel";
     assert.deepStrictEqual(await tried(prod), {
@@ -414,8 +471,15 @@ suite("the server form", () => {
     assert.deepStrictEqual(await tried({ ...prod, port: "" }), {
       type: "tested",
       ok: false,
-      text: "not tested, as port: From 1 to 65535",
+      text: "not tested, as port: Required",
     });
+    // A test needs no name: one missing or taken connects as test
+    answer = "open";
+    await tried({ ...prod, name: "" });
+    assert.strictEqual(
+      (opened[opened.length - 1][0] as { name: string }).name,
+      "Prod/test",
+    );
     // Nothing's written
     assert.strictEqual(user(), undefined);
     assert.strictEqual(made[0].closed, false);

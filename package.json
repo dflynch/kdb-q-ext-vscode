@@ -300,6 +300,7 @@
                   "timeout": {
                     "type": "integer",
                     "minimum": 0,
+                    "maximum": 2147483647,
                     "description": "How long to wait to connect and log in, in milliseconds. Without one, it waits as long as it takes."
                   },
                   "protect": {

@@ -12,6 +12,7 @@ import { definitions } from "../servers";
 
 const context: Context = {
   folder: [],
+  scopes: [],
   taken: ["old"],
   workspaceOpen: false,
   tlsFiles: [],
@@ -130,7 +131,7 @@ suite("the server form's fields", () => {
       ),
       {
         name: "old already exists",
-        host: "Port comes next",
+        host: "Put the port in Port",
         port: "From 1 to 65535",
         user: "Can't contain : or a 0 byte",
         password: "Can't contain a 0 byte",
@@ -146,7 +147,7 @@ suite("the server form's fields", () => {
       {
         name: "Required",
         host: "Required",
-        port: "From 1 to 65535",
+        port: "Required",
         password: "Required",
       },
     );
@@ -156,6 +157,25 @@ suite("the server form's fields", () => {
     // An IPv6 address has colons too, but more than one
     assert.deepStrictEqual(
       problems({ ...prod, host: "fe80::1" }, context, false),
+      {},
+    );
+  });
+
+  test("a timeout is at most what a timer takes, and the auth extension's needed to use it", () => {
+    assert.deepStrictEqual(
+      problems({ ...prod, timeout: "2147483648" }, context, false),
+      { timeout: "At most 2147483647" },
+    );
+    assert.deepStrictEqual(
+      problems({ ...prod, timeout: "2147483647" }, context, false),
+      {},
+    );
+    const extension = { ...prod, auth: "extension" as const };
+    assert.deepStrictEqual(problems(extension, context, false), {
+      auth: "The auth extension isn't set",
+    });
+    assert.deepStrictEqual(
+      problems(extension, { ...context, authExtension: "acme.sso" }, false),
       {},
     );
   });
