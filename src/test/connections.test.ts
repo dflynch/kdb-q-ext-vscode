@@ -172,7 +172,7 @@ suite("connections", () => {
     assert.deepStrictEqual(all.names, []);
   });
 
-  test("disconnecting while connecting stops it, and its failure isn't thrown", async () => {
+  test("disconnecting while connecting stops it, quietly", async () => {
     const { all, opening, changes } = connections();
     const connected = all.connect(prod);
     // Connecting again waits for the same outcome
@@ -180,7 +180,7 @@ suite("connections", () => {
     assert.strictEqual(opening[0].signal.aborted, false);
     all.disconnect("prod");
     assert.strictEqual(opening[0].signal.aborted, true);
-    opening[0].reject(new Error("cancelled"));
+    opening[0].resolve(undefined);
     assert.strictEqual(await connected, undefined);
     assert.strictEqual(await again, undefined);
     assert.strictEqual(opening.length, 1);

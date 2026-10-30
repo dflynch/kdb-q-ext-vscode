@@ -110,7 +110,8 @@ export class Connections<L extends Link> {
       link = await this.open(server, { signal: abort.signal });
     } catch (error) {
       if (this.entries.get(server.name) !== entry) {
-        // Disconnected while connecting, which stopped it
+        // Disconnected while connecting, as it failed: no one's waiting to
+        // be told
         return undefined;
       }
       entry.opening = undefined;

@@ -180,16 +180,16 @@ suite("connection", () => {
     );
     await server.login;
     abort.abort();
-    await assert.rejects(opening, { message: "cancelled" });
+    assert.strictEqual(await opening, undefined);
     await server.closed;
   });
 
   test("an aborted signal stops a connect before it starts", async () => {
     const abort = new AbortController();
     abort.abort();
-    await assert.rejects(
-      Connection.open({ host: "127.0.0.1", port: 1 }, abort.signal),
-      { message: "cancelled" },
+    assert.strictEqual(
+      await Connection.open({ host: "127.0.0.1", port: 1 }, abort.signal),
+      undefined,
     );
   });
 

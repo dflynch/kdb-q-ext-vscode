@@ -118,11 +118,20 @@ export class Connection {
   // Connect and log in. The server answers the login with one byte, the
   // protocol version it agrees to, or closes the connection to refuse it.
   // Failures are q's errors for hopen. Aborting the signal closes the
-  // socket, however far it's got.
-  static open(server: Server, signal?: AbortSignal): Promise<Connection> {
+  // socket, however far it's got, and gives undefined: a cancel isn't a
+  // failure.
+  static open(server: Server): Promise<Connection>;
+  static open(
+    server: Server,
+    signal?: AbortSignal,
+  ): Promise<Connection | undefined>;
+  static open(
+    server: Server,
+    signal?: AbortSignal,
+  ): Promise<Connection | undefined> {
     return new Promise((resolve, reject) => {
       if (signal?.aborted) {
-        reject(new Error("cancelled"));
+        resolve(undefined);
         return;
       }
       const socket = server.tls
@@ -209,7 +218,11 @@ export class Connection {
         socket.destroy();
         reject(reason);
       };
-      const aborted = () => fail(new Error("cancelled"));
+      const aborted = () => {
+        done();
+        socket.destroy();
+        resolve(undefined);
+      };
       signal?.addEventListener("abort", aborted, { once: true });
       socket.once("connect", tcp);
       socket.once(connected, login);
