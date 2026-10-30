@@ -71,10 +71,12 @@ saves it to your user or workspace settings, or write it in `settings.json`:
   keeps one in VS Code's secure storage, for the user, host and port, and
   **Clear Server Password** removes it. `"auth": "prompt"` asks for it at
   every connect instead, and never keeps it
-- **TLS** is `true`, or the files it needs besides the system's: a `ca` to
-  trust, and a client certificate as `cert` and `key` in PEM, or `pfx`.
-  Paths are absolute or start with `~/`. A client certificate's passphrase
-  is kept by **kdb+/q: Set Certificate Passphrase**
+- **`tls`** is `true` to connect with TLS. The files it needs besides the
+  system's are set once for every server, as q takes them for the whole
+  process: `tlsCaFile` to trust (q's `SSL_CA_CERT_FILE`), and a client
+  certificate as `tlsCertFile` and `tlsKeyFile` in PEM (`SSL_CERT_FILE`,
+  `SSL_KEY_FILE`). Paths are absolute or start with `~/`. An encrypted key's
+  passphrase is kept by **kdb+/q: Set Certificate Passphrase**
 - **`timeout`** is how long to wait to connect and log in, in milliseconds,
   overriding `connectTimeout`; 0 waits as long as it takes, as `hopen` does
 
@@ -294,6 +296,9 @@ Open Keyboard Shortcuts**.
 | `kdb-q-ext-vscode.servers`        | `{}`           | The servers to connect to, by name (see [Servers](#servers)) |
 | `kdb-q-ext-vscode.authExtension`  | `""`           | The extension that gives credentials, as `publisher.name`    |
 | `kdb-q-ext-vscode.connectTimeout` | `2000`         | How long to wait to connect and log in, in ms; 0 waits       |
+| `kdb-q-ext-vscode.tlsCaFile`      | `""`           | A CA certificate to trust for TLS, as `SSL_CA_CERT_FILE`     |
+| `kdb-q-ext-vscode.tlsCertFile`    | `""`           | A client certificate for TLS, as `SSL_CERT_FILE`             |
+| `kdb-q-ext-vscode.tlsKeyFile`     | `""`           | The client certificate's key, as `SSL_KEY_FILE`              |
 | `kdb-q-ext-vscode.consoleSize`    | `[1000, 1000]` | How much of a result to show, as lines then width            |
 | `kdb-q-ext-vscode.precision`      | `7`            | Significant digits of floats and reals, as `\P`; 0 for all   |
 | `kdb-q-ext-vscode.sizeLimit`      | `100`          | The largest result to take, in MB, uncompressed              |

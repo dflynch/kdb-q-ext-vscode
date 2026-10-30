@@ -33,26 +33,16 @@ suite("servers", () => {
     );
   });
 
-  test("tls is on with true or its files, and off otherwise", () => {
+  test("tls is on with true, and off otherwise", () => {
     const { servers, problems } = definitions({
       a: { host: "h", port: 1, tls: true },
       b: { host: "h", port: 1, tls: false },
-      c: {
-        host: "h",
-        port: 1,
-        tls: { ca: "~/ca.pem", cert: "/c.pem", key: "/k.pem" },
-      },
-      d: { host: "h", port: 1, tls: { pfx: "/c.p12" } },
+      c: { host: "h", port: 1 },
     });
     assert.deepStrictEqual(problems, []);
     assert.deepStrictEqual(
       servers.map((s) => s.tls),
-      [
-        {},
-        undefined,
-        { ca: "~/ca.pem", cert: "/c.pem", key: "/k.pem" },
-        { pfx: "/c.p12" },
-      ],
+      [true, undefined, undefined],
     );
   });
 
@@ -93,14 +83,7 @@ suite("servers", () => {
       h: { host: "h", port: 1, timeout: -1 },
       h2: { host: "h", port: 1, protect: "no" },
       t1: { host: "h", port: 1, tls: "yes" },
-      t2: { host: "h", port: 1, tls: { ca: "ca.pem" } },
-      t3: { host: "h", port: 1, tls: { cert: "/c.pem" } },
-      t4: {
-        host: "h",
-        port: 1,
-        tls: { pfx: "/c.p12", cert: "/c.pem", key: "/k.pem" },
-      },
-      t5: { host: "h", port: 1, tls: { crt: "/c.pem" } },
+      t2: { host: "h", port: 1, tls: { ca: "/ca.pem" } },
       i: { host: "h", port: 1, usr: "admin" },
       j: "h:1",
       "": { host: "h", port: 1 },
@@ -117,11 +100,8 @@ suite("servers", () => {
       "g: the user can't contain : or a 0 byte",
       "h: the timeout isn't a whole number of milliseconds",
       "h2: protect is true or false",
-      "t1: tls is true, false or its files",
-      "t2: tls's files are absolute paths or start with ~/",
-      "t3: tls's cert and key go together",
-      "t4: tls has a cert and key or a pfx, not both",
-      "t5: unknown tls field crt",
+      "t1: tls is true or false",
+      "t2: tls is true or false",
       "i: unknown field usr",
       "j: not an object",
       '"": a server needs a name',

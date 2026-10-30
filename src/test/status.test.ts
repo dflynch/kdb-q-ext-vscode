@@ -76,7 +76,7 @@ suite("status", () => {
         port: 5010,
         user: "admin",
         timeout: 500,
-        tls: { ca: "~/ca.pem" },
+        tls: true,
       }),
       [
         "Host: kdb1:5010",
@@ -95,11 +95,10 @@ suite("status", () => {
         auth: "prompt",
         protect: false,
         timeout: 0,
-        tls: { pfx: "/c.p12" },
       }).slice(1),
       [
         "Authentication: Ask each time",
-        "TLS: On, with a client certificate",
+        "TLS: Off",
         "Protected evaluation: Off",
         "Connection timeout: None",
       ],

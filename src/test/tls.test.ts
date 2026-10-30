@@ -10,6 +10,7 @@ import { Connection } from "../connection";
 import {
   authorities,
   filePath,
+  files,
   home,
   passphraseKey,
   read as readTls,
@@ -170,7 +171,7 @@ suite("tls", () => {
     assert.strictEqual((await query(await fake("elsewhere"), { ca })).type, -7);
   });
 
-  test("a client certificate, as a certificate and key or PKCS#12", async () => {
+  test("a client certificate, as a certificate and key", async () => {
     const port = await fake("server", true);
     const cert = file("client.pem");
     await assert.rejects(query(port, { ca }), /^Error: hop\. SSL reports: /);
@@ -181,11 +182,6 @@ suite("tls", () => {
     const key = file("client.encrypted.key");
     assert.strictEqual(
       (await query(port, { ca, cert, key }, { passphrase: "secret" })).type,
-      -7,
-    );
-    const pfx = file("client.p12");
-    assert.strictEqual(
-      (await query(port, { ca, pfx }, { passphrase: "secret" })).type,
       -7,
     );
   });
@@ -199,10 +195,6 @@ suite("tls", () => {
         message: "invalid client certificate",
       });
     }
-    await assert.rejects(
-      query(port, { ca, pfx: file("client.p12") }, { passphrase: "nope" }),
-      { message: "invalid client certificate" },
-    );
   });
 
   test("a file that can't be read, or isn't a small file, says so", async () => {
@@ -256,13 +248,37 @@ suite("tls", () => {
     for (const bad of ["a.pem", "./a.pem", "~a.pem", "\\a.pem", "C:a.pem"]) {
       assert.ok(!filePath.test(bad), bad);
     }
-    const schema = JSON.parse(
+    const settings = JSON.parse(
       readFileSync(path.join(__dirname, "../../package.json"), "utf8"),
-    ).contributes.configuration.properties["kdb-q-ext-vscode.servers"]
-      .additionalProperties.properties.tls.oneOf[1].properties;
-    for (const field of ["ca", "cert", "key", "pfx"]) {
-      assert.strictEqual(schema[field].pattern, filePath.source, field);
+    ).contributes.configuration.properties;
+    for (const setting of ["tlsCaFile", "tlsCertFile", "tlsKeyFile"]) {
+      assert.strictEqual(
+        settings[`kdb-q-ext-vscode.${setting}`].pattern,
+        `^$|${filePath.source}`,
+        setting,
+      );
     }
+  });
+
+  test("the TLS settings: each a path, unset if empty, cert with key", () => {
+    assert.deepStrictEqual(files("/ca.pem", "", undefined), {
+      files: { ca: "/ca.pem" },
+    });
+    assert.deepStrictEqual(files(undefined, "/c.pem", "~/k.pem"), {
+      files: { cert: "/c.pem", key: "~/k.pem" },
+    });
+    assert.deepStrictEqual(files("ca.pem", "", ""), {
+      files: {},
+      problem: "TLS file paths are absolute or start with ~/",
+    });
+    assert.deepStrictEqual(
+      files("", "/c.pem", "").problem,
+      "TLS certificate and key files go together",
+    );
+    assert.deepStrictEqual(
+      files("", "", "/k.pem").problem,
+      "TLS certificate and key files go together",
+    );
   });
 
   test("~ is the home directory", () => {
@@ -287,12 +303,11 @@ suite("tls", () => {
     assert.strictEqual(home(os.homedir()), os.homedir());
   });
 
-  test("a passphrase is kept under its certificate's file", () => {
+  test("a passphrase is kept under its key's file", () => {
     assert.strictEqual(
       passphraseKey({ cert: "/c.pem", key: "~/k.pem" }),
       `passphrase:${path.join(os.homedir(), "k.pem")}`,
     );
-    assert.strictEqual(passphraseKey({ pfx: "/c.p12" }), "passphrase:/c.p12");
     assert.strictEqual(passphraseKey({ ca: "/ca.pem" }), undefined);
   });
 });

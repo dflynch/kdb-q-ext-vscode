@@ -292,38 +292,8 @@
                 "markdownDescription": "Run each query under `.Q.trp`, so that an error comes back with its backtrace and its full text. The query is sent as written, as a list with the function that traps it, for q's default `.z.pg` to evaluate. Turn this off for a server whose `.z.pg` is customised or only takes strings, such as a gateway."
               },
               "tls": {
-                "markdownDescription": "Connect with TLS, as `tcps://` in q: `true`, or the files it needs besides the system's. The server's certificate is checked against the system's CAs and Node's, and any `ca` given. A client certificate's passphrase is kept by **kdb+/q: Set Certificate Passphrase**. Paths are absolute or start with `~/`.",
-                "oneOf": [
-                  {
-                    "type": "boolean"
-                  },
-                  {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                      "ca": {
-                        "type": "string",
-                        "pattern": "^(\\/|\\\\\\\\|[A-Za-z]:[\\\\/]|~[\\\\/])",
-                        "description": "A CA certificate to trust as well as the system's, in PEM, such as a firm's own."
-                      },
-                      "cert": {
-                        "type": "string",
-                        "pattern": "^(\\/|\\\\\\\\|[A-Za-z]:[\\\\/]|~[\\\\/])",
-                        "description": "A client certificate in PEM, for a server that requires one. Goes with key."
-                      },
-                      "key": {
-                        "type": "string",
-                        "pattern": "^(\\/|\\\\\\\\|[A-Za-z]:[\\\\/]|~[\\\\/])",
-                        "description": "The client certificate's private key in PEM, encrypted or not."
-                      },
-                      "pfx": {
-                        "type": "string",
-                        "pattern": "^(\\/|\\\\\\\\|[A-Za-z]:[\\\\/]|~[\\\\/])",
-                        "description": "A client certificate and its key in one PKCS#12 file, instead of cert and key."
-                      }
-                    }
-                  }
-                ]
+                "type": "boolean",
+                "markdownDescription": "Connect with TLS, as `tcps://` in q. The server's certificate is checked against the system's CAs and Node's, and `#kdb-q-ext-vscode.tlsCaFile#` if set; `#kdb-q-ext-vscode.tlsCertFile#` and `#kdb-q-ext-vscode.tlsKeyFile#` give a client certificate, for a server that requires one."
               },
               "auth": {
                 "markdownDescription": "Where the password comes from, when it isn't the one kept by **kdb+/q: Set Server Password**: `\"prompt\"` asks for it at every connect and doesn't keep it, where a password can't be stored or changes too often to keep; `\"extension\"` asks the extension in `#kdb-q-ext-vscode.authExtension#` at every connect, for a firm's own sign-on. An object asks it too, and gives it the object's fields for this server.",
@@ -351,6 +321,27 @@
           "patternErrorMessage": "An extension ID: publisher.name",
           "default": "",
           "markdownDescription": "The extension that gives the credentials for a firm's own sign-on, as `publisher.name`, for the servers whose `auth` is `\"extension\"` or that extension's fields. It exports `credentials(request)`."
+        },
+        "kdb-q-ext-vscode.tlsCaFile": {
+          "type": "string",
+          "default": "",
+          "pattern": "^$|^(\\/|\\\\\\\\|[A-Za-z]:[\\\\/]|~[\\\\/])",
+          "patternErrorMessage": "An absolute path, or one from ~/",
+          "markdownDescription": "A CA certificate in PEM to trust for TLS, as well as the system's and Node's, as q's `SSL_CA_CERT_FILE`. For every server with `tls`."
+        },
+        "kdb-q-ext-vscode.tlsCertFile": {
+          "type": "string",
+          "default": "",
+          "pattern": "^$|^(\\/|\\\\\\\\|[A-Za-z]:[\\\\/]|~[\\\\/])",
+          "patternErrorMessage": "An absolute path, or one from ~/",
+          "markdownDescription": "A client certificate in PEM, for servers that require one, as q's `SSL_CERT_FILE`, with `#kdb-q-ext-vscode.tlsKeyFile#`. For every server with `tls`."
+        },
+        "kdb-q-ext-vscode.tlsKeyFile": {
+          "type": "string",
+          "default": "",
+          "pattern": "^$|^(\\/|\\\\\\\\|[A-Za-z]:[\\\\/]|~[\\\\/])",
+          "patternErrorMessage": "An absolute path, or one from ~/",
+          "markdownDescription": "The client certificate's key in PEM, as q's `SSL_KEY_FILE`. An encrypted key's passphrase is kept by **kdb+/q: Set Certificate Passphrase**."
         },
         "kdb-q-ext-vscode.connectTimeout": {
           "type": "integer",

@@ -1,5 +1,5 @@
 import type { Server } from "./connection";
-import { filePath, type Secure } from "./tls";
+import type { Secure } from "./tls";
 
 // A server as the settings define it: everything but the password, which is
 // kept in VS Code's secure storage, never in a settings file
@@ -15,9 +15,8 @@ export type Definition = {
   // its backtrace: on unless false, as a gateway whose .z.pg is customised
   // may not evaluate it
   protect?: boolean;
-  // Whether to connect with TLS, and the files for it, each an absolute path
-  // or one from ~
-  tls?: Tls;
+  // Whether to connect with TLS, with the files in the TLS settings
+  tls?: boolean;
   // Where the password comes from: secure storage when there's no auth
   auth?: Auth;
 };
@@ -30,11 +29,6 @@ export type Definition = {
 // a server's login by taking a name agreed in advance. A server's fields for
 // it go to it as they are: "extension" is the same as no fields.
 export type Auth = "prompt" | { fields: Record<string, unknown> };
-
-// The files TLS can need besides the system's: a CA to trust as well as the
-// system's, and a client certificate, as a certificate and its key, or both
-// in one PKCS#12 file, for a server that verifies its clients
-export type Tls = { ca?: string; cert?: string; key?: string; pfx?: string };
 
 // What a login is made of
 export type Credentials = { user?: string; password?: string };
@@ -58,7 +52,6 @@ const fields = new Set([
   "tls",
   "auth",
 ]);
-const tlsFields = new Set(["ca", "cert", "key", "pfx"]);
 
 // A Marketplace extension ID, publisher.name
 export const extensionId = /^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9-]*$/i;
@@ -96,9 +89,8 @@ export function definitions(setting: unknown): {
     }
     const { host, port, user, timeout, protect, tls, auth } = value as Omit<
       Definition,
-      "name" | "tls" | "auth"
+      "name" | "auth"
     > & {
-      tls?: boolean | Tls;
       auth?: "prompt" | "extension" | Record<string, unknown>;
     };
     servers.push({
@@ -108,9 +100,7 @@ export function definitions(setting: unknown): {
       ...(user === undefined ? {} : { user }),
       ...(timeout === undefined ? {} : { timeout }),
       ...(protect === undefined ? {} : { protect }),
-      ...(tls === undefined || tls === false
-        ? {}
-        : { tls: tls === true ? {} : tls }),
+      ...(tls ? { tls } : {}),
       ...(auth === undefined ? {} : { auth: readAuth(auth) }),
     });
   }
@@ -148,39 +138,10 @@ function check(name: string, value: unknown): string | undefined {
   if (protect !== undefined && typeof protect !== "boolean") {
     return "protect is true or false";
   }
-  const problem = tls === undefined ? undefined : tlsProblem(tls);
-  if (problem) {
-    return problem;
+  if (tls !== undefined && typeof tls !== "boolean") {
+    return "tls is true or false";
   }
   return auth === undefined ? undefined : authProblem(auth);
-}
-
-function tlsProblem(tls: unknown): string | undefined {
-  if (typeof tls === "boolean") {
-    return undefined;
-  }
-  if (typeof tls !== "object" || tls === null || Array.isArray(tls)) {
-    return "tls is true, false or its files";
-  }
-  const unknown = Object.keys(tls).filter((key) => !tlsFields.has(key));
-  if (unknown.length > 0) {
-    return `unknown tls ${unknown.length === 1 ? "field" : "fields"} ${unknown.join(", ")}`;
-  }
-  const files = tls as Record<string, unknown>;
-  if (
-    Object.values(files).some(
-      (file) => typeof file !== "string" || !filePath.test(file),
-    )
-  ) {
-    return "tls's files are absolute paths or start with ~/";
-  }
-  if ((files.cert === undefined) !== (files.key === undefined)) {
-    return "tls's cert and key go together";
-  }
-  if (files.pfx !== undefined && files.cert !== undefined) {
-    return "tls has a cert and key or a pfx, not both";
-  }
-  return undefined;
 }
 
 function authProblem(auth: unknown): string | undefined {
@@ -273,7 +234,7 @@ export function passwordProblem(password: string): string | undefined {
     : undefined;
 }
 
-// What a connection needs, with the TLS options read from the server's tls
+// What a connection needs, with the TLS options read from the TLS
 // files. A user in the credentials, as an extension can give, replaces the
 // server's.
 export function server(

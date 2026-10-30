@@ -2,7 +2,6 @@ import * as vscode from "vscode";
 import type { Connection } from "./connection";
 import type { Connections, State } from "./connections";
 import { authExtension, type Definition } from "./servers";
-import { passphraseKey } from "./tls";
 
 // How long a query took, in whole milliseconds, as \t gives
 export type Timing = {
@@ -84,12 +83,6 @@ export function details(server: Definition, setting?: unknown): string[] {
         : extension.problem
           ? `Extension ${JSON.stringify(setting)} (invalid)`
           : `Extension ${extension.id ?? "not set"}`;
-  const tls =
-    server.tls === undefined
-      ? "Off"
-      : passphraseKey(server.tls) === undefined
-        ? "On"
-        : "On, with a client certificate";
   const timeout =
     server.timeout === undefined
       ? "Default"
@@ -100,7 +93,7 @@ export function details(server: Definition, setting?: unknown): string[] {
     `Host: ${server.host}:${server.port}`,
     ...(server.user ? [`User: ${server.user}`] : []),
     `Authentication: ${auth}`,
-    `TLS: ${tls}`,
+    `TLS: ${server.tls ? "On" : "Off"}`,
     `Protected evaluation: ${server.protect === false ? "Off" : "On"}`,
     `Connection timeout: ${timeout}`,
   ];

@@ -159,66 +159,20 @@ suite("adding a server", () => {
     });
   });
 
-  test("the options: TLS with its files, protect off and no timeout", async () => {
-    const ask = scripted([
-      "prod",
-      "kdb1",
-      "5010",
-      "",
-      "none",
-      ["tls"],
-      ["ca", "client"],
-      "~/certs/ca.pem",
-      "pem",
-      "~/certs/client.pem",
-      "~/certs/client.key",
-      "secret",
-    ]);
+  test("the options: TLS, protect off and no timeout", async () => {
+    const ask = scripted(["prod", "kdb1", "5010", "", "none", ["tls"]]);
     assert.deepStrictEqual(await add(ask, context), {
       name: "prod",
       value: {
         host: "kdb1",
         port: 5010,
-        tls: {
-          ca: "~/certs/ca.pem",
-          cert: "~/certs/client.pem",
-          key: "~/certs/client.key",
-        },
+        tls: true,
         protect: false,
         timeout: 0,
       },
-      passphrase: "secret",
       target: "user",
     });
-    assert.strictEqual(ask.asked.at(-1), "12/12 Passphrase (optional)");
-  });
-
-  test("TLS needing no files is true, and a PKCS#12 file is a pfx", async () => {
-    const plain = scripted([
-      "a",
-      "kdb1",
-      "1",
-      "",
-      "none",
-      ["tls", "protect", "timeout"],
-      [],
-    ]);
-    assert.deepStrictEqual((await add(plain, context))?.value.tls, true);
-    const pfx = scripted([
-      "b",
-      "kdb1",
-      "2",
-      "",
-      "none",
-      ["tls", "protect", "timeout"],
-      ["client"],
-      "pfx",
-      "/etc/client.p12",
-      "",
-    ]);
-    assert.deepStrictEqual((await add(pfx, context))?.value.tls, {
-      pfx: "/etc/client.p12",
-    });
+    assert.strictEqual(ask.asked.at(-1), "6/6 Options [protect,timeout]");
   });
 
   test("with a workspace open, asks where to keep it", async () => {
@@ -269,7 +223,7 @@ suite("adding a server", () => {
     );
   });
 
-  test("the checks: name, host, port, user, password and file", async () => {
+  test("the checks: name, host, port, user and password", async () => {
     const problems: (string | undefined)[] = [];
     const tries: Record<string, string[]> = {
       Name: ["old", " ", "prod"],
@@ -277,9 +231,8 @@ suite("adding a server", () => {
       "Port on kdb1": ["0", "65536", "5.5", "5000"],
       "User (optional)": ["a:b", ""],
       Password: ["", "secret"],
-      "CA certificate (PEM)": ["ca.pem", "~/ca.pem"],
     };
-    const picks = ["store", ["tls", "protect", "timeout"], ["ca"]];
+    const picks = ["store", ["tls", "protect", "timeout"]];
     const ask: Asker = {
       input: async (question) => {
         const texts = tries[question.prompt] ?? [];
@@ -305,8 +258,6 @@ suite("adding a server", () => {
       "Can't contain : or a 0 byte",
       undefined,
       "Required",
-      undefined,
-      "An absolute path, or one from ~/",
       undefined,
     ]);
   });
@@ -386,27 +337,6 @@ suite("addServer", () => {
       "password:admin@kdb1.example.com:5010": "secret",
     });
     assert.deepStrictEqual(told, ["kdb+/q: Added prod."]);
-  });
-
-  test("stores a client certificate's passphrase under its key", async () => {
-    const kept: Record<string, string> = {};
-    await addServer(
-      secrets(kept),
-      connections,
-      scripted([
-        "prod",
-        "kdb1",
-        "5010",
-        "",
-        "prompt",
-        ["tls", "protect", "timeout"],
-        ["client"],
-        "pfx",
-        "/etc/client.p12",
-        "secret",
-      ]),
-    );
-    assert.deepStrictEqual(kept, { "passphrase:/etc/client.p12": "secret" });
   });
 
   test("says an extension's fields go in settings.json", async () => {
