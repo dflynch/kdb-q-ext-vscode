@@ -163,9 +163,7 @@ const rows = {
   options: setting("Options", [], tls.wrap, tlsNote, protect.wrap, protectNote),
   timeout: setting(
     "Timeout",
-    [
-      "How long to wait for a connection, in milliseconds (0 waits as long as it takes)",
-    ],
+    ["Milliseconds to wait to connect, 0 for no limit"],
     timeout,
   ),
   target: setting("Save to", [], target, targetMeaning),
