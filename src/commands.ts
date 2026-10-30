@@ -344,7 +344,7 @@ export async function removeServer(
   }
   forms.close(server.name);
   connections.disconnect(server.name);
-  if (server.auth === undefined) {
+  if (server.auth === "store") {
     await forget(secrets, [servers.secretKey(server)]);
   }
 }
@@ -354,8 +354,8 @@ export async function removeServer(
 export async function setPassword(secrets: vscode.SecretStorage) {
   const title = "kdb+/q: Set Server Password";
   const server = await pickServer(title, {
-    test: (server) => server.auth === undefined,
-    none: "Every server gets its password from its auth setting.",
+    test: (server) => server.auth === "store",
+    none: 'No server has "auth": "store".',
   });
   if (!server) {
     return;

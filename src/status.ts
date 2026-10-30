@@ -77,12 +77,14 @@ export function details(server: Definition, setting?: unknown): string[] {
   const extension = authExtension(setting);
   const auth =
     server.auth === undefined
-      ? "Stored password"
-      : server.auth === "prompt"
-        ? "Ask each time"
-        : extension.problem
-          ? `Extension ${JSON.stringify(setting)} (invalid)`
-          : `Extension ${extension.id ?? "not set"}`;
+      ? "None"
+      : server.auth === "store"
+        ? "Stored password"
+        : server.auth === "prompt"
+          ? "Ask each time"
+          : extension.problem
+            ? `Extension ${JSON.stringify(setting)} (invalid)`
+            : `Extension ${extension.id ?? "not set"}`;
   const timeout = server.timeout ? `${server.timeout} ms` : "None";
   return [
     `Host: ${server.host}:${server.port}`,

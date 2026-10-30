@@ -87,8 +87,9 @@ settings file it's in:
   }
   ```
 
-- **Passwords** aren't kept in settings. The form, or **kdb+/q: Set Server
-  Password**, keeps one in VS Code's secure storage, for the user, host and
+- **Passwords** aren't kept in settings. A server with no `auth` sends
+  none. `"auth": "store"` sends the one the form, or **kdb+/q: Set Server
+  Password**, keeps in VS Code's secure storage for the user, host and
   port, and **Clear Server Password** removes it. One no server uses any
   more, once a server's edited or removed, is removed too. `"auth":
   "prompt"` asks for it at every connect instead, and never keeps it

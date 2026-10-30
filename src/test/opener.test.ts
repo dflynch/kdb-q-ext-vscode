@@ -58,6 +58,7 @@ suite("opener", () => {
       host: "127.0.0.1",
       port: fake.port,
       user: "admin",
+      auth: "store",
     };
     const open = opener(
       secrets({ [`password:admin@127.0.0.1:${fake.port}`]: "pw" }),
@@ -75,6 +76,7 @@ suite("opener", () => {
       host: "127.0.0.1",
       port: fake.port,
       user: "admin",
+      auth: "store",
     };
     const open = opener(
       secrets({ [`password:admin@127.0.0.1:${fake.port}`]: "pw" }),

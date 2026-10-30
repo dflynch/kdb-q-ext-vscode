@@ -40,8 +40,14 @@ export async function credentials(
 ): Promise<Credentials | undefined> {
   const auth = server.auth;
   if (auth === undefined) {
+    return {};
+  }
+  if (auth === "store") {
     const password = await sources.stored(secretKey(server));
-    return password === undefined ? {} : { password };
+    if (password === undefined) {
+      throw new Error("password not stored");
+    }
+    return { password };
   }
   if (auth === "prompt") {
     const password = await sources.ask(server);

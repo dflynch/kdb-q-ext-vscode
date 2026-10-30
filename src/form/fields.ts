@@ -71,19 +71,18 @@ export function blank(): Form {
   };
 }
 
-// A server's setting as the form has it, its password stored or not
+// A server's setting as the form has it
 export function fromSetting(
   name: string,
   value: {
     host: string;
     port: number;
     user?: string;
-    auth?: "prompt" | "extension";
+    auth?: "store" | "prompt" | "extension";
     tls?: boolean;
     protect?: boolean;
     timeout?: number;
   },
-  stored: boolean,
 ): Form {
   return {
     ...blank(),
@@ -91,7 +90,7 @@ export function fromSetting(
     host: value.host,
     port: String(value.port),
     user: value.user ?? "",
-    auth: value.auth ?? (stored ? "store" : "none"),
+    auth: value.auth ?? "none",
     tls: value.tls ?? false,
     protect: value.protect ?? true,
     timeout: value.timeout === undefined ? "" : String(value.timeout),
@@ -173,9 +172,7 @@ export function toSetting(form: Form): Record<string, unknown> {
     host: form.host.trim(),
     port: port(form.port),
     ...(user === "" ? {} : { user }),
-    ...(form.auth === "prompt" || form.auth === "extension"
-      ? { auth: form.auth }
-      : {}),
+    ...(form.auth === "none" ? {} : { auth: form.auth }),
     ...(form.tls ? { tls: true } : {}),
     ...(form.protect ? {} : { protect: false }),
     ...(ms === undefined ? {} : { timeout: ms }),

@@ -66,15 +66,13 @@ suite("the server form's fields", () => {
       host: "kdb1",
       port: 5010,
       user: "admin",
+      auth: "store",
     });
   });
 
   test("a server added starts with a 2000 ms timeout, and an empty one waits as long as it takes", () => {
     assert.strictEqual(blank().timeout, "2000");
-    assert.strictEqual(
-      fromSetting("s", { host: "h", port: 1 }, false).timeout,
-      "",
-    );
+    assert.strictEqual(fromSetting("s", { host: "h", port: 1 }).timeout, "");
     assert.strictEqual(toSetting({ ...prod, timeout: " " }).timeout, undefined);
     assert.deepStrictEqual(
       problems({ ...prod, timeout: "" }, context, false),
@@ -90,21 +88,22 @@ suite("the server form's fields", () => {
       { host: "h", port: 1, timeout: 0 },
     ]) {
       assert.deepStrictEqual(
-        toSetting(fromSetting("s", value, false)),
+        toSetting(fromSetting("s", value)),
         value,
         JSON.stringify(value),
       );
     }
   });
 
-  test("a server with no auth has a stored password, or none", () => {
+  test("a server with no auth has none, and a stored password is written as one", () => {
     const value = { host: "h", port: 1 };
-    assert.strictEqual(fromSetting("s", value, true).auth, "store");
-    assert.strictEqual(fromSetting("s", value, false).auth, "none");
+    assert.strictEqual(fromSetting("s", value).auth, "none");
     assert.strictEqual(
-      fromSetting("s", { ...value, auth: "prompt" }, true).auth,
-      "prompt",
+      fromSetting("s", { ...value, auth: "store" }).auth,
+      "store",
     );
+    assert.strictEqual(toSetting({ ...prod, auth: "store" }).auth, "store");
+    assert.strictEqual(toSetting({ ...prod, auth: "none" }).auth, undefined);
   });
 
   test("what the form writes, the settings read", () => {

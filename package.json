@@ -314,14 +314,18 @@
                   },
                   "auth": {
                     "enum": [
+                      "none",
+                      "store",
                       "prompt",
                       "extension"
                     ],
                     "enumDescriptions": [
+                      "No password, as with no auth.",
+                      "The password kept in VS Code's secure storage for the user, host and port.",
                       "Ask for the password at every connect, and don't keep it.",
                       "Ask the extension in kdb-q-ext-vscode.authExtension for the credentials at every connect."
                     ],
-                    "markdownDescription": "Where the password comes from, when it isn't the one kept by **kdb+/q: Set Server Password**: `\"prompt\"` asks for it at every connect and doesn't keep it, where a password can't be stored or changes too often to keep; `\"extension\"` asks the extension in `#kdb-q-ext-vscode.authExtension#` at every connect, for a firm's own sign-on."
+                    "markdownDescription": "Where the password comes from; none without one. `\"store\"` is the one kept in VS Code's secure storage for the user, host and port, by the server form or **kdb+/q: Set Server Password**; `\"prompt\"` asks for it at every connect and doesn't keep it, where a password can't be stored or changes too often to keep; `\"extension\"` asks the extension in `#kdb-q-ext-vscode.authExtension#` at every connect, for a firm's own sign-on."
                   }
                 }
               },

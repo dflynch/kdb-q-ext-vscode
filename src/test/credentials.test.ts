@@ -43,20 +43,29 @@ async function rejects(
 }
 
 suite("credentials", () => {
-  test("with no auth, the password kept for the user, host and port", async () => {
+  test("a stored password is the one kept for the user, host and port", async () => {
     const keys: string[] = [];
     const stored = async (key: string) => {
       keys.push(key);
       return "pw";
     };
-    assert.deepStrictEqual(await credentials(prod, sources({ stored })), {
+    const kept: Definition = { ...prod, auth: "store" };
+    assert.deepStrictEqual(await credentials(kept, sources({ stored })), {
       password: "pw",
     });
     assert.deepStrictEqual(keys, ["password:admin@kdb1:5010"]);
   });
 
-  test("with no password kept, none", async () => {
-    const stored = async () => undefined;
+  test("a stored password that isn't stored is a failure", async () => {
+    const kept: Definition = { ...prod, auth: "store" };
+    await assert.rejects(
+      credentials(kept, sources({ stored: async () => undefined })),
+      { message: "password not stored" },
+    );
+  });
+
+  test("with no auth, no password, even one stored for the login", async () => {
+    const stored = async () => "pw";
     assert.deepStrictEqual(await credentials(prod, sources({ stored })), {});
   });
 

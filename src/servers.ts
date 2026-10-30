@@ -21,17 +21,19 @@ export type Definition = {
   protect?: boolean;
   // Whether to connect with TLS, with the files in the TLS settings
   tls?: boolean;
-  // Where the password comes from: secure storage when there's no auth
+  // Where the password comes from: none unless it's given
   auth?: Auth;
 };
 
-// A password asked for at every connect and never kept, where a firm doesn't
-// allow one to be stored or it changes too often to keep; or one the auth
+// A password kept in VS Code's secure storage, for the user, host and port;
+// one asked for at every connect and never kept, where a firm doesn't allow
+// one to be stored or it changes too often to keep; or one the auth
 // extension gives, for a firm's own sign-on: a Kerberos ticket or an access
 // token, say, which the server checks in .z.pw. The authExtension setting
 // names the extension, once for every server, so no other extension is given
-// a server's login by taking a name agreed in advance.
-export type Auth = "prompt" | "extension";
+// a server's login by taking a name agreed in advance. "none", as the
+// setting can say, is read as no auth.
+export type Auth = "store" | "prompt" | "extension";
 
 // What a login is made of
 export type Credentials = { user?: string; password?: string };
@@ -203,7 +205,7 @@ function definition(name: string, value: Record<string, unknown>): Definition {
     ...(timeout === undefined ? {} : { timeout }),
     ...(protect === undefined ? {} : { protect }),
     ...(tls ? { tls } : {}),
-    ...(auth === undefined ? {} : { auth }),
+    ...(auth === undefined || (auth as string) === "none" ? {} : { auth }),
   };
 }
 
@@ -245,8 +247,11 @@ function check(value: unknown): string | undefined {
   if (tls !== undefined && typeof tls !== "boolean") {
     return "tls is true or false";
   }
-  if (auth !== undefined && auth !== "prompt" && auth !== "extension") {
-    return 'auth is "prompt" or "extension"';
+  if (
+    auth !== undefined &&
+    !["none", "store", "prompt", "extension"].includes(auth as string)
+  ) {
+    return 'auth is "none", "store", "prompt" or "extension"';
   }
   return undefined;
 }

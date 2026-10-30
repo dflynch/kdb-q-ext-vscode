@@ -103,7 +103,7 @@ export async function forget(
     const used = defined.some(
       (server) =>
         server.name !== except &&
-        server.auth === undefined &&
+        server.auth === "store" &&
         servers.secretKey(server) === key,
     );
     if (!used) {
@@ -316,11 +316,7 @@ export class ServerForms implements vscode.Disposable {
       return { type: "gone" };
     }
     const stored = await this.stored(servers.secretKey(server));
-    const form = fromSetting(
-      server.name.split("/").at(-1) ?? "",
-      server,
-      stored,
-    );
+    const form = fromSetting(server.name.split("/").at(-1) ?? "", server);
     return { type: "load", form, context, stored };
   }
 
@@ -442,11 +438,8 @@ export class ServerForms implements vscode.Disposable {
       }
     }
     const unused = new Set<string>();
-    if (before !== undefined && before.auth === undefined) {
+    if (before?.auth === "store") {
       unused.add(servers.secretKey(before));
-    }
-    if (form.auth === "none") {
-      unused.add(key);
     }
     if (form.auth === "store") {
       unused.delete(key);

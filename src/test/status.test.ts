@@ -76,6 +76,7 @@ suite("status", () => {
         host: "kdb1",
         port: 5010,
         user: "admin",
+        auth: "store",
         timeout: 500,
         tls: true,
       }),

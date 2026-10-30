@@ -115,22 +115,27 @@ suite("servers", () => {
     ]);
   });
 
-  test("auth is a prompt or the auth extension", () => {
+  test("auth is none, a stored password, a prompt or the auth extension", () => {
     const { servers, problems } = definitions({
+      none: { host: "h", port: 1, auth: "none" },
+      kept: { host: "h", port: 1, auth: "store" },
       otp: { host: "h", port: 1, auth: "prompt" },
       sso: { host: "h", port: 1, auth: "extension" },
       a: { host: "h", port: 1, auth: "stored" },
       b: { host: "h", port: 1, auth: ["prompt"] },
       c: { host: "h", port: 1, auth: null },
     });
+    // "none" is read as no auth
     assert.deepStrictEqual(servers, [
+      { name: "none", host: "h", port: 1 },
+      { name: "kept", host: "h", port: 1, auth: "store" },
       { name: "otp", host: "h", port: 1, auth: "prompt" },
       { name: "sso", host: "h", port: 1, auth: "extension" },
     ]);
     assert.deepStrictEqual(problems, [
-      'a: auth is "prompt" or "extension"',
-      'b: auth is "prompt" or "extension"',
-      'c: auth is "prompt" or "extension"',
+      'a: auth is "none", "store", "prompt" or "extension"',
+      'b: auth is "none", "store", "prompt" or "extension"',
+      'c: auth is "none", "store", "prompt" or "extension"',
     ]);
   });
 

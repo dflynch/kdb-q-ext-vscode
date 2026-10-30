@@ -189,7 +189,12 @@ suite("the server form", () => {
     assert.deepStrictEqual(user(), {
       old: { host: "kdb0", port: 1 },
       Prod: {
-        TP: { host: "kdb1.example.com", port: 5010, user: "admin" },
+        TP: {
+          host: "kdb1.example.com",
+          port: 5010,
+          user: "admin",
+          auth: "store",
+        },
       },
     });
     assert.deepStrictEqual(kept, {
@@ -199,7 +204,14 @@ suite("the server form", () => {
 
   test("a server edited is shown as written, with its password stored", async () => {
     await setUser({
-      Prod: { TP: { host: "kdb1.example.com", port: 5010, user: "admin" } },
+      Prod: {
+        TP: {
+          host: "kdb1.example.com",
+          port: 5010,
+          user: "admin",
+          auth: "store",
+        },
+      },
     });
     const { made, forms } = open({
       "password:admin@kdb1.example.com:5010": "secret",
@@ -305,7 +317,12 @@ suite("the server form", () => {
   });
 
   test("a password no server gets any more is forgotten, unless another does", async () => {
-    const login = { host: "kdb1.example.com", port: 5010, user: "admin" };
+    const login = {
+      host: "kdb1.example.com",
+      port: 5010,
+      user: "admin",
+      auth: "store",
+    };
     await setUser({ prod: login, copy: login });
     const kept: Record<string, string> = {
       "password:admin@kdb1.example.com:5010": "secret",
@@ -336,7 +353,7 @@ suite("the server form", () => {
   });
 
   test("None forgets the password stored for the login", async () => {
-    await setUser({ prod: { host: "kdb1", port: 1 } });
+    await setUser({ prod: { host: "kdb1", port: 1, auth: "store" } });
     const kept: Record<string, string> = { "password:@kdb1:1": "secret" };
     const { made, forms } = open(kept);
     forms.edit("prod");
@@ -347,6 +364,25 @@ suite("the server form", () => {
     });
     await made[0].closing;
     assert.deepStrictEqual(kept, {});
+  });
+
+  test("None holds for a server sharing its login with one that stores it", async () => {
+    const login = { host: "kdb1", port: 1, auth: "store" };
+    await setUser({ a: login, b: login });
+    const kept: Record<string, string> = { "password:@kdb1:1": "secret" };
+    const { made, forms } = open(kept);
+    forms.edit("a");
+    const { form } = await made[0].loaded();
+    made[0].say({ type: "save", form: { ...form, auth: "none" } });
+    await made[0].closing;
+    // b still gets it, and a has none
+    assert.deepStrictEqual(kept, { "password:@kdb1:1": "secret" });
+    assert.deepStrictEqual((user() as Record<string, unknown>).a, {
+      host: "kdb1",
+      port: 1,
+    });
+    forms.edit("a");
+    assert.strictEqual((await made[1].loaded()).form.auth, "none");
   });
 
   test("whether a password's stored is answered for the login typed", async () => {
@@ -448,6 +484,7 @@ suite("the server form", () => {
           host: "kdb1.example.com",
           port: 5010,
           user: "admin",
+          auth: "store",
         },
         "secret",
       ],
@@ -540,8 +577,8 @@ suite("editServer and removeServer", () => {
 
   test("Remove, once confirmed, removes the server and forgets its password", async () => {
     await setUser({
-      Prod: { TP: { host: "kdb1", port: 1 } },
-      other: { host: "kdb2", port: 1 },
+      Prod: { TP: { host: "kdb1", port: 1, auth: "store" } },
+      other: { host: "kdb2", port: 1, auth: "store" },
     });
     const kept: Record<string, string> = {
       "password:@kdb1:1": "secret",
@@ -572,7 +609,7 @@ suite("editServer and removeServer", () => {
       // The folder stays, empty
       assert.deepStrictEqual(user(), {
         Prod: {},
-        other: { host: "kdb2", port: 1 },
+        other: { host: "kdb2", port: 1, auth: "store" },
       });
       assert.deepStrictEqual(kept, { "password:@kdb2:1": "kept" });
       assert.strictEqual(made[0].closed, true);
