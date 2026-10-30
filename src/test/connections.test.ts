@@ -175,11 +175,15 @@ suite("connections", () => {
   test("disconnecting while connecting stops it, and its failure isn't thrown", async () => {
     const { all, opening, changes } = connections();
     const connected = all.connect(prod);
+    // Connecting again waits for the same outcome
+    const again = all.connect(prod);
     assert.strictEqual(opening[0].signal.aborted, false);
     all.disconnect("prod");
     assert.strictEqual(opening[0].signal.aborted, true);
     opening[0].reject(new Error("cancelled"));
     assert.strictEqual(await connected, undefined);
+    assert.strictEqual(await again, undefined);
+    assert.strictEqual(opening.length, 1);
     assert.deepStrictEqual(all.names, []);
     assert.strictEqual(all.active, undefined);
     assert.ok(changes.every((change) => !change.lost));

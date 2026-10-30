@@ -75,7 +75,8 @@ export class Connections<L extends Link> {
 
   // Make a server's connection active, opening it if it isn't open. One
   // that closed is opened again. A failure to open is kept as the reason,
-  // and thrown.
+  // and thrown. Connecting while it's connecting waits for the same
+  // outcome.
   async connect(server: Definition): Promise<L | undefined> {
     const existing = this.entries.get(server.name);
     if (existing?.state.kind === "open") {
@@ -86,16 +87,27 @@ export class Connections<L extends Link> {
       this.activate(server.name);
       return existing.opening;
     }
-    const before = this.current;
-    const abort = new AbortController();
-    const entry: Entry<L> = { server, state: { kind: "connecting" }, abort };
+    const entry: Entry<L> = { server, state: { kind: "connecting" } };
     this.entries.set(server.name, entry);
+    const before = this.current;
     this.current = server.name;
-    entry.opening = this.open(server, { signal: abort.signal });
+    entry.opening = this.opened(entry, before);
     this.emit({});
+    return entry.opening;
+  }
+
+  // The connection opened for an entry, or undefined if it's cancelled or
+  // disconnected while connecting, which isn't a failure
+  private async opened(
+    entry: Entry<L>,
+    before: string | undefined,
+  ): Promise<L | undefined> {
+    const { server } = entry;
+    const abort = new AbortController();
+    entry.abort = abort;
     let link: L | undefined;
     try {
-      link = await entry.opening;
+      link = await this.open(server, { signal: abort.signal });
     } catch (error) {
       if (this.entries.get(server.name) !== entry) {
         // Disconnected while connecting, which stopped it
