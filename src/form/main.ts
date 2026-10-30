@@ -121,8 +121,9 @@ const password = text("password", "password");
 const timeout = text("timeout");
 const tls = tick(
   "tls",
-  "TLS, with the files in the ",
-  link("TLS settings", "tls"),
+  "Use TLS (",
+  link("Edit certificates in settings.json", "tls"),
+  ")",
 );
 const protect = tick(
   "protect",
@@ -163,7 +164,6 @@ const rows = {
   timeout: setting("Connection timeout", [], timeout),
   target: setting("Save to", [], target, targetMeaning),
 };
-rows.port.row.classList.add("narrow");
 rows.timeout.row.classList.add("half");
 
 // Settings side by side

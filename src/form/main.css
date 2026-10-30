@@ -67,10 +67,6 @@ h1 {
   min-width: 220px;
 }
 
-.line > .setting.narrow {
-  flex: 0 0 130px;
-}
-
 .label {
   font-weight: 600;
   margin-bottom: 6px;

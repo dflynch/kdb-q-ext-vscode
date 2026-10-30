@@ -370,17 +370,27 @@ export class ServerForms implements vscode.Disposable {
     open.panel.dispose();
   }
 
-  // A setting the form refers to: the servers in settings.json, where they
-  // can be edited as written, or the auth extension's or the TLS settings
-  // in the Settings editor
+  // A setting the form refers to: the servers, or the TLS files, in
+  // settings.json, where they can be edited as written, or the auth
+  // extension's in the Settings editor
   private async openSetting(
     open: Open,
     setting: "servers" | "authExtension" | "tls",
   ) {
-    if (setting !== "servers") {
+    if (setting === "authExtension") {
       await vscode.commands.executeCommand(
         "workbench.action.openSettings",
-        `kdb-q-ext-vscode.${setting}`,
+        "kdb-q-ext-vscode.authExtension",
+      );
+      return;
+    }
+    // The TLS files are the same for every server, so they're the user's
+    if (setting === "tls") {
+      await vscode.commands.executeCommand(
+        "workbench.action.openSettingsJson",
+        {
+          revealSetting: { key: "kdb-q-ext-vscode.tlsCaFile", edit: true },
+        },
       );
       return;
     }
@@ -392,7 +402,7 @@ export class ServerForms implements vscode.Disposable {
       scope === "workspace"
         ? "workbench.action.openWorkspaceSettingsFile"
         : "workbench.action.openSettingsJson",
-      { query: "kdb-q-ext-vscode.servers" },
+      { revealSetting: { key: "kdb-q-ext-vscode.servers" } },
     );
   }
 }
