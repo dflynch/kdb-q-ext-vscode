@@ -50,12 +50,22 @@ read.
 
 ### Servers
 
-Add a server with **kdb+/q: Add Server**, which opens a form for its
-settings and saves them to your user or workspace settings, or write it in
-`settings.json`. **Edit Server** opens the same form for a server, where a
-password can be stored too, and **Remove Server** removes one, from every
-settings file it's in. They write the whole setting, as VS Code writes
-one, so a comment inside it isn't kept:
+The **Servers** view, under the q in the activity bar, lists your servers
+in their folders, each with its connection's state and the active one
+marked. Hover over a server to connect, make it active, disconnect or edit
+it, and right-click for the rest; drag a server or a folder into another
+folder to move it. A folder says what's connected in it. A
+server with a problem in the settings is listed with a warning and the
+problem, and Edit opens it in the form to fix.
+
+Add a server with **kdb+/q: Add Server**, or the + on the view or on a
+folder, which opens a form for its settings and saves them to your user or
+workspace settings, or write it in `settings.json`. **Edit Server** opens
+the same form for a server, where a password can be stored too, and
+**Remove Server** removes one, from every settings file it's in. **New
+Folder**, and Rename and Remove Folder on a folder's right-click menu, do
+the same for folders. They write the whole setting, as VS Code writes one,
+so a comment inside it isn't kept:
 
 ```json
 "kdb-q-ext-vscode.servers": {
@@ -288,7 +298,7 @@ token.
 
 The Run and Toggle Block Comment commands, and their keybindings, apply in
 q files. The Run commands are on the editor's right-click menu, and the
-server commands on the status bar's.
+server commands on the status bar's and in the Servers view.
 
 | Command                               | Keybinding       |
 | ------------------------------------- | ---------------- |
@@ -304,6 +314,7 @@ server commands on the status bar's.
 | kdb+/q: Add Server                    |                  |
 | kdb+/q: Edit Server                   |                  |
 | kdb+/q: Remove Server                 |                  |
+| kdb+/q: New Folder                    |                  |
 | kdb+/q: Open Settings                 |                  |
 | kdb+/q: Set Server Password           |                  |
 | kdb+/q: Clear Server Password         |                  |

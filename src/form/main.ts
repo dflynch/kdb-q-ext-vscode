@@ -353,6 +353,16 @@ function show(message: Extract<ToForm, { type: "load" }>) {
   meanings.extension = authExtension
     ? [`From ${authExtension}, the `, link("auth extension", "authExtension")]
     : ["From the ", link("auth extension", "authExtension"), " setting"];
+  // A server with a problem as it's written shows what's wrong with each
+  // field at once
+  if (message.context.problem) {
+    for (const field of Object.keys(rows)) {
+      left.add(field as Field);
+    }
+    warn(
+      `In the settings, it ${message.context.problem}. Saving writes it as the form has it.`,
+    );
+  }
   update();
   if (first && editing === undefined) {
     name.focus();

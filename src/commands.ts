@@ -250,14 +250,14 @@ export async function toggleBlockComment(editor: vscode.TextEditor) {
 }
 
 // A scope as VS Code names it
-function scopeName(scope: Scope): string {
+export function scopeName(scope: Scope): string {
   return scope === "user" ? "User" : "Workspace";
 }
 
 // The servers in the settings; one with a problem is shown, with it, in the
 // Servers view, and offered nowhere else
 export function definitions(): servers.Definition[] {
-  return servers.read(scopes()).servers;
+  return servers.read(scopes());
 }
 
 // A server picked from those defined, under the command's title: any, or
@@ -317,31 +317,39 @@ async function pickServer(
   return picked?.server;
 }
 
-// Edit a server picked, in its form
-export async function editServer(forms: ServerForms) {
-  const server = await pickServer("kdb+/q: Edit Server");
-  if (server) {
-    forms.edit(server.path);
+// A server in the Servers view, with what it's written as if it can be
+// read, which a command run on its row is given
+export type Row = { path: string[]; server?: servers.Definition };
+
+// Edit the server whose row it's run on, or one picked, in its form: one
+// with a problem too, to fix it
+export async function editServer(forms: ServerForms, row?: Row) {
+  const path = row?.path ?? (await pickServer("kdb+/q: Edit Server"))?.path;
+  if (path) {
+    forms.edit(path);
   }
 }
 
-// Remove a server picked, once confirmed, from every scope it's written in,
-// as one left in the user's settings would still be there. Its connection
-// is closed, its form too, and its password forgotten if no other server
-// gets it.
+// Remove the server whose row it's run on, or one picked, once confirmed,
+// from every scope it's written in, as one left in the user's settings
+// would still be there. Its connection is closed, its form too, and its
+// password forgotten if no other server gets it.
 export async function removeServer(
   secrets: vscode.SecretStorage,
   connections: Connections<Connection>,
   forms: ServerForms,
+  row?: Row,
 ) {
-  const server = await pickServer("kdb+/q: Remove Server");
-  if (!server) {
+  const picked = row ?? (await pickServer("kdb+/q: Remove Server"));
+  if (!picked) {
     return;
   }
-  const scopes = scopesOf(server.path);
+  const { path } = picked;
+  const server = row ? row.server : (picked as servers.Definition);
+  const scopes = scopesOf(path);
   const remove = "Remove";
   const choice = await vscode.window.showWarningMessage(
-    `Remove ${servers.shown(server.path)}?`,
+    `Remove ${servers.shown(path)}?`,
     {
       modal: true,
       detail: `It's removed from your ${scopes.map(scopeName).join(" and ")} settings.`,
@@ -356,17 +364,17 @@ export async function removeServer(
   // its file has unsaved changes, leaves the server, and says why.
   for (const scope of scopes) {
     try {
-      await write(scope, server.path, undefined);
+      await write(scope, path, undefined);
     } catch (error) {
       vscode.window.showErrorMessage(
-        `kdb+/q: ${servers.shown(server.path)} wasn't removed from ${scopeName(scope)} settings: ${(error as Error).message}`,
+        `kdb+/q: ${servers.shown(path)} wasn't removed from ${scopeName(scope)} settings: ${(error as Error).message}`,
       );
       return;
     }
   }
-  forms.close(server.path);
-  connections.disconnect(servers.id(server.path));
-  if (server.auth === "store") {
+  forms.close(path);
+  connections.disconnect(servers.id(path));
+  if (server?.auth === "store") {
     await forget(secrets, [servers.secretKey(server)]);
   }
 }
@@ -517,8 +525,15 @@ export function opener(secrets: vscode.SecretStorage) {
   };
 }
 
-// Connect to a server picked, or make its connection active if it's open
-export async function connect(connections: Connections<Connection>) {
+// Connect to the server whose row it's run on, or one picked, or make its
+// connection active if it's open
+export async function connect(connections: Connections<Connection>, row?: Row) {
+  if (row) {
+    if (row.server) {
+      await connectTo(connections, row.server);
+    }
+    return;
+  }
   const server = await pickServer("kdb+/q: Connect to Server", {
     detail: (server) => {
       const id = servers.id(server.path);
@@ -588,8 +603,16 @@ export async function showServerMenu() {
   }
 }
 
-// Close a connection: the only one, or one picked
-export async function disconnect(connections: Connections<Connection>) {
+// Close a connection: the one whose row it's run on, the only one, or one
+// picked
+export async function disconnect(
+  connections: Connections<Connection>,
+  row?: Row,
+) {
+  if (row) {
+    connections.disconnect(servers.id(row.path));
+    return;
+  }
   const connected = connections.servers;
   if (connected.length === 0) {
     vscode.window.showInformationMessage("kdb+/q: No server is connected.");

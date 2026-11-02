@@ -45,6 +45,9 @@ export type Defaults = {
 
 export const defaults: Defaults = { limit: 100e6 };
 
+// A server's fields as written, once checked
+type Fields = Omit<Definition, "path">;
+
 const fields = new Set([
   "host",
   "port",
@@ -63,6 +66,13 @@ export { shown };
 // Never shown.
 export function id(path: string[]): string {
   return JSON.stringify(path);
+}
+
+// Whether a path is a folder's, or is in it, at any depth
+export function within(path: string[], folder: string[]): boolean {
+  return (
+    path.length >= folder.length && folder.every((name, i) => path[i] === name)
+  );
 }
 
 // A problem in the servers setting, at the path of what has it, empty for
@@ -97,8 +107,7 @@ function isTimeout(value: unknown): value is number {
   return value === 0 || (isCount(value) && value <= longestTimeout);
 }
 
-// The servers in a setting, in the order written, and the folders they're
-// in, empty ones too, for the Servers view to show. An object with a host
+// The servers in a setting, in the order written. An object with a host
 // or a port is a server, and any other is a folder, holding servers and
 // folders, or nothing. VS Code doesn't hold a setting to its schema, so
 // each is checked here too; one with a problem is skipped and the problem
@@ -106,67 +115,100 @@ function isTimeout(value: unknown): value is number {
 // a user whose name was misspelt.
 export function definitions(setting: unknown): {
   servers: Definition[];
-  folders: string[][];
   problems: Problem[];
 } {
   const servers: Definition[] = [];
-  const folders: string[][] = [];
   const problems: Problem[] = [];
   if (setting === undefined || setting === null) {
-    return { servers, folders, problems };
+    return { servers, problems };
   }
   if (!isObject(setting)) {
-    return {
-      servers,
-      folders,
-      problems: [{ path: [], problem: "isn't an object" }],
-    };
+    return { servers, problems: [{ path: [], problem: "isn't an object" }] };
   }
   const read = (folder: Record<string, unknown>, at: string[]) => {
     for (const [key, value] of Object.entries(folder)) {
       const path = [...at, key];
-      const problem = nameProblem(key) ?? check(value);
+      const problem = entryProblem(key, value);
       if (problem) {
         problems.push({ path, problem });
         continue;
       }
       const object = value as Record<string, unknown>;
       if (!isServer(object)) {
-        folders.push(path);
         read(object, path);
       } else {
-        servers.push(definition(path, object));
+        servers.push(definition(path, object as Fields));
       }
     }
   };
   read(setting, []);
-  return { servers, folders, problems };
+  return { servers, problems };
+}
+
+// What's in the servers setting, as the Servers view shows it: a folder,
+// with what it holds, or a server; with the problem each has, if one does.
+// A server with one is anything else written in a folder, whatever it is,
+// so that it can be fixed in its form; a folder with one, a folder with no
+// name, holds nothing that's read.
+export type Entry =
+  | { kind: "folder"; path: string[]; entries: Entry[]; problem?: string }
+  | { kind: "server"; path: string[]; server?: Definition; problem?: string };
+
+const collator = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: "base",
+});
+
+// The entries in a folder, or the setting, folders first, then servers,
+// each A to Z, as the Explorer has files
+export function entries(folder: Record<string, unknown>, at: string[] = []) {
+  const found = Object.entries(folder).map(([key, value]): Entry => {
+    const path = [...at, key];
+    const problem = entryProblem(key, value);
+    if (isObject(value) && !isServer(value)) {
+      return problem
+        ? { kind: "folder", path, entries: [], problem }
+        : { kind: "folder", path, entries: entries(value, path) };
+    }
+    return problem
+      ? { kind: "server", path, problem }
+      : { kind: "server", path, server: definition(path, value as Fields) };
+  });
+  return found.sort(
+    (a, b) =>
+      Number(a.kind === "server") - Number(b.kind === "server") ||
+      collator.compare(a.path.at(-1) ?? "", b.path.at(-1) ?? ""),
+  );
+}
+
+// What's at a path in a setting: a folder, anything else, which is a
+// server or should be, or nothing
+export function kindAt(
+  setting: unknown,
+  path: string[],
+): Entry["kind"] | undefined {
+  const value = at(setting, path);
+  return value === undefined
+    ? undefined
+    : isObject(value) && !isServer(value)
+      ? "folder"
+      : "server";
 }
 
 // The servers setting as written in each scope
 export type Written = Record<Scope, unknown>;
 
-// The servers the scopes define together, and their folders, with the
-// problems in each scope said of it. A folder in both holds what each has;
-// anything else in the workspace's replaces what's at its place in the
+// The servers the scopes define together: a folder in both holds what each
+// has; anything else in the workspace's replaces what's at its place in the
 // user's whole, rather than VS Code's merge, which mixes their fields, so
-// that a server is as one scope writes it, and a problem is said where it's
-// written.
-export function read(written: Written): {
-  servers: Definition[];
-  folders: string[][];
-  problems: (Problem & { scope: Scope })[];
-} {
-  const { servers, folders } = definitions(
-    merge(written.user, written.workspace, true),
-  );
-  const problems = (["user", "workspace"] as const).flatMap((scope) =>
-    definitions(written[scope]).problems.map((problem) => ({
-      ...problem,
-      scope,
-    })),
-  );
-  return { servers, folders, problems };
+// that a server is as one scope writes it
+export function read(written: Written): Definition[] {
+  return definitions(merged(written)).servers;
+}
+
+// The servers setting as the scopes write it together
+export function merged(written: Written): unknown {
+  return merge(written.user, written.workspace, true);
 }
 
 // The user's and the workspace's values at the same place, as read
@@ -188,12 +230,6 @@ export function merge(user: unknown, workspace: unknown, folders = false) {
     merged.set(key, merge(merged.get(key), value));
   }
   return Object.fromEntries(merged);
-}
-
-// Whether a server's written at a path in a setting
-export function serverAt(setting: unknown, path: string[]): boolean {
-  const value = at(setting, path);
-  return isObject(value) && isServer(value);
 }
 
 // Whether a value is an object, as the servers setting and its folders and
@@ -268,20 +304,14 @@ export function isServer(value: Record<string, unknown>): boolean {
   );
 }
 
-// A server's or a folder's name
-function nameProblem(name: string): string | undefined {
-  return name.trim() === "" ? "has no name" : undefined;
+// The problem with an entry in a folder, by its name and its value
+export function entryProblem(name: string, value: unknown): string | undefined {
+  return name.trim() === "" ? "has no name" : check(value);
 }
 
 // A server as checked
-function definition(
-  path: string[],
-  value: Record<string, unknown>,
-): Definition {
-  const { host, port, user, timeout, protect, tls, auth } = value as Omit<
-    Definition,
-    "path"
-  >;
+function definition(path: string[], value: Fields): Definition {
+  const { host, port, user, timeout, protect, tls, auth } = value as Fields;
   return {
     path,
     host,

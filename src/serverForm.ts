@@ -56,12 +56,16 @@ export function scopes(): servers.Written {
   return { user: inspected?.globalValue, workspace: inspected?.workspaceValue };
 }
 
-// The scopes a server's written in: one in both is the workspace's, the
-// user's kept but not used
-export function scopesOf(path: string[]): Scope[] {
+// The scopes a server, or a folder, is written in. A server in both is the
+// workspace's, the user's kept but not used; a folder in both holds what
+// each has. A server with a problem counts, whatever's written.
+export function scopesOf(
+  path: string[],
+  kind: servers.Entry["kind"] = "server",
+): Scope[] {
   const written = scopes();
-  return (["user", "workspace"] as const).filter((scope) =>
-    servers.serverAt(written[scope], path),
+  return (["user", "workspace"] as const).filter(
+    (scope) => servers.kindAt(written[scope], path) === kind,
   );
 }
 
@@ -89,6 +93,24 @@ export async function write(
   );
 }
 
+// Move a server or a folder from one path to another in one scope's
+// setting, in one write. Renamed in the same folder, it keeps its place.
+export async function move(scope: Scope, from: string[], to: string[]) {
+  const setting = scopes()[scope] ?? {};
+  if (!servers.isObject(setting)) {
+    throw new Error("the servers setting isn't an object");
+  }
+  const value = servers.at(setting, from);
+  const renamed = servers.id(from.slice(0, -1)) === servers.id(to.slice(0, -1));
+  await config().update(
+    "servers",
+    renamed
+      ? servers.put(setting, to, value, from.at(-1))
+      : servers.put(servers.put(setting, from, undefined), to, value),
+    targets[scope],
+  );
+}
+
 // The servers setting in a scope's settings.json, where it can be edited as
 // written, as the Settings editor can't edit an object
 export async function openServers(scope: Scope) {
@@ -108,7 +130,7 @@ export async function forget(
   keys: Iterable<string>,
   except?: string[],
 ) {
-  const { servers: defined } = servers.read(scopes());
+  const defined = servers.read(scopes());
   const skipped = except && servers.id(except);
   for (const key of keys) {
     const used = defined.some(
@@ -176,9 +198,14 @@ export class ServerForms implements vscode.Disposable {
     );
   }
 
-  // Close a server's form, as when it's removed
+  // Close a server's form, or those of every server in a folder, as when
+  // it's removed
   close(path: string[]) {
-    this.forms.get(servers.id(path))?.panel.dispose();
+    for (const { panel, editing } of [...this.forms.values()]) {
+      if (editing && servers.within(editing, path)) {
+        panel.dispose();
+      }
+    }
   }
 
   dispose() {
@@ -267,11 +294,7 @@ export class ServerForms implements vscode.Disposable {
 
   // What the form needs to know, as the settings are now
   private context(open: Open): Context {
-    const { user, workspace } = scopes();
-    const folder = servers.at(
-      servers.merge(user, workspace, true),
-      open.folder,
-    );
+    const folder = servers.at(servers.merged(scopes()), open.folder);
     const own = open.editing?.at(-1);
     const authExtension = config().get("authExtension");
     const { files } = tls.files(
@@ -302,7 +325,7 @@ export class ServerForms implements vscode.Disposable {
     const id = open.editing && servers.id(open.editing);
     return servers
       .read(scopes())
-      .servers.find((server) => servers.id(server.path) === id);
+      .find((server) => servers.id(server.path) === id);
   }
 
   // Post the form as the settings have it: blank for a server to add, or
@@ -320,18 +343,32 @@ export class ServerForms implements vscode.Disposable {
     }
   }
 
+  // A server with a problem is loaded as it's written, with the problem
   private async loading(open: Open): Promise<ToForm> {
     const context = this.context(open);
     if (open.editing === undefined) {
       return { type: "load", form: blank(), context, stored: false };
     }
+    const name = open.editing.at(-1) ?? "";
     const server = this.editing(open);
-    if (server === undefined) {
+    if (server) {
+      const stored = await this.stored(servers.secretKey(server));
+      const form = fromSetting(name, server);
+      return { type: "load", form, context, stored };
+    }
+    const merged = servers.merged(scopes());
+    if (servers.kindAt(merged, open.editing) !== "server") {
       return { type: "gone" };
     }
-    const stored = await this.stored(servers.secretKey(server));
-    const form = fromSetting(server.path.at(-1) ?? "", server);
-    return { type: "load", form, context, stored };
+    const value = servers.at(merged, open.editing);
+    const problem = servers.entryProblem(name, value);
+    const form = fromSetting(name, value);
+    return {
+      type: "load",
+      form,
+      context: { ...context, ...(problem === undefined ? {} : { problem }) },
+      stored: await this.stored(keyFor(form)),
+    };
   }
 
   // The server the form makes, by its path, and its setting, read back as

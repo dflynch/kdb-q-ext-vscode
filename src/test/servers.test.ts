@@ -9,15 +9,16 @@ import {
   type Definition,
   defaults,
   definitions,
+  entries,
   isObject,
   isServer,
+  kindAt,
   merge,
   put,
   read,
   said,
   secretKey,
   server,
-  serverAt,
   settings,
 } from "../servers";
 
@@ -39,7 +40,6 @@ suite("servers", () => {
           },
           { path: ["local"], host: "localhost", port: 5000 },
         ],
-        folders: [],
         problems: [],
       },
     );
@@ -72,7 +72,6 @@ suite("servers", () => {
   test("no setting is no servers", () => {
     assert.deepStrictEqual(definitions(undefined), {
       servers: [],
-      folders: [],
       problems: [],
     });
   });
@@ -80,7 +79,6 @@ suite("servers", () => {
   test("a setting that isn't an object is a problem", () => {
     assert.deepStrictEqual(definitions([{ host: "h", port: 1 }]), {
       servers: [],
-      folders: [],
       problems: [{ path: [], problem: "isn't an object" }],
     });
   });
@@ -179,9 +177,56 @@ suite("servers", () => {
           { path: ["Prod", "TP"], host: "prod", port: 5010 },
           { path: ["local"], host: "localhost", port: 5000 },
         ],
-        folders: [["Dev"], ["Dev", "trades"], ["Prod"], ["UAT"]],
         problems: [],
       },
+    );
+  });
+
+  test("the view's entries: folders first, then servers, each A to Z", () => {
+    assert.deepStrictEqual(
+      entries({
+        tp: { host: "h", port: 1 },
+        Prod: { rdb: { host: "h", port: 2 }, x: "h:3" },
+        server10: { host: "h", port: 10 },
+        server9: { host: "h", port: 9 },
+        dev: {},
+        " ": { a: { host: "h", port: 4 } },
+      }),
+      [
+        { kind: "folder", path: [" "], entries: [], problem: "has no name" },
+        { kind: "folder", path: ["dev"], entries: [] },
+        {
+          kind: "folder",
+          path: ["Prod"],
+          entries: [
+            {
+              kind: "server",
+              path: ["Prod", "rdb"],
+              server: { path: ["Prod", "rdb"], host: "h", port: 2 },
+            },
+            {
+              kind: "server",
+              path: ["Prod", "x"],
+              problem: "isn't a server or a folder",
+            },
+          ],
+        },
+        {
+          kind: "server",
+          path: ["server9"],
+          server: { path: ["server9"], host: "h", port: 9 },
+        },
+        {
+          kind: "server",
+          path: ["server10"],
+          server: { path: ["server10"], host: "h", port: 10 },
+        },
+        {
+          kind: "server",
+          path: ["tp"],
+          server: { path: ["tp"], host: "h", port: 1 },
+        },
+      ],
     );
   });
 
@@ -269,7 +314,6 @@ suite("servers", () => {
           { path: ["Dev", "HDB"], host: "dev", port: 5012 },
           { path: ["UAT", "TP"], host: "uat", port: 5010 },
         ],
-        folders: [["Dev"], ["Dev", "trades"], ["UAT"]],
         problems: [
           { path: ["Dev", "TP"], problem: "has an unknown field, hots" },
           { path: ["Dev", "trades", " "], problem: "has no name" },
@@ -283,7 +327,7 @@ suite("servers", () => {
   });
 
   test("a host or a port makes a server, and nothing else does", () => {
-    const { servers, folders, problems } = definitions({
+    const setting = {
       // A misspelt field, with a port
       local: { hots: "localhost", port: 5000 },
       // Every field misspelt: a folder of things that aren't servers
@@ -296,11 +340,15 @@ suite("servers", () => {
       Dev: { port: { host: "dev", port: 1 } },
       // A folder whose only entry is wrong is still a folder
       Prod: { TP: "x" },
-    });
+    };
+    const { servers, problems } = definitions(setting);
     assert.deepStrictEqual(servers, [
       { path: ["Dev", "port"], host: "dev", port: 1 },
     ]);
-    assert.deepStrictEqual(folders, [["typo"], ["empty"], ["Dev"], ["Prod"]]);
+    assert.deepStrictEqual(
+      Object.keys(setting).map((name) => kindAt(setting, [name])),
+      ["server", "folder", "folder", "server", "folder", "folder"],
+    );
     assert.deepStrictEqual(problems, [
       { path: ["local"], problem: "has an unknown field, hots" },
       { path: ["typo", "hots"], problem: "isn't a server or a folder" },
@@ -338,34 +386,22 @@ suite("servers", () => {
     assert.deepStrictEqual(merge(undefined, workspace, true), workspace);
   });
 
-  test("each scope's problems are said of it, and the servers read together", () => {
-    const { servers, folders, problems } = read({
-      user: { Dev: { rdb: "dev:5011", TP: { host: "dev", port: 1 } } },
-      workspace: { gw: { port: 7 }, Dev: {} },
-    });
-    assert.deepStrictEqual(servers, [
-      { path: ["Dev", "TP"], host: "dev", port: 1 },
-    ]);
-    assert.deepStrictEqual(folders, [["Dev"]]);
-    assert.deepStrictEqual(problems, [
-      {
-        path: ["Dev", "rdb"],
-        problem: "isn't a server or a folder",
-        scope: "user",
-      },
-      { path: ["gw"], problem: "has no host", scope: "workspace" },
-    ]);
-    assert.deepStrictEqual(read({ user: 1, workspace: undefined }).problems, [
-      { path: [], problem: "isn't an object", scope: "user" },
-    ]);
+  test("the servers are read from the scopes together", () => {
+    assert.deepStrictEqual(
+      read({
+        user: { Dev: { rdb: "dev:5011", TP: { host: "dev", port: 1 } } },
+        workspace: { gw: { port: 7 }, Dev: {} },
+      }),
+      [{ path: ["Dev", "TP"], host: "dev", port: 1 }],
+    );
   });
 
-  test("a server's at a path, not a folder or anything else", () => {
+  test("what's at a path: a folder, a server, or something that should be", () => {
     const setting = { Prod: { TP: { host: "h", port: 1 }, bad: "x" } };
-    assert.ok(serverAt(setting, ["Prod", "TP"]));
-    assert.ok(!serverAt(setting, ["Prod"]));
-    assert.ok(!serverAt(setting, ["Prod", "bad"]));
-    assert.ok(!serverAt(setting, ["nothing"]));
+    assert.strictEqual(kindAt(setting, ["Prod", "TP"]), "server");
+    assert.strictEqual(kindAt(setting, ["Prod"]), "folder");
+    assert.strictEqual(kindAt(setting, ["Prod", "bad"]), "server");
+    assert.strictEqual(kindAt(setting, ["nothing"]), undefined);
   });
 
   test("a problem's said of what has it, by its path", () => {
