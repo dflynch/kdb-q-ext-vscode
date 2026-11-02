@@ -575,7 +575,7 @@ suite("editServer and removeServer", () => {
       await editServer(forms);
       assert.deepStrictEqual(
         made.map((tab) => tab.title),
-        ["Edit TP"],
+        ["Edit Prod › TP"],
       );
     } finally {
       forms.dispose();
