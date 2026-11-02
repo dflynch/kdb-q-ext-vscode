@@ -70,12 +70,12 @@ settings file it's in:
 }
 ```
 
-- **Folders** group servers, to any depth. A server has fields; a folder
-  has none of its own, holding only servers and folders, or nothing. A
-  server is shown with its folders, as `Prod › trades › TP`, and the same
-  name can be used in different folders. A folder in your user settings
-  and one of the same name in the workspace's are shown as one folder. For
-  example:
+- **Folders** group servers, to any depth. An object with a `host` or a
+  `port` is a server, and any other is a folder, holding servers and
+  folders, or nothing. A server is shown with its folders, as
+  `Prod › trades › TP`, and the same name can be used in different
+  folders. A folder in your user settings and one of the same name in the
+  workspace's are shown as one folder. For example:
 
   ```json
   "kdb-q-ext-vscode.servers": {

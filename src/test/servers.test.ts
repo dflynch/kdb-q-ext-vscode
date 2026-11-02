@@ -221,7 +221,8 @@ suite("servers", () => {
           trades: { " ": { host: "dev", port: 1 }, "": {} },
           HDB: { host: "dev", port: 5012 },
         },
-        // A value that isn't an object makes a server of what holds it
+        // A value that isn't an object is said in its folder, which keeps
+        // the rest
         UAT: { TP: { host: "uat", port: 5010 }, RDB: "uat:5011" },
         // An object in a server is said as its field
         gw: { host: "gw", port: 1, tls: { ca: "/ca.pem" } },
@@ -231,18 +232,46 @@ suite("servers", () => {
         servers: [
           { path: ["Dev", "a/b"], host: "dev", port: 1 },
           { path: ["Dev", "HDB"], host: "dev", port: 5012 },
+          { path: ["UAT", "TP"], host: "uat", port: 5010 },
         ],
-        folders: [["Dev"], ["Dev", "trades"]],
+        folders: [["Dev"], ["Dev", "trades"], ["UAT"]],
         problems: [
           { path: ["Dev", "TP"], problem: "has an unknown field, hots" },
           { path: ["Dev", "trades", " "], problem: "has no name" },
           { path: ["Dev", "trades", ""], problem: "has no name" },
-          { path: ["UAT"], problem: "has unknown fields, TP, RDB" },
+          { path: ["UAT", "RDB"], problem: "isn't a server or a folder" },
           { path: ["gw"], problem: "has a tls that isn't true or false" },
           { path: ["stray"], problem: "isn't a server or a folder" },
         ],
       },
     );
+  });
+
+  test("a host or a port makes a server, and nothing else does", () => {
+    const { servers, folders, problems } = definitions({
+      // A misspelt field, with a port
+      local: { hots: "localhost", port: 5000 },
+      // Every field misspelt: a folder of things that aren't servers
+      typo: { hots: "h" },
+      // Empty: a folder
+      empty: {},
+      // A server's own field as an object
+      gw: { host: "gw", port: { n: 1 } },
+      // A server named port, in a folder
+      Dev: { port: { host: "dev", port: 1 } },
+      // A folder whose only entry is wrong is still a folder
+      Prod: { TP: "x" },
+    });
+    assert.deepStrictEqual(servers, [
+      { path: ["Dev", "port"], host: "dev", port: 1 },
+    ]);
+    assert.deepStrictEqual(folders, [["typo"], ["empty"], ["Dev"], ["Prod"]]);
+    assert.deepStrictEqual(problems, [
+      { path: ["local"], problem: "has an unknown field, hots" },
+      { path: ["typo", "hots"], problem: "isn't a server or a folder" },
+      { path: ["gw"], problem: "has a port that isn't from 1 to 65535" },
+      { path: ["Prod", "TP"], problem: "isn't a server or a folder" },
+    ]);
   });
 
   test("a problem's said of what has it, by its path", () => {

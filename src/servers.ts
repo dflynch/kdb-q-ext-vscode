@@ -101,10 +101,9 @@ function isTimeout(value: unknown): value is number {
 }
 
 // The servers in the setting, in the order written, and the folders they're
-// in, empty ones too, for the Servers view to show. A server has fields and
-// a folder has none of its own, holding only servers and folders, or
-// nothing, so an object with any plain value is a server, and any other is
-// a folder. VS Code doesn't hold a setting to its schema, so each is checked
+// in, empty ones too, for the Servers view to show. An object with a host
+// or a port is a server, and any other is a folder, holding servers and
+// folders, or nothing. VS Code doesn't hold a setting to its schema, so each is checked
 // here too; one with a problem is left out and the problem said, rather than
 // connecting somewhere other than meant, such as without a user whose name
 // was misspelt.
@@ -135,7 +134,7 @@ export function definitions(setting: unknown): {
         continue;
       }
       const object = value as Record<string, unknown>;
-      if (isFolder(object)) {
+      if (!isServer(object)) {
         folders.push(path);
         read(object, path);
       } else {
@@ -209,9 +208,14 @@ function replaced(
   return Object.fromEntries(entries);
 }
 
-// An object holding only objects, or nothing
-function isFolder(value: Record<string, unknown>): boolean {
-  return Object.values(value).every(isObject);
+// An object with a host or a port is a server, and any other a folder, so
+// that each is told by what it has itself: a mistake in a folder's entry
+// doesn't make a server of the folder. A server named host or port is an
+// object, as a server's own host and port aren't.
+function isServer(value: Record<string, unknown>): boolean {
+  return ["host", "port"].some(
+    (field) => Object.hasOwn(value, field) && !isObject(value[field]),
+  );
 }
 
 // A server's or a folder's name
@@ -246,7 +250,7 @@ function check(value: unknown): string | undefined {
   if (!isObject(value)) {
     return "isn't a server or a folder";
   }
-  if (isFolder(value)) {
+  if (!isServer(value)) {
     return undefined;
   }
   const unknown = Object.keys(value).filter((key) => !fields.has(key));
