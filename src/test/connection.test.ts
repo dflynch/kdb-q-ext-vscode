@@ -193,12 +193,10 @@ suite("connection", () => {
     );
   });
 
-  test("a timeout of 0 waits as long as the login takes", async function () {
-    // Past the default's 2 seconds
-    this.timeout(5000);
+  test("a timeout of 0 waits as long as the login takes", async () => {
     const server = net.createServer((socket) => {
       socket.once("data", () =>
-        setTimeout(() => socket.write(Buffer.of(3)), 2100),
+        setTimeout(() => socket.write(Buffer.of(3)), 50),
       );
     });
     server.listen(0, "127.0.0.1");

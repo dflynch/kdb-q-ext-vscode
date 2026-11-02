@@ -182,10 +182,6 @@ input[type="checkbox"]:checked::before {
   cursor: pointer;
 }
 
-.tick + .tick {
-  margin-top: 6px;
-}
-
 /* Under a tick, in line with what the tick says */
 .note-under {
   margin: 2px 0 0 24px;
@@ -215,14 +211,11 @@ code {
 
 .tested {
   margin-top: 8px;
+  color: var(--vscode-descriptionForeground);
 }
 
 .tested:empty {
   display: none;
-}
-
-.tested {
-  color: var(--vscode-descriptionForeground);
 }
 
 .tested.failed {

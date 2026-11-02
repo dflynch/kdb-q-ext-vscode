@@ -85,7 +85,7 @@ export function details(server: Definition, setting?: unknown): string[] {
           : extension.problem
             ? `Extension ${JSON.stringify(setting)} (invalid)`
             : `Extension ${extension.id ?? "not set"}`;
-  const timeout = server.timeout ? `${server.timeout} ms` : "None";
+  const timeout = server.timeout ? `${server.timeout} ms` : "No limit";
   return [
     `Host: ${server.host}:${server.port}`,
     ...(server.user ? [`User: ${server.user}`] : []),

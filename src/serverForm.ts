@@ -90,8 +90,7 @@ export async function write(
 }
 
 // The servers setting in a scope's settings.json, where it can be edited as
-// written: the Settings editor can't edit an object, and a query naming a
-// setting reveals it in the file
+// written, as the Settings editor can't edit an object
 export async function openServers(scope: Scope) {
   await vscode.commands.executeCommand(
     scope === "workspace"

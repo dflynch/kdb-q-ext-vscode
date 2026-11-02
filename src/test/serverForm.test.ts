@@ -638,7 +638,7 @@ suite("editServer and removeServer", () => {
       assert.strictEqual(warned[0][0], "Remove Prod › TP?");
       assert.deepStrictEqual(warned[0][1], {
         modal: true,
-        detail: "It's removed from your user settings.",
+        detail: "It's removed from your User settings.",
       });
       assert.ok(
         user() !== undefined && "TP" in (user() as { Prod: object }).Prod,

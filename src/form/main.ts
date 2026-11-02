@@ -1,7 +1,7 @@
 // The server form's script, bundled into dist/form.js. It runs in the
 // webview, with the DOM but no Node and no VS Code API, and talks to the
 // extension only by messages. Laid out as the Settings editor lays out a
-// setting: its name in bold, what it does, then its box.
+// setting: its name in bold, its box, then what it does.
 import {
   type Context,
   type Field,
@@ -9,6 +9,7 @@ import {
   type FromForm,
   type Login,
   problems,
+  shown,
   type ToForm,
 } from "./fields";
 
@@ -23,8 +24,8 @@ const vscode = acquireVsCodeApi();
 let loaded: Form | undefined;
 let context: Context | undefined;
 let stored = false;
-// The fields left once, whose problems are shown; all of them once Save is
-// tried
+// The fields left once, whose problems are shown; all of them once Save or
+// Test is tried
 const left = new Set<Field>();
 // A load that came while the form had changes, applied on Reload
 let pending: Extract<ToForm, { type: "load" }> | undefined;
@@ -328,7 +329,7 @@ function show(message: Extract<ToForm, { type: "load" }>) {
     editing === undefined ? "Add Server" : `Edit ${message.form.name}`;
   // Its folders, and for one edited, the settings it's in
   const places = [
-    ...(folder.length > 0 ? [folder.join(" › ")] : []),
+    ...(folder.length > 0 ? [shown(folder)] : []),
     ...(scopes.length > 0
       ? [
           `${listed(scopes.map((scope) => (scope === "user" ? "User" : "Workspace")))} settings`,
@@ -391,7 +392,7 @@ window.addEventListener("message", (event: MessageEvent<ToForm>) => {
       break;
     case "gone":
       warn(
-        `${[...(context?.folder ?? []), context?.editing].join(" › ")} is no longer in the settings.`,
+        `${shown([...(context?.folder ?? []), context?.editing ?? ""])} is no longer in the settings.`,
       );
       save.disabled = true;
       test.disabled = true;

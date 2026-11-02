@@ -336,7 +336,7 @@ async function pickServer(
   let last = "";
   for (const server of defined) {
     const folder = servers.shown(server.path.slice(0, -1));
-    if (folder !== last || (items.length === 0 && folder !== "")) {
+    if (folder !== last) {
       items.push({ label: folder, kind: vscode.QuickPickItemKind.Separator });
       last = folder;
     }
@@ -383,7 +383,7 @@ export async function removeServer(
     `Remove ${servers.shown(server.path)}?`,
     {
       modal: true,
-      detail: `It's removed from your ${scopes.join(" and ")} settings.`,
+      detail: `It's removed from your ${scopes.map((scope) => (scope === "user" ? "User" : "Workspace")).join(" and ")} settings.`,
     },
     remove,
   );
@@ -423,7 +423,7 @@ export async function setPassword(secrets: vscode.SecretStorage) {
   await secrets.store(servers.secretKey(server), password);
 }
 
-// Any server, so that a password kept before its auth was set can go too
+// Any server, so that a password kept while its auth was store can go too
 export async function clearPassword(secrets: vscode.SecretStorage) {
   const server = await pickServer("kdb+/q: Clear Server Password");
   if (server) {

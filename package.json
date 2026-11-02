@@ -266,10 +266,10 @@
         "kdb-q-ext-vscode.servers": {
           "type": "object",
           "default": {},
-          "markdownDescription": "The kdb+ processes to connect to, by name, in folders to any depth if you like: an object with a `host` or a `port` is a server, and any other is a folder, holding servers and folders, or nothing. Add one with **kdb+/q: Add Server**. Passwords aren't kept here: set one with **kdb+/q: Set Server Password**, which keeps it in VS Code's secure storage for the user, host and port, or have it come from elsewhere with `auth`.",
+          "markdownDescription": "The kdb+ processes to connect to, by name, in folders to any depth if you like: an object with a `host` or a `port` is a server, and any other is a folder, holding servers and folders, or nothing. Add one with **kdb+/q: Add Server**. Passwords aren't kept here: `auth` says where one comes from, such as `\"store\"`, VS Code's secure storage, where **kdb+/q: Set Server Password** keeps it for the user, host and port. Without `auth`, none is sent.",
           "propertyNames": {
             "pattern": "\\S",
-            "patternErrorMessage": "A name that isn't empty"
+            "patternErrorMessage": "A name that isn't blank"
           },
           "additionalProperties": {
             "type": "object",
@@ -388,7 +388,7 @@
           "pattern": "^([a-zA-Z0-9][a-zA-Z0-9-]*\\.[a-zA-Z0-9][a-zA-Z0-9-]*)?$",
           "patternErrorMessage": "An extension ID: publisher.name",
           "default": "",
-          "markdownDescription": "The extension that gives the credentials for a firm's own sign-on, as `publisher.name`, for the servers whose `auth` is `\"extension\"` It exports `credentials(request)`, given the server's name, its path such as `Prod/trades/TP`, and its host, port and user."
+          "markdownDescription": "The extension that gives the credentials for a firm's own sign-on, as `publisher.name`, for the servers whose `auth` is `\"extension\"`. It exports `credentials(request)`, given the server's path, its folders and its own name, such as `[\"Prod\", \"trades\", \"TP\"]`, and its host, port and user."
         },
         "kdb-q-ext-vscode.tlsCaFile": {
           "type": "string",

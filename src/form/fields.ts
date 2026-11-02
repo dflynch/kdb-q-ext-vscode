@@ -52,7 +52,13 @@ export type Context = {
 };
 
 // The timeout a server added starts with, in milliseconds
-export const connectTimeout = 2000;
+export const startingTimeout = 2000;
+
+// A server's name as it's shown: its folders' names and its own, as a
+// breadcrumb, Prod › trades › TP
+export function shown(path: string[]): string {
+  return path.join(" › ");
+}
 
 // The form for a server to add: protected evaluation on, as a server has
 // it by default
@@ -66,7 +72,7 @@ export function blank(): Form {
     password: "",
     tls: false,
     protect: true,
-    timeout: String(connectTimeout),
+    timeout: String(startingTimeout),
     target: "user",
   };
 }

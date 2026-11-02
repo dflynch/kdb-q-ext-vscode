@@ -1,5 +1,5 @@
 import type { Server } from "./connection";
-import { longestTimeout, type Scope } from "./form/fields";
+import { longestTimeout, type Scope, shown } from "./form/fields";
 import { passwordProblem, userProblem } from "./login";
 import type { Secure } from "./tls";
 
@@ -55,11 +55,8 @@ const fields = new Set([
   "auth",
 ]);
 
-// A server's name as it's shown: its folders' names and its own, as a
-// breadcrumb, Prod › trades › TP
-export function shown(path: string[]): string {
-  return path.join(" › ");
-}
+// Shared with the server form, which can't import this
+export { shown };
 
 // What a server's known by inside the extension, for its connection and its
 // form: its path, as no name in it can be mistaken for part of another.
@@ -104,7 +101,7 @@ function isTimeout(value: unknown): value is number {
 // in, empty ones too, for the Servers view to show. An object with a host
 // or a port is a server, and any other is a folder, holding servers and
 // folders, or nothing. VS Code doesn't hold a setting to its schema, so
-// each is checked here too; one with a problem is left out and the problem
+// each is checked here too; one with a problem is skipped and the problem
 // said, rather than connecting somewhere other than meant, such as without
 // a user whose name was misspelt.
 export function definitions(setting: unknown): {

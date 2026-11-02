@@ -150,7 +150,7 @@ suite("the server form's fields", () => {
         password: "Required",
       },
     );
-    // Any name will do, as the setting nests folders rather than naming them
+    // Any name will do
     assert.deepStrictEqual(
       problems({ ...prod, name: "fx/spot" }, context, false),
       {},
