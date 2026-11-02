@@ -54,16 +54,35 @@ suite("opener", () => {
   test("logs in with the password kept for the server", async () => {
     const fake = await serve();
     const server: Definition = {
-      name: "local",
+      path: ["local"],
       host: "127.0.0.1",
       port: fake.port,
       user: "admin",
+      auth: "store",
     };
     const open = opener(
       secrets({ [`password:admin@127.0.0.1:${fake.port}`]: "pw" }),
     );
     const connection = await open(server);
     assert.strictEqual(await fake.login, "admin:pw");
+    connection?.close();
+    fake.stop();
+  });
+
+  test("a password typed in the server form, in place of the one kept", async () => {
+    const fake = await serve();
+    const server: Definition = {
+      path: ["local"],
+      host: "127.0.0.1",
+      port: fake.port,
+      user: "admin",
+      auth: "store",
+    };
+    const open = opener(
+      secrets({ [`password:admin@127.0.0.1:${fake.port}`]: "pw" }),
+    );
+    const connection = await open(server, { typed: "typed" });
+    assert.strictEqual(await fake.login, "admin:typed");
     connection?.close();
     fake.stop();
   });
@@ -87,7 +106,7 @@ suite("opener", () => {
     }
     try {
       const server: Definition = {
-        name: "secure",
+        path: ["secure"],
         host: "localhost",
         port: fake.port,
         tls: true,
@@ -124,7 +143,7 @@ suite("opener", () => {
     };
     try {
       const server: Definition = {
-        name: "secure",
+        path: ["secure"],
         host: "localhost",
         port: 1,
         tls: true,

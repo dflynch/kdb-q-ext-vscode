@@ -62,9 +62,9 @@ export class QError extends Error {
 
 // The hint under an error that protected evaluation would have caught, or a
 // response it didn't give: the server likely refused to evaluate it, as one
-// whose .z.pg is customised, or takes only strings, does
+// that enforces an allowlist does
 const unprotected =
-  "protected evaluation may have been refused: turn off protect for a server whose .z.pg is customised";
+  "protected evaluation may have been refused: turn off protect when the server enforces an allowlist";
 
 const utf8 = new TextDecoder("utf-8", { ignoreBOM: true });
 

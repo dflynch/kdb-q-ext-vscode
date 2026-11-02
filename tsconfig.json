@@ -15,12 +15,13 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },
-  // The webview's script, its grid and its chart have the DOM and no Node:
+  // The webviews' scripts, the grid and the chart have the DOM and no Node:
   // tsconfig.web.json checks them
   "exclude": [
     "src/webview/main.ts",
     "src/webview/grid.ts",
     "src/webview/chart/chart.ts",
-    "src/webview/chart/panel.ts"
+    "src/webview/chart/panel.ts",
+    "src/form/main.ts"
   ]
 }

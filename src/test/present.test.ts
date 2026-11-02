@@ -94,7 +94,7 @@ suite("the Console view", () => {
   test("an error signalled under protection, with its hint on the line after", () => {
     const signalled = bytes("010000000e000000807479706500");
     assert.deepStrictEqual(present(result(signalled, true)), {
-      text: "'type\nprotected evaluation may have been refused: turn off protect for a server whose .z.pg is customised",
+      text: "'type\nprotected evaluation may have been refused: turn off protect when the server enforces an allowlist",
     });
   });
 

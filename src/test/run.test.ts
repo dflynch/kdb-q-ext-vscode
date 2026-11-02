@@ -4,7 +4,7 @@ import { runFileOnServer, runOnServer } from "../commands";
 import type { Connection, Result } from "../connection";
 import { Connections } from "../connections";
 import type { Results } from "../resultView";
-import type { Definition } from "../servers";
+import { type Definition, id } from "../servers";
 import type { Status } from "../status";
 import { present } from "../webview/present";
 
@@ -27,7 +27,7 @@ const protectedLong: Result = {
 
 // Let the Result view's answer arrive
 const answered = () => new Promise((resolve) => setImmediate(resolve));
-const prod: Definition = { name: "prod", host: "kdb1", port: 5010 };
+const prod: Definition = { path: ["prod"], host: "kdb1", port: 5010 };
 
 // A stand-in connection answering each query from a script
 function scripted(answers: (Result | Error)[]) {
@@ -114,9 +114,9 @@ suite("runOnServer", () => {
       { query: "f:{\n  x+1} / add one\nf 1", server: "prod" },
     ]);
     assert.deepStrictEqual(told, [
-      ["running", "prod"],
-      ["ended", "prod", 3],
-      ["executed", "prod", 7],
+      ["running", id(["prod"])],
+      ["ended", id(["prod"]), 3],
+      ["executed", id(["prod"]), 7],
     ]);
   });
 
@@ -170,7 +170,7 @@ suite("runOnServer", () => {
     );
     await answered();
     assert.deepStrictEqual(replaced, ["'type"]);
-    assert.deepStrictEqual(told.at(-1), ["ended", "prod", 1]);
+    assert.deepStrictEqual(told.at(-1), ["ended", id(["prod"]), 1]);
   });
 
   test("an error of ours, with no timing", async () => {
@@ -183,7 +183,7 @@ suite("runOnServer", () => {
       status,
     );
     assert.deepStrictEqual(replaced, ["'connection closed unexpectedly"]);
-    assert.deepStrictEqual(told.at(-1), ["ended", "prod", undefined]);
+    assert.deepStrictEqual(told.at(-1), ["ended", id(["prod"]), undefined]);
   });
 
   test("the query ends even if showing its result fails", async () => {
@@ -199,7 +199,7 @@ suite("runOnServer", () => {
       runOnServer(await selecting("1"), await opened(link), results, status),
       { message: "can't show it" },
     );
-    assert.deepStrictEqual(told.at(-1), ["ended", "prod", 0]);
+    assert.deepStrictEqual(told.at(-1), ["ended", id(["prod"]), 0]);
   });
 
   test("waits for the active connection while it opens", async () => {

@@ -171,12 +171,32 @@ suite("connection", () => {
     );
   });
 
-  test("a timeout of 0 waits as long as the login takes", async function () {
-    // Past the default's 2 seconds
-    this.timeout(5000);
+  test("a login waiting with no timeout is stopped by its signal, closing the socket", async () => {
+    const server = await fake(() => {}, "ignore");
+    const abort = new AbortController();
+    const opening = Connection.open(
+      { host: "127.0.0.1", port: server.port, timeout: 0 },
+      abort.signal,
+    );
+    await server.login;
+    abort.abort();
+    assert.strictEqual(await opening, undefined);
+    await server.closed;
+  });
+
+  test("an aborted signal stops a connect before it starts", async () => {
+    const abort = new AbortController();
+    abort.abort();
+    assert.strictEqual(
+      await Connection.open({ host: "127.0.0.1", port: 1 }, abort.signal),
+      undefined,
+    );
+  });
+
+  test("a timeout of 0 waits as long as the login takes", async () => {
     const server = net.createServer((socket) => {
       socket.once("data", () =>
-        setTimeout(() => socket.write(Buffer.of(3)), 2100),
+        setTimeout(() => socket.write(Buffer.of(3)), 50),
       );
     });
     server.listen(0, "127.0.0.1");

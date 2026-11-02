@@ -1,11 +1,11 @@
 import * as vscode from "vscode";
-import { type Asker, add } from "./adding";
 import * as comments from "./comments";
 import { Connection } from "./connection";
 import type { Connections } from "./connections";
 import { credentials, type Sources } from "./credentials";
+import type { Scope } from "./form/fields";
 import type { Size } from "./format/console";
-import { quickInput } from "./quickInput";
+import { passwordProblem } from "./login";
 import {
   type Outcome,
   precisionSetting,
@@ -14,10 +14,38 @@ import {
   toView,
 } from "./result";
 import type { Results } from "./resultView";
+import type { ServerForms } from "./serverForm";
+import { forget, openServers, scopes, scopesOf, write } from "./serverForm";
 import * as servers from "./servers";
 import * as statements from "./statements";
 import { describe, type Status } from "./status";
 import { files, passphraseKey, type Secure, secure } from "./tls";
+import { Told } from "./told";
+
+const told = new Told();
+
+// Warn of the problems found in a setting that haven't been told, said by
+// the message given, with a button to open the setting: in the Settings
+// editor, or where else it's opened
+function warn(
+  setting: string,
+  problems: string[],
+  message: (news: string[]) => string,
+  open: () => Thenable<unknown> = () =>
+    vscode.commands.executeCommand(
+      "workbench.action.openSettings",
+      `kdb-q-ext-vscode.${setting}`,
+    ),
+) {
+  const news = told.news(setting, problems);
+  if (news.length === 0) {
+    return;
+  }
+  const button = "Open Settings";
+  vscode.window
+    .showWarningMessage(`kdb+/q: ${message(news)}`, button)
+    .then((choice) => (choice === button ? open() : undefined));
+}
 
 // Send the selected text, or the current line, to the active terminal one
 // statement at a time. With several selections, each is sent in turn from the
@@ -52,18 +80,22 @@ export function runSelectedText(editor: vscode.TextEditor) {
 }
 
 // The console size, the precision and the row limit, with any problem in
-// them shown
+// them told
 function consoleSize(): Size {
   const config = vscode.workspace.getConfiguration("kdb-q-ext-vscode");
   const { size, problem } = sizeSetting(config.get("consoleSize"));
   const digits = precisionSetting(config.get("precision"));
   const rows = rowLimitSetting(config.get("rowLimit"));
-  for (const wrong of [problem, digits.problem, rows.problem]) {
-    if (wrong) {
-      vscode.window.showWarningMessage(
-        `kdb+/q: Using the default, as ${wrong}.`,
-      );
-    }
+  for (const [setting, wrong] of [
+    ["consoleSize", problem],
+    ["precision", digits.problem],
+    ["rowLimit", rows.problem],
+  ] as const) {
+    warn(
+      setting,
+      wrong ? [wrong] : [],
+      ([news]) => `Using the default, as ${news}.`,
+    );
   }
   return { ...size, precision: digits.precision, rowLimit: rows.rowLimit };
 }
@@ -109,20 +141,21 @@ async function run(
   // pick one, as Connect does. Whatever opens it says if that fails.
   const active = connections.active;
   const opening =
-    active?.state.kind === "connecting" && connections.server(active.name);
+    active?.state.kind === "connecting" && connections.server(active.id);
   if (opening) {
     await connections.connect(opening).catch(() => undefined);
   } else if (active?.state.kind !== "open") {
     await connect(connections);
   }
-  const name = connections.active?.name;
-  const link = name && connections.link(name);
-  if (!name || !link) {
+  const id = connections.active?.id;
+  const server = id && connections.server(id);
+  const link = id && connections.link(id);
+  if (!server || !link) {
     return;
   }
   const size = consoleSize();
   await results.reveal();
-  const ended = status.running(name);
+  const ended = status.running(id);
   const outcome: Outcome = await link.query(query).then(
     (result) => ({ result }),
     (error: Error) => ({ error }),
@@ -132,7 +165,7 @@ async function run(
   );
   // The server's time is known once the webview has decoded the response
   results
-    .show(toView(outcome, size), { query, server: name })
+    .show(toView(outcome, size), { query, server: servers.shown(server.path) })
     .then((execution) => {
       if (execution !== undefined) {
         executed(execution);
@@ -247,15 +280,26 @@ export async function toggleBlockComment(editor: vscode.TextEditor) {
   }
 }
 
-// The servers in the settings, with any problems in them shown
+// A scope as VS Code names it
+function scopeName(scope: Scope): string {
+  return scope === "user" ? "User" : "Workspace";
+}
+
+// The servers in the settings, with any problems in each scope told: what
+// has one is skipped
 export function definitions(): servers.Definition[] {
-  const setting = vscode.workspace
-    .getConfiguration("kdb-q-ext-vscode")
-    .get("servers");
-  const { servers: defined, problems } = servers.definitions(setting);
-  if (problems.length > 0) {
-    vscode.window.showWarningMessage(
-      `kdb+/q: Left out of the servers setting: ${problems.join("; ")}.`,
+  const { servers: defined, problems } = servers.read(scopes());
+  for (const scope of ["user", "workspace"] as const) {
+    const where = `${scopeName(scope)} settings`;
+    const found = problems.filter((problem) => problem.scope === scope);
+    warn(
+      `servers.${scope}`,
+      found.map(servers.said),
+      (news) =>
+        found.some(({ path }) => path.length === 0)
+          ? `The servers setting in ${where} is skipped, as it isn't an object.`
+          : `Skipped in the servers setting, in ${where}: ${news.join("; ")}.`,
+      () => openServers(scope),
     );
   }
   return defined;
@@ -292,81 +336,83 @@ async function pickServer(
     }
     return undefined;
   }
-  const picked = await vscode.window.showQuickPick(
-    defined.map((server) => ({
-      label: server.name,
-      description: `${server.user ? `${server.user}@` : ""}${server.host}:${server.port}`,
+  // Each server by its own name, under its folders, which are in its
+  // description too, so that typing a folder's name finds its servers
+  const items: (vscode.QuickPickItem & { server?: servers.Definition })[] = [];
+  let last = "";
+  for (const server of defined) {
+    const folder = servers.shown(server.path.slice(0, -1));
+    if (folder !== last) {
+      items.push({ label: folder, kind: vscode.QuickPickItemKind.Separator });
+      last = folder;
+    }
+    const login = `${server.user ? `${server.user}@` : ""}${server.host}:${server.port}`;
+    items.push({
+      label: server.path.at(-1) ?? "",
+      description: folder === "" ? login : `${folder} · ${login}`,
       detail: detail?.(server),
       server,
-    })),
-    { title, placeHolder: "Server" },
-  );
+    });
+  }
+  const picked = await vscode.window.showQuickPick(items, {
+    title,
+    placeHolder: "Server",
+    matchOnDescription: true,
+  });
   return picked?.server;
 }
 
-// Add a server to the user's or the workspace's settings, asking for each of
-// its settings. settings.json can be opened at the setting once it's added.
-export async function addServer(
+// Edit a server picked, in its form
+export async function editServer(forms: ServerForms) {
+  const server = await pickServer("kdb+/q: Edit Server");
+  if (server) {
+    forms.edit(server.path);
+  }
+}
+
+// Remove a server picked, once confirmed, from every scope it's written in,
+// as one left in the user's settings would still be there. Its connection
+// is closed, its form too, and its password forgotten if no other server
+// gets it.
+export async function removeServer(
   secrets: vscode.SecretStorage,
   connections: Connections<Connection>,
-  ask: Asker = quickInput("kdb+/q: Add Server"),
+  forms: ServerForms,
 ) {
-  const config = vscode.workspace.getConfiguration("kdb-q-ext-vscode");
-  const inspected = config.inspect("servers");
-  const scopes = {
-    user: inspected?.globalValue ?? {},
-    workspace: inspected?.workspaceValue ?? {},
-  };
-  // Checked before asking, rather than refusing once everything's answered
-  if (!servers.isObject(scopes.user) || !servers.isObject(scopes.workspace)) {
-    vscode.window.showErrorMessage(
-      "kdb+/q: The servers setting isn't an object, so a server can't be added to it.",
-    );
+  const server = await pickServer("kdb+/q: Remove Server");
+  if (!server) {
     return;
   }
-  const adding = await add(ask, {
-    taken: Object.keys({ ...scopes.user, ...scopes.workspace }),
-    timeout: connectionDefaults().timeout,
-    workspaceOpen: vscode.workspace.workspaceFolders !== undefined,
-  });
-  if (adding === undefined) {
+  const scopes = scopesOf(server.path);
+  const remove = "Remove";
+  const choice = await vscode.window.showWarningMessage(
+    `Remove ${servers.shown(server.path)}?`,
+    {
+      modal: true,
+      detail: `It's removed from your ${scopes.map(scopeName).join(" and ")} settings.`,
+    },
+    remove,
+  );
+  if (choice !== remove) {
     return;
   }
-  const { name, value, password, target } = adding;
-  // Read back as connecting reads it
-  const read = servers.definitions({ [name]: value });
-  const [definition] = read.servers;
-  if (definition === undefined) {
-    throw new Error(`kdb+/q: ${read.problems.join("; ")}`);
+  // The user's first: if the workspace's can't be written, the server's as
+  // it was, the workspace's winning. One that can't be written, as when
+  // its file has unsaved changes, leaves the server, and says why.
+  for (const scope of scopes) {
+    try {
+      await write(scope, server.path, undefined);
+    } catch (error) {
+      vscode.window.showErrorMessage(
+        `kdb+/q: ${servers.shown(server.path)} wasn't removed from ${scopeName(scope)} settings: ${(error as Error).message}`,
+      );
+      return;
+    }
   }
-  await config.update(
-    "servers",
-    { ...scopes[target], [name]: value },
-    target === "workspace"
-      ? vscode.ConfigurationTarget.Workspace
-      : vscode.ConfigurationTarget.Global,
-  );
-  if (password !== undefined) {
-    await secrets.store(servers.secretKey(definition), password);
-  }
-  const connect = "Connect";
-  const edit = "Open settings.json";
-  const choice = await vscode.window.showInformationMessage(
-    `kdb+/q: Added ${name}.`,
-    connect,
-    edit,
-  );
-  if (choice === connect) {
-    await connectTo(connections, definition);
-  } else if (choice === edit) {
-    // The Settings editor can't edit an object; a query naming a setting
-    // reveals it in the file
-    await vscode.commands.executeCommand(
-      target === "workspace"
-        ? "workbench.action.openWorkspaceSettingsFile"
-        : "workbench.action.openSettingsJson",
-      { query: "kdb-q-ext-vscode.servers" },
-    );
+  forms.close(server.path);
+  connections.disconnect(servers.id(server.path));
+  if (server.auth === "store") {
+    await forget(secrets, [servers.secretKey(server)]);
   }
 }
 
@@ -375,8 +421,8 @@ export async function addServer(
 export async function setPassword(secrets: vscode.SecretStorage) {
   const title = "kdb+/q: Set Server Password";
   const server = await pickServer(title, {
-    test: (server) => server.auth === undefined,
-    none: "Every server gets its password from its auth setting.",
+    test: (server) => server.auth === "store",
+    none: 'No server has "auth": "store".',
   });
   if (!server) {
     return;
@@ -385,7 +431,7 @@ export async function setPassword(secrets: vscode.SecretStorage) {
     title,
     prompt: "Password",
     password: true,
-    validateInput: servers.passwordProblem,
+    validateInput: passwordProblem,
   });
   if (password === undefined) {
     return;
@@ -393,7 +439,7 @@ export async function setPassword(secrets: vscode.SecretStorage) {
   await secrets.store(servers.secretKey(server), password);
 }
 
-// Any server, so that a password kept before its auth was set can go too
+// Any server, so that a password kept while its auth was store can go too
 export async function clearPassword(secrets: vscode.SecretStorage) {
   const server = await pickServer("kdb+/q: Clear Server Password");
   if (server) {
@@ -450,18 +496,15 @@ export async function clearPassphrase(secrets: vscode.SecretStorage) {
   }
 }
 
-// The connect timeout and the size limit, with any problems in them shown
+// The size limit, with any problem in it told
 export function connectionDefaults(): servers.Defaults {
   const config = vscode.workspace.getConfiguration("kdb-q-ext-vscode");
-  const { defaults, problems } = servers.settings(
-    config.get("connectTimeout"),
-    config.get("sizeLimit"),
+  const { defaults, problems } = servers.settings(config.get("sizeLimit"));
+  warn(
+    "sizeLimit",
+    problems,
+    (news) => `Using the default, as ${news.join(" and ")}.`,
   );
-  if (problems.length > 0) {
-    vscode.window.showWarningMessage(
-      `kdb+/q: Using the default, as ${problems.join(" and ")}.`,
-    );
-  }
   return defaults;
 }
 
@@ -475,7 +518,7 @@ export function sources(secrets: vscode.SecretStorage): Sources {
         prompt: "Password",
         password: true,
         ignoreFocusOut: true,
-        validateInput: servers.passwordProblem,
+        validateInput: passwordProblem,
       }),
     authExtension: () =>
       vscode.workspace
@@ -490,16 +533,24 @@ export function sources(secrets: vscode.SecretStorage): Sources {
 
 // A connection to a server as its settings define it, with its password or
 // credentials and its TLS files got at each connect, so that a token is
-// fresh. Undefined if the user cancels being asked for a password.
+// fresh, or a password typed in the server form, to test it before it's
+// stored. Undefined if the user cancels being asked for a password.
 export function opener(secrets: vscode.SecretStorage) {
-  return async (definition: servers.Definition) => {
+  return async (
+    definition: servers.Definition,
+    { signal, typed }: { signal?: AbortSignal; typed?: string } = {},
+  ) => {
     // Checked first, so that no password is asked for, nor an extension
     // asked, for a connect that would fail
     const tlsSettings = definition.tls ? tlsFiles() : undefined;
     if (tlsSettings?.problem) {
       throw new Error(`invalid TLS settings: ${tlsSettings.problem}`);
     }
-    const given = await credentials(definition, sources(secrets));
+    const from = sources(secrets);
+    const given = await credentials(
+      definition,
+      typed === undefined ? from : { ...from, stored: async () => typed },
+    );
     if (given === undefined) {
       return undefined;
     }
@@ -510,6 +561,7 @@ export function opener(secrets: vscode.SecretStorage) {
     }
     return Connection.open(
       servers.server(definition, given, connectionDefaults(), tls),
+      signal,
     );
   };
 }
@@ -518,8 +570,9 @@ export function opener(secrets: vscode.SecretStorage) {
 export async function connect(connections: Connections<Connection>) {
   const server = await pickServer("kdb+/q: Connect to Server", {
     detail: (server) => {
-      const state = connections.state(server.name);
-      const active = connections.active?.name === server.name;
+      const id = servers.id(server.path);
+      const state = connections.state(id);
+      const active = connections.active?.id === id;
       return state && `${active ? "Active, " : ""}${describe(state)}`;
     },
   });
@@ -536,7 +589,7 @@ async function connectTo(
     await connections.connect(server);
   } catch (error) {
     vscode.window.showErrorMessage(
-      `kdb+/q: ${server.name}: ${(error as Error).message}`,
+      `kdb+/q: ${servers.shown(server.path)}: ${(error as Error).message}`,
     );
   }
 }
@@ -554,6 +607,8 @@ export const serverMenu: { group: string; commands: [string, string][] }[] = [
     group: "Servers",
     commands: [
       ["kdb-q-ext-vscode.addServer", "Add Server"],
+      ["kdb-q-ext-vscode.editServer", "Edit Server"],
+      ["kdb-q-ext-vscode.removeServer", "Remove Server"],
       ["kdb-q-ext-vscode.openSettings", "Open Settings"],
     ],
   },
@@ -584,19 +639,27 @@ export async function showServerMenu() {
 
 // Close a connection: the only one, or one picked
 export async function disconnect(connections: Connections<Connection>) {
-  const names = connections.names;
-  if (names.length === 0) {
+  const connected = connections.servers;
+  if (connected.length === 0) {
     vscode.window.showInformationMessage("kdb+/q: No server is connected.");
     return;
   }
-  const name =
-    names.length === 1
-      ? names[0]
-      : await vscode.window.showQuickPick(names, {
-          title: "kdb+/q: Disconnect from Server",
-          placeHolder: "Server",
-        });
-  if (name) {
-    connections.disconnect(name);
+  const server =
+    connected.length === 1
+      ? connected[0]
+      : (
+          await vscode.window.showQuickPick(
+            connected.map((server) => ({
+              label: servers.shown(server.path),
+              server,
+            })),
+            {
+              title: "kdb+/q: Disconnect from Server",
+              placeHolder: "Server",
+            },
+          )
+        )?.server;
+  if (server) {
+    connections.disconnect(servers.id(server.path));
   }
 }
