@@ -3,6 +3,7 @@ import * as comments from "./comments";
 import { Connection } from "./connection";
 import type { Connections } from "./connections";
 import { credentials, type Sources } from "./credentials";
+import type { Scope } from "./form/fields";
 import type { Size } from "./format/console";
 import { passwordProblem } from "./login";
 import {
@@ -279,12 +280,17 @@ export async function toggleBlockComment(editor: vscode.TextEditor) {
   }
 }
 
+// A scope as VS Code names it
+function scopeName(scope: Scope): string {
+  return scope === "user" ? "User" : "Workspace";
+}
+
 // The servers in the settings, with any problems in each scope told: what
 // has one is skipped
 export function definitions(): servers.Definition[] {
   const { servers: defined, problems } = servers.read(scopes());
   for (const scope of ["user", "workspace"] as const) {
-    const where = scope === "user" ? "User settings" : "Workspace settings";
+    const where = `${scopeName(scope)} settings`;
     const found = problems.filter((problem) => problem.scope === scope);
     warn(
       `servers.${scope}`,
@@ -383,15 +389,25 @@ export async function removeServer(
     `Remove ${servers.shown(server.path)}?`,
     {
       modal: true,
-      detail: `It's removed from your ${scopes.map((scope) => (scope === "user" ? "User" : "Workspace")).join(" and ")} settings.`,
+      detail: `It's removed from your ${scopes.map(scopeName).join(" and ")} settings.`,
     },
     remove,
   );
   if (choice !== remove) {
     return;
   }
+  // The user's first: if the workspace's can't be written, the server's as
+  // it was, the workspace's winning. One that can't be written, as when
+  // its file has unsaved changes, leaves the server, and says why.
   for (const scope of scopes) {
-    await write(scope, server.path, undefined);
+    try {
+      await write(scope, server.path, undefined);
+    } catch (error) {
+      vscode.window.showErrorMessage(
+        `kdb+/q: ${servers.shown(server.path)} wasn't removed from ${scopeName(scope)} settings: ${(error as Error).message}`,
+      );
+      return;
+    }
   }
   forms.close(server.path);
   connections.disconnect(servers.id(server.path));

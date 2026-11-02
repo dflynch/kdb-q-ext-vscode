@@ -54,7 +54,8 @@ Add a server with **kdb+/q: Add Server**, which opens a form for its
 settings and saves them to your user or workspace settings, or write it in
 `settings.json`. **Edit Server** opens the same form for a server, where a
 password can be stored too, and **Remove Server** removes one, from every
-settings file it's in:
+settings file it's in. They write the whole setting, as VS Code writes
+one, so a comment inside it isn't kept:
 
 ```json
 "kdb-q-ext-vscode.servers": {

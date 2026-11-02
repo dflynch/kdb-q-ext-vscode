@@ -656,4 +656,51 @@ suite("editServer and removeServer", () => {
       forms.dispose();
     }
   });
+
+  test("Remove that can't write the setting leaves the server, and says why", async () => {
+    await setUser({ prod: { host: "kdb1", port: 1, auth: "store" } });
+    const kept: Record<string, string> = { "password:@kdb1:1": "secret" };
+    const { workspace } = vscode;
+    const configuration = workspace.getConfiguration;
+    const error = window.showErrorMessage;
+    const errors: string[] = [];
+    // As VS Code refuses a settings file with unsaved changes
+    workspace.getConfiguration = ((
+      ...args: Parameters<typeof configuration>
+    ) => {
+      const config = configuration(...args);
+      return Object.create(config, {
+        update: {
+          value: async () => {
+            throw new Error("the file has unsaved changes");
+          },
+        },
+      });
+    }) as typeof configuration;
+    window.showErrorMessage = (async (text: string) => {
+      errors.push(text);
+    }) as typeof error;
+    const forms = new ServerForms(
+      extension,
+      secrets(kept),
+      connections,
+      nowhere,
+      tabs().panels,
+    );
+    try {
+      answer = "Remove";
+      await removeServer(secrets(kept), connections, forms);
+    } finally {
+      workspace.getConfiguration = configuration;
+      window.showErrorMessage = error;
+      forms.dispose();
+    }
+    assert.deepStrictEqual(errors, [
+      "kdb+/q: prod wasn't removed from User settings: the file has unsaved changes",
+    ]);
+    assert.deepStrictEqual(user(), {
+      prod: { host: "kdb1", port: 1, auth: "store" },
+    });
+    assert.deepStrictEqual(kept, { "password:@kdb1:1": "secret" });
+  });
 });
