@@ -166,12 +166,13 @@ export class ServerForms implements vscode.Disposable {
     this.show("", { folder }, "Add Server");
   }
 
-  // The form to edit a server, by its path
+  // The form to edit a server, by its path, which its tab's title gives,
+  // as servers in different folders can have the same name
   edit(path: string[]) {
     this.show(
       servers.id(path),
       { folder: path.slice(0, -1), editing: path },
-      `Edit ${path.at(-1)}`,
+      `Edit ${servers.shown(path)}`,
     );
   }
 

@@ -218,7 +218,7 @@ suite("the server form", () => {
       "password:admin@kdb1.example.com:5010": "secret",
     });
     forms.edit(["Prod", "TP"]);
-    assert.strictEqual(made[0].title, "Edit TP");
+    assert.strictEqual(made[0].title, "Edit Prod › TP");
     const loaded = await made[0].loaded();
     assert.deepStrictEqual(loaded.form, {
       ...prod,
