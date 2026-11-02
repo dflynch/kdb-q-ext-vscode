@@ -137,7 +137,7 @@ const user = text("user");
 user.placeholder = "Optional";
 const password = text("password", "password");
 const timeout = text("timeout");
-timeout.placeholder = "No limit";
+timeout.placeholder = "None";
 const tls = tick("tls", "Use TLS");
 // Where TLS gets its certificates, under its tick once it's ticked
 const tlsNote = element("div", "note-under description");
@@ -360,7 +360,7 @@ function show(message: Extract<ToForm, { type: "load" }>) {
       left.add(field as Field);
     }
     warn(
-      `In the settings, it ${message.context.problem}. Saving writes it as the form has it.`,
+      `In the settings, it ${message.context.problem}. Saving replaces it with what's shown here.`,
     );
   }
   update();

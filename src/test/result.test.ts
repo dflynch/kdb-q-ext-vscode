@@ -36,7 +36,7 @@ suite("result", () => {
     assert.strictEqual(rowLimitSetting(10), 10);
     for (const wrong of [0, -1, 2.5, "10"]) {
       assert.throws(() => rowLimitSetting(wrong), {
-        message: "invalid rowLimit setting: not a whole number from 1",
+        message: "invalid rowLimit setting: must be a positive whole number",
       });
     }
   });
@@ -53,7 +53,7 @@ suite("result", () => {
         () => sizeSetting(wrong),
         {
           message:
-            "invalid consoleSize setting: not two whole numbers from 10 to 2000",
+            "invalid consoleSize setting: must be two whole numbers from 10 to 2000",
         },
         JSON.stringify(wrong),
       );
@@ -68,7 +68,8 @@ suite("result", () => {
       assert.throws(
         () => precisionSetting(wrong),
         {
-          message: "invalid precision setting: not a whole number from 0 to 17",
+          message:
+            "invalid precision setting: must be a whole number from 0 to 17",
         },
         JSON.stringify(wrong),
       );

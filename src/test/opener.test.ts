@@ -150,7 +150,8 @@ suite("opener", () => {
         auth: "prompt",
       };
       await assert.rejects(opener(secrets({}))(server), {
-        message: "invalid TLS settings: tlsCertFile and tlsKeyFile go together",
+        message:
+          "invalid TLS settings: tlsCertFile and tlsKeyFile must be set together",
       });
       assert.strictEqual(asked, false);
     } finally {
@@ -182,7 +183,7 @@ suite("opener", () => {
       };
       await assert.rejects(opener(secrets({}))(server), {
         message:
-          "invalid sizeLimit setting: not a positive number of megabytes",
+          "invalid sizeLimit setting: must be a positive number of megabytes",
       });
       assert.strictEqual(asked, false);
     } finally {

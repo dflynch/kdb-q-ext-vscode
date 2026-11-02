@@ -200,7 +200,7 @@ suite("runOnServer", () => {
       );
       assert.deepStrictEqual(sent, []);
       assert.deepStrictEqual(replaced, [
-        "'invalid rowLimit setting: not a whole number from 1",
+        "'invalid rowLimit setting: must be a positive whole number",
       ]);
       assert.deepStrictEqual(answers, [{ query: "1", server: "prod" }]);
       assert.deepStrictEqual(told, []);

@@ -21,7 +21,7 @@ export function sizeSetting(setting: unknown): Size {
     return { ...defaultSize, lines, width };
   }
   throw new Error(
-    "invalid consoleSize setting: not two whole numbers from 10 to 2000",
+    "invalid consoleSize setting: must be two whole numbers from 10 to 2000",
   );
 }
 
@@ -38,7 +38,9 @@ export function precisionSetting(setting: unknown): number {
   ) {
     return setting as number;
   }
-  throw new Error("invalid precision setting: not a whole number from 0 to 17");
+  throw new Error(
+    "invalid precision setting: must be a whole number from 0 to 17",
+  );
 }
 
 // The most rows a result, or a cell's value drilled into, can have to be
@@ -50,7 +52,7 @@ export function rowLimitSetting(setting: unknown): number {
   if (Number.isInteger(setting) && (setting as number) >= 1) {
     return setting as number;
   }
-  throw new Error("invalid rowLimit setting: not a whole number from 1");
+  throw new Error("invalid rowLimit setting: must be a positive whole number");
 }
 
 // What to show for a query in the Result view: its response, for the

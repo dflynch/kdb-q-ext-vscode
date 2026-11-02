@@ -102,7 +102,7 @@ suite("status", () => {
         "Authentication: Ask each time",
         "TLS: Off",
         "Protected evaluation: Off",
-        "Connection timeout: No limit",
+        "Connection timeout: None",
       ],
     );
   });
@@ -122,7 +122,7 @@ suite("status", () => {
         'Authentication: Extension "kdb-auth" (invalid)',
       ),
     );
-    assert.ok(lines.includes("Connection timeout: No limit"));
+    assert.ok(lines.includes("Connection timeout: None"));
   });
 
   test("the server menu names each command as the palette does", () => {

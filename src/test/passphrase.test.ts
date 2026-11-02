@@ -84,7 +84,7 @@ suite("certificate passphrase", () => {
     assert.deepStrictEqual(kept, {});
     assert.deepStrictEqual(told, [
       "kdb+/q: No TLS key file is set.",
-      "kdb+/q: invalid TLS settings: tlsKeyFile: not an absolute path or one from ~/",
+      "kdb+/q: invalid TLS settings: tlsKeyFile: must be an absolute path or start with ~/",
     ]);
   });
 });

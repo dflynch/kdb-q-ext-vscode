@@ -555,7 +555,7 @@ suite("servers", () => {
     for (const wrong of [0, "10"]) {
       assert.throws(() => settings(wrong), {
         message:
-          "invalid sizeLimit setting: not a positive number of megabytes",
+          "invalid sizeLimit setting: must be a positive number of megabytes",
       });
     }
   });

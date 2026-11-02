@@ -397,7 +397,7 @@ export function settings(megabytes: unknown): Defaults {
     return { ...defaults, limit: Math.round(megabytes * 1e6) };
   }
   throw new Error(
-    "invalid sizeLimit setting: not a positive number of megabytes",
+    "invalid sizeLimit setting: must be a positive number of megabytes",
   );
 }
 
