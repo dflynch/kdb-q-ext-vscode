@@ -9,6 +9,8 @@ import {
   type Definition,
   defaults,
   definitions,
+  isObject,
+  isServer,
   merge,
   put,
   read,
@@ -195,7 +197,7 @@ suite("servers", () => {
         .split("/")
         .reduce((at, part) => at?.[part], configuration);
     const servers = configuration.properties["kdb-q-ext-vscode.servers"];
-    const [, folder] = servers.additionalProperties.anyOf;
+    const folder = servers.additionalProperties.else;
     assert.strictEqual(
       resolve(folder.additionalProperties.$ref),
       servers.additionalProperties,
@@ -210,6 +212,36 @@ suite("servers", () => {
     }
     for (const name of ["", " "]) {
       assert.ok(!names.test(name), name);
+    }
+  });
+
+  test("the schema tells a server from a folder as the reader does", () => {
+    const servers = JSON.parse(
+      readFileSync(path.join(__dirname, "../../package.json"), "utf8"),
+    ).contributes.configuration.properties["kdb-q-ext-vscode.servers"];
+    // The if is any of: the fields required, and none of them an object
+    const schemaSays = (value: Record<string, unknown>) =>
+      servers.additionalProperties.if.anyOf.some(
+        (branch: { required: string[] }) =>
+          branch.required.every(
+            (field) => Object.hasOwn(value, field) && !isObject(value[field]),
+          ),
+      );
+    for (const value of [
+      { host: "h", port: 1 },
+      { hots: "h", port: 1 },
+      { host: "h" },
+      { hots: "h" },
+      {},
+      { port: { host: "h", port: 1 } },
+      { host: { n: 1 }, port: 1 },
+      { rdb: "dev:5011", TP: { host: "h", port: 1 } },
+    ]) {
+      assert.strictEqual(
+        schemaSays(value),
+        isServer(value),
+        JSON.stringify(value),
+      );
     }
   });
 
