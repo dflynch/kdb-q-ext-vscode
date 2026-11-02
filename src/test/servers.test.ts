@@ -9,10 +9,13 @@ import {
   type Definition,
   defaults,
   definitions,
+  merge,
   put,
+  read,
   said,
   secretKey,
   server,
+  serverAt,
   settings,
 } from "../servers";
 
@@ -272,6 +275,65 @@ suite("servers", () => {
       { path: ["gw"], problem: "has a port that isn't from 1 to 65535" },
       { path: ["Prod", "TP"], problem: "isn't a server or a folder" },
     ]);
+  });
+
+  test("a folder in both scopes holds what each has; the workspace's wins otherwise", () => {
+    const user = {
+      Prod: {
+        TP: { host: "user", port: 1, user: "admin" },
+        RDB: { host: "rdb", port: 2 },
+      },
+      gw: { host: "gw", port: 3, protect: false },
+      X: { a: { host: "a", port: 4 } },
+    };
+    const workspace = {
+      Prod: { TP: { host: "ws", port: 5 }, HDB: { host: "hdb", port: 6 } },
+      // A server's fields aren't mixed: the workspace's replaces it whole
+      gw: { port: 7 },
+      // Nor are a folder and a server
+      X: { host: "x", port: 8 },
+    };
+    assert.deepStrictEqual(merge(user, workspace, true), {
+      Prod: {
+        TP: { host: "ws", port: 5 },
+        RDB: { host: "rdb", port: 2 },
+        HDB: { host: "hdb", port: 6 },
+      },
+      gw: { port: 7 },
+      X: { host: "x", port: 8 },
+    });
+    assert.strictEqual(merge(user, undefined, true), user);
+    assert.deepStrictEqual(merge(undefined, workspace, true), workspace);
+  });
+
+  test("each scope's problems are said of it, and the servers read together", () => {
+    const { servers, folders, problems } = read({
+      user: { Dev: { rdb: "dev:5011", TP: { host: "dev", port: 1 } } },
+      workspace: { gw: { port: 7 }, Dev: {} },
+    });
+    assert.deepStrictEqual(servers, [
+      { path: ["Dev", "TP"], host: "dev", port: 1 },
+    ]);
+    assert.deepStrictEqual(folders, [["Dev"]]);
+    assert.deepStrictEqual(problems, [
+      {
+        path: ["Dev", "rdb"],
+        problem: "isn't a server or a folder",
+        scope: "user",
+      },
+      { path: ["gw"], problem: "has no host", scope: "workspace" },
+    ]);
+    assert.deepStrictEqual(read({ user: 1, workspace: undefined }).problems, [
+      { path: [], problem: "isn't an object", scope: "user" },
+    ]);
+  });
+
+  test("a server's at a path, not a folder or anything else", () => {
+    const setting = { Prod: { TP: { host: "h", port: 1 }, bad: "x" } };
+    assert.ok(serverAt(setting, ["Prod", "TP"]));
+    assert.ok(!serverAt(setting, ["Prod"]));
+    assert.ok(!serverAt(setting, ["Prod", "bad"]));
+    assert.ok(!serverAt(setting, ["nothing"]));
   });
 
   test("a problem's said of what has it, by its path", () => {

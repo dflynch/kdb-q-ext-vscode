@@ -1,5 +1,5 @@
 import type { Server } from "./connection";
-import { longestTimeout } from "./form/fields";
+import { longestTimeout, type Scope } from "./form/fields";
 import { passwordProblem, userProblem } from "./login";
 import type { Secure } from "./tls";
 
@@ -100,13 +100,13 @@ function isTimeout(value: unknown): value is number {
   return value === 0 || (isCount(value) && value <= longestTimeout);
 }
 
-// The servers in the setting, in the order written, and the folders they're
+// The servers in a setting, in the order written, and the folders they're
 // in, empty ones too, for the Servers view to show. An object with a host
 // or a port is a server, and any other is a folder, holding servers and
-// folders, or nothing. VS Code doesn't hold a setting to its schema, so each is checked
-// here too; one with a problem is left out and the problem said, rather than
-// connecting somewhere other than meant, such as without a user whose name
-// was misspelt.
+// folders, or nothing. VS Code doesn't hold a setting to its schema, so
+// each is checked here too; one with a problem is left out and the problem
+// said, rather than connecting somewhere other than meant, such as without
+// a user whose name was misspelt.
 export function definitions(setting: unknown): {
   servers: Definition[];
   folders: string[][];
@@ -144,6 +144,59 @@ export function definitions(setting: unknown): {
   };
   read(setting, []);
   return { servers, folders, problems };
+}
+
+// The servers setting as written in each scope
+export type Written = Record<Scope, unknown>;
+
+// The servers the scopes define together, and their folders, with the
+// problems in each scope said of it. A folder in both holds what each has;
+// anything else in the workspace's replaces what's at its place in the
+// user's whole, rather than VS Code's merge, which mixes their fields, so
+// that a server is as one scope writes it, and a problem is said where it's
+// written.
+export function read(written: Written): {
+  servers: Definition[];
+  folders: string[][];
+  problems: (Problem & { scope: Scope })[];
+} {
+  const { servers, folders } = definitions(
+    merge(written.user, written.workspace, true),
+  );
+  const problems = (["user", "workspace"] as const).flatMap((scope) =>
+    definitions(written[scope]).problems.map((problem) => ({
+      ...problem,
+      scope,
+    })),
+  );
+  return { servers, folders, problems };
+}
+
+// The user's and the workspace's values at the same place, as read
+// together: two folders, or the settings themselves, which are folders,
+// are merged, the user's names first, and otherwise the workspace's wins
+export function merge(user: unknown, workspace: unknown, folders = false) {
+  if (workspace === undefined) {
+    return user;
+  }
+  if (
+    !isObject(user) ||
+    !isObject(workspace) ||
+    (!folders && (isServer(user) || isServer(workspace)))
+  ) {
+    return workspace;
+  }
+  const merged = new Map(Object.entries(user));
+  for (const [key, value] of Object.entries(workspace)) {
+    merged.set(key, merge(merged.get(key), value));
+  }
+  return Object.fromEntries(merged);
+}
+
+// Whether a server's written at a path in a setting
+export function serverAt(setting: unknown, path: string[]): boolean {
+  const value = at(setting, path);
+  return isObject(value) && isServer(value);
 }
 
 // Whether a value is an object, as the servers setting and its folders and
@@ -212,7 +265,7 @@ function replaced(
 // that each is told by what it has itself: a mistake in a folder's entry
 // doesn't make a server of the folder. A server named host or port is an
 // object, as a server's own host and port aren't.
-function isServer(value: Record<string, unknown>): boolean {
+export function isServer(value: Record<string, unknown>): boolean {
   return ["host", "port"].some(
     (field) => Object.hasOwn(value, field) && !isObject(value[field]),
   );

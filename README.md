@@ -75,7 +75,9 @@ settings file it's in:
   folders, or nothing. A server is shown with its folders, as
   `Prod › trades › TP`, and the same name can be used in different
   folders. A folder in your user settings and one of the same name in the
-  workspace's are shown as one folder. For example:
+  workspace's are shown as one folder; anything else of the same name in
+  both is the workspace's, as it's written there, its fields not mixed with
+  the user's. For example:
 
   ```json
   "kdb-q-ext-vscode.servers": {

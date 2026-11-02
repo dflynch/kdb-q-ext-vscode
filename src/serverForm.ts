@@ -51,17 +51,17 @@ type Open = {
 const config = () => vscode.workspace.getConfiguration("kdb-q-ext-vscode");
 
 // The servers setting in each scope, as written there
-function scopes(): Record<Scope, unknown> {
+export function scopes(): servers.Written {
   const inspected = config().inspect("servers");
   return { user: inspected?.globalValue, workspace: inspected?.workspaceValue };
 }
 
-// The scopes a server's written in: a server in both has their fields
-// merged, the workspace's over the user's
+// The scopes a server's written in: one in both is the workspace's, the
+// user's kept but not used
 export function scopesOf(path: string[]): Scope[] {
   const written = scopes();
-  return (["user", "workspace"] as const).filter(
-    (scope) => servers.at(written[scope], path) !== undefined,
+  return (["user", "workspace"] as const).filter((scope) =>
+    servers.serverAt(written[scope], path),
   );
 }
 
@@ -101,15 +101,6 @@ export async function openServers(scope: Scope) {
   );
 }
 
-// The scope whose servers setting has a problem, the workspace's first, as
-// it wins
-export function troubled(): Scope {
-  const written = scopes();
-  return servers.definitions(written.workspace).problems.length > 0
-    ? "workspace"
-    : "user";
-}
-
 // Delete the passwords no server other than the one at the path given still
 // gets from secure storage: several servers with the same user, host and
 // port share one
@@ -118,7 +109,7 @@ export async function forget(
   keys: Iterable<string>,
   except?: string[],
 ) {
-  const { servers: defined } = servers.definitions(config().get("servers"));
+  const { servers: defined } = servers.read(scopes());
   const skipped = except && servers.id(except);
   for (const key of keys) {
     const used = defined.some(
@@ -276,8 +267,11 @@ export class ServerForms implements vscode.Disposable {
 
   // What the form needs to know, as the settings are now
   private context(open: Open): Context {
-    const setting = config().get("servers");
-    const folder = servers.at(setting, open.folder);
+    const { user, workspace } = scopes();
+    const folder = servers.at(
+      servers.merge(user, workspace, true),
+      open.folder,
+    );
     const own = open.editing?.at(-1);
     const authExtension = config().get("authExtension");
     const { files } = tls.files(
@@ -307,7 +301,7 @@ export class ServerForms implements vscode.Disposable {
   private editing(open: Open): servers.Definition | undefined {
     const id = open.editing && servers.id(open.editing);
     return servers
-      .definitions(config().get("servers"))
+      .read(scopes())
       .servers.find((server) => servers.id(server.path) === id);
   }
 

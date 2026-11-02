@@ -14,7 +14,7 @@ import {
 } from "./result";
 import type { Results } from "./resultView";
 import type { ServerForms } from "./serverForm";
-import { forget, openServers, scopesOf, troubled, write } from "./serverForm";
+import { forget, openServers, scopes, scopesOf, write } from "./serverForm";
 import * as servers from "./servers";
 import * as statements from "./statements";
 import { describe, type Status } from "./status";
@@ -24,31 +24,26 @@ import { Told } from "./told";
 const told = new Told();
 
 // Warn of the problems found in a setting that haven't been told, said by
-// the message given, with a button to open the setting
+// the message given, with a button to open the setting: in the Settings
+// editor, or where else it's opened
 function warn(
   setting: string,
   problems: string[],
   message: (news: string[]) => string,
+  open: () => Thenable<unknown> = () =>
+    vscode.commands.executeCommand(
+      "workbench.action.openSettings",
+      `kdb-q-ext-vscode.${setting}`,
+    ),
 ) {
   const news = told.news(setting, problems);
   if (news.length === 0) {
     return;
   }
-  const open = "Open Settings";
+  const button = "Open Settings";
   vscode.window
-    .showWarningMessage(`kdb+/q: ${message(news)}`, open)
-    .then((choice) => {
-      if (choice !== open) {
-        return;
-      }
-      if (setting === "servers") {
-        return openServers(troubled());
-      }
-      return vscode.commands.executeCommand(
-        "workbench.action.openSettings",
-        `kdb-q-ext-vscode.${setting}`,
-      );
-    });
+    .showWarningMessage(`kdb+/q: ${message(news)}`, button)
+    .then((choice) => (choice === button ? open() : undefined));
 }
 
 // Send the selected text, or the current line, to the active terminal one
@@ -284,18 +279,23 @@ export async function toggleBlockComment(editor: vscode.TextEditor) {
   }
 }
 
-// The servers in the settings, with any problems in them told: what has
-// one is skipped
+// The servers in the settings, with any problems in each scope told: what
+// has one is skipped
 export function definitions(): servers.Definition[] {
-  const setting = vscode.workspace
-    .getConfiguration("kdb-q-ext-vscode")
-    .get("servers");
-  const { servers: defined, problems } = servers.definitions(setting);
-  warn("servers", problems.map(servers.said), (news) =>
-    problems.some(({ path }) => path.length === 0)
-      ? "The servers setting is skipped, as it isn't an object."
-      : `Skipped in the servers setting: ${news.join("; ")}.`,
-  );
+  const { servers: defined, problems } = servers.read(scopes());
+  for (const scope of ["user", "workspace"] as const) {
+    const where = scope === "user" ? "User settings" : "Workspace settings";
+    const found = problems.filter((problem) => problem.scope === scope);
+    warn(
+      `servers.${scope}`,
+      found.map(servers.said),
+      (news) =>
+        found.some(({ path }) => path.length === 0)
+          ? `The servers setting in ${where} is skipped, as it isn't an object.`
+          : `Skipped in the servers setting, in ${where}: ${news.join("; ")}.`,
+      () => openServers(scope),
+    );
+  }
   return defined;
 }
 
