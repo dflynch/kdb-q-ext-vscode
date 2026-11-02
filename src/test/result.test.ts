@@ -32,27 +32,28 @@ suite("result", () => {
   });
 
   test("the row limit is a whole number from 1", () => {
-    assert.deepStrictEqual(rowLimitSetting(undefined), { rowLimit: 5_000_000 });
-    assert.deepStrictEqual(rowLimitSetting(10), { rowLimit: 10 });
+    assert.strictEqual(rowLimitSetting(undefined), 5_000_000);
+    assert.strictEqual(rowLimitSetting(10), 10);
     for (const wrong of [0, -1, 2.5, "10"]) {
-      assert.deepStrictEqual(rowLimitSetting(wrong), {
-        rowLimit: 5_000_000,
-        problem: "the row limit isn't a whole number from 1",
+      assert.throws(() => rowLimitSetting(wrong), {
+        message: "invalid rowLimit setting: not a whole number from 1",
       });
     }
   });
 
   test("the console size is lines then width, each from 10 to 2000", () => {
-    assert.deepStrictEqual(sizeSetting(undefined), { size: defaultSize });
+    assert.deepStrictEqual(sizeSetting(undefined), defaultSize);
     assert.deepStrictEqual(sizeSetting([25, 80]), {
-      size: { ...defaultSize, lines: 25, width: 80 },
+      ...defaultSize,
+      lines: 25,
+      width: 80,
     });
     for (const wrong of [[9, 80], [25, 2001], [25], [25, 80.5], "25 80"]) {
-      assert.deepStrictEqual(
-        sizeSetting(wrong),
+      assert.throws(
+        () => sizeSetting(wrong),
         {
-          size: defaultSize,
-          problem: "the console size isn't two whole numbers from 10 to 2000",
+          message:
+            "invalid consoleSize setting: not two whole numbers from 10 to 2000",
         },
         JSON.stringify(wrong),
       );
@@ -60,15 +61,14 @@ suite("result", () => {
   });
 
   test("the precision is a whole number from 0 to 17, as q's \\P", () => {
-    assert.deepStrictEqual(precisionSetting(undefined), { precision: 7 });
-    assert.deepStrictEqual(precisionSetting(0), { precision: 0 });
-    assert.deepStrictEqual(precisionSetting(17), { precision: 17 });
+    assert.strictEqual(precisionSetting(undefined), 7);
+    assert.strictEqual(precisionSetting(0), 0);
+    assert.strictEqual(precisionSetting(17), 17);
     for (const wrong of [-1, 18, 2.5, "7"]) {
-      assert.deepStrictEqual(
-        precisionSetting(wrong),
+      assert.throws(
+        () => precisionSetting(wrong),
         {
-          precision: 7,
-          problem: "the precision isn't a whole number from 0 to 17",
+          message: "invalid precision setting: not a whole number from 0 to 17",
         },
         JSON.stringify(wrong),
       );

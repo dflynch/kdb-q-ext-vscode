@@ -4,7 +4,7 @@ import { Connection } from "./connection";
 import type { Connections } from "./connections";
 import { credentials, type Sources } from "./credentials";
 import type { Scope } from "./form/fields";
-import type { Size } from "./format/console";
+import { errorText, type Size } from "./format/console";
 import { passwordProblem } from "./login";
 import {
   type Outcome,
@@ -15,38 +15,11 @@ import {
 } from "./result";
 import type { Results } from "./resultView";
 import type { ServerForms } from "./serverForm";
-import { forget, openServers, scopes, scopesOf, write } from "./serverForm";
+import { forget, scopes, scopesOf, write } from "./serverForm";
 import * as servers from "./servers";
 import * as statements from "./statements";
 import { describe, type Status } from "./status";
 import { files, passphraseKey, type Secure, secure } from "./tls";
-import { Told } from "./told";
-
-const told = new Told();
-
-// Warn of the problems found in a setting that haven't been told, said by
-// the message given, with a button to open the setting: in the Settings
-// editor, or where else it's opened
-function warn(
-  setting: string,
-  problems: string[],
-  message: (news: string[]) => string,
-  open: () => Thenable<unknown> = () =>
-    vscode.commands.executeCommand(
-      "workbench.action.openSettings",
-      `kdb-q-ext-vscode.${setting}`,
-    ),
-) {
-  const news = told.news(setting, problems);
-  if (news.length === 0) {
-    return;
-  }
-  const button = "Open Settings";
-  vscode.window
-    .showWarningMessage(`kdb+/q: ${message(news)}`, button)
-    .then((choice) => (choice === button ? open() : undefined));
-}
-
 // Send the selected text, or the current line, to the active terminal one
 // statement at a time. With several selections, each is sent in turn from the
 // top of the document.
@@ -79,25 +52,15 @@ export function runSelectedText(editor: vscode.TextEditor) {
   }
 }
 
-// The console size, the precision and the row limit, with any problem in
-// them told
+// The console size, the precision and the row limit, read at each run; one
+// that's wrong is thrown
 function consoleSize(): Size {
   const config = vscode.workspace.getConfiguration("kdb-q-ext-vscode");
-  const { size, problem } = sizeSetting(config.get("consoleSize"));
-  const digits = precisionSetting(config.get("precision"));
-  const rows = rowLimitSetting(config.get("rowLimit"));
-  for (const [setting, wrong] of [
-    ["consoleSize", problem],
-    ["precision", digits.problem],
-    ["rowLimit", rows.problem],
-  ] as const) {
-    warn(
-      setting,
-      wrong ? [wrong] : [],
-      ([news]) => `Using the default, as ${news}.`,
-    );
-  }
-  return { ...size, precision: digits.precision, rowLimit: rows.rowLimit };
+  return {
+    ...sizeSetting(config.get("consoleSize")),
+    precision: precisionSetting(config.get("precision")),
+    rowLimit: rowLimitSetting(config.get("rowLimit")),
+  };
 }
 
 // Run the whole file, saved or not, on the active connection, as selecting
@@ -153,8 +116,16 @@ async function run(
   if (!server || !link) {
     return;
   }
-  const size = consoleSize();
+  const about = { query, server: servers.shown(server.path) };
   await results.reveal();
+  // A wrong setting fails the run, saying why, before the query's sent
+  let size: Size;
+  try {
+    size = consoleSize();
+  } catch (error) {
+    results.show({ type: "error", text: errorText(error as Error) }, about);
+    return;
+  }
   const ended = status.running(id);
   const outcome: Outcome = await link.query(query).then(
     (result) => ({ result }),
@@ -164,13 +135,11 @@ async function run(
     "result" in outcome ? outcome.result.roundtrip : undefined,
   );
   // The server's time is known once the webview has decoded the response
-  results
-    .show(toView(outcome, size), { query, server: servers.shown(server.path) })
-    .then((execution) => {
-      if (execution !== undefined) {
-        executed(execution);
-      }
-    });
+  results.show(toView(outcome, size), about).then((execution) => {
+    if (execution !== undefined) {
+      executed(execution);
+    }
+  });
 }
 
 // Comment out the selected lines with "/" and "\" marker lines, or remove the
@@ -285,24 +254,10 @@ function scopeName(scope: Scope): string {
   return scope === "user" ? "User" : "Workspace";
 }
 
-// The servers in the settings, with any problems in each scope told: what
-// has one is skipped
+// The servers in the settings; one with a problem is shown, with it, in the
+// Servers view, and offered nowhere else
 export function definitions(): servers.Definition[] {
-  const { servers: defined, problems } = servers.read(scopes());
-  for (const scope of ["user", "workspace"] as const) {
-    const where = `${scopeName(scope)} settings`;
-    const found = problems.filter((problem) => problem.scope === scope);
-    warn(
-      `servers.${scope}`,
-      found.map(servers.said),
-      (news) =>
-        found.some(({ path }) => path.length === 0)
-          ? `The servers setting in ${where} is skipped, as it isn't an object.`
-          : `Skipped in the servers setting, in ${where}: ${news.join("; ")}.`,
-      () => openServers(scope),
-    );
-  }
-  return defined;
+  return servers.read(scopes()).servers;
 }
 
 // A server picked from those defined, under the command's title: any, or
@@ -496,16 +451,11 @@ export async function clearPassphrase(secrets: vscode.SecretStorage) {
   }
 }
 
-// The size limit, with any problem in it told
-export function connectionDefaults(): servers.Defaults {
-  const config = vscode.workspace.getConfiguration("kdb-q-ext-vscode");
-  const { defaults, problems } = servers.settings(config.get("sizeLimit"));
-  warn(
-    "sizeLimit",
-    problems,
-    (news) => `Using the default, as ${news.join(" and ")}.`,
+// The size limit, read at each connect; one that's wrong is thrown
+function connectionDefaults(): servers.Defaults {
+  return servers.settings(
+    vscode.workspace.getConfiguration("kdb-q-ext-vscode").get("sizeLimit"),
   );
-  return defaults;
 }
 
 // Where credentials come from in VS Code
@@ -542,6 +492,7 @@ export function opener(secrets: vscode.SecretStorage) {
   ) => {
     // Checked first, so that no password is asked for, nor an extension
     // asked, for a connect that would fail
+    const defaults = connectionDefaults();
     const tlsSettings = definition.tls ? tlsFiles() : undefined;
     if (tlsSettings?.problem) {
       throw new Error(`invalid TLS settings: ${tlsSettings.problem}`);
@@ -560,7 +511,7 @@ export function opener(secrets: vscode.SecretStorage) {
       tls = await secure(tlsSettings.files, key && (await secrets.get(key)));
     }
     return Connection.open(
-      servers.server(definition, given, connectionDefaults(), tls),
+      servers.server(definition, given, defaults, tls),
       signal,
     );
   };

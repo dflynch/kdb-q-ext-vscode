@@ -511,18 +511,15 @@ suite("servers", () => {
   });
 
   test("the size limit", () => {
-    assert.deepStrictEqual(settings(undefined), { defaults, problems: [] });
-    assert.deepStrictEqual(settings(2.5), {
-      defaults: { limit: 2500000 },
-      problems: [],
-    });
+    assert.deepStrictEqual(settings(undefined), defaults);
+    assert.deepStrictEqual(settings(2.5), { limit: 2500000 });
   });
 
-  test("a wrong setting is a problem, and its default is used", () => {
+  test("a wrong size limit is refused, not replaced by the default", () => {
     for (const wrong of [0, "10"]) {
-      assert.deepStrictEqual(settings(wrong), {
-        defaults,
-        problems: ["the size limit isn't a positive number of megabytes"],
+      assert.throws(() => settings(wrong), {
+        message:
+          "invalid sizeLimit setting: not a positive number of megabytes",
       });
     }
   });

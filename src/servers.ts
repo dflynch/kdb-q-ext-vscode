@@ -357,21 +357,18 @@ export function authExtension(setting: unknown): {
     : { problem: "the auth extension isn't an extension ID" };
 }
 
-// The size limit, with the problem said if it's wrong and its default used
-export function settings(megabytes: unknown): {
-  defaults: Defaults;
-  problems: string[];
-} {
-  const problems: string[] = [];
-  let result = { ...defaults };
-  if (megabytes !== undefined) {
-    if (typeof megabytes === "number" && megabytes > 0) {
-      result = { ...result, limit: Math.round(megabytes * 1e6) };
-    } else {
-      problems.push("the size limit isn't a positive number of megabytes");
-    }
+// The size limit, in megabytes; one that's wrong is refused, so that the
+// connect that reads it fails, saying why, rather than use another
+export function settings(megabytes: unknown): Defaults {
+  if (megabytes === undefined) {
+    return defaults;
   }
-  return { defaults: result, problems };
+  if (typeof megabytes === "number" && megabytes > 0) {
+    return { ...defaults, limit: Math.round(megabytes * 1e6) };
+  }
+  throw new Error(
+    "invalid sizeLimit setting: not a positive number of megabytes",
+  );
 }
 
 // Where a server's password is kept. Keyed by where it's sent, not by the
