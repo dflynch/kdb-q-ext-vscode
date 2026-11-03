@@ -1,4 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="-21.6 -5 266 266">
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="-38.2 -5 266 266">
+  <!-- The q is centred 9.75px across, not 8, to line up with the icons of
+       Seti, the default file icon theme: they are drawn from a font at 150%
+       and overflow their 16px box. -->
   <title>q</title>
   <g fill="none" stroke="#14213D" stroke-width="31" stroke-linecap="round">
     <circle cx="122" cy="108" r="48"/>
