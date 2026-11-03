@@ -196,7 +196,7 @@ export type Login = { user: string; host: string; port: string };
 // failed
 export type ToForm =
   | { type: "load"; form: Form; context: Context; stored: boolean }
-  | { type: "gone" }
+  | { type: "gone"; path: string[] }
   | { type: "stored"; login: Login; stored: boolean }
   | { type: "tested"; ok: boolean; text: string }
   | { type: "unsaved"; text: string };

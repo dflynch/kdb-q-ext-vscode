@@ -69,6 +69,15 @@ export function scopesOf(
   );
 }
 
+// Whether the server a form edits, or the folder it adds to, has gone from
+// the settings. The top level is never gone.
+function gone({ folder, editing }: Pick<Open, "folder" | "editing">) {
+  const merged = servers.merged(scopes());
+  return editing
+    ? servers.kindAt(merged, editing) !== "server"
+    : folder.length > 0 && servers.kindAt(merged, folder) !== "folder";
+}
+
 const targets = {
   user: vscode.ConfigurationTarget.Global,
   workspace: vscode.ConfigurationTarget.Workspace,
@@ -183,8 +192,13 @@ export class ServerForms implements vscode.Disposable {
     });
   }
 
-  // The form to add a server to a folder
+  // The form to add a server to a folder, replacing one whose folder's gone
   add(folder: string[] = []) {
+    const shown = this.forms.get("");
+    if (shown && gone(shown)) {
+      this.forms.delete("");
+      shown.panel.dispose();
+    }
     this.show("", { folder }, "Add Server");
   }
 
@@ -198,11 +212,11 @@ export class ServerForms implements vscode.Disposable {
     );
   }
 
-  // Close a server's form, or those of every server in a folder, as when
-  // it's removed
+  // Close a server's form, or those of every server in a folder and those
+  // adding to it, as when it's removed
   close(path: string[]) {
-    for (const { panel, editing } of [...this.forms.values()]) {
-      if (editing && servers.within(editing, path)) {
+    for (const { panel, folder, editing } of [...this.forms.values()]) {
+      if (servers.within(editing ?? folder, path)) {
         panel.dispose();
       }
     }
@@ -329,8 +343,8 @@ export class ServerForms implements vscode.Disposable {
   }
 
   // Post the form as the settings have it: blank for a server to add, or
-  // the server edited, unless it's gone. Not while it's saved, nor again
-  // when the change is to something else.
+  // the server edited, unless it, or the folder added to, is gone. Not
+  // while it's saved, nor again when the change is to something else.
   private async load(open: Open) {
     if (open.saving) {
       return;
@@ -345,6 +359,9 @@ export class ServerForms implements vscode.Disposable {
 
   // A server with a problem is loaded as it's written, with the problem
   private async loading(open: Open): Promise<ToForm> {
+    if (gone(open)) {
+      return { type: "gone", path: open.editing ?? open.folder };
+    }
     const context = this.context(open);
     if (open.editing === undefined) {
       return { type: "load", form: blank(), context, stored: false };
@@ -357,9 +374,6 @@ export class ServerForms implements vscode.Disposable {
       return { type: "load", form, context, stored };
     }
     const merged = servers.merged(scopes());
-    if (servers.kindAt(merged, open.editing) !== "server") {
-      return { type: "gone" };
-    }
     const value = servers.at(merged, open.editing);
     const problem = servers.entryProblem(name, value);
     const form = fromSetting(name, value);
@@ -466,6 +480,12 @@ export class ServerForms implements vscode.Disposable {
     const key = servers.secretKey(definition);
     if (form.auth === "store" && form.password !== "") {
       await this.secrets.store(key, form.password);
+    }
+    // Checked after the waits above, so as not to write it back
+    if (gone(open)) {
+      throw new Error(
+        `not saved, as ${servers.shown(open.editing ?? open.folder)} is no longer in settings`,
+      );
     }
     if (open.editing === undefined) {
       const scope: Scope =

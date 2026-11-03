@@ -401,9 +401,7 @@ window.addEventListener("message", (event: MessageEvent<ToForm>) => {
       }
       break;
     case "gone":
-      warn(
-        `${shown([...(context?.folder ?? []), context?.editing ?? ""])} is no longer in the settings.`,
-      );
+      warn(`${shown(message.path)} is no longer in the settings.`);
       save.disabled = true;
       test.disabled = true;
       break;

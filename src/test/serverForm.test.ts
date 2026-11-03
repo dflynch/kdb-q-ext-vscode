@@ -434,7 +434,92 @@ suite("the server form", () => {
     );
     next = made[0].next();
     await setUser({});
-    assert.deepStrictEqual(await next, { type: "gone" });
+    assert.deepStrictEqual(await next, { type: "gone", path: ["prod"] });
+    made[0].say({ type: "save", form: { ...prod, name: "prod" } });
+    assert.deepStrictEqual(await made[0].next(), {
+      type: "unsaved",
+      text: "not saved, as prod is no longer in settings",
+    });
+    assert.deepStrictEqual(user(), {});
+  });
+
+  test("a form adding to a folder is told the folder's gone, and doesn't bring it back", async () => {
+    await setUser({ Prod: { TP: { host: "kdb1", port: 1 } } });
+    const { made, forms } = open();
+    forms.add(["Prod"]);
+    await made[0].loaded();
+    const next = made[0].next();
+    await setUser({ Dev: { TP: { host: "kdb1", port: 1 } } });
+    assert.deepStrictEqual(await next, { type: "gone", path: ["Prod"] });
+    made[0].say({ type: "save", form: { ...prod, name: "RDB" } });
+    assert.deepStrictEqual(await made[0].next(), {
+      type: "unsaved",
+      text: "not saved, as Prod is no longer in settings",
+    });
+    assert.deepStrictEqual(user(), { Dev: { TP: { host: "kdb1", port: 1 } } });
+  });
+
+  test("a form adding to a folder is gone with its parent, or as a server takes its place", async () => {
+    await setUser({ Prod: { EU: {} } });
+    const { made, forms } = open();
+    forms.add(["Prod", "EU"]);
+    await made[0].loaded();
+    let next = made[0].next();
+    await setUser({ Live: { EU: {} } });
+    assert.deepStrictEqual(await next, { type: "gone", path: ["Prod", "EU"] });
+    forms.dispose();
+    await setUser({ Prod: {} });
+    const again = open();
+    again.forms.add(["Prod"]);
+    await again.made[0].loaded();
+    next = again.made[0].next();
+    await setUser({ Prod: { host: "kdb1", port: 1 } });
+    assert.deepStrictEqual(await next, { type: "gone", path: ["Prod"] });
+  });
+
+  test("Add replaces a form whose folder's gone, and only that", async () => {
+    await setUser({ Prod: {}, Dev: {} });
+    const { made, forms } = open();
+    forms.add(["Prod"]);
+    await made[0].loaded();
+    forms.add(["Dev"]);
+    assert.strictEqual(made.length, 1);
+    const next = made[0].next();
+    await setUser({ Dev: {} });
+    await next;
+    forms.add(["Dev"]);
+    assert.strictEqual(made[0].closed, true);
+    assert.strictEqual(made.length, 2);
+    assert.deepStrictEqual((await made[1].loaded()).context.folder, ["Dev"]);
+  });
+
+  test("a form adding to the top level is never gone", async () => {
+    await setUser({ prod: { host: "kdb1", port: 1 } });
+    const { made, forms } = open();
+    forms.add();
+    await made[0].loaded();
+    const next = made[0].next();
+    await setUser({});
+    assert.strictEqual((await next).type, "load");
+  });
+
+  test("closing a folder closes the forms adding to it, or in it, and no others", async () => {
+    await setUser({
+      Prod: { EU: { TP: { host: "kdb1", port: 1 } } },
+      Dev: {},
+    });
+    const { made, forms } = open();
+    forms.add(["Prod", "EU"]);
+    forms.edit(["Prod", "EU", "TP"]);
+    forms.close(["Prod"]);
+    assert.deepStrictEqual(
+      made.map(({ closed }) => closed),
+      [true, true],
+    );
+    forms.add(["Dev"]);
+    forms.close(["Prod"]);
+    forms.close(["Dev", "TP"]);
+    assert.strictEqual(made[2].closed, false);
   });
 
   test("a server with a problem opens as written, with it, and saving fixes it", async () => {
