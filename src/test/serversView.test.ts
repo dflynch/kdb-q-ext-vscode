@@ -129,13 +129,13 @@ suite("the Servers view", () => {
 
   test("a server with a problem shows it, with a warning", () => {
     const item = row(
-      { kind: "server", path: ["rdb"], problem: "has no host" },
+      { kind: "server", path: ["rdb"], problem: "no host" },
       look(),
     );
     assert.strictEqual(icon(item), "warning");
-    assert.strictEqual(item.description, "has no host");
+    assert.strictEqual(item.description, "no host");
     assert.strictEqual(item.contextValue, "broken");
-    assert.strictEqual(item.tooltip, "has no host\nIn User settings");
+    assert.strictEqual(item.tooltip, "no host\nIn User settings");
   });
 
   test("a folder says what's connected in it", () => {
@@ -165,7 +165,7 @@ suite("the Servers view", () => {
 
   test("a folder with no name shows it, quoted", () => {
     const item = row(
-      { kind: "folder", path: [" "], entries: [], problem: "has no name" },
+      { kind: "folder", path: [" "], entries: [], problem: "no name" },
       look(),
     );
     assert.strictEqual(item.label, '" "');
@@ -179,12 +179,12 @@ suite("the Servers view", () => {
       workspace: { gw: { host: "gw", port: 1 } },
     });
     assert.deepStrictEqual(top, [
-      { kind: "setting", scope: "user", problem: "isn't an object" },
+      { kind: "setting", scope: "user", problem: "not an object" },
       ...entries({ gw: { host: "gw", port: 1 } }),
     ]);
     const item = row(top[0], look());
     assert.strictEqual(item.label, "User settings");
-    assert.strictEqual(item.description, "servers isn't an object");
+    assert.strictEqual(item.description, "servers: not an object");
     assert.strictEqual(item.contextValue, "setting");
     assert.deepStrictEqual(
       roots({ user: undefined, workspace: undefined }),

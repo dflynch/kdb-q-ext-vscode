@@ -360,7 +360,7 @@ function show(message: Extract<ToForm, { type: "load" }>) {
       left.add(field as Field);
     }
     warn(
-      `In the settings, it ${message.context.problem}. Saving replaces it with what's shown here.`,
+      `In the settings: ${message.context.problem}. Saving replaces it with what's shown here.`,
     );
   }
   update();

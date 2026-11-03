@@ -76,10 +76,10 @@ export function within(path: string[], folder: string[]): boolean {
 }
 
 // A problem in the servers setting, at the path of what has it, empty for
-// the setting itself, said of it: isn't a server or a folder
+// the setting itself: not a server or a folder
 export type Problem = { path: string[]; problem: string };
 
-// A problem as a clause, with what has it by its path: Dev › rdb isn't a
+// A problem as it's told, after what has it, by its path: Dev › rdb: not a
 // server or a folder
 export function said({ path, problem }: Problem): string {
   const own = path.at(-1);
@@ -92,7 +92,7 @@ export function said({ path, problem }: Problem): string {
         : folder.length > 0
           ? `an entry in ${shown(folder)}`
           : "an entry";
-  return `${what} ${problem}`;
+  return `${what}: ${problem}`;
 }
 
 // A Marketplace extension ID, publisher.name
@@ -123,7 +123,7 @@ export function definitions(setting: unknown): {
     return { servers, problems };
   }
   if (!isObject(setting)) {
-    return { servers, problems: [{ path: [], problem: "isn't an object" }] };
+    return { servers, problems: [{ path: [], problem: "not an object" }] };
   }
   const read = (folder: Record<string, unknown>, at: string[]) => {
     for (const [key, value] of Object.entries(folder)) {
@@ -306,7 +306,7 @@ export function isServer(value: Record<string, unknown>): boolean {
 
 // The problem with an entry in a folder, by its name and its value
 export function entryProblem(name: string, value: unknown): string | undefined {
-  return name.trim() === "" ? "has no name" : check(value);
+  return name.trim() === "" ? "no name" : check(value);
 }
 
 // A server as checked
@@ -328,7 +328,7 @@ function definition(path: string[], value: Fields): Definition {
 // server nor a folder
 function check(value: unknown): string | undefined {
   if (!isObject(value)) {
-    return "isn't a server or a folder";
+    return "not a server or a folder";
   }
   if (!isServer(value)) {
     return undefined;
@@ -336,39 +336,39 @@ function check(value: unknown): string | undefined {
   const unknown = Object.keys(value).filter((key) => !fields.has(key));
   if (unknown.length > 0) {
     return unknown.length === 1
-      ? `has an unknown field, ${unknown[0]}`
-      : `has unknown fields, ${unknown.join(", ")}`;
+      ? `unknown field: ${unknown[0]}`
+      : `unknown fields: ${unknown.join(", ")}`;
   }
   const { host, port, user, timeout, protect, tls, auth } = value as Record<
     string,
     unknown
   >;
   if (typeof host !== "string" || host.trim() === "") {
-    return "has no host";
+    return "no host";
   }
   if (!isCount(port) || port > 65535) {
-    return "has a port that isn't from 1 to 65535";
+    return "port must be from 1 to 65535";
   }
   // q takes the login as user:password, ending at a 0 byte
   if (user !== undefined && (typeof user !== "string" || userProblem(user))) {
-    return "has a user with a : or a 0 byte";
+    return "user can't contain : or a 0 byte";
   }
   if (timeout !== undefined && !isTimeout(timeout)) {
     return isCount(timeout)
-      ? `has a timeout over ${longestTimeout} ms`
-      : "has a timeout that isn't a whole number of milliseconds";
+      ? `timeout must be at most ${longestTimeout} ms`
+      : "timeout must be a whole number of milliseconds";
   }
   if (protect !== undefined && typeof protect !== "boolean") {
-    return "has a protect that isn't true or false";
+    return "protect must be true or false";
   }
   if (tls !== undefined && typeof tls !== "boolean") {
-    return "has a tls that isn't true or false";
+    return "tls must be true or false";
   }
   if (
     auth !== undefined &&
     !["none", "store", "prompt", "extension"].includes(auth as string)
   ) {
-    return 'has an auth that isn\'t "none", "store", "prompt" or "extension"';
+    return 'auth must be "none", "store", "prompt" or "extension"';
   }
   return undefined;
 }

@@ -50,7 +50,7 @@ export type Context = {
   // connect
   connected: boolean;
   // The problem the server has as it's written, when editing one that has
-  // one: has no host
+  // one: no host
   problem?: string;
 };
 

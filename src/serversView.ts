@@ -60,9 +60,9 @@ export function row(node: Node, look: Look): vscode.TreeItem {
   if (node.kind === "setting") {
     const item = new vscode.TreeItem(`${scopeNames[node.scope]} settings`);
     item.id = `setting:${node.scope}`;
-    item.description = `servers ${node.problem}`;
+    item.description = `servers: ${node.problem}`;
     item.iconPath = warning;
-    item.tooltip = `The servers setting ${node.problem}, so nothing in it can be read`;
+    item.tooltip = `The servers setting: ${node.problem}, so nothing in it can be read`;
     item.contextValue = "setting";
     return item;
   }
@@ -241,7 +241,7 @@ export function roots(written: servers.Written): Node[] {
       setting === null ||
       servers.isObject(setting)
       ? []
-      : [{ kind: "setting", scope, problem: "isn't an object" }];
+      : [{ kind: "setting", scope, problem: "not an object" }];
   });
   const merged = servers.merged(written);
   return [

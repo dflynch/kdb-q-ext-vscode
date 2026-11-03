@@ -453,7 +453,7 @@ suite("the server form", () => {
       auth: "store",
       timeout: "",
     });
-    assert.strictEqual(context.problem, "has an unknown field, hots");
+    assert.strictEqual(context.problem, "unknown field: hots");
     assert.deepStrictEqual(context.scopes, ["user"]);
     // Not stored for a login with no host
     assert.strictEqual(stored, false);
@@ -467,13 +467,13 @@ suite("the server form", () => {
     });
   });
 
-  test("anything in a folder that isn't a server or a folder opens with its name", async () => {
+  test("anything in a folder that not a server or a folder opens with its name", async () => {
     await setUser({ rdb: "dev:5011" });
     const { made, forms } = open();
     forms.edit(["rdb"]);
     const { form, context } = await made[0].loaded();
     assert.deepStrictEqual(form, { ...blank(), name: "rdb", timeout: "" });
-    assert.strictEqual(context.problem, "isn't a server or a folder");
+    assert.strictEqual(context.problem, "not a server or a folder");
   });
 
   test("a form with a problem isn't saved, and says why", async () => {
