@@ -1,8 +1,8 @@
 {
   "name": "kdb-q-ext-vscode",
-  "displayName": "Quirk: kdb+/q toolkit",
+  "displayName": "Ink: kdb+/q toolkit",
   "description": "A lightweight extension for kdb+/q programming",
-  "icon": "./icons/quirk.png",
+  "icon": "./icons/ink.png",
   "version": "1.1.0",
   "publisher": "dflynch3",
   "license": "MIT",

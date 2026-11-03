@@ -197,7 +197,7 @@ suite("tls", () => {
   });
 
   test("a file that can't be read, or isn't a small file, says so", async () => {
-    const dir = mkdtempSync(path.join(os.tmpdir(), "quirk-tls-"));
+    const dir = mkdtempSync(path.join(os.tmpdir(), "ink-tls-"));
     const big = path.join(dir, "big.pem");
     writeFileSync(big, Buffer.alloc(1e6 + 1));
     for (const name of [file("nope.pem"), dir, big]) {
@@ -211,7 +211,7 @@ suite("tls", () => {
   });
 
   test("a ca that isn't a certificate in PEM says so", async () => {
-    const dir = mkdtempSync(path.join(os.tmpdir(), "quirk-tls-"));
+    const dir = mkdtempSync(path.join(os.tmpdir(), "ink-tls-"));
     const der = path.join(dir, "ca.der");
     writeFileSync(
       der,

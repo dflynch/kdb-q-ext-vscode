@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>Ink</title>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="#F7F5EF" stroke="#14213D" stroke-opacity="0.14" stroke-width="2"/>
+  <g fill="none" stroke="#14213D" stroke-width="31" stroke-linecap="round">
+    <circle cx="122" cy="108" r="48"/>
+    <path d="M170 64V165"/>
+  </g>
+  <path fill="#14213D" d="M154.5 158C154.5 182 148 192 148 206a22 22 0 0 0 44 0C192 192 185.5 182 185.5 158Z"/>
+</svg>

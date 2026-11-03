@@ -10,5 +10,5 @@ src/**
 out/**
 esbuild.mjs
 biome.json
-icons/quirk.svg
+icons/ink.svg
 test/**
