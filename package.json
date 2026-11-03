@@ -44,14 +44,14 @@
         {
           "id": "kdb-q-ext-vscode",
           "title": "kdb+/q",
-          "icon": "icons/q-dark.svg"
+          "icon": "icons/q-drop.svg"
         }
       ],
       "activitybar": [
         {
           "id": "kdb-q-ext-vscode-servers",
           "title": "kdb+/q",
-          "icon": "icons/q-dark.svg"
+          "icon": "icons/q-drop.svg"
         }
       ]
     },
