@@ -61,8 +61,8 @@ problem, and Edit opens it in the form to fix.
 Add a server with **kdb+/q: Add Server**, or the + on the view or on a
 folder, which opens a form for its settings, or write it in
 `settings.json`. The form saves a server in the settings its folder is
-in; at the top, or in a folder in both, you pick your user or workspace
-settings. **Edit Server** opens the same form for a server, where a
+in; with a workspace open, at the top, or in a folder in both, you pick
+your user or workspace settings. **Edit Server** opens the same form for a server, where a
 password can be stored too, and **Remove Server** removes one, from every
 settings file it's in. **New Folder**, and Rename and Remove Folder on a
 folder's right-click menu, do the same for folders. They write the whole

@@ -390,13 +390,16 @@ export function settings(megabytes: unknown): Defaults {
   );
 }
 
+// What every server password's key starts with
+export const passwordKey = "password:";
+
 // Where a server's password is kept. Keyed by where it's sent, not by the
 // server's name, so that a password is never sent to a host other than the
 // one it was given for, if a server's host is changed
 export function secretKey(
   server: Pick<Definition, "user" | "host" | "port">,
 ): string {
-  return `password:${server.user ?? ""}@${server.host.toLowerCase()}:${server.port}`;
+  return `${passwordKey}${server.user ?? ""}@${server.host.toLowerCase()}:${server.port}`;
 }
 
 // Credentials as an extension gave them, checked as the setting is: they

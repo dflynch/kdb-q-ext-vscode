@@ -199,10 +199,14 @@ suite("User and Workspace settings", () => {
     await refusing(workspaceOnly, () =>
       removeServer(connections, forms, rowAt(["TP"])),
     );
+    await refusing(workspaceOnly, () =>
+      removeFolder(connections, forms, rowAt(["Ops"])),
+    );
     assert.deepStrictEqual(errors, [
-      "kdb+/q: TP wasn't moved in Workspace settings: the file has unsaved changes",
-      "kdb+/q: Ops wasn't renamed in Workspace settings: the file has unsaved changes",
-      "kdb+/q: TP wasn't removed from Workspace settings: the file has unsaved changes",
+      "kdb+/q: TP wasn't moved, as Workspace settings refused: the file has unsaved changes",
+      "kdb+/q: Ops wasn't renamed, as Workspace settings refused: the file has unsaved changes",
+      "kdb+/q: TP wasn't removed, as Workspace settings refused: the file has unsaved changes",
+      "kdb+/q: Ops wasn't removed, as Workspace settings refused: the file has unsaved changes",
     ]);
     assert.deepStrictEqual({ user: user(), workspace: workspace() }, both);
     forms.edit(["TP"]);
@@ -213,7 +217,7 @@ suite("User and Workspace settings", () => {
     });
     assert.deepStrictEqual(await unsaved, {
       type: "unsaved",
-      text: "not saved in Workspace settings: the file has unsaved changes",
+      text: "not saved, as Workspace settings refused: the file has unsaved changes",
     });
     assert.deepStrictEqual({ user: user(), workspace: workspace() }, both);
     // Nothing's half done, so it can be run again

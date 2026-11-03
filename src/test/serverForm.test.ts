@@ -741,7 +741,7 @@ suite("editServer and removeServer", () => {
       forms.dispose();
     }
     assert.deepStrictEqual(errors, [
-      "kdb+/q: prod wasn't removed from User settings: the file has unsaved changes",
+      "kdb+/q: prod wasn't removed, as User settings refused: the file has unsaved changes",
     ]);
     assert.deepStrictEqual(user(), {
       prod: { host: "kdb1", port: 1, auth: "store" },

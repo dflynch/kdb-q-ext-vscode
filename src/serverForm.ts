@@ -129,12 +129,15 @@ export async function write(
   );
 }
 
-// Write each scope in turn, the user's first. One that can't be written,
-// as when its file has unsaved changes, has those written before it put
-// back as they were, so that nothing's half done, and is refused with:
-// "TP wasn't moved in Workspace settings". A form's save has no name: "not
-// saved in Workspace settings". Should putting back fail too, it says what
-// was done: "TP was moved in User settings but not in Workspace settings".
+// Write each scope in the order given, the user's first. One that can't be
+// written, as when its file has unsaved changes, has those written before
+// it put back as they were, so that nothing's half done, and is refused
+// with: "TP wasn't moved, as Workspace settings refused". A form's save has
+// no name: "not saved, as Workspace settings refused". Should putting back
+// fail too, it says what was done: "TP was moved in User settings but not
+// in Workspace settings". A scope's put back whole, as it was just before
+// it was written: a write to it in that moment, from another form or by
+// hand, is lost with it.
 export async function writeEach(
   order: Scope[],
   said: { name?: string; verb: string; prep: "in" | "from" },
@@ -147,13 +150,14 @@ export async function writeEach(
     try {
       await write(scope);
     } catch (error) {
-      const not = `${prep} ${scopeName(scope)} settings: ${(error as Error).message}`;
+      const failed = `${scopeName(scope)} settings`;
+      const { message } = error as Error;
       const kept = await putBack(written);
-      const done = `${prep} ${kept.map(scopeName).join(" and ")} settings`;
+      const done = `${kept.map(scopeName).join(" and ")} settings`;
       throw new Error(
         kept.length === 0
-          ? `${name ? `${name} wasn't` : "not"} ${verb} ${not}`
-          : `${name ? `${name} was ` : ""}${verb} ${done} but not ${not}`,
+          ? `${name ? `${name} wasn't` : "not"} ${verb}, as ${failed} refused: ${message}`
+          : `${name ? `${name} was ` : ""}${verb} ${prep} ${done} but not ${prep} ${failed}: ${message}`,
       );
     }
     written.push({ scope, was });

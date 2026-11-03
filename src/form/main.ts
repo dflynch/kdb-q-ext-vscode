@@ -385,6 +385,10 @@ window.addEventListener("message", (event: MessageEvent<ToForm>) => {
   const message = event.data;
   switch (message.type) {
     case "load":
+      // There to save again, as after it was gone a moment, a write that
+      // couldn't be finished put back
+      save.disabled = false;
+      test.disabled = false;
       // A form with changes keeps them until Reload
       if (changed()) {
         pending = message;

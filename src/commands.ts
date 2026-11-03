@@ -369,11 +369,12 @@ export async function removeServer(
   if (choice !== remove) {
     return;
   }
-  // One that can't be written, as when its file has unsaved changes,
-  // leaves the server there, and says so
+  // Where it's written now, as that may have changed while asked; one
+  // that can't be written, as when its file has unsaved changes, leaves
+  // the server there, and says so
   try {
     await writeEach(
-      scopes,
+      scopesOf(path),
       { name: servers.shown(path), verb: "removed", prep: "from" },
       (scope) => write(scope, path, undefined),
     );
@@ -413,8 +414,9 @@ export async function setPassword(secrets: vscode.SecretStorage) {
 // gets is listed too, as a server edited or removed leaves its password,
 // which a server in another workspace's settings may get.
 export async function clearPassword(secrets: vscode.SecretStorage) {
-  const prefix = "password:";
-  const stored = (await secrets.keys()).filter((key) => key.startsWith(prefix));
+  const stored = (await secrets.keys()).filter((key) =>
+    key.startsWith(servers.passwordKey),
+  );
   if (stored.length === 0) {
     vscode.window.showInformationMessage("kdb+/q: No passwords are stored.");
     return;
@@ -434,7 +436,7 @@ export async function clearPassword(secrets: vscode.SecretStorage) {
   const picked = await vscode.window.showQuickPick(
     stored
       .map((key) => {
-        const login = key.slice(prefix.length);
+        const login = key.slice(servers.passwordKey.length);
         return {
           label: login.startsWith("@") ? login.slice(1) : login,
           description: getting.get(key)?.join(", ") ?? "no server here",
