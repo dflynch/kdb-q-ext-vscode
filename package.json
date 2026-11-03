@@ -43,14 +43,14 @@
       "panel": [
         {
           "id": "kdb-q-ext-vscode",
-          "title": "kdb+/q",
+          "title": "KDB+/Q",
           "icon": "icons/q-drop.svg"
         }
       ],
       "activitybar": [
         {
           "id": "kdb-q-ext-vscode-servers",
-          "title": "kdb+/q",
+          "title": "KDB+/Q",
           "icon": "icons/q-drop.svg"
         }
       ]
@@ -608,7 +608,7 @@
           "type": "integer",
           "default": 5000000,
           "minimum": 1,
-          "markdownDescription": "The most rows a result, or a cell's value drilled into, can have to be shown; one with more is refused. The **kdb+/q** tab, and each kept tab, has about 4 GB of memory, and its Grid takes about 250 bytes a row, whatever the columns, and a mixed list's items up to about 200 bytes more each. A tab that runs out turns grey, while VS Code and other extensions carry on."
+          "markdownDescription": "The most rows a result, or a cell's value drilled into, can have to be shown; one with more is refused. The **KDB+/Q** tab, and each kept tab, has about 4 GB of memory, and its Grid takes about 250 bytes a row, whatever the columns, and a mixed list's items up to about 200 bytes more each. A tab that runs out turns grey, while VS Code and other extensions carry on."
         }
       }
     }
