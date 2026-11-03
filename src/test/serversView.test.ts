@@ -232,7 +232,7 @@ suite("the Servers view", () => {
     const folder = entries(user() as Record<string, unknown>)[0];
     try {
       answer = undefined;
-      await removeFolder(secrets(kept), connections, forms, folder);
+      await removeFolder(connections, forms, folder);
       assert.deepStrictEqual(warned[0], [
         "Remove Prod?",
         {
@@ -244,12 +244,13 @@ suite("the Servers view", () => {
       ]);
       assert.ok("Prod" in (user() as object));
       answer = "Remove";
-      await removeFolder(secrets(kept), connections, forms, folder);
+      await removeFolder(connections, forms, folder);
     } finally {
       forms.dispose();
     }
     assert.deepStrictEqual(user(), { other: { host: "kdb3", port: 1 } });
-    assert.deepStrictEqual(kept, {});
+    // Kept, as a server in another workspace's settings may get it
+    assert.deepStrictEqual(kept, { "password:@kdb1:1": "secret" });
   });
 
   test("a server dragged into a folder moves there, disconnected, unless the name's taken", async () => {
@@ -311,7 +312,7 @@ suite("the Servers view", () => {
     );
   });
 
-  test("Remove Folder of a folder with no name counts what's in it, and forgets its passwords", async () => {
+  test("Remove Folder of a folder with no name counts what's in it", async () => {
     await setUser({ " ": { TP: { host: "kdb1", port: 1, auth: "store" } } });
     const kept: Record<string, string> = { "password:@kdb1:1": "secret" };
     const connections = await opened();
@@ -324,7 +325,7 @@ suite("the Servers view", () => {
     const [folder] = entries(user() as Record<string, unknown>);
     try {
       answer = "Remove";
-      await removeFolder(secrets(kept), connections, forms, folder);
+      await removeFolder(connections, forms, folder);
     } finally {
       forms.dispose();
     }
@@ -333,7 +334,8 @@ suite("the Servers view", () => {
       "It and the server in it are removed from your User settings.",
     );
     assert.deepStrictEqual(user(), {});
-    assert.deepStrictEqual(kept, {});
+    // Kept, as a server in another workspace's settings may get it
+    assert.deepStrictEqual(kept, { "password:@kdb1:1": "secret" });
   });
 
   test("Connect, Make Active and Disconnect take the server whose row they're run on", async () => {

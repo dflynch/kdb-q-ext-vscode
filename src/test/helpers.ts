@@ -89,6 +89,7 @@ export function secrets(kept: Record<string, string>): vscode.SecretStorage {
     delete: async (key: string) => {
       delete kept[key];
     },
+    keys: async () => Object.keys(kept),
   } as unknown as vscode.SecretStorage;
 }
 

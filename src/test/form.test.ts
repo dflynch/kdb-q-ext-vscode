@@ -181,24 +181,6 @@ suite("the server form's fields", () => {
     );
   });
 
-  test("a server added goes where its folder is, or nowhere for a folder that's gone", () => {
-    const workspace = { ...prod, target: "workspace" as const };
-    assert.deepStrictEqual(problems(workspace, context, false), {
-      target: "Must be User settings",
-    });
-    for (const targets of [["user", "workspace"], []] as const) {
-      assert.deepStrictEqual(
-        problems(workspace, { ...context, targets: [...targets] }, false),
-        {},
-      );
-    }
-    // Not asked of a server edited, which stays where it is
-    assert.deepStrictEqual(
-      problems(workspace, { ...context, editing: "prod" }, false),
-      {},
-    );
-  });
-
   test("a password stored for the login needn't be typed again", () => {
     const keep = { ...prod, password: "" };
     assert.deepStrictEqual(problems(keep, context, true), {});

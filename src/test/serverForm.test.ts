@@ -1,6 +1,6 @@
 import * as assert from "node:assert";
 import * as vscode from "vscode";
-import { editServer, removeServer } from "../commands";
+import { clearPassword, editServer, removeServer } from "../commands";
 import type { Connection } from "../connection";
 import { Connections } from "../connections";
 import { blank, type Form, type ToForm } from "../form/fields";
@@ -224,43 +224,7 @@ suite("the server form", () => {
     }
   });
 
-  test("a password no server gets any more is forgotten, unless another does", async () => {
-    const login = {
-      host: "kdb1.example.com",
-      port: 5010,
-      user: "admin",
-      auth: "store",
-    };
-    await setUser({ prod: login, copy: login });
-    const kept: Record<string, string> = {
-      "password:admin@kdb1.example.com:5010": "secret",
-    };
-    const { made, forms } = open(kept);
-    forms.edit(["prod"]);
-    const { form } = await made[0].loaded();
-    made[0].say({
-      type: "save",
-      form: { ...form, host: "kdb2.example.com", password: "other" },
-    });
-    await made[0].closing;
-    // copy still gets the first
-    assert.deepStrictEqual(kept, {
-      "password:admin@kdb1.example.com:5010": "secret",
-      "password:admin@kdb2.example.com:5010": "other",
-    });
-    forms.edit(["copy"]);
-    const second = await made[1].loaded();
-    made[1].say({
-      type: "save",
-      form: { ...second.form, auth: "prompt" },
-    });
-    await made[1].closing;
-    assert.deepStrictEqual(kept, {
-      "password:admin@kdb2.example.com:5010": "other",
-    });
-  });
-
-  test("None forgets the password stored for the login", async () => {
+  test("a password's kept when its server's edited away from it, as another workspace's may get it", async () => {
     await setUser({ prod: { host: "kdb1", port: 1, auth: "store" } });
     const kept: Record<string, string> = { "password:@kdb1:1": "secret" };
     const { made, forms } = open(kept);
@@ -268,10 +232,17 @@ suite("the server form", () => {
     const { form } = await made[0].loaded();
     made[0].say({
       type: "save",
-      form: { ...form, auth: "none" },
+      form: { ...form, host: "kdb2", password: "other" },
     });
     await made[0].closing;
-    assert.deepStrictEqual(kept, {});
+    forms.edit(["prod"]);
+    const second = await made[1].loaded();
+    made[1].say({ type: "save", form: { ...second.form, auth: "none" } });
+    await made[1].closing;
+    assert.deepStrictEqual(kept, {
+      "password:@kdb1:1": "secret",
+      "password:@kdb2:1": "other",
+    });
   });
 
   test("None holds for a server sharing its login with one that stores it", async () => {
@@ -645,7 +616,7 @@ suite("editServer and removeServer", () => {
     }
   });
 
-  test("Remove, once confirmed, removes the server and forgets its password", async () => {
+  test("Remove, once confirmed, removes the server and keeps its password", async () => {
     await setUser({
       Prod: { TP: { host: "kdb1", port: 1, auth: "store" } },
       other: { host: "kdb2", port: 1, auth: "store" },
@@ -665,7 +636,7 @@ suite("editServer and removeServer", () => {
     try {
       forms.edit(["Prod", "TP"]);
       answer = undefined;
-      await removeServer(secrets(kept), connections, forms);
+      await removeServer(connections, forms);
       assert.strictEqual(warned[0][0], "Remove Prod › TP?");
       assert.deepStrictEqual(warned[0][1], {
         modal: true,
@@ -675,17 +646,54 @@ suite("editServer and removeServer", () => {
         user() !== undefined && "TP" in (user() as { Prod: object }).Prod,
       );
       answer = "Remove";
-      await removeServer(secrets(kept), connections, forms);
+      await removeServer(connections, forms);
       // The folder stays, empty
       assert.deepStrictEqual(user(), {
         Prod: {},
         other: { host: "kdb2", port: 1, auth: "store" },
       });
-      assert.deepStrictEqual(kept, { "password:@kdb2:1": "kept" });
+      // Kept, as a server in another workspace's settings may get it
+      assert.ok("password:@kdb1:1" in kept);
       assert.strictEqual(made[0].closed, true);
     } finally {
       forms.dispose();
     }
+  });
+
+  test("Clear Server Password lists the passwords stored, with the servers here that get each, and removes the one picked", async () => {
+    const login = { host: "kdb1", port: 1, user: "admin", auth: "store" };
+    await setUser({
+      Prod: { TP: login },
+      copy: login,
+      gw: { host: "gw", port: 1 },
+    });
+    const kept: Record<string, string> = {
+      "password:admin@kdb1:1": "secret",
+      "password:@old:2": "left",
+      "passphrase:/key.pem": "other",
+    };
+    const pick = window.showQuickPick;
+    let listed: vscode.QuickPickItem[] = [];
+    window.showQuickPick = (async (items: vscode.QuickPickItem[]) => {
+      listed = items;
+      return items[0];
+    }) as typeof pick;
+    try {
+      await clearPassword(secrets(kept));
+    } finally {
+      window.showQuickPick = pick;
+    }
+    assert.deepStrictEqual(
+      listed.map(({ label, description }) => [label, description]),
+      [
+        ["old:2", "no server here"],
+        ["admin@kdb1:1", "Prod › TP, copy"],
+      ],
+    );
+    assert.deepStrictEqual(Object.keys(kept), [
+      "password:admin@kdb1:1",
+      "passphrase:/key.pem",
+    ]);
   });
 
   test("Remove takes the server whose row it's run on, one with a problem too", async () => {
@@ -699,7 +707,7 @@ suite("editServer and removeServer", () => {
     );
     answer = "Remove";
     try {
-      await removeServer(secrets({}), connections, forms, { path: ["rdb"] });
+      await removeServer(connections, forms, { path: ["rdb"] });
     } finally {
       forms.dispose();
     }
@@ -724,9 +732,7 @@ suite("editServer and removeServer", () => {
     );
     try {
       answer = "Remove";
-      await refusing(undefined, () =>
-        removeServer(secrets(kept), connections, forms),
-      );
+      await refusing(undefined, () => removeServer(connections, forms));
     } finally {
       window.showErrorMessage = error;
       forms.dispose();

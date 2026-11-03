@@ -104,9 +104,12 @@ setting, as VS Code writes one, so a comment inside it isn't kept:
 - **Passwords** aren't kept in settings. A server with no `auth` sends
   none. `"auth": "store"` sends the one the form, or **kdb+/q: Set Server
   Password**, keeps in VS Code's secure storage for the user, host and
-  port, and **Clear Server Password** removes it. One no server uses any
-  more, once a server's edited or removed, is removed too. `"auth":
-  "prompt"` asks for it at every connect instead, and never keeps it
+  port, so that it's only ever sent where it was given. Every workspace
+  shares them, so editing or removing a server leaves its password, which
+  another workspace's server may get: **Clear Server Password** lists the
+  passwords stored, with the servers here that get each, and removes the
+  one picked. `"auth": "prompt"` asks for it at every connect instead, and
+  never keeps it
 - **`tls`** is `true` to connect with TLS. The files it needs besides the
   system's are set once for every server, as q takes them for the whole
   process: `tlsCaFile` to trust (q's `SSL_CA_CERT_FILE`), and a client

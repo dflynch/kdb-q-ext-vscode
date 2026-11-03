@@ -108,10 +108,9 @@ suite("User and Workspace settings", () => {
     assert.deepStrictEqual(workspace(), {
       Ops: { TP: { host: "kdb1", port: 1, auth: "store" } },
     });
-    await removeServer(secrets(kept), connections, forms, rowAt(["Ops", "TP"]));
+    await removeServer(connections, forms, rowAt(["Ops", "TP"]));
     assert.deepStrictEqual(workspace(), { Ops: {} });
     assert.strictEqual(user(), undefined);
-    assert.deepStrictEqual(kept, {});
   });
 
   test("a folder in Workspace settings alone is renamed and removed there", async () => {
@@ -121,7 +120,7 @@ suite("User and Workspace settings", () => {
     assert.deepStrictEqual(workspace(), {
       Live: { TP: { host: "kdb1", port: 1 } },
     });
-    await removeFolder(secrets({}), connections, open().forms, rowAt(["Live"]));
+    await removeFolder(connections, open().forms, rowAt(["Live"]));
     assert.strictEqual(
       (warned[0][1] as { detail: string }).detail,
       "It and the server in it are removed from your Workspace settings.",
@@ -188,7 +187,7 @@ suite("User and Workspace settings", () => {
       moveTo(connections, forms, rowAt(["TP"]), ["Ops"]),
     );
     assert.deepStrictEqual(errors, [
-      "kdb+/q: TP wasn't moved in Workspace settings: the file has unsaved changes",
+      "kdb+/q: TP was moved in User settings but not in Workspace settings: the file has unsaved changes",
     ]);
     assert.deepStrictEqual(user(), { Ops: { TP: { host: "kdb1", port: 1 } } });
     typed = "Live";
@@ -197,7 +196,7 @@ suite("User and Workspace settings", () => {
     );
     assert.strictEqual(
       errors[1],
-      "kdb+/q: Ops wasn't renamed in Workspace settings: the file has unsaved changes",
+      "kdb+/q: Ops was renamed in User settings but not in Workspace settings: the file has unsaved changes",
     );
     assert.deepStrictEqual(user(), {
       Live: { TP: { host: "kdb1", port: 1 } },
@@ -215,54 +214,47 @@ suite("User and Workspace settings", () => {
     });
     assert.deepStrictEqual(await unsaved, {
       type: "unsaved",
-      text: "not saved in Workspace settings: the file has unsaved changes",
+      text: "saved in User settings but not in Workspace settings: the file has unsaved changes",
     });
     assert.deepStrictEqual(user(), { RDB: { host: "kdb1", port: 1 } });
     assert.deepStrictEqual(workspace(), { TP: { host: "kdb2", port: 1 } });
   });
 
-  test("Remove takes a server, and the password of each scope's, from both", async () => {
-    await setUser({ TP: { host: "kdb1", port: 1, auth: "store" } });
-    await setWorkspace({ TP: { host: "kdb2", port: 1, auth: "store" } });
-    const kept: Record<string, string> = {
-      "password:@kdb1:1": "secret",
-      "password:@kdb2:1": "other",
-    };
-    await removeServer(secrets(kept), connections, open().forms, rowAt(["TP"]));
+  test("Remove takes a server from both", async () => {
+    await setUser({ TP: { host: "kdb1", port: 1 } });
+    await setWorkspace({ TP: { host: "kdb2", port: 1 } });
+    await removeServer(connections, open().forms, rowAt(["TP"]));
     assert.strictEqual(
       (warned[0][1] as { detail: string }).detail,
       "It's removed from your User and Workspace settings.",
     );
     assert.deepStrictEqual(user(), {});
     assert.deepStrictEqual(workspace(), {});
-    assert.deepStrictEqual(kept, {});
   });
 
-  test("Remove Folder takes a folder in both from each, with each copy's password", async () => {
-    await setUser({ Prod: { TP: { host: "kdb1", port: 1, auth: "store" } } });
+  test("Remove Folder takes a folder in both from each", async () => {
+    await setUser({ Prod: { TP: { host: "kdb1", port: 1 } } });
     await setWorkspace({
-      Prod: {
-        TP: { host: "kdb2", port: 1, auth: "store" },
-        RDB: { host: "kdb3", port: 1 },
-      },
+      Prod: { TP: { host: "kdb2", port: 1 }, RDB: { host: "kdb3", port: 1 } },
     });
-    const kept: Record<string, string> = {
-      "password:@kdb1:1": "secret",
-      "password:@kdb2:1": "other",
-    };
-    await removeFolder(
-      secrets(kept),
-      connections,
-      open().forms,
-      rowAt(["Prod"]),
-    );
+    await removeFolder(connections, open().forms, rowAt(["Prod"]));
     assert.strictEqual(
       (warned[0][1] as { detail: string }).detail,
       "It and the 2 servers in it are removed from your User and Workspace settings.",
     );
     assert.deepStrictEqual(user(), {});
     assert.deepStrictEqual(workspace(), {});
-    assert.deepStrictEqual(kept, {});
+  });
+
+  test("Move refuses a folder not in each scope the server's in, as Add does", async () => {
+    await setUser({ Mine: {} });
+    await setWorkspace({ TP: { host: "kdb1", port: 1 } });
+    await moveTo(connections, open().forms, rowAt(["TP"]), ["Mine"]);
+    assert.deepStrictEqual(warned, [
+      ["kdb+/q: TP wasn't moved: Mine isn't in Workspace settings"],
+    ]);
+    assert.deepStrictEqual(user(), { Mine: {} });
+    assert.deepStrictEqual(workspace(), { TP: { host: "kdb1", port: 1 } });
   });
 
   test("Add saves where its folder is, and offers both only where there are both", async () => {
@@ -310,7 +302,7 @@ suite("User and Workspace settings", () => {
     made[0].say({ type: "save", form: { ...prod, target: "workspace" } });
     assert.deepStrictEqual(await made[0].next(), {
       type: "unsaved",
-      text: "not saved, as target: Must be User settings",
+      text: "not saved, as Prod is no longer in Workspace settings",
     });
     assert.strictEqual(workspace(), undefined);
   });

@@ -4,13 +4,12 @@ import type { Connections, State } from "./connections";
 import { type Scope, scopeName } from "./form/fields";
 import type { ServerForms } from "./serverForm";
 import {
-  forget,
   move,
   scopes,
   scopesOf,
-  storedKeys,
   targetsIn,
   write,
+  writeEach,
 } from "./serverForm";
 import * as servers from "./servers";
 import { describe, details } from "./status";
@@ -288,17 +287,25 @@ export async function moveTo(
     );
     return;
   }
-  // The user's first, as Remove Server does; one that can't be written
-  // says which, as the user's may have moved
-  for (const scope of scopesOf(from, entry.kind)) {
-    try {
-      await move(scope, from, to);
-    } catch (error) {
-      vscode.window.showErrorMessage(
-        `kdb+/q: ${servers.shown(from)} wasn't moved in ${scopeName(scope)} settings: ${(error as Error).message}`,
-      );
-      return;
-    }
+  // Only into a folder in each scope it's in, as one in the other would
+  // otherwise be made there, as Add Server does
+  const written = scopesOf(from, entry.kind);
+  const missing = written.find((scope) => !targetsIn(folder).includes(scope));
+  if (missing) {
+    vscode.window.showWarningMessage(
+      `kdb+/q: ${servers.shown(from)} wasn't moved: ${servers.shown(folder)} isn't in ${scopeName(missing)} settings`,
+    );
+    return;
+  }
+  try {
+    await writeEach(
+      written,
+      { name: servers.shown(from), verb: "moved", prep: "in" },
+      (scope) => move(scope, from, to),
+    );
+  } catch (error) {
+    vscode.window.showErrorMessage(`kdb+/q: ${(error as Error).message}`);
+    return;
   }
   forms.close(from);
   disconnectWithin(connections, from);
@@ -396,15 +403,15 @@ export async function renameFolder(
     return;
   }
   const to = [...parent, typed.trim()];
-  for (const scope of scopesOf(row.path, "folder")) {
-    try {
-      await move(scope, row.path, to);
-    } catch (error) {
-      vscode.window.showErrorMessage(
-        `kdb+/q: ${servers.shown(row.path)} wasn't renamed in ${scopeName(scope)} settings: ${(error as Error).message}`,
-      );
-      return;
-    }
+  try {
+    await writeEach(
+      scopesOf(row.path, "folder"),
+      { name: servers.shown(row.path), verb: "renamed", prep: "in" },
+      (scope) => move(scope, row.path, to),
+    );
+  } catch (error) {
+    vscode.window.showErrorMessage(`kdb+/q: ${(error as Error).message}`);
+    return;
   }
   forms.close(row.path);
   disconnectWithin(connections, row.path);
@@ -413,7 +420,6 @@ export async function renameFolder(
 // Remove the folder whose row it's run on, once confirmed, with everything
 // in it, from every scope it's written in, as Remove Server does a server
 export async function removeFolder(
-  secrets: vscode.SecretStorage,
   connections: Connections<Connection>,
   forms: ServerForms,
   row: servers.Entry,
@@ -427,7 +433,6 @@ export async function removeFolder(
     ? serversIn(servers.entries(value, row.path))
     : [];
   const where = scopesOf(row.path, "folder").map(scopeName);
-  const keys = storedKeys(row.path);
   const what =
     held.length === 0
       ? "It's"
@@ -446,17 +451,16 @@ export async function removeFolder(
   if (choice !== remove) {
     return;
   }
-  for (const scope of scopesOf(row.path, "folder")) {
-    try {
-      await write(scope, row.path, undefined);
-    } catch (error) {
-      vscode.window.showErrorMessage(
-        `kdb+/q: ${servers.shown(row.path)} wasn't removed from ${scopeName(scope)} settings: ${(error as Error).message}`,
-      );
-      return;
-    }
+  try {
+    await writeEach(
+      scopesOf(row.path, "folder"),
+      { name: servers.shown(row.path), verb: "removed", prep: "from" },
+      (scope) => write(scope, row.path, undefined),
+    );
+  } catch (error) {
+    vscode.window.showErrorMessage(`kdb+/q: ${(error as Error).message}`);
+    return;
   }
   forms.close(row.path);
   disconnectWithin(connections, row.path);
-  await forget(secrets, keys);
 }

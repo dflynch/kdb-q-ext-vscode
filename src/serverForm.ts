@@ -73,12 +73,12 @@ export function scopesOf(
 // The scopes something new in a folder can be written in: those the folder
 // is in, or at the top level, each there is
 export function targetsIn(folder: string[]): Scope[] {
-  if (vscode.workspace.workspaceFolders === undefined) {
-    return ["user"];
+  if (folder.length > 0) {
+    return scopesOf(folder, "folder");
   }
-  return folder.length === 0
-    ? ["user", "workspace"]
-    : scopesOf(folder, "folder");
+  return vscode.workspace.workspaceFolders === undefined
+    ? ["user"]
+    : ["user", "workspace"];
 }
 
 // Whether the server a form edits, or the folder it adds to, has gone from
@@ -129,20 +129,31 @@ export async function write(
   );
 }
 
-// Write as write does, saying in which scope it failed: a save writing
-// two may have written the first
-async function writeIn(
-  scope: Scope,
-  path: string[],
-  value: unknown,
-  from?: string,
+// Write each scope in turn, the user's first, refusing, if one can't be
+// written, with which, and which were written before it, as those are
+// done: "TP wasn't moved in Workspace settings", or "TP was moved in User
+// settings but not in Workspace settings". A form's save has no name:
+// "not saved in Workspace settings".
+export async function writeEach(
+  scopes: Scope[],
+  said: { name?: string; verb: string; prep: "in" | "from" },
+  write: (scope: Scope) => Promise<void>,
 ) {
-  try {
-    await write(scope, path, value, from);
-  } catch (error) {
-    throw new Error(
-      `not saved in ${scopeName(scope)} settings: ${(error as Error).message}`,
-    );
+  const { name, verb, prep } = said;
+  const written: Scope[] = [];
+  for (const scope of scopes) {
+    try {
+      await write(scope);
+    } catch (error) {
+      const not = `${prep} ${scopeName(scope)} settings: ${(error as Error).message}`;
+      const done = `${prep} ${written.map(scopeName).join(" and ")} settings`;
+      throw new Error(
+        written.length === 0
+          ? `${name ? `${name} wasn't` : "not"} ${verb} ${not}`
+          : `${name ? `${name} was ` : ""}${verb} ${done} but not ${not}`,
+      );
+    }
+    written.push(scope);
   }
 }
 
@@ -172,57 +183,6 @@ export async function openServers(scope: Scope) {
       ? "workbench.action.openWorkspaceSettingsFile"
       : "workbench.action.openSettingsJson",
     { revealSetting: { key: "kdb-q-ext-vscode.servers" } },
-  );
-}
-
-// The passwords the server at a path, or those in the folder there, get
-// from secure storage, as each scope writes them: one the workspace's hides
-// too. A folder's read from what it holds, as one with no name has none
-// of its own.
-export function storedKeys(path: string[]): string[] {
-  const written = scopes();
-  return (["user", "workspace"] as const).flatMap((scope) => {
-    const value = servers.at(written[scope], path);
-    if (value === undefined) {
-      return [];
-    }
-    const found =
-      servers.kindAt(written[scope], path) === "folder"
-        ? servers.entries(value as Record<string, unknown>, path)
-        : servers.entries({ [path.at(-1) ?? ""]: value }, path.slice(0, -1));
-    return servers
-      .everything(found)
-      .flatMap((entry) =>
-        entry.kind === "server" && entry.server?.auth === "store"
-          ? [servers.secretKey(entry.server)]
-          : [],
-      );
-  });
-}
-
-// Delete the passwords no server still gets from secure storage: several
-// servers with the same user, host and port share one. One the workspace's
-// hides still counts, as it's every other workspace's. Those of other
-// workspaces' settings can't be seen.
-export async function forget(
-  secrets: vscode.SecretStorage,
-  keys: Iterable<string>,
-) {
-  const used = new Set(stored().map(servers.secretKey));
-  for (const key of keys) {
-    if (!used.has(key)) {
-      await secrets.delete(key);
-    }
-  }
-}
-
-// The servers whose password is stored, in every scope
-function stored(): servers.Definition[] {
-  const written = scopes();
-  return (["user", "workspace"] as const).flatMap((scope) =>
-    servers
-      .definitions(written[scope])
-      .servers.filter((server) => server.auth === "store"),
   );
 }
 
@@ -470,7 +430,6 @@ export class ServerForms implements vscode.Disposable {
     const named = found.name === undefined;
     if (testing) {
       delete found.name;
-      delete found.target;
     }
     const wrong = Object.entries(found).map(
       ([field, problem]) => `${field}: ${problem}`,
@@ -546,25 +505,23 @@ export class ServerForms implements vscode.Disposable {
     }
   }
 
-  // Keep the server's password, then write the server where it's written,
-  // or for one added, where it's to go; and forget the password it had if
-  // no other server gets it. A server renamed is renamed in every scope
-  // it's in, and its connection closed.
+  // Write the server where it's written, or for one added, where it's to
+  // go, then keep its password. A server renamed is renamed in every scope
+  // it's in, and its connection closed. The password it had is kept, as
+  // a server in another workspace's settings may get it: Clear Server
+  // Password removes it.
   private async saved(open: Open, form: Form) {
     const { path, value, definition } = await this.checked(open, form);
-    // Checked again after checking's wait, as the settings may have changed,
-    // and before the password's kept, so that a save refused keeps nothing
+    // Checked again after checking's wait, as the settings may have changed
     const missing = missingFrom(open, form.target);
     if (missing) {
       throw new Error(`not saved, as ${missing}`);
     }
-    const before = this.editing(open);
-    const key = servers.secretKey(definition);
-    if (form.auth === "store" && form.password !== "") {
-      await this.secrets.store(key, form.password);
-    }
+    const said = { verb: "saved", prep: "in" } as const;
     if (open.editing === undefined) {
-      await writeIn(form.target, path, value);
+      await writeEach([form.target], said, (scope) =>
+        write(scope, path, value),
+      );
     } else {
       const old = open.editing;
       const from = old.at(-1);
@@ -573,24 +530,22 @@ export class ServerForms implements vscode.Disposable {
       // Its fields are written where they win; anywhere else it's only
       // renamed, keeping what's written there
       const scope = written.at(-1) ?? "user";
-      for (const other of written.filter((each) => each !== scope)) {
-        if (renamed) {
-          await writeIn(other, path, servers.at(scopes()[other], old), from);
-        }
-      }
-      await writeIn(scope, path, value, from);
+      const others = renamed ? written.filter((each) => each !== scope) : [];
+      await writeEach([...others, scope], said, (each) =>
+        write(
+          each,
+          path,
+          each === scope ? value : servers.at(scopes()[each], old),
+          from,
+        ),
+      );
       if (renamed) {
         this.connections.disconnect(servers.id(old));
       }
     }
-    const unused = new Set<string>();
-    if (before?.auth === "store") {
-      unused.add(servers.secretKey(before));
+    if (form.auth === "store" && form.password !== "") {
+      await this.secrets.store(servers.secretKey(definition), form.password);
     }
-    if (form.auth === "store") {
-      unused.delete(key);
-    }
-    await forget(this.secrets, unused);
   }
 
   // A setting the form refers to: the servers, or the TLS files, in

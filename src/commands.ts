@@ -15,7 +15,7 @@ import {
 } from "./result";
 import type { Results } from "./resultView";
 import type { ServerForms } from "./serverForm";
-import { forget, scopes, scopesOf, storedKeys, write } from "./serverForm";
+import { scopes, scopesOf, write, writeEach } from "./serverForm";
 import * as servers from "./servers";
 import * as statements from "./statements";
 import { describe, type Status } from "./status";
@@ -343,10 +343,10 @@ export async function editServer(forms: ServerForms, row?: Row) {
 
 // Remove the server whose row it's run on, or one picked, once confirmed,
 // from every scope it's written in, as one left in the user's settings
-// would still be there. Its connection is closed, its form too, and its
-// password forgotten if no other server gets it.
+// would still be there. Its connection is closed, and its form. Its
+// password is kept, as a server in another workspace's settings may get
+// it: Clear Server Password removes it.
 export async function removeServer(
-  secrets: vscode.SecretStorage,
   connections: Connections<Connection>,
   forms: ServerForms,
   row?: Row,
@@ -357,7 +357,6 @@ export async function removeServer(
   }
   const { path } = picked;
   const scopes = scopesOf(path);
-  const keys = storedKeys(path);
   const remove = "Remove";
   const choice = await vscode.window.showWarningMessage(
     `Remove ${servers.shown(path)}?`,
@@ -370,22 +369,20 @@ export async function removeServer(
   if (choice !== remove) {
     return;
   }
-  // The user's first: if the workspace's can't be written, the server's as
-  // it was, the workspace's winning. One that can't be written, as when
-  // its file has unsaved changes, leaves the server, and says why.
-  for (const scope of scopes) {
-    try {
-      await write(scope, path, undefined);
-    } catch (error) {
-      vscode.window.showErrorMessage(
-        `kdb+/q: ${servers.shown(path)} wasn't removed from ${scopeName(scope)} settings: ${(error as Error).message}`,
-      );
-      return;
-    }
+  // One that can't be written, as when its file has unsaved changes,
+  // leaves the server there, and says so
+  try {
+    await writeEach(
+      scopes,
+      { name: servers.shown(path), verb: "removed", prep: "from" },
+      (scope) => write(scope, path, undefined),
+    );
+  } catch (error) {
+    vscode.window.showErrorMessage(`kdb+/q: ${(error as Error).message}`);
+    return;
   }
   forms.close(path);
   connections.disconnect(servers.id(path));
-  await forget(secrets, keys);
 }
 
 // Keep a server's password in VS Code's secure storage, for the servers
@@ -411,11 +408,46 @@ export async function setPassword(secrets: vscode.SecretStorage) {
   await secrets.store(servers.secretKey(server), password);
 }
 
-// Any server, so that a password kept while its auth was store can go too
+// Remove a password from secure storage, picked from those stored, by the
+// login it's for, with the servers here that get it. One no server here
+// gets is listed too, as a server edited or removed leaves its password,
+// which a server in another workspace's settings may get.
 export async function clearPassword(secrets: vscode.SecretStorage) {
-  const server = await pickServer("kdb+/q: Clear Server Password");
-  if (server) {
-    await secrets.delete(servers.secretKey(server));
+  const prefix = "password:";
+  const stored = (await secrets.keys())
+    .filter((key) => key.startsWith(prefix))
+    .sort();
+  if (stored.length === 0) {
+    vscode.window.showInformationMessage("kdb+/q: No passwords are stored.");
+    return;
+  }
+  const getting = new Map<string, string[]>();
+  for (const server of definitions()) {
+    if (server.auth === "store") {
+      const key = servers.secretKey(server);
+      getting.set(key, [
+        ...(getting.get(key) ?? []),
+        servers.shown(server.path),
+      ]);
+    }
+  }
+  const picked = await vscode.window.showQuickPick(
+    stored.map((key) => {
+      const login = key.slice(prefix.length);
+      return {
+        label: login.startsWith("@") ? login.slice(1) : login,
+        description: getting.get(key)?.join(", ") ?? "no server here",
+        key,
+      };
+    }),
+    {
+      title: "kdb+/q: Clear Server Password",
+      placeHolder: "Password",
+      matchOnDescription: true,
+    },
+  );
+  if (picked) {
+    await secrets.delete(picked.key);
   }
 }
 
