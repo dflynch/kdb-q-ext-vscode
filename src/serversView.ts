@@ -1,10 +1,17 @@
 import * as vscode from "vscode";
-import { scopeName } from "./commands";
 import type { Connection } from "./connection";
 import type { Connections, State } from "./connections";
-import type { Scope } from "./form/fields";
+import { type Scope, scopeName } from "./form/fields";
 import type { ServerForms } from "./serverForm";
-import { forget, move, scopes, scopesOf, write } from "./serverForm";
+import {
+  forget,
+  move,
+  scopes,
+  scopesOf,
+  storedKeys,
+  targetsIn,
+  write,
+} from "./serverForm";
 import * as servers from "./servers";
 import { describe, details } from "./status";
 
@@ -281,15 +288,17 @@ export async function moveTo(
     );
     return;
   }
-  try {
-    for (const scope of scopesOf(from, entry.kind)) {
+  // The user's first, as Remove Server does; one that can't be written
+  // says which, as the user's may have moved
+  for (const scope of scopesOf(from, entry.kind)) {
+    try {
       await move(scope, from, to);
+    } catch (error) {
+      vscode.window.showErrorMessage(
+        `kdb+/q: ${servers.shown(from)} wasn't moved in ${scopeName(scope)} settings: ${(error as Error).message}`,
+      );
+      return;
     }
-  } catch (error) {
-    vscode.window.showErrorMessage(
-      `kdb+/q: ${servers.shown(from)} wasn't moved: ${(error as Error).message}`,
-    );
-    return;
   }
   forms.close(from);
   disconnectWithin(connections, from);
@@ -338,12 +347,7 @@ export async function newFolder(row?: servers.Entry) {
   if (typed === undefined) {
     return;
   }
-  const workspaceOpen = vscode.workspace.workspaceFolders !== undefined;
-  const candidates: Scope[] = !workspaceOpen
-    ? ["user"]
-    : parent.length === 0
-      ? ["user", "workspace"]
-      : scopesOf(parent, "folder");
+  const candidates = targetsIn(parent);
   let scope = candidates[0] ?? "user";
   if (candidates.length > 1) {
     const picked = await vscode.window.showQuickPick(
@@ -392,15 +396,15 @@ export async function renameFolder(
     return;
   }
   const to = [...parent, typed.trim()];
-  try {
-    for (const scope of scopesOf(row.path, "folder")) {
+  for (const scope of scopesOf(row.path, "folder")) {
+    try {
       await move(scope, row.path, to);
+    } catch (error) {
+      vscode.window.showErrorMessage(
+        `kdb+/q: ${servers.shown(row.path)} wasn't renamed in ${scopeName(scope)} settings: ${(error as Error).message}`,
+      );
+      return;
     }
-  } catch (error) {
-    vscode.window.showErrorMessage(
-      `kdb+/q: ${servers.shown(row.path)} wasn't renamed: ${(error as Error).message}`,
-    );
-    return;
   }
   forms.close(row.path);
   disconnectWithin(connections, row.path);
@@ -423,6 +427,7 @@ export async function removeFolder(
     ? serversIn(servers.entries(value, row.path))
     : [];
   const where = scopesOf(row.path, "folder").map(scopeName);
+  const keys = storedKeys(row.path);
   const what =
     held.length === 0
       ? "It's"
@@ -453,10 +458,5 @@ export async function removeFolder(
   }
   forms.close(row.path);
   disconnectWithin(connections, row.path);
-  await forget(
-    secrets,
-    held.flatMap(({ server }) =>
-      server?.auth === "store" ? [servers.secretKey(server)] : [],
-    ),
-  );
+  await forget(secrets, keys);
 }

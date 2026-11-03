@@ -3,7 +3,7 @@ import * as comments from "./comments";
 import { Connection } from "./connection";
 import type { Connections } from "./connections";
 import { credentials, type Sources } from "./credentials";
-import type { Scope } from "./form/fields";
+import { scopeName } from "./form/fields";
 import { errorText, type Size } from "./format/console";
 import { passwordProblem } from "./login";
 import {
@@ -15,7 +15,7 @@ import {
 } from "./result";
 import type { Results } from "./resultView";
 import type { ServerForms } from "./serverForm";
-import { forget, scopes, scopesOf, write } from "./serverForm";
+import { forget, scopes, scopesOf, storedKeys, write } from "./serverForm";
 import * as servers from "./servers";
 import * as statements from "./statements";
 import { describe, type Status } from "./status";
@@ -249,11 +249,6 @@ export async function toggleBlockComment(editor: vscode.TextEditor) {
   }
 }
 
-// A scope as VS Code names it
-export function scopeName(scope: Scope): string {
-  return scope === "user" ? "User" : "Workspace";
-}
-
 // The servers in the settings; one with a problem is shown, with it, in the
 // Servers view, and offered nowhere else
 export function definitions(): servers.Definition[] {
@@ -361,8 +356,8 @@ export async function removeServer(
     return;
   }
   const { path } = picked;
-  const server = row ? row.server : (picked as servers.Definition);
   const scopes = scopesOf(path);
+  const keys = storedKeys(path);
   const remove = "Remove";
   const choice = await vscode.window.showWarningMessage(
     `Remove ${servers.shown(path)}?`,
@@ -390,9 +385,7 @@ export async function removeServer(
   }
   forms.close(path);
   connections.disconnect(servers.id(path));
-  if (server?.auth === "store") {
-    await forget(secrets, [servers.secretKey(server)]);
-  }
+  await forget(secrets, keys);
 }
 
 // Keep a server's password in VS Code's secure storage, for the servers

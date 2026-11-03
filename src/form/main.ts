@@ -9,6 +9,7 @@ import {
   type FromForm,
   type Login,
   problems,
+  scopeName,
   shown,
   type ToForm,
 } from "./fields";
@@ -323,23 +324,18 @@ function show(message: Extract<ToForm, { type: "load" }>) {
   });
   left.clear();
   fill(message.form);
-  const { editing, folder, scopes, authExtension, workspaceOpen } =
-    message.context;
+  const { editing, folder, scopes, authExtension, targets } = message.context;
   title.textContent =
     editing === undefined ? "Add Server" : `Edit ${message.form.name}`;
   // Its folders, and for one edited, the settings it's in
   const places = [
     ...(folder.length > 0 ? [shown(folder)] : []),
-    ...(scopes.length > 0
-      ? [
-          `${listed(scopes.map((scope) => (scope === "user" ? "User" : "Workspace")))} settings`,
-        ]
-      : []),
+    ...(scopes.length > 0 ? [`${listed(scopes.map(scopeName))} settings`] : []),
   ];
   where.textContent = places.length > 0 ? `In ${places.join(", in ")}` : "";
   where.hidden = places.length === 0;
   note.hidden = !message.context.connected;
-  rows.target.row.hidden = editing !== undefined || !workspaceOpen;
+  rows.target.row.hidden = editing !== undefined || targets.length < 2;
   json.hidden = editing === undefined;
   const files = message.context.tlsFiles;
   tlsNote.replaceChildren(

@@ -14,11 +14,7 @@ import {
   roots,
   row,
 } from "../serversView";
-
-const config = () => vscode.workspace.getConfiguration("kdb-q-ext-vscode");
-const user = () => config().inspect("servers")?.globalValue;
-const setUser = (value: unknown) =>
-  config().update("servers", value, vscode.ConfigurationTarget.Global);
+import { secrets, setUser, user } from "./helpers";
 
 // What a row's given: nothing connected, unless a test says
 function look(states: Record<string, State> = {}, more: Partial<Look> = {}) {
@@ -42,19 +38,6 @@ const rdb: Entry = {
 const prod: Entry = { kind: "folder", path: ["Prod"], entries: [rdb, tp] };
 
 const icon = (item: vscode.TreeItem) => (item.iconPath as vscode.ThemeIcon).id;
-
-// Secure storage keeping what's stored
-function secrets(kept: Record<string, string>): vscode.SecretStorage {
-  return {
-    get: async (key: string) => kept[key],
-    store: async (key: string, value: string) => {
-      kept[key] = value;
-    },
-    delete: async (key: string) => {
-      delete kept[key];
-    },
-  } as unknown as vscode.SecretStorage;
-}
 
 // Connections with the servers given open
 async function opened(...servers: Entry[]) {

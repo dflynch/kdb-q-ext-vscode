@@ -13,6 +13,7 @@ import {
   port,
   problems,
   type Scope,
+  scopeName,
   type ToForm,
   toSetting,
 } from "./form/fields";
@@ -69,6 +70,17 @@ export function scopesOf(
   );
 }
 
+// The scopes something new in a folder can be written in: those the folder
+// is in, or at the top level, each there is
+export function targetsIn(folder: string[]): Scope[] {
+  if (vscode.workspace.workspaceFolders === undefined) {
+    return ["user"];
+  }
+  return folder.length === 0
+    ? ["user", "workspace"]
+    : scopesOf(folder, "folder");
+}
+
 // Whether the server a form edits, or the folder it adds to, has gone from
 // the settings. The top level is never gone.
 function gone({ folder, editing }: Pick<Open, "folder" | "editing">) {
@@ -102,6 +114,18 @@ export async function write(
   );
 }
 
+// Write as write does, saying in which scope it failed: a save writing
+// two may have written the first
+async function writeIn(...args: Parameters<typeof write>) {
+  try {
+    await write(...args);
+  } catch (error) {
+    throw new Error(
+      `not saved in ${scopeName(args[0])} settings: ${(error as Error).message}`,
+    );
+  }
+}
+
 // Move a server or a folder from one path to another in one scope's
 // setting, in one write. Renamed in the same folder, it keeps its place.
 export async function move(scope: Scope, from: string[], to: string[]) {
@@ -131,27 +155,55 @@ export async function openServers(scope: Scope) {
   );
 }
 
-// Delete the passwords no server other than the one at the path given still
-// gets from secure storage: several servers with the same user, host and
-// port share one
+// The passwords the server at a path, or those in the folder there, get
+// from secure storage, as each scope writes them: one the workspace's hides
+// too. A folder's read from what it holds, as one with no name has none
+// of its own.
+export function storedKeys(path: string[]): string[] {
+  const written = scopes();
+  return (["user", "workspace"] as const).flatMap((scope) => {
+    const value = servers.at(written[scope], path);
+    if (value === undefined) {
+      return [];
+    }
+    const found =
+      servers.kindAt(written[scope], path) === "folder"
+        ? servers.entries(value as Record<string, unknown>, path)
+        : servers.entries({ [path.at(-1) ?? ""]: value }, path.slice(0, -1));
+    return servers
+      .everything(found)
+      .flatMap((entry) =>
+        entry.kind === "server" && entry.server?.auth === "store"
+          ? [servers.secretKey(entry.server)]
+          : [],
+      );
+  });
+}
+
+// Delete the passwords no server still gets from secure storage: several
+// servers with the same user, host and port share one. One the workspace's
+// hides still counts, as it's every other workspace's. Those of other
+// workspaces' settings can't be seen.
 export async function forget(
   secrets: vscode.SecretStorage,
   keys: Iterable<string>,
-  except?: string[],
 ) {
-  const defined = servers.read(scopes());
-  const skipped = except && servers.id(except);
+  const used = new Set(stored().map(servers.secretKey));
   for (const key of keys) {
-    const used = defined.some(
-      (server) =>
-        servers.id(server.path) !== skipped &&
-        server.auth === "store" &&
-        servers.secretKey(server) === key,
-    );
-    if (!used) {
+    if (!used.has(key)) {
       await secrets.delete(key);
     }
   }
+}
+
+// The servers whose password is stored, in every scope
+function stored(): servers.Definition[] {
+  const written = scopes();
+  return (["user", "workspace"] as const).flatMap((scope) =>
+    servers
+      .definitions(written[scope])
+      .servers.filter((server) => server.auth === "store"),
+  );
 }
 
 // Where a password typed for a login would be kept, if the login's
@@ -323,7 +375,7 @@ export class ServerForms implements vscode.Disposable {
       taken: servers.isObject(folder)
         ? Object.keys(folder).filter((name) => name !== own)
         : [],
-      workspaceOpen: vscode.workspace.workspaceFolders !== undefined,
+      targets: open.editing === undefined ? targetsIn(open.folder) : [],
       ...(typeof authExtension === "string" && authExtension !== ""
         ? { authExtension }
         : {}),
@@ -364,7 +416,10 @@ export class ServerForms implements vscode.Disposable {
     }
     const context = this.context(open);
     if (open.editing === undefined) {
-      return { type: "load", form: blank(), context, stored: false };
+      // Saved where its folder is, unless the user picks
+      const target = context.targets[0] ?? "user";
+      const form = { ...blank(), target };
+      return { type: "load", form, context, stored: false };
     }
     const name = open.editing.at(-1) ?? "";
     const server = this.editing(open);
@@ -395,6 +450,7 @@ export class ServerForms implements vscode.Disposable {
     const named = found.name === undefined;
     if (testing) {
       delete found.name;
+      delete found.target;
     }
     const wrong = Object.entries(found).map(
       ([field, problem]) => `${field}: ${problem}`,
@@ -475,7 +531,7 @@ export class ServerForms implements vscode.Disposable {
   // no other server gets it. A server renamed is renamed in every scope
   // it's in, and its connection closed.
   private async saved(open: Open, form: Form) {
-    const { context, path, value, definition } = await this.checked(open, form);
+    const { path, value, definition } = await this.checked(open, form);
     const before = this.editing(open);
     const key = servers.secretKey(definition);
     if (form.auth === "store" && form.password !== "") {
@@ -487,12 +543,16 @@ export class ServerForms implements vscode.Disposable {
         `not saved, as ${servers.shown(open.editing ?? open.folder)} is no longer in settings`,
       );
     }
+    if (
+      open.editing === undefined &&
+      !targetsIn(open.folder).includes(form.target)
+    ) {
+      throw new Error(
+        `not saved, as ${servers.shown(open.folder)} is no longer in ${scopeName(form.target)} settings`,
+      );
+    }
     if (open.editing === undefined) {
-      const scope: Scope =
-        context.workspaceOpen && form.target === "workspace"
-          ? "workspace"
-          : "user";
-      await write(scope, path, value);
+      await writeIn(form.target, path, value);
     } else {
       const old = open.editing;
       const from = old.at(-1);
@@ -503,10 +563,10 @@ export class ServerForms implements vscode.Disposable {
       const scope = written.at(-1) ?? "user";
       for (const other of written.filter((each) => each !== scope)) {
         if (renamed) {
-          await write(other, path, servers.at(scopes()[other], old), from);
+          await writeIn(other, path, servers.at(scopes()[other], old), from);
         }
       }
-      await write(scope, path, value, from);
+      await writeIn(scope, path, value, from);
       if (renamed) {
         this.connections.disconnect(servers.id(old));
       }
@@ -518,7 +578,7 @@ export class ServerForms implements vscode.Disposable {
     if (form.auth === "store") {
       unused.delete(key);
     }
-    await forget(this.secrets, unused, path);
+    await forget(this.secrets, unused);
   }
 
   // A setting the form refers to: the servers, or the TLS files, in
