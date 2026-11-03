@@ -68,6 +68,9 @@ All notable changes to the extension are documented in this file.
 
 ### Changed
 
+- The extension is now named Ink: kdb+/q toolkit, with a new icon: an ink q
+  on paper, its tail ending in a drop. q files and the kdb+/q icon in the
+  Activity Bar and panel have the same q
 - Run Selected Text is now Run Selected Text in Terminal, beside Run
   Selected Text on Server
 - Ctrl/Cmd + Enter runs on the server, asking which one when none is

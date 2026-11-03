@@ -1,10 +1,10 @@
-# Quirk: kdb+/q toolkit
+# Ink: kdb+/q toolkit
 
 A lightweight extension for kdb+/q programming.
 
 ## Scope
 
-Quirk is for writing q, and in time for querying kdb+ and reading what comes
+Ink is for writing q, and in time for querying kdb+ and reading what comes
 back, without leaving VS Code. It's one extension with nothing to install
 alongside it. Today it highlights q, edits it, runs it in a terminal, and
 connects to kdb+ to run queries and show their results as q's console does,
@@ -18,7 +18,7 @@ and tables in a grid (see [Features](#features)).
 
 ### The query you send is the query you wrote
 
-Quirk never edits a query: it won't wrap it to fetch extra metadata, or add
+Ink never edits a query: it won't wrap it to fetch extra metadata, or add
 a row limit to it. With [protected evaluation](#protected-evaluation) on, the
 text is sent beside the function that traps its errors, unchanged; turn it
 off and a gateway that only allows listed calls sees exactly what you typed.
@@ -31,7 +31,7 @@ read.
 - Rename, formatting, diagnostics and `.k` files
 - Names built from strings at runtime, such as `value "f",string x`: q can't
   resolve them until the code runs, so navigation won't either
-- Starting or bundling q: Quirk connects to kdb+ processes you started, and
+- Starting or bundling q: Ink connects to kdb+ processes you started, and
   Run Selected Text in Terminal sends your code to a q session you started
 
 ## Features
