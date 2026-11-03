@@ -20,19 +20,19 @@ All notable changes to the extension are documented in this file.
   active connection, and how long its last query took, in the status bar
 - **kdb+/q: Run File on Server**, also the ▶ in the editor's title bar,
   which sends the whole file as one query, and shows the result in the
-  **kdb+/q** tab of the bottom panel as q's console prints it, and a
+  **KDB+/Q** tab of the bottom panel as q's console prints it, and a
   table, keyed table, dictionary or list in a grid too, with each row's
   index, sorting, filters of the text shown, or of numbers and times
   compared as q compares them, typed as q writes them or picked, and a
   cell's value, double-clicked, as a result of its own
 - **kdb+/q: Run Selected Text on Server**, which sends the selection, or
   the current line, the same way
-- **kdb+/q: Keep Result**, also the pin in the **kdb+/q** tab's title
+- **kdb+/q: Keep Result**, also the pin in the **KDB+/Q** tab's title
   bar, which opens the latest result in an editor tab of its own, where the
   next query doesn't replace it, for comparing results side by side; it
   opens as it was left: the view, the cell drilled into, each grid's sort,
   filter and column order, and each chart's settings
-- **kdb+/q: Export Result to CSV**, also a button in the **kdb+/q** tab's
+- **kdb+/q: Export Result to CSV**, also a button in the **KDB+/Q** tab's
   title bar and a kept tab's, which saves the Grid shown, its rows as
   sorted and filtered, as q's `csv 0:` writes them, quoted as RFC 4180 has
   it; like q's, it won't write a column of lists or tables

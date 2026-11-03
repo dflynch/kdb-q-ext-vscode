@@ -171,7 +171,7 @@ connection open, it asks for a server, and with one opening, it waits.
 **kdb+/q: Run Selected Text on Server** sends the selection, or the current
 line, the same way. With several selections, only the first is sent.
 
-The result shows in the **kdb+/q** tab of the bottom panel, beside Output and
+The result shows in the **KDB+/Q** tab of the bottom panel, beside Output and
 Terminal, as q's console prints it, replacing the last: an assignment shows
 nothing, and an error shows as `'type` with its backtrace. Running a query
 brings the tab into view and leaves the cursor in the editor. Switching away
@@ -349,7 +349,7 @@ next run; a result already shown, or kept, stays as it was.
 
 A result over `sizeLimit` is refused before it's read, and the connection
 closed. The extension holds the latest result as it arrived, and decodes it
-in the **kdb+/q** tab, and in each kept tab, which have about 4 GB of memory.
+in the **KDB+/Q** tab, and in each kept tab, which have about 4 GB of memory.
 The Grid takes about 250 bytes a row, whatever the columns, and a mixed
 list's items up to about 200 bytes more each, so a result, or a cell's value
 drilled into, of more rows than `rowLimit` is refused; like `precision`, it
