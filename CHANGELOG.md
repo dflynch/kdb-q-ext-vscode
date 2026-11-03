@@ -11,6 +11,11 @@ All notable changes to the extension are documented in this file.
   any depth if you like, with TLS, passwords kept in VS Code's secure
   storage, asked for at every connect, or given by another extension, and
   protected evaluation
+- The **Servers** view, under the q in the activity bar: servers in their
+  folders, with each connection's state; connect, disconnect, edit and
+  remove from a row, add servers and folders, rename and remove folders,
+  and drag to move. A server with a problem in the settings is listed with
+  it, to fix in the form
 - **kdb+/q: Connect to Server** and **Disconnect from Server**, with the
   active connection, and how long its last query took, in the status bar
 - **kdb+/q: Run File on Server**, also the ▶ in the editor's title bar,

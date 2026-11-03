@@ -133,7 +133,7 @@ suite("credentials", () => {
     await rejects(
       credentials(sso, sources({ authExtension: () => "kdb-auth" })),
       "invalid auth extension",
-      "the auth extension isn't an extension ID",
+      "the auth extension must be an extension ID",
     );
   });
 

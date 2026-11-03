@@ -137,7 +137,7 @@ const user = text("user");
 user.placeholder = "Optional";
 const password = text("password", "password");
 const timeout = text("timeout");
-timeout.placeholder = "No limit";
+timeout.placeholder = "None";
 const tls = tick("tls", "Use TLS");
 // Where TLS gets its certificates, under its tick once it's ticked
 const tlsNote = element("div", "note-under description");
@@ -353,6 +353,16 @@ function show(message: Extract<ToForm, { type: "load" }>) {
   meanings.extension = authExtension
     ? [`From ${authExtension}, the `, link("auth extension", "authExtension")]
     : ["From the ", link("auth extension", "authExtension"), " setting"];
+  // A server with a problem as it's written shows what's wrong with each
+  // field at once
+  if (message.context.problem) {
+    for (const field of Object.keys(rows)) {
+      left.add(field as Field);
+    }
+    warn(
+      `In the settings: ${message.context.problem}. Saving replaces it with what's shown here.`,
+    );
+  }
   update();
   if (first && editing === undefined) {
     name.focus();

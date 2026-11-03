@@ -9,20 +9,20 @@ import {
   type Definition,
   defaults,
   definitions,
+  entries,
   isObject,
   isServer,
+  kindAt,
   merge,
   put,
   read,
-  said,
   secretKey,
   server,
-  serverAt,
   settings,
 } from "../servers";
 
 suite("servers", () => {
-  test("reads servers in the order written", () => {
+  test("reads servers as the view lists them: folders first, each A to Z", () => {
     assert.deepStrictEqual(
       definitions({
         prod: { host: "kdb1", port: 5010, user: "admin", timeout: 500 },
@@ -30,6 +30,7 @@ suite("servers", () => {
       }),
       {
         servers: [
+          { path: ["local"], host: "localhost", port: 5000 },
           {
             path: ["prod"],
             host: "kdb1",
@@ -37,9 +38,7 @@ suite("servers", () => {
             user: "admin",
             timeout: 500,
           },
-          { path: ["local"], host: "localhost", port: 5000 },
         ],
-        folders: [],
         problems: [],
       },
     );
@@ -72,7 +71,6 @@ suite("servers", () => {
   test("no setting is no servers", () => {
     assert.deepStrictEqual(definitions(undefined), {
       servers: [],
-      folders: [],
       problems: [],
     });
   });
@@ -80,8 +78,7 @@ suite("servers", () => {
   test("a setting that isn't an object is a problem", () => {
     assert.deepStrictEqual(definitions([{ host: "h", port: 1 }]), {
       servers: [],
-      folders: [],
-      problems: [{ path: [], problem: "isn't an object" }],
+      problems: [{ path: [], problem: "not an object" }],
     });
   });
 
@@ -105,23 +102,23 @@ suite("servers", () => {
     });
     assert.deepStrictEqual(servers, [{ path: ["ok"], host: "h", port: 1 }]);
     assert.deepStrictEqual(problems, [
-      { path: ["a"], problem: "has a port that isn't from 1 to 65535" },
-      { path: ["b"], problem: "has a port that isn't from 1 to 65535" },
-      { path: ["c"], problem: "has a port that isn't from 1 to 65535" },
-      { path: ["d"], problem: "has no host" },
-      { path: ["e"], problem: "has no host" },
-      { path: ["f"], problem: "has a user with a : or a 0 byte" },
-      { path: ["g"], problem: "has a user with a : or a 0 byte" },
+      { path: [""], problem: "no name" },
+      { path: ["a"], problem: "port must be from 1 to 65535" },
+      { path: ["b"], problem: "port must be from 1 to 65535" },
+      { path: ["c"], problem: "port must be from 1 to 65535" },
+      { path: ["d"], problem: "no host" },
+      { path: ["e"], problem: "no host" },
+      { path: ["f"], problem: "user can't contain : or a 0 byte" },
+      { path: ["g"], problem: "user can't contain : or a 0 byte" },
       {
         path: ["h"],
-        problem: "has a timeout that isn't a whole number of milliseconds",
+        problem: "timeout must be a whole number of milliseconds",
       },
-      { path: ["h2"], problem: "has a protect that isn't true or false" },
-      { path: ["t1"], problem: "has a tls that isn't true or false" },
-      { path: ["t2"], problem: "has a tls that isn't true or false" },
-      { path: ["i"], problem: "has an unknown field, usr" },
-      { path: ["j"], problem: "isn't a server or a folder" },
-      { path: [""], problem: "has no name" },
+      { path: ["h2"], problem: "protect must be true or false" },
+      { path: ["i"], problem: "unknown field: usr" },
+      { path: ["j"], problem: "not a server or a folder" },
+      { path: ["t1"], problem: "tls must be true or false" },
+      { path: ["t2"], problem: "tls must be true or false" },
     ]);
   });
 
@@ -137,26 +134,23 @@ suite("servers", () => {
     });
     // "none" is read as no auth
     assert.deepStrictEqual(servers, [
-      { path: ["none"], host: "h", port: 1 },
       { path: ["kept"], host: "h", port: 1, auth: "store" },
+      { path: ["none"], host: "h", port: 1 },
       { path: ["otp"], host: "h", port: 1, auth: "prompt" },
       { path: ["sso"], host: "h", port: 1, auth: "extension" },
     ]);
     assert.deepStrictEqual(problems, [
       {
         path: ["a"],
-        problem:
-          'has an auth that isn\'t "none", "store", "prompt" or "extension"',
+        problem: 'auth must be "none", "store", "prompt" or "extension"',
       },
       {
         path: ["b"],
-        problem:
-          'has an auth that isn\'t "none", "store", "prompt" or "extension"',
+        problem: 'auth must be "none", "store", "prompt" or "extension"',
       },
       {
         path: ["c"],
-        problem:
-          'has an auth that isn\'t "none", "store", "prompt" or "extension"',
+        problem: 'auth must be "none", "store", "prompt" or "extension"',
       },
     ]);
   });
@@ -174,14 +168,61 @@ suite("servers", () => {
       }),
       {
         servers: [
-          { path: ["Dev", "TP"], host: "dev", port: 5010 },
           { path: ["Dev", "trades", "RDB"], host: "dev", port: 5011 },
+          { path: ["Dev", "TP"], host: "dev", port: 5010 },
           { path: ["Prod", "TP"], host: "prod", port: 5010 },
           { path: ["local"], host: "localhost", port: 5000 },
         ],
-        folders: [["Dev"], ["Dev", "trades"], ["Prod"], ["UAT"]],
         problems: [],
       },
+    );
+  });
+
+  test("the view's entries: folders first, then servers, each A to Z", () => {
+    assert.deepStrictEqual(
+      entries({
+        tp: { host: "h", port: 1 },
+        Prod: { rdb: { host: "h", port: 2 }, x: "h:3" },
+        server10: { host: "h", port: 10 },
+        server9: { host: "h", port: 9 },
+        dev: {},
+        " ": { a: { host: "h", port: 4 } },
+      }),
+      [
+        { kind: "folder", path: [" "], entries: [], problem: "no name" },
+        { kind: "folder", path: ["dev"], entries: [] },
+        {
+          kind: "folder",
+          path: ["Prod"],
+          entries: [
+            {
+              kind: "server",
+              path: ["Prod", "rdb"],
+              server: { path: ["Prod", "rdb"], host: "h", port: 2 },
+            },
+            {
+              kind: "server",
+              path: ["Prod", "x"],
+              problem: "not a server or a folder",
+            },
+          ],
+        },
+        {
+          kind: "server",
+          path: ["server9"],
+          server: { path: ["server9"], host: "h", port: 9 },
+        },
+        {
+          kind: "server",
+          path: ["server10"],
+          server: { path: ["server10"], host: "h", port: 10 },
+        },
+        {
+          kind: "server",
+          path: ["tp"],
+          server: { path: ["tp"], host: "h", port: 1 },
+        },
+      ],
     );
   });
 
@@ -245,7 +286,7 @@ suite("servers", () => {
     }
   });
 
-  test("a problem in a folder is said by its path", () => {
+  test("a problem in a folder is kept with its path", () => {
     assert.deepStrictEqual(
       definitions({
         Dev: {
@@ -256,10 +297,10 @@ suite("servers", () => {
           trades: { " ": { host: "dev", port: 1 }, "": {} },
           HDB: { host: "dev", port: 5012 },
         },
-        // A value that isn't an object is said in its folder, which keeps
+        // A value that isn't an object is a problem in its folder, which keeps
         // the rest
         UAT: { TP: { host: "uat", port: 5010 }, RDB: "uat:5011" },
-        // An object in a server is said as its field
+        // An object in a server is a problem with its field
         gw: { host: "gw", port: 1, tls: { ca: "/ca.pem" } },
         stray: "gw:1",
       }),
@@ -269,21 +310,20 @@ suite("servers", () => {
           { path: ["Dev", "HDB"], host: "dev", port: 5012 },
           { path: ["UAT", "TP"], host: "uat", port: 5010 },
         ],
-        folders: [["Dev"], ["Dev", "trades"], ["UAT"]],
         problems: [
-          { path: ["Dev", "TP"], problem: "has an unknown field, hots" },
-          { path: ["Dev", "trades", " "], problem: "has no name" },
-          { path: ["Dev", "trades", ""], problem: "has no name" },
-          { path: ["UAT", "RDB"], problem: "isn't a server or a folder" },
-          { path: ["gw"], problem: "has a tls that isn't true or false" },
-          { path: ["stray"], problem: "isn't a server or a folder" },
+          { path: ["Dev", "trades", ""], problem: "no name" },
+          { path: ["Dev", "trades", " "], problem: "no name" },
+          { path: ["Dev", "TP"], problem: "unknown field: hots" },
+          { path: ["UAT", "RDB"], problem: "not a server or a folder" },
+          { path: ["gw"], problem: "tls must be true or false" },
+          { path: ["stray"], problem: "not a server or a folder" },
         ],
       },
     );
   });
 
   test("a host or a port makes a server, and nothing else does", () => {
-    const { servers, folders, problems } = definitions({
+    const setting = {
       // A misspelt field, with a port
       local: { hots: "localhost", port: 5000 },
       // Every field misspelt: a folder of things that aren't servers
@@ -296,16 +336,20 @@ suite("servers", () => {
       Dev: { port: { host: "dev", port: 1 } },
       // A folder whose only entry is wrong is still a folder
       Prod: { TP: "x" },
-    });
+    };
+    const { servers, problems } = definitions(setting);
     assert.deepStrictEqual(servers, [
       { path: ["Dev", "port"], host: "dev", port: 1 },
     ]);
-    assert.deepStrictEqual(folders, [["typo"], ["empty"], ["Dev"], ["Prod"]]);
+    assert.deepStrictEqual(
+      Object.keys(setting).map((name) => kindAt(setting, [name])),
+      ["server", "folder", "folder", "server", "folder", "folder"],
+    );
     assert.deepStrictEqual(problems, [
-      { path: ["local"], problem: "has an unknown field, hots" },
-      { path: ["typo", "hots"], problem: "isn't a server or a folder" },
-      { path: ["gw"], problem: "has a port that isn't from 1 to 65535" },
-      { path: ["Prod", "TP"], problem: "isn't a server or a folder" },
+      { path: ["Prod", "TP"], problem: "not a server or a folder" },
+      { path: ["typo", "hots"], problem: "not a server or a folder" },
+      { path: ["gw"], problem: "port must be from 1 to 65535" },
+      { path: ["local"], problem: "unknown field: hots" },
     ]);
   });
 
@@ -338,54 +382,22 @@ suite("servers", () => {
     assert.deepStrictEqual(merge(undefined, workspace, true), workspace);
   });
 
-  test("each scope's problems are said of it, and the servers read together", () => {
-    const { servers, folders, problems } = read({
-      user: { Dev: { rdb: "dev:5011", TP: { host: "dev", port: 1 } } },
-      workspace: { gw: { port: 7 }, Dev: {} },
-    });
-    assert.deepStrictEqual(servers, [
-      { path: ["Dev", "TP"], host: "dev", port: 1 },
-    ]);
-    assert.deepStrictEqual(folders, [["Dev"]]);
-    assert.deepStrictEqual(problems, [
-      {
-        path: ["Dev", "rdb"],
-        problem: "isn't a server or a folder",
-        scope: "user",
-      },
-      { path: ["gw"], problem: "has no host", scope: "workspace" },
-    ]);
-    assert.deepStrictEqual(read({ user: 1, workspace: undefined }).problems, [
-      { path: [], problem: "isn't an object", scope: "user" },
-    ]);
+  test("the servers are read from the scopes together", () => {
+    assert.deepStrictEqual(
+      read({
+        user: { Dev: { rdb: "dev:5011", TP: { host: "dev", port: 1 } } },
+        workspace: { gw: { port: 7 }, Dev: {} },
+      }),
+      [{ path: ["Dev", "TP"], host: "dev", port: 1 }],
+    );
   });
 
-  test("a server's at a path, not a folder or anything else", () => {
+  test("what's at a path: a folder, a server, or something that should be", () => {
     const setting = { Prod: { TP: { host: "h", port: 1 }, bad: "x" } };
-    assert.ok(serverAt(setting, ["Prod", "TP"]));
-    assert.ok(!serverAt(setting, ["Prod"]));
-    assert.ok(!serverAt(setting, ["Prod", "bad"]));
-    assert.ok(!serverAt(setting, ["nothing"]));
-  });
-
-  test("a problem's said of what has it, by its path", () => {
-    const problem = "isn't a server or a folder";
-    assert.strictEqual(
-      said({ path: ["Dev", "rdb"], problem }),
-      "Dev › rdb isn't a server or a folder",
-    );
-    assert.strictEqual(
-      said({ path: ["Dev", " "], problem: "has no name" }),
-      "an entry in Dev has no name",
-    );
-    assert.strictEqual(
-      said({ path: [""], problem: "has no name" }),
-      "an entry has no name",
-    );
-    assert.strictEqual(
-      said({ path: [], problem: "isn't an object" }),
-      "the setting isn't an object",
-    );
+    assert.strictEqual(kindAt(setting, ["Prod", "TP"]), "server");
+    assert.strictEqual(kindAt(setting, ["Prod"]), "folder");
+    assert.strictEqual(kindAt(setting, ["Prod", "bad"]), "server");
+    assert.strictEqual(kindAt(setting, ["nothing"]), undefined);
   });
 
   test("what's at a path, or undefined", () => {
@@ -469,10 +481,10 @@ suite("servers", () => {
     assert.deepStrictEqual(authExtension(undefined), {});
     assert.deepStrictEqual(authExtension(""), {});
     assert.deepStrictEqual(authExtension("kdb-auth"), {
-      problem: "the auth extension isn't an extension ID",
+      problem: "the auth extension must be an extension ID",
     });
     assert.deepStrictEqual(authExtension(1), {
-      problem: "the auth extension isn't an extension ID",
+      problem: "the auth extension must be an extension ID",
     });
   });
 
@@ -511,18 +523,15 @@ suite("servers", () => {
   });
 
   test("the size limit", () => {
-    assert.deepStrictEqual(settings(undefined), { defaults, problems: [] });
-    assert.deepStrictEqual(settings(2.5), {
-      defaults: { limit: 2500000 },
-      problems: [],
-    });
+    assert.deepStrictEqual(settings(undefined), defaults);
+    assert.deepStrictEqual(settings(2.5), { limit: 2500000 });
   });
 
-  test("a wrong setting is a problem, and its default is used", () => {
+  test("a wrong size limit is refused, not replaced by the default", () => {
     for (const wrong of [0, "10"]) {
-      assert.deepStrictEqual(settings(wrong), {
-        defaults,
-        problems: ["the size limit isn't a positive number of megabytes"],
+      assert.throws(() => settings(wrong), {
+        message:
+          "invalid sizeLimit setting: must be a positive number of megabytes",
       });
     }
   });

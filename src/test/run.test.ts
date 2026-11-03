@@ -186,6 +186,33 @@ suite("runOnServer", () => {
     assert.deepStrictEqual(told.at(-1), ["ended", id(["prod"]), undefined]);
   });
 
+  test("a wrong setting fails the run, saying why, and sends nothing", async () => {
+    const config = vscode.workspace.getConfiguration("kdb-q-ext-vscode");
+    await config.update("rowLimit", 0, vscode.ConfigurationTarget.Global);
+    try {
+      const { link, sent } = scripted([long(1)]);
+      const { replaced, answers, told, results, status } = shown();
+      await runOnServer(
+        await selecting("1"),
+        await opened(link),
+        results,
+        status,
+      );
+      assert.deepStrictEqual(sent, []);
+      assert.deepStrictEqual(replaced, [
+        "'invalid rowLimit setting: must be a positive whole number",
+      ]);
+      assert.deepStrictEqual(answers, [{ query: "1", server: "prod" }]);
+      assert.deepStrictEqual(told, []);
+    } finally {
+      await config.update(
+        "rowLimit",
+        undefined,
+        vscode.ConfigurationTarget.Global,
+      );
+    }
+  });
+
   test("the query ends even if showing its result fails", async () => {
     const { link } = scripted([long(1)]);
     const { told, status } = shown();

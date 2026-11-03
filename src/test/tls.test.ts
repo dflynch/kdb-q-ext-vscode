@@ -269,15 +269,16 @@ suite("tls", () => {
     // The rest are kept, as a passphrase is kept under the key
     assert.deepStrictEqual(files("ca.pem", "/c.pem", 1), {
       files: { cert: "/c.pem" },
-      problem: "tlsCaFile, tlsKeyFile: not an absolute path or one from ~/",
+      problem:
+        "tlsCaFile, tlsKeyFile: must be an absolute path or start with ~/",
     });
     assert.deepStrictEqual(
       files("", "/c.pem", "").problem,
-      "tlsCertFile and tlsKeyFile go together",
+      "tlsCertFile and tlsKeyFile must be set together",
     );
     assert.deepStrictEqual(
       files("", "", "/k.pem").problem,
-      "tlsCertFile and tlsKeyFile go together",
+      "tlsCertFile and tlsKeyFile must be set together",
     );
   });
 

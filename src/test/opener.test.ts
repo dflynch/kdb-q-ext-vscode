@@ -150,13 +150,46 @@ suite("opener", () => {
         auth: "prompt",
       };
       await assert.rejects(opener(secrets({}))(server), {
-        message: "invalid TLS settings: tlsCertFile and tlsKeyFile go together",
+        message:
+          "invalid TLS settings: tlsCertFile and tlsKeyFile must be set together",
       });
       assert.strictEqual(asked, false);
     } finally {
       window.showInputBox = ask;
       await config.update(
         "tlsCertFile",
+        undefined,
+        vscode.ConfigurationTarget.Global,
+      );
+    }
+  });
+
+  test("a wrong size limit fails the connect, before credentials are asked for", async () => {
+    const config = vscode.workspace.getConfiguration("kdb-q-ext-vscode");
+    await config.update("sizeLimit", 0, vscode.ConfigurationTarget.Global);
+    const window = vscode.window as unknown as Record<string, unknown>;
+    const ask = window.showInputBox;
+    let asked = false;
+    window.showInputBox = async () => {
+      asked = true;
+      return "pw";
+    };
+    try {
+      const server: Definition = {
+        path: ["local"],
+        host: "localhost",
+        port: 1,
+        auth: "prompt",
+      };
+      await assert.rejects(opener(secrets({}))(server), {
+        message:
+          "invalid sizeLimit setting: must be a positive number of megabytes",
+      });
+      assert.strictEqual(asked, false);
+    } finally {
+      window.showInputBox = ask;
+      await config.update(
+        "sizeLimit",
         undefined,
         vscode.ConfigurationTarget.Global,
       );

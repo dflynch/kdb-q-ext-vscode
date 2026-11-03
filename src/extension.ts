@@ -2,8 +2,16 @@ import * as vscode from "vscode";
 import * as commands from "./commands";
 import { Connections } from "./connections";
 import { exporting, saveCsv } from "./exporting";
+import type { Scope } from "./form/fields";
 import { ResultView, registerResultView } from "./resultView";
-import { ServerForms } from "./serverForm";
+import { openServers, ServerForms } from "./serverForm";
+import type { Entry } from "./servers";
+import {
+  newFolder,
+  removeFolder,
+  renameFolder,
+  ServersView,
+} from "./serversView";
 import { showStatus } from "./status";
 
 export function activate(context: vscode.ExtensionContext) {
@@ -20,6 +28,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     status,
     forms,
+    new ServersView(connections, forms),
     connections,
     registerResultView(results),
     vscode.commands.registerCommand("kdb-q-ext-vscode.keepResult", () =>
@@ -34,11 +43,17 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("kdb-q-ext-vscode.copyWithHeaders", () =>
       results.copyWithHeaders(),
     ),
-    vscode.commands.registerCommand("kdb-q-ext-vscode.connect", () =>
-      commands.connect(connections),
+    // Those a Servers view row offers are given the row
+    vscode.commands.registerCommand("kdb-q-ext-vscode.connect", (row?: Entry) =>
+      commands.connect(connections, row),
     ),
-    vscode.commands.registerCommand("kdb-q-ext-vscode.disconnect", () =>
-      commands.disconnect(connections),
+    vscode.commands.registerCommand(
+      "kdb-q-ext-vscode.makeActive",
+      (row: Entry) => commands.connect(connections, row),
+    ),
+    vscode.commands.registerCommand(
+      "kdb-q-ext-vscode.disconnect",
+      (row?: Entry) => commands.disconnect(connections, row),
     ),
     vscode.commands.registerCommand(
       "kdb-q-ext-vscode.showServerMenu",
@@ -83,14 +98,34 @@ export function activate(context: vscode.ExtensionContext) {
         }
       },
     ),
-    vscode.commands.registerCommand("kdb-q-ext-vscode.addServer", () =>
-      forms.add(),
+    vscode.commands.registerCommand(
+      "kdb-q-ext-vscode.addServer",
+      (row?: Entry) => forms.add(row?.path),
     ),
-    vscode.commands.registerCommand("kdb-q-ext-vscode.editServer", () =>
-      commands.editServer(forms),
+    vscode.commands.registerCommand(
+      "kdb-q-ext-vscode.editServer",
+      (row?: Entry) => commands.editServer(forms, row),
     ),
-    vscode.commands.registerCommand("kdb-q-ext-vscode.removeServer", () =>
-      commands.removeServer(context.secrets, connections, forms),
+    vscode.commands.registerCommand(
+      "kdb-q-ext-vscode.removeServer",
+      (row?: Entry) =>
+        commands.removeServer(context.secrets, connections, forms, row),
+    ),
+    vscode.commands.registerCommand(
+      "kdb-q-ext-vscode.newFolder",
+      (row?: Entry) => newFolder(row),
+    ),
+    vscode.commands.registerCommand(
+      "kdb-q-ext-vscode.renameFolder",
+      (row: Entry) => renameFolder(connections, forms, row),
+    ),
+    vscode.commands.registerCommand(
+      "kdb-q-ext-vscode.removeFolder",
+      (row: Entry) => removeFolder(context.secrets, connections, forms, row),
+    ),
+    vscode.commands.registerCommand(
+      "kdb-q-ext-vscode.openServersSetting",
+      (row: { scope: Scope }) => openServers(row.scope),
     ),
     vscode.commands.registerCommand("kdb-q-ext-vscode.setPassword", () =>
       commands.setPassword(context.secrets),

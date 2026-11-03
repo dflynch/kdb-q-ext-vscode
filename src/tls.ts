@@ -49,11 +49,11 @@ export function files(
   if (wrong.length > 0) {
     return {
       files,
-      problem: `${wrong.join(", ")}: not an absolute path or one from ~/`,
+      problem: `${wrong.join(", ")}: must be an absolute path or start with ~/`,
     };
   }
   return (files.cert === undefined) !== (files.key === undefined)
-    ? { files, problem: "tlsCertFile and tlsKeyFile go together" }
+    ? { files, problem: "tlsCertFile and tlsKeyFile must be set together" }
     : { files };
 }
 

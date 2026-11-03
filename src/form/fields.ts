@@ -49,6 +49,9 @@ export type Context = {
   // Whether the server's connected, so that changes wait for the next
   // connect
   connected: boolean;
+  // The problem the server has as it's written, when editing one that has
+  // one: no host
+  problem?: string;
 };
 
 // The timeout a server added starts with, in milliseconds
@@ -77,29 +80,29 @@ export function blank(): Form {
   };
 }
 
-// A server's setting as the form has it
-export function fromSetting(
-  name: string,
-  value: {
-    host: string;
-    port: number;
-    user?: string;
-    auth?: "store" | "prompt" | "extension";
-    tls?: boolean;
-    protect?: boolean;
-    timeout?: number;
-  },
-): Form {
+// A server's setting as the form has it: what can be read of it, for one
+// with a problem too, so that it can be fixed in the form. A field that's
+// wrong is as written, where a box can show it, for its problem to show.
+export function fromSetting(name: string, value: unknown): Form {
+  const fields: Record<string, unknown> =
+    typeof value === "object" && value !== null && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+  const text = (field: unknown) =>
+    typeof field === "string" || typeof field === "number" ? String(field) : "";
+  const auth = ["store", "prompt", "extension"].includes(fields.auth as string)
+    ? (fields.auth as Auth)
+    : "none";
   return {
     ...blank(),
     name,
-    host: value.host,
-    port: String(value.port),
-    user: value.user ?? "",
-    auth: value.auth ?? "none",
-    tls: value.tls ?? false,
-    protect: value.protect ?? true,
-    timeout: value.timeout === undefined ? "" : String(value.timeout),
+    host: text(fields.host),
+    port: text(fields.port),
+    user: text(fields.user),
+    auth,
+    tls: fields.tls === true,
+    protect: fields.protect !== false,
+    timeout: text(fields.timeout),
   };
 }
 

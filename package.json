@@ -46,6 +46,13 @@
           "title": "kdb+/q",
           "icon": "icons/q-dark.svg"
         }
+      ],
+      "activitybar": [
+        {
+          "id": "kdb-q-ext-vscode-servers",
+          "title": "kdb+/q",
+          "icon": "icons/q-dark.svg"
+        }
       ]
     },
     "views": {
@@ -55,8 +62,20 @@
           "id": "kdb-q-ext-vscode.result",
           "name": "Result"
         }
+      ],
+      "kdb-q-ext-vscode-servers": [
+        {
+          "id": "kdb-q-ext-vscode.servers",
+          "name": "Servers"
+        }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "kdb-q-ext-vscode.servers",
+        "contents": "No servers yet.\n[Add Server](command:kdb-q-ext-vscode.addServer)"
+      }
+    ],
     "commands": [
       {
         "command": "kdb-q-ext-vscode.runFileOnServer",
@@ -82,17 +101,47 @@
       {
         "command": "kdb-q-ext-vscode.addServer",
         "category": "kdb+/q",
-        "title": "Add Server"
+        "title": "Add Server",
+        "icon": "$(add)"
       },
       {
         "command": "kdb-q-ext-vscode.editServer",
         "category": "kdb+/q",
-        "title": "Edit Server"
+        "title": "Edit Server",
+        "icon": "$(edit)"
       },
       {
         "command": "kdb-q-ext-vscode.removeServer",
         "category": "kdb+/q",
         "title": "Remove Server"
+      },
+      {
+        "command": "kdb-q-ext-vscode.makeActive",
+        "category": "kdb+/q",
+        "title": "Make Active",
+        "icon": "$(target)"
+      },
+      {
+        "command": "kdb-q-ext-vscode.newFolder",
+        "category": "kdb+/q",
+        "title": "New Folder",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "kdb-q-ext-vscode.renameFolder",
+        "category": "kdb+/q",
+        "title": "Rename Folder"
+      },
+      {
+        "command": "kdb-q-ext-vscode.removeFolder",
+        "category": "kdb+/q",
+        "title": "Remove Folder"
+      },
+      {
+        "command": "kdb-q-ext-vscode.openServersSetting",
+        "category": "kdb+/q",
+        "title": "Edit in settings.json",
+        "icon": "$(go-to-file)"
       },
       {
         "command": "kdb-q-ext-vscode.keepResult",
@@ -123,12 +172,14 @@
       {
         "command": "kdb-q-ext-vscode.connect",
         "category": "kdb+/q",
-        "title": "Connect to Server"
+        "title": "Connect to Server",
+        "icon": "$(plug)"
       },
       {
         "command": "kdb-q-ext-vscode.disconnect",
         "category": "kdb+/q",
-        "title": "Disconnect from Server"
+        "title": "Disconnect from Server",
+        "icon": "$(debug-disconnect)"
       },
       {
         "command": "kdb-q-ext-vscode.showServerMenu",
@@ -138,7 +189,8 @@
       {
         "command": "kdb-q-ext-vscode.openSettings",
         "category": "kdb+/q",
-        "title": "Open Settings"
+        "title": "Open Settings",
+        "icon": "$(settings-gear)"
       },
       {
         "command": "kdb-q-ext-vscode.setPassword",
@@ -190,6 +242,22 @@
         {
           "command": "kdb-q-ext-vscode.copyWithHeaders",
           "when": "false"
+        },
+        {
+          "command": "kdb-q-ext-vscode.makeActive",
+          "when": "false"
+        },
+        {
+          "command": "kdb-q-ext-vscode.renameFolder",
+          "when": "false"
+        },
+        {
+          "command": "kdb-q-ext-vscode.removeFolder",
+          "when": "false"
+        },
+        {
+          "command": "kdb-q-ext-vscode.openServersSetting",
+          "when": "false"
         }
       ],
       "webview/context": [
@@ -209,6 +277,21 @@
           "command": "kdb-q-ext-vscode.keepResult",
           "when": "view == kdb-q-ext-vscode.result",
           "group": "navigation@2"
+        },
+        {
+          "command": "kdb-q-ext-vscode.addServer",
+          "when": "view == kdb-q-ext-vscode.servers",
+          "group": "navigation@1"
+        },
+        {
+          "command": "kdb-q-ext-vscode.newFolder",
+          "when": "view == kdb-q-ext-vscode.servers",
+          "group": "navigation@2"
+        },
+        {
+          "command": "kdb-q-ext-vscode.openSettings",
+          "when": "view == kdb-q-ext-vscode.servers",
+          "group": "navigation@3"
         }
       ],
       "editor/title": [
@@ -240,6 +323,88 @@
           "when": "editorLangId == q",
           "group": "kdb-q@3"
         }
+      ],
+      "view/item/context": [
+        {
+          "command": "kdb-q-ext-vscode.connect",
+          "when": "view == kdb-q-ext-vscode.servers && viewItem =~ /^(idle|closed)$/",
+          "group": "inline@1"
+        },
+        {
+          "command": "kdb-q-ext-vscode.makeActive",
+          "when": "view == kdb-q-ext-vscode.servers && viewItem == open",
+          "group": "inline@1"
+        },
+        {
+          "command": "kdb-q-ext-vscode.disconnect",
+          "when": "view == kdb-q-ext-vscode.servers && viewItem =~ /^(active|connecting)$/",
+          "group": "inline@1"
+        },
+        {
+          "command": "kdb-q-ext-vscode.editServer",
+          "when": "view == kdb-q-ext-vscode.servers && viewItem =~ /^(idle|connecting|open|active|closed|broken)$/",
+          "group": "inline@2"
+        },
+        {
+          "command": "kdb-q-ext-vscode.addServer",
+          "when": "view == kdb-q-ext-vscode.servers && viewItem == folder",
+          "group": "inline@1"
+        },
+        {
+          "command": "kdb-q-ext-vscode.openServersSetting",
+          "when": "view == kdb-q-ext-vscode.servers && viewItem == setting",
+          "group": "inline@1"
+        },
+        {
+          "command": "kdb-q-ext-vscode.connect",
+          "when": "view == kdb-q-ext-vscode.servers && viewItem =~ /^(idle|closed)$/",
+          "group": "1_connection@1"
+        },
+        {
+          "command": "kdb-q-ext-vscode.makeActive",
+          "when": "view == kdb-q-ext-vscode.servers && viewItem == open",
+          "group": "1_connection@1"
+        },
+        {
+          "command": "kdb-q-ext-vscode.disconnect",
+          "when": "view == kdb-q-ext-vscode.servers && viewItem =~ /^(open|active|connecting|closed)$/",
+          "group": "1_connection@2"
+        },
+        {
+          "command": "kdb-q-ext-vscode.editServer",
+          "when": "view == kdb-q-ext-vscode.servers && viewItem =~ /^(idle|connecting|open|active|closed|broken)$/",
+          "group": "2_edit@1"
+        },
+        {
+          "command": "kdb-q-ext-vscode.removeServer",
+          "when": "view == kdb-q-ext-vscode.servers && viewItem =~ /^(idle|connecting|open|active|closed|broken)$/",
+          "group": "2_edit@2"
+        },
+        {
+          "command": "kdb-q-ext-vscode.addServer",
+          "when": "view == kdb-q-ext-vscode.servers && viewItem == folder",
+          "group": "1_new@1"
+        },
+        {
+          "command": "kdb-q-ext-vscode.newFolder",
+          "when": "view == kdb-q-ext-vscode.servers && viewItem == folder",
+          "group": "1_new@2"
+        },
+        {
+          "command": "kdb-q-ext-vscode.renameFolder",
+          "when": "view == kdb-q-ext-vscode.servers && viewItem =~ /^(folder|brokenFolder)$/",
+          "group": "2_edit@1"
+        },
+        {
+          "command": "kdb-q-ext-vscode.removeFolder",
+          "when": "view == kdb-q-ext-vscode.servers && viewItem =~ /^(folder|brokenFolder)$/",
+          "group": "2_edit@2"
+        },
+        {
+          "command": "kdb-q-ext-vscode.openServersSetting",
+          "when": "view == kdb-q-ext-vscode.servers && viewItem == setting",
+          "group": "1_edit@1"
+        }
       ]
     },
     "keybindings": [
@@ -269,7 +434,7 @@
           "markdownDescription": "The kdb+ processes to connect to, by name, in folders to any depth if you like: an object with a `host` or a `port` is a server, and any other is a folder, holding servers and folders, or nothing. Add one with **kdb+/q: Add Server**. Passwords aren't kept here: `auth` says where one comes from, such as `\"store\"`, VS Code's secure storage, where **kdb+/q: Set Server Password** keeps it for the user, host and port. Without `auth`, none is sent.",
           "propertyNames": {
             "pattern": "\\S",
-            "patternErrorMessage": "A name that isn't blank"
+            "patternErrorMessage": "Must not be blank"
           },
           "additionalProperties": {
             "type": "object",
@@ -327,7 +492,7 @@
                   "type": "string",
                   "description": "The host name or address.",
                   "pattern": "\\S",
-                  "patternErrorMessage": "A host that isn't empty"
+                  "patternErrorMessage": "Must not be blank"
                 },
                 "port": {
                   "type": "integer",
@@ -386,7 +551,7 @@
         "kdb-q-ext-vscode.authExtension": {
           "type": "string",
           "pattern": "^([a-zA-Z0-9][a-zA-Z0-9-]*\\.[a-zA-Z0-9][a-zA-Z0-9-]*)?$",
-          "patternErrorMessage": "An extension ID: publisher.name",
+          "patternErrorMessage": "Must be an extension ID: publisher.name",
           "default": "",
           "markdownDescription": "The extension that gives the credentials for a firm's own sign-on, as `publisher.name`, for the servers whose `auth` is `\"extension\"`. It exports `credentials(request)`, given the server's path, its folders and its own name, such as `[\"Prod\", \"trades\", \"TP\"]`, and its host, port and user."
         },
@@ -394,21 +559,21 @@
           "type": "string",
           "default": "",
           "pattern": "^$|^(\\/|\\\\\\\\|[A-Za-z]:[\\\\/]|~[\\\\/])",
-          "patternErrorMessage": "An absolute path, or one from ~/",
+          "patternErrorMessage": "Must be an absolute path or start with ~/",
           "markdownDescription": "A CA certificate in PEM to trust for TLS, as well as the system's and Node's, as q's `SSL_CA_CERT_FILE`. For every server with `tls`."
         },
         "kdb-q-ext-vscode.tlsCertFile": {
           "type": "string",
           "default": "",
           "pattern": "^$|^(\\/|\\\\\\\\|[A-Za-z]:[\\\\/]|~[\\\\/])",
-          "patternErrorMessage": "An absolute path, or one from ~/",
+          "patternErrorMessage": "Must be an absolute path or start with ~/",
           "markdownDescription": "A client certificate in PEM, for servers that require one, as q's `SSL_CERT_FILE`, with `#kdb-q-ext-vscode.tlsKeyFile#`. For every server with `tls`."
         },
         "kdb-q-ext-vscode.tlsKeyFile": {
           "type": "string",
           "default": "",
           "pattern": "^$|^(\\/|\\\\\\\\|[A-Za-z]:[\\\\/]|~[\\\\/])",
-          "patternErrorMessage": "An absolute path, or one from ~/",
+          "patternErrorMessage": "Must be an absolute path or start with ~/",
           "markdownDescription": "The client certificate's key in PEM, as q's `SSL_KEY_FILE`. An encrypted key's passphrase is kept by **kdb+/q: Set Certificate Passphrase**."
         },
         "kdb-q-ext-vscode.consoleSize": {

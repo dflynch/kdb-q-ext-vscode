@@ -643,12 +643,12 @@ suite("the Result view", () => {
       "dflynch3.kdb-q-ext-vscode",
     )?.packageJSON;
     assert.deepStrictEqual(
-      manifest.contributes.menus["view/title"].map(
-        ({ command, when }: { command: string; when: string }) => [
+      manifest.contributes.menus["view/title"]
+        .filter(({ when }: { when: string }) => when === `view == ${viewId}`)
+        .map(({ command, when }: { command: string; when: string }) => [
           command,
           when,
-        ],
-      ),
+        ]),
       [
         ["kdb-q-ext-vscode.exportResult", `view == ${viewId}`],
         ["kdb-q-ext-vscode.keepResult", `view == ${viewId}`],

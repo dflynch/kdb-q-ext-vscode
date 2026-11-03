@@ -437,6 +437,45 @@ suite("the server form", () => {
     assert.deepStrictEqual(await next, { type: "gone" });
   });
 
+  test("a server with a problem opens as written, with it, and saving fixes it", async () => {
+    await setUser({
+      Dev: { TP: { hots: "dev", port: 5010, user: "admin", auth: "store" } },
+    });
+    const { made, forms } = open({ "password:admin@:5010": "secret" });
+    forms.edit(["Dev", "TP"]);
+    const { form, context, stored } = await made[0].loaded();
+    assert.deepStrictEqual(form, {
+      ...blank(),
+      name: "TP",
+      host: "",
+      port: "5010",
+      user: "admin",
+      auth: "store",
+      timeout: "",
+    });
+    assert.strictEqual(context.problem, "unknown field: hots");
+    assert.deepStrictEqual(context.scopes, ["user"]);
+    // Not stored for a login with no host
+    assert.strictEqual(stored, false);
+    made[0].say({
+      type: "save",
+      form: { ...form, host: "dev", password: "secret" },
+    });
+    await made[0].closing;
+    assert.deepStrictEqual(user(), {
+      Dev: { TP: { host: "dev", port: 5010, user: "admin", auth: "store" } },
+    });
+  });
+
+  test("anything in a folder that's not a server or a folder opens with its name", async () => {
+    await setUser({ rdb: "dev:5011" });
+    const { made, forms } = open();
+    forms.edit(["rdb"]);
+    const { form, context } = await made[0].loaded();
+    assert.deepStrictEqual(form, { ...blank(), name: "rdb", timeout: "" });
+    assert.strictEqual(context.problem, "not a server or a folder");
+  });
+
   test("a form with a problem isn't saved, and says why", async () => {
     await setUser({ old: { host: "kdb0", port: 1 } });
     const { made, forms } = open();
@@ -655,6 +694,25 @@ suite("editServer and removeServer", () => {
     } finally {
       forms.dispose();
     }
+  });
+
+  test("Remove takes the server whose row it's run on, one with a problem too", async () => {
+    await setUser({ rdb: "dev:5011", gw: { host: "gw", port: 1 } });
+    const forms = new ServerForms(
+      extension,
+      secrets({}),
+      connections,
+      nowhere,
+      tabs().panels,
+    );
+    answer = "Remove";
+    try {
+      await removeServer(secrets({}), connections, forms, { path: ["rdb"] });
+    } finally {
+      forms.dispose();
+    }
+    assert.deepStrictEqual(warned[0][0], "Remove rdb?");
+    assert.deepStrictEqual(user(), { gw: { host: "gw", port: 1 } });
   });
 
   test("Remove that can't write the setting leaves the server, and says why", async () => {
