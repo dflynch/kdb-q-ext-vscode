@@ -45,9 +45,7 @@ function label(path: string[]): string {
 export function serversIn(
   entries: servers.Entry[],
 ): Extract<servers.Entry, { kind: "server" }>[] {
-  return entries.flatMap((entry) =>
-    entry.kind === "folder" ? serversIn(entry.entries) : [entry],
-  );
+  return servers.everything(entries).filter((entry) => entry.kind === "server");
 }
 
 // A row as the view shows it. A server's icon says its connection's state,

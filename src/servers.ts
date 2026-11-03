@@ -79,22 +79,6 @@ export function within(path: string[], folder: string[]): boolean {
 // the setting itself: not a server or a folder
 export type Problem = { path: string[]; problem: string };
 
-// A problem as it's told, after what has it, by its path: Dev › rdb: not a
-// server or a folder
-export function said({ path, problem }: Problem): string {
-  const own = path.at(-1);
-  const folder = path.slice(0, -1);
-  const what =
-    own === undefined
-      ? "the setting"
-      : own.trim() !== ""
-        ? shown(path)
-        : folder.length > 0
-          ? `an entry in ${shown(folder)}`
-          : "an entry";
-  return `${what}: ${problem}`;
-}
-
 // A Marketplace extension ID, publisher.name
 export const extensionId = /^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9-]*$/i;
 
@@ -107,42 +91,38 @@ function isTimeout(value: unknown): value is number {
   return value === 0 || (isCount(value) && value <= longestTimeout);
 }
 
-// The servers in a setting, in the order written. An object with a host
-// or a port is a server, and any other is a folder, holding servers and
-// folders, or nothing. VS Code doesn't hold a setting to its schema, so
-// each is checked here too; one with a problem is skipped and the problem
-// said, rather than connecting somewhere other than meant, such as without
-// a user whose name was misspelt.
+// The servers in a setting, and the problems in it, as the Servers view
+// lists them. VS Code doesn't hold a setting to its schema, so each server
+// is checked here too; one with a problem is left out, rather than
+// connecting somewhere other than meant, such as without a user whose name
+// was misspelt.
 export function definitions(setting: unknown): {
   servers: Definition[];
   problems: Problem[];
 } {
-  const servers: Definition[] = [];
-  const problems: Problem[] = [];
   if (setting === undefined || setting === null) {
-    return { servers, problems };
+    return { servers: [], problems: [] };
   }
   if (!isObject(setting)) {
-    return { servers, problems: [{ path: [], problem: "not an object" }] };
+    return { servers: [], problems: [{ path: [], problem: "not an object" }] };
   }
-  const read = (folder: Record<string, unknown>, at: string[]) => {
-    for (const [key, value] of Object.entries(folder)) {
-      const path = [...at, key];
-      const problem = entryProblem(key, value);
-      if (problem) {
-        problems.push({ path, problem });
-        continue;
-      }
-      const object = value as Record<string, unknown>;
-      if (!isServer(object)) {
-        read(object, path);
-      } else {
-        servers.push(definition(path, object as Fields));
-      }
-    }
+  const all = everything(entries(setting));
+  return {
+    servers: all.flatMap((entry) =>
+      entry.kind === "server" && entry.server ? [entry.server] : [],
+    ),
+    problems: all.flatMap(({ path, problem }) =>
+      problem ? [{ path, problem }] : [],
+    ),
   };
-  read(setting, []);
-  return { servers, problems };
+}
+
+// Every entry, and those in each folder, at any depth, in the view's order
+export function everything(found: Entry[]): Entry[] {
+  return found.flatMap((entry) => [
+    entry,
+    ...(entry.kind === "folder" ? everything(entry.entries) : []),
+  ]);
 }
 
 // What's in the servers setting, as the Servers view shows it: a folder,
@@ -320,7 +300,7 @@ export function entryProblem(name: string, value: unknown): string | undefined {
 
 // A server as checked
 function definition(path: string[], value: Fields): Definition {
-  const { host, port, user, timeout, protect, tls, auth } = value as Fields;
+  const { host, port, user, timeout, protect, tls, auth } = value;
   return {
     path,
     host,

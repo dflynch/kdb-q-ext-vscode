@@ -396,7 +396,9 @@ export class ServerForms implements vscode.Disposable {
     const read = servers.definitions({ [name]: value });
     const [checked] = read.servers;
     if (checked === undefined) {
-      throw new Error(read.problems.map(servers.said).join("; "));
+      throw new Error(
+        `${testing ? "not tested" : "not saved"}, as ${read.problems.map(({ problem }) => problem).join("; ")}`,
+      );
     }
     const definition = { ...checked, path };
     return { context, path, value, definition };
