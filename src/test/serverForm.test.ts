@@ -6,7 +6,7 @@ import { Connections } from "../connections";
 import { blank, type Form, type ToForm } from "../form/fields";
 import { formType, type Opener, ServerForms } from "../serverForm";
 import type * as servers from "../servers";
-import { config, secrets, setUser, tabs, user } from "./helpers";
+import { config, refusing, secrets, setUser, tabs, user } from "./helpers";
 
 const extension = vscode.Uri.file("/extension");
 
@@ -710,23 +710,8 @@ suite("editServer and removeServer", () => {
   test("Remove that can't write the setting leaves the server, and says why", async () => {
     await setUser({ prod: { host: "kdb1", port: 1, auth: "store" } });
     const kept: Record<string, string> = { "password:@kdb1:1": "secret" };
-    const { workspace } = vscode;
-    const configuration = workspace.getConfiguration;
     const error = window.showErrorMessage;
     const errors: string[] = [];
-    // As VS Code refuses a settings file with unsaved changes
-    workspace.getConfiguration = ((
-      ...args: Parameters<typeof configuration>
-    ) => {
-      const config = configuration(...args);
-      return Object.create(config, {
-        update: {
-          value: async () => {
-            throw new Error("the file has unsaved changes");
-          },
-        },
-      });
-    }) as typeof configuration;
     window.showErrorMessage = (async (text: string) => {
       errors.push(text);
     }) as typeof error;
@@ -739,9 +724,10 @@ suite("editServer and removeServer", () => {
     );
     try {
       answer = "Remove";
-      await removeServer(secrets(kept), connections, forms);
+      await refusing(undefined, () =>
+        removeServer(secrets(kept), connections, forms),
+      );
     } finally {
-      workspace.getConfiguration = configuration;
       window.showErrorMessage = error;
       forms.dispose();
     }

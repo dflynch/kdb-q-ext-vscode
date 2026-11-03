@@ -90,6 +90,21 @@ function gone({ folder, editing }: Pick<Open, "folder" | "editing">) {
     : folder.length > 0 && servers.kindAt(merged, folder) !== "folder";
 }
 
+// What a form would save to that's no longer in the settings: the server
+// edited, or the folder added to, or that folder in the scope picked
+function missingFrom(
+  open: Pick<Open, "folder" | "editing">,
+  target: Scope,
+): string | undefined {
+  if (gone(open)) {
+    return `${servers.shown(open.editing ?? open.folder)} is no longer in settings`;
+  }
+  if (open.editing === undefined && !targetsIn(open.folder).includes(target)) {
+    return `${servers.shown(open.folder)} is no longer in ${scopeName(target)} settings`;
+  }
+  return undefined;
+}
+
 const targets = {
   user: vscode.ConfigurationTarget.Global,
   workspace: vscode.ConfigurationTarget.Workspace,
@@ -116,12 +131,17 @@ export async function write(
 
 // Write as write does, saying in which scope it failed: a save writing
 // two may have written the first
-async function writeIn(...args: Parameters<typeof write>) {
+async function writeIn(
+  scope: Scope,
+  path: string[],
+  value: unknown,
+  from?: string,
+) {
   try {
-    await write(...args);
+    await write(scope, path, value, from);
   } catch (error) {
     throw new Error(
-      `not saved in ${scopeName(args[0])} settings: ${(error as Error).message}`,
+      `not saved in ${scopeName(scope)} settings: ${(error as Error).message}`,
     );
   }
 }
@@ -532,24 +552,16 @@ export class ServerForms implements vscode.Disposable {
   // it's in, and its connection closed.
   private async saved(open: Open, form: Form) {
     const { path, value, definition } = await this.checked(open, form);
+    // Checked again after checking's wait, as the settings may have changed,
+    // and before the password's kept, so that a save refused keeps nothing
+    const missing = missingFrom(open, form.target);
+    if (missing) {
+      throw new Error(`not saved, as ${missing}`);
+    }
     const before = this.editing(open);
     const key = servers.secretKey(definition);
     if (form.auth === "store" && form.password !== "") {
       await this.secrets.store(key, form.password);
-    }
-    // Checked after the waits above, so as not to write it back
-    if (gone(open)) {
-      throw new Error(
-        `not saved, as ${servers.shown(open.editing ?? open.folder)} is no longer in settings`,
-      );
-    }
-    if (
-      open.editing === undefined &&
-      !targetsIn(open.folder).includes(form.target)
-    ) {
-      throw new Error(
-        `not saved, as ${servers.shown(open.folder)} is no longer in ${scopeName(form.target)} settings`,
-      );
     }
     if (open.editing === undefined) {
       await writeIn(form.target, path, value);

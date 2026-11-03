@@ -166,7 +166,12 @@ export function problems(
   if (form.auth === "extension" && context.authExtension === undefined) {
     found.auth = "The auth extension isn't set";
   }
-  if (context.editing === undefined && !context.targets.includes(form.target)) {
+  // None, for a folder that's gone, which the form says instead
+  if (
+    context.editing === undefined &&
+    context.targets.length > 0 &&
+    !context.targets.includes(form.target)
+  ) {
     found.target = `Must be ${context.targets.map(scopeName).join(" or ")} settings`;
   }
   const ms = timeout(form.timeout);

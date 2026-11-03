@@ -10,6 +10,7 @@ import { ServerForms, scopes } from "../../serverForm";
 import * as servers from "../../servers";
 import { moveTo, removeFolder, renameFolder } from "../../serversView";
 import {
+  refusing,
   secrets,
   setUser,
   setWorkspace,
@@ -52,6 +53,7 @@ suite("User and Workspace settings", () => {
 
   setup(() => {
     assert.ok(vscode.workspace.workspaceFolders, "no folder open");
+    typed = undefined;
     warned = [];
     errors = [];
     window.showInputBox = async () => typed;
@@ -85,35 +87,6 @@ suite("User and Workspace settings", () => {
       panels,
     );
     return { made, forms };
-  }
-
-  // Update refused for Workspace settings only, as VS Code refuses a
-  // settings file with unsaved changes
-  async function refusingWorkspace<T>(run: () => Promise<T>): Promise<T> {
-    const { workspace } = vscode;
-    const configuration = workspace.getConfiguration;
-    workspace.getConfiguration = ((
-      ...args: Parameters<typeof configuration>
-    ) => {
-      const config = configuration(...args);
-      return Object.create(config, {
-        update: {
-          value: async (
-            ...update: Parameters<vscode.WorkspaceConfiguration["update"]>
-          ) => {
-            if (update[2] === vscode.ConfigurationTarget.Workspace) {
-              throw new Error("the file has unsaved changes");
-            }
-            return config.update(...update);
-          },
-        },
-      });
-    }) as typeof configuration;
-    try {
-      return await run();
-    } finally {
-      workspace.getConfiguration = configuration;
-    }
   }
 
   test("a server in Workspace settings alone is edited, moved and removed there", async () => {
@@ -211,7 +184,7 @@ suite("User and Workspace settings", () => {
     await setUser({ TP: { host: "kdb1", port: 1 }, Ops: {} });
     await setWorkspace({ TP: { host: "kdb2", port: 1 }, Ops: {} });
     const { made, forms } = open();
-    await refusingWorkspace(() =>
+    await refusing(vscode.ConfigurationTarget.Workspace, () =>
       moveTo(connections, forms, rowAt(["TP"]), ["Ops"]),
     );
     assert.deepStrictEqual(errors, [
@@ -219,16 +192,21 @@ suite("User and Workspace settings", () => {
     ]);
     assert.deepStrictEqual(user(), { Ops: { TP: { host: "kdb1", port: 1 } } });
     typed = "Live";
-    await refusingWorkspace(() =>
+    await refusing(vscode.ConfigurationTarget.Workspace, () =>
       renameFolder(connections, forms, rowAt(["Ops"])),
     );
     assert.strictEqual(
       errors[1],
       "kdb+/q: Ops wasn't renamed in Workspace settings: the file has unsaved changes",
     );
+    assert.deepStrictEqual(user(), {
+      Live: { TP: { host: "kdb1", port: 1 } },
+    });
+    await setUser({ TP: { host: "kdb1", port: 1 } });
+    await setWorkspace({ TP: { host: "kdb2", port: 1 } });
     forms.edit(["TP"]);
     await made[0].loaded();
-    const unsaved = refusingWorkspace(async () => {
+    const unsaved = refusing(vscode.ConfigurationTarget.Workspace, async () => {
       made[0].say({
         type: "save",
         form: { ...prod, name: "RDB", auth: "none" },
@@ -239,6 +217,8 @@ suite("User and Workspace settings", () => {
       type: "unsaved",
       text: "not saved in Workspace settings: the file has unsaved changes",
     });
+    assert.deepStrictEqual(user(), { RDB: { host: "kdb1", port: 1 } });
+    assert.deepStrictEqual(workspace(), { TP: { host: "kdb2", port: 1 } });
   });
 
   test("Remove takes a server, and the password of each scope's, from both", async () => {
@@ -258,10 +238,18 @@ suite("User and Workspace settings", () => {
     assert.deepStrictEqual(kept, {});
   });
 
-  test("Remove Folder takes a folder in both from each", async () => {
+  test("Remove Folder takes a folder in both from each, with each copy's password", async () => {
     await setUser({ Prod: { TP: { host: "kdb1", port: 1, auth: "store" } } });
-    await setWorkspace({ Prod: { RDB: { host: "kdb2", port: 1 } } });
-    const kept: Record<string, string> = { "password:@kdb1:1": "secret" };
+    await setWorkspace({
+      Prod: {
+        TP: { host: "kdb2", port: 1, auth: "store" },
+        RDB: { host: "kdb3", port: 1 },
+      },
+    });
+    const kept: Record<string, string> = {
+      "password:@kdb1:1": "secret",
+      "password:@kdb2:1": "other",
+    };
     await removeFolder(
       secrets(kept),
       connections,
@@ -325,5 +313,58 @@ suite("User and Workspace settings", () => {
       text: "not saved, as target: Must be User settings",
     });
     assert.strictEqual(workspace(), undefined);
+  });
+
+  test("a save is refused if its folder leaves a scope while it's checked, and keeps no password", async () => {
+    await setUser({ Prod: {} });
+    await setWorkspace({ Prod: {}, Team: {} });
+    const kept: Record<string, string> = {};
+    // The settings change while the form checks for a stored password
+    let change: (() => Thenable<void>) | undefined;
+    const { made, panels } = tabs();
+    forms = new ServerForms(
+      vscode.Uri.file("/extension"),
+      {
+        ...secrets(kept),
+        get: async (key: string) => {
+          await change?.();
+          change = undefined;
+          return kept[key];
+        },
+      } as vscode.SecretStorage,
+      connections,
+      async () => undefined,
+      panels,
+    );
+    // What a save's refused with, past anything else posted
+    const refused = async (tab: (typeof made)[number]) => {
+      for (;;) {
+        const message = await tab.next();
+        if (message.type === "unsaved") {
+          return message.text;
+        }
+      }
+    };
+    forms.add(["Prod"]);
+    await made[0].loaded();
+    change = () => setWorkspace({ Team: {} });
+    let text = refused(made[0]);
+    made[0].say({ type: "save", form: { ...prod, target: "workspace" } });
+    assert.strictEqual(
+      await text,
+      "not saved, as Prod is no longer in Workspace settings",
+    );
+    made[0].panel.dispose();
+    forms.add(["Team"]);
+    await made[1].loaded();
+    change = () => setWorkspace(undefined);
+    text = refused(made[1]);
+    made[1].say({ type: "save", form: { ...prod, target: "workspace" } });
+    assert.strictEqual(
+      await text,
+      "not saved, as Team is no longer in settings",
+    );
+    assert.deepStrictEqual(kept, {});
+    assert.deepStrictEqual(user(), { Prod: {} });
   });
 });

@@ -100,3 +100,33 @@ export const setUser = (value: unknown) =>
   config().update("servers", value, vscode.ConfigurationTarget.Global);
 export const setWorkspace = (value: unknown) =>
   config().update("servers", value, vscode.ConfigurationTarget.Workspace);
+
+// Settings updates refused, for one scope or every one, while run runs, as
+// VS Code refuses a settings file with unsaved changes
+export async function refusing<T>(
+  only: vscode.ConfigurationTarget | undefined,
+  run: () => Promise<T>,
+): Promise<T> {
+  const { workspace } = vscode;
+  const configuration = workspace.getConfiguration;
+  workspace.getConfiguration = ((...args: Parameters<typeof configuration>) => {
+    const config = configuration(...args);
+    return Object.create(config, {
+      update: {
+        value: async (
+          ...update: Parameters<vscode.WorkspaceConfiguration["update"]>
+        ) => {
+          if (only === undefined || update[2] === only) {
+            throw new Error("the file has unsaved changes");
+          }
+          return config.update(...update);
+        },
+      },
+    });
+  }) as typeof configuration;
+  try {
+    return await run();
+  } finally {
+    workspace.getConfiguration = configuration;
+  }
+}

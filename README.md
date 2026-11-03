@@ -59,14 +59,14 @@ server with a problem in the settings is listed with a warning and the
 problem, and Edit opens it in the form to fix.
 
 Add a server with **kdb+/q: Add Server**, or the + on the view or on a
-folder, which opens a form for its settings and saves them where its
-folder is: in your user or workspace settings, as you pick, at the top or
-in a folder that's in both. Or write it in `settings.json`. **Edit Server** opens
-the same form for a server, where a password can be stored too, and
-**Remove Server** removes one, from every settings file it's in. **New
-Folder**, and Rename and Remove Folder on a folder's right-click menu, do
-the same for folders. They write the whole setting, as VS Code writes one,
-so a comment inside it isn't kept:
+folder, which opens a form for its settings, or write it in
+`settings.json`. The form saves a server in the settings its folder is
+in; at the top, or in a folder in both, you pick your user or workspace
+settings. **Edit Server** opens the same form for a server, where a
+password can be stored too, and **Remove Server** removes one, from every
+settings file it's in. **New Folder**, and Rename and Remove Folder on a
+folder's right-click menu, do the same for folders. They write the whole
+setting, as VS Code writes one, so a comment inside it isn't kept:
 
 ```json
 "kdb-q-ext-vscode.servers": {
