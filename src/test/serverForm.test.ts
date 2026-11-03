@@ -467,7 +467,7 @@ suite("the server form", () => {
     });
   });
 
-  test("anything in a folder that not a server or a folder opens with its name", async () => {
+  test("anything in a folder that's not a server or a folder opens with its name", async () => {
     await setUser({ rdb: "dev:5011" });
     const { made, forms } = open();
     forms.edit(["rdb"]);

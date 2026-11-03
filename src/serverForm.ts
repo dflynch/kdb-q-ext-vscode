@@ -84,7 +84,7 @@ export async function write(
 ) {
   const setting = scopes()[scope] ?? {};
   if (!servers.isObject(setting)) {
-    throw new Error("the servers setting isn't an object");
+    throw new Error("the servers setting must be an object");
   }
   await config().update(
     "servers",
@@ -98,7 +98,7 @@ export async function write(
 export async function move(scope: Scope, from: string[], to: string[]) {
   const setting = scopes()[scope] ?? {};
   if (!servers.isObject(setting)) {
-    throw new Error("the servers setting isn't an object");
+    throw new Error("the servers setting must be an object");
   }
   const value = servers.at(setting, from);
   const renamed = servers.id(from.slice(0, -1)) === servers.id(to.slice(0, -1));

@@ -502,10 +502,10 @@ suite("servers", () => {
     assert.deepStrictEqual(authExtension(undefined), {});
     assert.deepStrictEqual(authExtension(""), {});
     assert.deepStrictEqual(authExtension("kdb-auth"), {
-      problem: "the auth extension isn't an extension ID",
+      problem: "the auth extension must be an extension ID",
     });
     assert.deepStrictEqual(authExtension(1), {
-      problem: "the auth extension isn't an extension ID",
+      problem: "the auth extension must be an extension ID",
     });
   });
 

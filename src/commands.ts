@@ -280,6 +280,22 @@ async function pickServer(
     vscode.window.showInformationMessage(`kdb+/q: ${none}`);
     return undefined;
   }
+  // Servers with problems are offered nowhere but the Servers view, where
+  // they can be fixed
+  if (
+    defined.length === 0 &&
+    servers.definitions(servers.merged(scopes())).problems.length > 0
+  ) {
+    const show = "Show Servers";
+    const choice = await vscode.window.showInformationMessage(
+      "kdb+/q: Every server in the settings has a problem.",
+      show,
+    );
+    if (choice === show) {
+      await vscode.commands.executeCommand("kdb-q-ext-vscode.servers.focus");
+    }
+    return undefined;
+  }
   if (defined.length === 0) {
     const add = "Add Server";
     const choice = await vscode.window.showInformationMessage(

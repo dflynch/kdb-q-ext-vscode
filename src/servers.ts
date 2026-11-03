@@ -207,8 +207,12 @@ export function read(written: Written): Definition[] {
 }
 
 // The servers setting as the scopes write it together
+// A scope whose setting isn't an object is left out, so that it hides
+// nothing of the other's.
 export function merged(written: Written): unknown {
-  return merge(written.user, written.workspace, true);
+  const readable = (setting: unknown) =>
+    isObject(setting) ? setting : undefined;
+  return merge(readable(written.user), readable(written.workspace), true);
 }
 
 // The user's and the workspace's values at the same place, as read
@@ -259,7 +263,12 @@ export function put(
 ): Record<string, unknown> {
   const [key, ...rest] = path;
   if (rest.length > 0) {
+    // A folder this scope writes as a server, or anything else, is left as
+    // it is, rather than written into or replaced
     const folder = at(setting, [key]);
+    if (folder !== undefined && !(isObject(folder) && !isServer(folder))) {
+      throw new Error(`${key} isn't a folder in this scope's settings`);
+    }
     return replaced(
       setting,
       key,
@@ -384,7 +393,7 @@ export function authExtension(setting: unknown): {
   }
   return typeof setting === "string" && extensionId.test(setting)
     ? { id: setting }
-    : { problem: "the auth extension isn't an extension ID" };
+    : { problem: "the auth extension must be an extension ID" };
 }
 
 // The size limit, in megabytes; one that's wrong is refused, so that the

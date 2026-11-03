@@ -1,9 +1,10 @@
 import * as assert from "node:assert";
 import * as vscode from "vscode";
+import { connect, disconnect } from "../commands";
 import type { Connection } from "../connection";
 import { Connections, type State } from "../connections";
 import { ServerForms } from "../serverForm";
-import { type Entry, entries, id } from "../servers";
+import { type Entry, entries, id, put } from "../servers";
 import {
   type Look,
   moveTo,
@@ -268,27 +269,102 @@ suite("the Servers view", () => {
     assert.deepStrictEqual(kept, {});
   });
 
-  test("a server dragged into a folder moves there, unless the name's taken", async () => {
+  test("a server dragged into a folder moves there, disconnected, unless the name's taken", async () => {
     await setUser({
       Prod: { TP: { host: "kdb1", port: 1 } },
       TP: { host: "kdb2", port: 1 },
       gw: { host: "gw", port: 1 },
     });
-    const connections = await opened();
     const [folder, gw, taken] = entries(user() as Record<string, unknown>);
-    await moveTo(connections, gw, folder.path);
-    assert.deepStrictEqual(user(), {
-      Prod: { TP: { host: "kdb1", port: 1 }, gw: { host: "gw", port: 1 } },
-      TP: { host: "kdb2", port: 1 },
+    const connections = await opened(gw);
+    const forms = new ServerForms(
+      vscode.Uri.file("/extension"),
+      secrets({}),
+      connections,
+      async () => undefined,
+    );
+    try {
+      await moveTo(connections, forms, gw, folder.path);
+      assert.deepStrictEqual(user(), {
+        Prod: { TP: { host: "kdb1", port: 1 }, gw: { host: "gw", port: 1 } },
+        TP: { host: "kdb2", port: 1 },
+      });
+      // It's known by its path, so its connection's closed
+      assert.deepStrictEqual(connections.servers, []);
+      await moveTo(connections, forms, taken, folder.path);
+      assert.deepStrictEqual(warned.at(-1), [
+        "kdb+/q: TP wasn't moved: TP already exists in Prod",
+      ]);
+      // Into the folder it's in, or into itself, it stays
+      const before = user();
+      await moveTo(connections, forms, folder, []);
+      await moveTo(connections, forms, folder, folder.path);
+      assert.deepStrictEqual(user(), before);
+    } finally {
+      forms.dispose();
+    }
+  });
+
+  test("a scope's folder that the other writes as a server is refused, not written into", async () => {
+    // The workspace's Prod is a folder, which the view shows; the user's
+    // is a server
+    assert.throws(
+      () => put({ Prod: { host: "h", port: 1 } }, ["Prod", "a"], {}),
+      { message: "Prod isn't a folder in this scope's settings" },
+    );
+    assert.throws(() => put({ Prod: "x" }, ["Prod", "a"], {}));
+    assert.deepStrictEqual(put({ Prod: {} }, ["Prod", "a"], {}), {
+      Prod: { a: {} },
     });
-    await moveTo(connections, taken, folder.path);
-    assert.deepStrictEqual(warned.at(-1), [
-      "kdb+/q: TP wasn't moved: Prod already has one named TP",
-    ]);
-    // Into the folder it's in, or into itself, it stays
-    const before = user();
-    await moveTo(connections, folder, []);
-    await moveTo(connections, folder, folder.path);
-    assert.deepStrictEqual(user(), before);
+  });
+
+  test("a scope's setting that isn't an object hides nothing of the other's", () => {
+    assert.deepStrictEqual(
+      roots({ user: { gw: { host: "gw", port: 1 } }, workspace: "x" }),
+      [
+        { kind: "setting", scope: "workspace", problem: "not an object" },
+        ...entries({ gw: { host: "gw", port: 1 } }),
+      ],
+    );
+  });
+
+  test("Remove Folder of a folder with no name counts what's in it, and forgets its passwords", async () => {
+    await setUser({ " ": { TP: { host: "kdb1", port: 1, auth: "store" } } });
+    const kept: Record<string, string> = { "password:@kdb1:1": "secret" };
+    const connections = await opened();
+    const forms = new ServerForms(
+      vscode.Uri.file("/extension"),
+      secrets(kept),
+      connections,
+      async () => undefined,
+    );
+    const [folder] = entries(user() as Record<string, unknown>);
+    try {
+      answer = "Remove";
+      await removeFolder(secrets(kept), connections, forms, folder);
+    } finally {
+      forms.dispose();
+    }
+    assert.strictEqual(
+      (warned[0][1] as { detail: string }).detail,
+      "It and the server in it are removed from your User settings.",
+    );
+    assert.deepStrictEqual(user(), {});
+    assert.deepStrictEqual(kept, {});
+  });
+
+  test("Connect, Make Active and Disconnect take the server whose row they're run on", async () => {
+    const connections = await opened();
+    await connect(connections, tp);
+    await connect(connections, rdb);
+    assert.strictEqual(connections.active?.id, id(rdb.path));
+    // Make Active is Connect on one that's open
+    await connect(connections, tp);
+    assert.strictEqual(connections.active?.id, id(tp.path));
+    await disconnect(connections, tp);
+    assert.deepStrictEqual(
+      connections.servers.map(({ path }) => path),
+      [rdb.path],
+    );
   });
 });

@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { scopeName } from "./commands";
 import type { Connection } from "./connection";
 import type { Connections, State } from "./connections";
 import type { Scope } from "./form/fields";
@@ -24,11 +25,9 @@ export type Look = {
   authExtension?: unknown;
 };
 
-const scopeNames = { user: "User", workspace: "Workspace" };
-
 // Where a row's written, as VS Code names the settings
 function written(scopes: Scope[]): string {
-  return `In ${scopes.map((scope) => scopeNames[scope]).join(" and ")} settings`;
+  return `In ${scopes.map(scopeName).join(" and ")} settings`;
 }
 
 const warning = new vscode.ThemeIcon(
@@ -58,7 +57,7 @@ export function serversIn(
 // folder collapsed or not as the user left it, and doesn't say which.
 export function row(node: Node, look: Look): vscode.TreeItem {
   if (node.kind === "setting") {
-    const item = new vscode.TreeItem(`${scopeNames[node.scope]} settings`);
+    const item = new vscode.TreeItem(`${scopeName(node.scope)} settings`);
     item.id = `setting:${node.scope}`;
     item.description = `servers: ${node.problem}`;
     item.iconPath = warning;
@@ -162,7 +161,10 @@ export class ServersView
   readonly onDidChangeTreeData = this.changed.event;
   private disposables: vscode.Disposable[];
 
-  constructor(private readonly connections: Connections<Connection>) {
+  constructor(
+    private readonly connections: Connections<Connection>,
+    private readonly forms: ServerForms,
+  ) {
     const view = vscode.window.createTreeView(viewId, {
       treeDataProvider: this,
       dragAndDropController: this,
@@ -227,7 +229,7 @@ export class ServersView
           ? target.path
           : target.path.slice(0, -1);
     for (const entry of entries) {
-      await moveTo(this.connections, entry, folder);
+      await moveTo(this.connections, this.forms, entry, folder);
     }
   }
 }
@@ -252,7 +254,9 @@ export function roots(written: servers.Written): Node[] {
 
 // Where a folder is, as a message says it
 function place(folder: string[]): string {
-  return folder.length === 0 ? "The top level" : servers.shown(folder);
+  return folder.length === 0
+    ? "at the top level"
+    : `in ${servers.shown(folder)}`;
 }
 
 // Move a server or a folder into a folder, in each scope it's written in,
@@ -261,6 +265,7 @@ function place(folder: string[]): string {
 // they're known by their paths.
 export async function moveTo(
   connections: Connections<Connection>,
+  forms: ServerForms,
   entry: servers.Entry,
   folder: string[],
 ) {
@@ -274,7 +279,7 @@ export async function moveTo(
   }
   if (servers.kindAt(servers.merged(scopes()), to) !== undefined) {
     vscode.window.showWarningMessage(
-      `kdb+/q: ${servers.shown(from)} wasn't moved: ${place(folder)} already has one named ${to.at(-1)}`,
+      `kdb+/q: ${servers.shown(from)} wasn't moved: ${to.at(-1)} already exists ${place(folder)}`,
     );
     return;
   }
@@ -286,7 +291,9 @@ export async function moveTo(
     vscode.window.showErrorMessage(
       `kdb+/q: ${servers.shown(from)} wasn't moved: ${(error as Error).message}`,
     );
+    return;
   }
+  forms.close(from);
   disconnectWithin(connections, from);
 }
 
@@ -411,8 +418,12 @@ export async function removeFolder(
   if (row.kind !== "folder") {
     return;
   }
-  const held = serversIn(row.entries);
-  const where = scopesOf(row.path, "folder").map((scope) => scopeNames[scope]);
+  // Read from the setting, as a folder with no name has none of its own
+  const value = servers.at(servers.merged(scopes()), row.path);
+  const held = servers.isObject(value)
+    ? serversIn(servers.entries(value, row.path))
+    : [];
+  const where = scopesOf(row.path, "folder").map(scopeName);
   const what =
     held.length === 0
       ? "It's"
@@ -436,7 +447,7 @@ export async function removeFolder(
       await write(scope, row.path, undefined);
     } catch (error) {
       vscode.window.showErrorMessage(
-        `kdb+/q: ${servers.shown(row.path)} wasn't removed from ${scopeNames[scope]} settings: ${(error as Error).message}`,
+        `kdb+/q: ${servers.shown(row.path)} wasn't removed from ${scopeName(scope)} settings: ${(error as Error).message}`,
       );
       return;
     }

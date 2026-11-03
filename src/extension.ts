@@ -28,7 +28,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     status,
     forms,
-    new ServersView(connections),
+    new ServersView(connections, forms),
     connections,
     registerResultView(results),
     vscode.commands.registerCommand("kdb-q-ext-vscode.keepResult", () =>
