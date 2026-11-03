@@ -179,45 +179,87 @@ suite("User and Workspace settings", () => {
     });
   });
 
-  test("a write Workspace settings refuse says so, the User's having been written", async () => {
+  test("a write Workspace settings refuse is undone in User settings, so it can be run again", async () => {
     await setUser({ TP: { host: "kdb1", port: 1 }, Ops: {} });
     await setWorkspace({ TP: { host: "kdb2", port: 1 }, Ops: {} });
+    const both = {
+      user: { TP: { host: "kdb1", port: 1 }, Ops: {} },
+      workspace: { TP: { host: "kdb2", port: 1 }, Ops: {} },
+    };
     const { made, forms } = open();
-    await refusing(vscode.ConfigurationTarget.Workspace, () =>
+    const workspaceOnly = (target: vscode.ConfigurationTarget) =>
+      target === vscode.ConfigurationTarget.Workspace;
+    await refusing(workspaceOnly, () =>
       moveTo(connections, forms, rowAt(["TP"]), ["Ops"]),
+    );
+    typed = "Live";
+    await refusing(workspaceOnly, () =>
+      renameFolder(connections, forms, rowAt(["Ops"])),
+    );
+    await refusing(workspaceOnly, () =>
+      removeServer(connections, forms, rowAt(["TP"])),
+    );
+    assert.deepStrictEqual(errors, [
+      "kdb+/q: TP wasn't moved in Workspace settings: the file has unsaved changes",
+      "kdb+/q: Ops wasn't renamed in Workspace settings: the file has unsaved changes",
+      "kdb+/q: TP wasn't removed from Workspace settings: the file has unsaved changes",
+    ]);
+    assert.deepStrictEqual({ user: user(), workspace: workspace() }, both);
+    forms.edit(["TP"]);
+    await made[0].loaded();
+    const unsaved = refusing(workspaceOnly, async () => {
+      made[0].say({ type: "save", form: { ...prod, name: "RDB" } });
+      return made[0].next();
+    });
+    assert.deepStrictEqual(await unsaved, {
+      type: "unsaved",
+      text: "not saved in Workspace settings: the file has unsaved changes",
+    });
+    assert.deepStrictEqual({ user: user(), workspace: workspace() }, both);
+    // Nothing's half done, so it can be run again
+    await moveTo(connections, forms, rowAt(["TP"]), ["Ops"]);
+    assert.deepStrictEqual(user(), { Ops: { TP: { host: "kdb1", port: 1 } } });
+    assert.deepStrictEqual(workspace(), {
+      Ops: { TP: { host: "kdb2", port: 1 } },
+    });
+  });
+
+  test("a write that can't be undone says what was done", async () => {
+    await setUser({ TP: { host: "kdb1", port: 1 }, Ops: {} });
+    await setWorkspace({ TP: { host: "kdb2", port: 1 }, Ops: {} });
+    // User settings take the move, then refuse putting it back
+    let users = 0;
+    await refusing(
+      (target) =>
+        target === vscode.ConfigurationTarget.Workspace ||
+        (target === vscode.ConfigurationTarget.Global && users++ > 0),
+      () => moveTo(connections, open().forms, rowAt(["TP"]), ["Ops"]),
     );
     assert.deepStrictEqual(errors, [
       "kdb+/q: TP was moved in User settings but not in Workspace settings: the file has unsaved changes",
     ]);
     assert.deepStrictEqual(user(), { Ops: { TP: { host: "kdb1", port: 1 } } });
-    typed = "Live";
-    await refusing(vscode.ConfigurationTarget.Workspace, () =>
-      renameFolder(connections, forms, rowAt(["Ops"])),
-    );
-    assert.strictEqual(
-      errors[1],
-      "kdb+/q: Ops was renamed in User settings but not in Workspace settings: the file has unsaved changes",
-    );
-    assert.deepStrictEqual(user(), {
-      Live: { TP: { host: "kdb1", port: 1 } },
-    });
+  });
+
+  test("a password's stored once the server's saved, and not for a save refused", async () => {
     await setUser({ TP: { host: "kdb1", port: 1 } });
     await setWorkspace({ TP: { host: "kdb2", port: 1 } });
+    const kept: Record<string, string> = {};
+    const { made, forms } = open(kept);
     forms.edit(["TP"]);
     await made[0].loaded();
-    const unsaved = refusing(vscode.ConfigurationTarget.Workspace, async () => {
-      made[0].say({
-        type: "save",
-        form: { ...prod, name: "RDB", auth: "none" },
-      });
-      return made[0].next();
-    });
-    assert.deepStrictEqual(await unsaved, {
-      type: "unsaved",
-      text: "saved in User settings but not in Workspace settings: the file has unsaved changes",
-    });
-    assert.deepStrictEqual(user(), { RDB: { host: "kdb1", port: 1 } });
-    assert.deepStrictEqual(workspace(), { TP: { host: "kdb2", port: 1 } });
+    const unsaved = refusing(
+      (target) => target === vscode.ConfigurationTarget.Workspace,
+      async () => {
+        made[0].say({ type: "save", form: { ...prod, name: "RDB" } });
+        return made[0].next();
+      },
+    );
+    assert.strictEqual((await unsaved).type, "unsaved");
+    assert.deepStrictEqual(kept, {});
+    made[0].say({ type: "save", form: { ...prod, name: "RDB" } });
+    await made[0].closing;
+    assert.deepStrictEqual(kept, { "password:@kdb2:1": "secret" });
   });
 
   test("Remove takes a server from both", async () => {

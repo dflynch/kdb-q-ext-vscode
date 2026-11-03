@@ -676,7 +676,7 @@ suite("editServer and removeServer", () => {
     let listed: vscode.QuickPickItem[] = [];
     window.showQuickPick = (async (items: vscode.QuickPickItem[]) => {
       listed = items;
-      return items[0];
+      return items.find(({ label }) => label === "old:2");
     }) as typeof pick;
     try {
       await clearPassword(secrets(kept));
@@ -686,8 +686,8 @@ suite("editServer and removeServer", () => {
     assert.deepStrictEqual(
       listed.map(({ label, description }) => [label, description]),
       [
-        ["old:2", "no server here"],
         ["admin@kdb1:1", "Prod › TP, copy"],
+        ["old:2", "no server here"],
       ],
     );
     assert.deepStrictEqual(Object.keys(kept), [
@@ -732,7 +732,10 @@ suite("editServer and removeServer", () => {
     );
     try {
       answer = "Remove";
-      await refusing(undefined, () => removeServer(connections, forms));
+      await refusing(
+        () => true,
+        () => removeServer(connections, forms),
+      );
     } finally {
       window.showErrorMessage = error;
       forms.dispose();

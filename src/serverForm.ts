@@ -129,32 +129,49 @@ export async function write(
   );
 }
 
-// Write each scope in turn, the user's first, refusing, if one can't be
-// written, with which, and which were written before it, as those are
-// done: "TP wasn't moved in Workspace settings", or "TP was moved in User
-// settings but not in Workspace settings". A form's save has no name:
-// "not saved in Workspace settings".
+// Write each scope in turn, the user's first. One that can't be written,
+// as when its file has unsaved changes, has those written before it put
+// back as they were, so that nothing's half done, and is refused with:
+// "TP wasn't moved in Workspace settings". A form's save has no name: "not
+// saved in Workspace settings". Should putting back fail too, it says what
+// was done: "TP was moved in User settings but not in Workspace settings".
 export async function writeEach(
-  scopes: Scope[],
+  order: Scope[],
   said: { name?: string; verb: string; prep: "in" | "from" },
   write: (scope: Scope) => Promise<void>,
 ) {
   const { name, verb, prep } = said;
-  const written: Scope[] = [];
-  for (const scope of scopes) {
+  const written: { scope: Scope; was: unknown }[] = [];
+  for (const scope of order) {
+    const was = scopes()[scope];
     try {
       await write(scope);
     } catch (error) {
       const not = `${prep} ${scopeName(scope)} settings: ${(error as Error).message}`;
-      const done = `${prep} ${written.map(scopeName).join(" and ")} settings`;
+      const kept = await putBack(written);
+      const done = `${prep} ${kept.map(scopeName).join(" and ")} settings`;
       throw new Error(
-        written.length === 0
+        kept.length === 0
           ? `${name ? `${name} wasn't` : "not"} ${verb} ${not}`
           : `${name ? `${name} was ` : ""}${verb} ${done} but not ${not}`,
       );
     }
-    written.push(scope);
+    written.push({ scope, was });
   }
+}
+
+// Put the scopes written back as they were, the last first; those that
+// can't be stay written
+async function putBack(written: { scope: Scope; was: unknown }[]) {
+  const kept: Scope[] = [];
+  for (const { scope, was } of [...written].reverse()) {
+    try {
+      await config().update("servers", was, targets[scope]);
+    } catch {
+      kept.unshift(scope);
+    }
+  }
+  return kept;
 }
 
 // Move a server or a folder from one path to another in one scope's
@@ -543,8 +560,16 @@ export class ServerForms implements vscode.Disposable {
         this.connections.disconnect(servers.id(old));
       }
     }
+    // Saved by now, so a password that can't be stored is said apart,
+    // the form closing as saved; Set Server Password stores it later
     if (form.auth === "store" && form.password !== "") {
-      await this.secrets.store(servers.secretKey(definition), form.password);
+      try {
+        await this.secrets.store(servers.secretKey(definition), form.password);
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `kdb+/q: ${servers.shown(path)} was saved, but its password wasn't stored: ${(error as Error).message}`,
+        );
+      }
     }
   }
 

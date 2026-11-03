@@ -414,13 +414,13 @@ export async function setPassword(secrets: vscode.SecretStorage) {
 // which a server in another workspace's settings may get.
 export async function clearPassword(secrets: vscode.SecretStorage) {
   const prefix = "password:";
-  const stored = (await secrets.keys())
-    .filter((key) => key.startsWith(prefix))
-    .sort();
+  const stored = (await secrets.keys()).filter((key) => key.startsWith(prefix));
   if (stored.length === 0) {
     vscode.window.showInformationMessage("kdb+/q: No passwords are stored.");
     return;
   }
+  // The servers that get each, as offered elsewhere: one with a problem
+  // isn't, until it's fixed
   const getting = new Map<string, string[]>();
   for (const server of definitions()) {
     if (server.auth === "store") {
@@ -432,14 +432,16 @@ export async function clearPassword(secrets: vscode.SecretStorage) {
     }
   }
   const picked = await vscode.window.showQuickPick(
-    stored.map((key) => {
-      const login = key.slice(prefix.length);
-      return {
-        label: login.startsWith("@") ? login.slice(1) : login,
-        description: getting.get(key)?.join(", ") ?? "no server here",
-        key,
-      };
-    }),
+    stored
+      .map((key) => {
+        const login = key.slice(prefix.length);
+        return {
+          label: login.startsWith("@") ? login.slice(1) : login,
+          description: getting.get(key)?.join(", ") ?? "no server here",
+          key,
+        };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label)),
     {
       title: "kdb+/q: Clear Server Password",
       placeHolder: "Password",
