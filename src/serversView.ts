@@ -400,6 +400,7 @@ export async function renameFolder(
     vscode.window.showErrorMessage(
       `kdb+/q: ${servers.shown(row.path)} wasn't renamed: ${(error as Error).message}`,
     );
+    return;
   }
   forms.close(row.path);
   disconnectWithin(connections, row.path);
