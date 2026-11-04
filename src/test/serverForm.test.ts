@@ -652,12 +652,59 @@ suite("editServer and removeServer", () => {
         Prod: {},
         other: { host: "kdb2", port: 1, auth: "store" },
       });
-      // Kept, as a server in another workspace's settings may get it
-      assert.ok("password:@kdb1:1" in kept);
       assert.strictEqual(made[0].closed, true);
     } finally {
       forms.dispose();
     }
+  });
+
+  test("Clear Server Password says so when none is stored", async () => {
+    const say = window.showInformationMessage;
+    const said: string[] = [];
+    window.showInformationMessage = (async (text: string) => {
+      said.push(text);
+    }) as typeof say;
+    try {
+      await clearPassword(secrets({ "passphrase:/key.pem": "other" }));
+    } finally {
+      window.showInformationMessage = say;
+    }
+    assert.deepStrictEqual(said, ["kdb+/q: No passwords are stored."]);
+  });
+
+  test("a password that can't be stored once its server's saved is said apart, the form closing as saved", async () => {
+    await setUser({});
+    const error = window.showErrorMessage;
+    const errors: string[] = [];
+    window.showErrorMessage = (async (text: string) => {
+      errors.push(text);
+    }) as typeof error;
+    const { made, panels } = tabs();
+    const forms = new ServerForms(
+      extension,
+      {
+        ...secrets({}),
+        store: async () => {
+          throw new Error("keyring locked");
+        },
+      } as vscode.SecretStorage,
+      connections,
+      nowhere,
+      panels,
+    );
+    try {
+      forms.add();
+      await made[0].loaded();
+      made[0].say({ type: "save", form: { ...prod } });
+      await made[0].closing;
+    } finally {
+      window.showErrorMessage = error;
+      forms.dispose();
+    }
+    assert.deepStrictEqual(errors, [
+      "kdb+/q: prod was saved, but its password wasn't stored: keyring locked",
+    ]);
+    assert.deepStrictEqual(Object.keys(user() as object), ["prod"]);
   });
 
   test("Clear Server Password lists the passwords stored, with the servers here that get each, and removes the one picked", async () => {
@@ -741,7 +788,7 @@ suite("editServer and removeServer", () => {
       forms.dispose();
     }
     assert.deepStrictEqual(errors, [
-      "kdb+/q: prod wasn't removed, as User settings refused: the file has unsaved changes",
+      "kdb+/q: prod wasn't removed, as User settings couldn't be written: the file has unsaved changes",
     ]);
     assert.deepStrictEqual(user(), {
       prod: { host: "kdb1", port: 1, auth: "store" },

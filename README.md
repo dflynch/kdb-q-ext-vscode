@@ -61,12 +61,13 @@ problem, and Edit opens it in the form to fix.
 Add a server with **kdb+/q: Add Server**, or the + on the view or on a
 folder, which opens a form for its settings, or write it in
 `settings.json`. The form saves a server in the settings its folder is
-in; with a workspace open, at the top, or in a folder in both, you pick
-your user or workspace settings. **Edit Server** opens the same form for a server, where a
-password can be stored too, and **Remove Server** removes one, from every
-settings file it's in. **New Folder**, and Rename and Remove Folder on a
-folder's right-click menu, do the same for folders. They write the whole
-setting, as VS Code writes one, so a comment inside it isn't kept:
+in. At the top level with a workspace open, or in a folder in both, you
+pick your user or workspace settings. **Edit Server** opens the same form
+for a server, where a password can be stored too, and **Remove Server**
+removes one, from every settings file it's in. **New Folder**, and Rename
+and Remove Folder on a folder's right-click menu, do the same for folders.
+They write the whole setting, as VS Code writes one, so a comment inside
+it isn't kept:
 
 ```json
 "kdb-q-ext-vscode.servers": {
@@ -105,10 +106,10 @@ setting, as VS Code writes one, so a comment inside it isn't kept:
   none. `"auth": "store"` sends the one the form, or **kdb+/q: Set Server
   Password**, keeps in VS Code's secure storage for the user, host and
   port, so that it's only ever sent where it was given. Every workspace
-  shares them, so editing or removing a server leaves its password, which
-  another workspace's server may get: **Clear Server Password** lists the
-  passwords stored, with the servers here that get each, and removes the
-  one picked. `"auth": "prompt"` asks for it at every connect instead, and
+  shares them, so editing or removing a server keeps its password, as a
+  server in another workspace may use it: **Clear Server Password** lists
+  the passwords stored, with the servers here that use each, and removes
+  the one picked. `"auth": "prompt"` asks for it at every connect instead, and
   never keeps it
 - **`tls`** is `true` to connect with TLS. The files it needs besides the
   system's are set once for every server, as q takes them for the whole

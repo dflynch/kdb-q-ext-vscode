@@ -30,6 +30,8 @@ let stored = false;
 const left = new Set<Field>();
 // A load that came while the form had changes, applied on Reload
 let pending: Extract<ToForm, { type: "load" }> | undefined;
+// Whether what the form saves is gone from the settings, until it's back
+let gone = false;
 
 function element<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -385,10 +387,13 @@ window.addEventListener("message", (event: MessageEvent<ToForm>) => {
   const message = event.data;
   switch (message.type) {
     case "load":
-      // There to save again, as after it was gone a moment, a write that
-      // couldn't be finished put back
-      save.disabled = false;
-      test.disabled = false;
+      // Back, as when a write that couldn't be finished is put back: there
+      // to save again, edits or not
+      if (gone) {
+        gone = false;
+        save.disabled = false;
+        test.disabled = false;
+      }
       // A form with changes keeps them until Reload
       if (changed()) {
         pending = message;
@@ -401,6 +406,7 @@ window.addEventListener("message", (event: MessageEvent<ToForm>) => {
       }
       break;
     case "gone":
+      gone = true;
       warn(`${shown(message.path)} is no longer in the settings.`);
       save.disabled = true;
       test.disabled = true;

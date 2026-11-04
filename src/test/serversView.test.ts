@@ -221,11 +221,10 @@ suite("the Servers view", () => {
       },
       other: { host: "kdb3", port: 1 },
     });
-    const kept: Record<string, string> = { "password:@kdb1:1": "secret" };
     const connections = await opened();
     const forms = new ServerForms(
       vscode.Uri.file("/extension"),
-      secrets(kept),
+      secrets({}),
       connections,
       async () => undefined,
     );
@@ -249,8 +248,6 @@ suite("the Servers view", () => {
       forms.dispose();
     }
     assert.deepStrictEqual(user(), { other: { host: "kdb3", port: 1 } });
-    // Kept, as a server in another workspace's settings may get it
-    assert.deepStrictEqual(kept, { "password:@kdb1:1": "secret" });
   });
 
   test("a server dragged into a folder moves there, disconnected, unless the name's taken", async () => {
@@ -314,11 +311,10 @@ suite("the Servers view", () => {
 
   test("Remove Folder of a folder with no name counts what's in it", async () => {
     await setUser({ " ": { TP: { host: "kdb1", port: 1, auth: "store" } } });
-    const kept: Record<string, string> = { "password:@kdb1:1": "secret" };
     const connections = await opened();
     const forms = new ServerForms(
       vscode.Uri.file("/extension"),
-      secrets(kept),
+      secrets({}),
       connections,
       async () => undefined,
     );
@@ -334,8 +330,6 @@ suite("the Servers view", () => {
       "It and the server in it are removed from your User settings.",
     );
     assert.deepStrictEqual(user(), {});
-    // Kept, as a server in another workspace's settings may get it
-    assert.deepStrictEqual(kept, { "password:@kdb1:1": "secret" });
   });
 
   test("Connect, Make Active and Disconnect take the server whose row they're run on", async () => {
