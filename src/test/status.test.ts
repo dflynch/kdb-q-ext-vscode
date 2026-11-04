@@ -4,6 +4,7 @@ import * as path from "node:path";
 import { serverMenu } from "../commands";
 import type { Definition } from "../servers";
 import { describe, details, lastTiming, took } from "../status";
+import { connectionsWith } from "./helpers";
 
 suite("status", () => {
   test("a query's time: the server's and the roundtrip, or the roundtrip", () => {
@@ -125,7 +126,13 @@ suite("status", () => {
     assert.ok(lines.includes("Connection timeout: None"));
   });
 
-  test("the server menu names each command as the palette does", () => {
+  test("the server menu names each command as the palette does", async () => {
+    const menu = serverMenu(
+      await connectionsWith(
+        [{ path: ["a"], host: "kdb1", port: 1 }],
+        [{ path: ["b"], host: "kdb1", port: 2 }],
+      ),
+    );
     const manifest = JSON.parse(
       readFileSync(path.join(__dirname, "../../package.json"), "utf8"),
     );
@@ -134,8 +141,33 @@ suite("status", () => {
         (c: { command: string; title: string }) => [c.command, c.title],
       ),
     );
-    for (const [command, label] of serverMenu.flatMap((g) => g.commands)) {
+    for (const [command, label] of menu.flatMap((g) => g.commands)) {
       assert.strictEqual(titles.get(command), label, command);
     }
+  });
+
+  test("the server menu offers Disconnect while one is open or connecting, and Dismiss while one is closed", async () => {
+    const a: Definition = { path: ["a"], host: "kdb1", port: 1 };
+    const b: Definition = { path: ["b"], host: "kdb1", port: 2 };
+    const offered = async (...given: Parameters<typeof connectionsWith>) =>
+      serverMenu(await connectionsWith(...given))[0].commands.map(([c]) => c);
+    const connect = "kdb-q-ext-vscode.connect";
+    const disconnect = "kdb-q-ext-vscode.disconnect";
+    const dismiss = "kdb-q-ext-vscode.dismiss";
+    assert.deepStrictEqual(await offered([]), [connect]);
+    assert.deepStrictEqual(await offered([a]), [connect, disconnect]);
+    assert.deepStrictEqual(await offered([], [], [a]), [connect, disconnect]);
+    assert.deepStrictEqual(await offered([], [a]), [connect, dismiss]);
+    // Whichever's active
+    assert.deepStrictEqual(await offered([a], [b]), [
+      connect,
+      disconnect,
+      dismiss,
+    ]);
+    assert.deepStrictEqual(await offered([], [b], [a]), [
+      connect,
+      disconnect,
+      dismiss,
+    ]);
   });
 });

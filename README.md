@@ -153,13 +153,16 @@ the extension keeps by server.
 
 **kdb+/q: Connect to Server** picks a server and makes its connection the
 active one, opening it if it isn't open. Several can be open at once.
-**Disconnect from Server** closes one.
+**Disconnect from Server** closes one. A connection that fails to open, or
+closes without being disconnected, is kept with why, and stays active, so
+that queries aren't sent elsewhere; connect again to retry, or **Dismiss
+Closed Connection** to forget it.
 
 The status bar shows the active connection, and opens a menu of the server
 commands when clicked:
 - A plug, joined when connected and pulled apart when not, spinning while
-  it connects or runs a query, and a warning color when the connection
-  closed without being disconnected
+  it connects or runs a query, and a warning color while the connection is
+  closed, until it's dismissed or connected again
 - How long the last query took, as `2 ms (3 ms roundtrip)`: the server's
   time, as `\t` gives, and the roundtrip. Without protected evaluation, only
   the roundtrip is known
@@ -316,6 +319,7 @@ server commands on the status bar's and in the Servers view.
 | kdb+/q: Toggle Block Comment          | Shift + Alt + A  |
 | kdb+/q: Connect to Server             |                  |
 | kdb+/q: Disconnect from Server        |                  |
+| kdb+/q: Dismiss Closed Connection     |                  |
 | kdb+/q: Add Server                    |                  |
 | kdb+/q: Edit Server                   |                  |
 | kdb+/q: Remove Server                 |                  |

@@ -1,10 +1,11 @@
 import * as assert from "node:assert";
+import { readFileSync } from "node:fs";
+import * as path from "node:path";
 import * as vscode from "vscode";
-import { connect, disconnect } from "../commands";
-import type { Connection } from "../connection";
-import { Connections, type State } from "../connections";
+import { connect, disconnect, dismiss } from "../commands";
+import type { State } from "../connections";
 import { ServerForms } from "../serverForm";
-import { type Entry, entries, id, put } from "../servers";
+import { type Definition, type Entry, entries, id, put } from "../servers";
 import {
   type Look,
   moveTo,
@@ -14,7 +15,7 @@ import {
   roots,
   row,
 } from "../serversView";
-import { secrets, setUser, user } from "./helpers";
+import { connectionsWith, secrets, setUser, user } from "./helpers";
 
 // What a row's given: nothing connected, unless a test says
 function look(states: Record<string, State> = {}, more: Partial<Look> = {}) {
@@ -25,33 +26,33 @@ function look(states: Record<string, State> = {}, more: Partial<Look> = {}) {
   };
 }
 
-const tp: Entry = {
-  kind: "server",
+const tpServer: Definition = {
   path: ["Prod", "TP"],
-  server: { path: ["Prod", "TP"], host: "kdb1", port: 5010, user: "admin" },
+  host: "kdb1",
+  port: 5010,
+  user: "admin",
 };
-const rdb: Entry = {
-  kind: "server",
+const rdbServer: Definition = {
   path: ["Prod", "RDB"],
-  server: { path: ["Prod", "RDB"], host: "kdb1", port: 5011 },
+  host: "kdb1",
+  port: 5011,
 };
+const tp: Entry = { kind: "server", path: tpServer.path, server: tpServer };
+const rdb: Entry = { kind: "server", path: rdbServer.path, server: rdbServer };
+// Two more, only ever connected to
+const ref: Definition = { path: ["Prod", "REF"], host: "kdb1", port: 5012 };
+const hdb: Definition = { path: ["Prod", "HDB"], host: "kdb1", port: 5013 };
 const prod: Entry = { kind: "folder", path: ["Prod"], entries: [rdb, tp] };
 
 const icon = (item: vscode.TreeItem) => (item.iconPath as vscode.ThemeIcon).id;
 
 // Connections with the servers given open
-async function opened(...servers: Entry[]) {
-  const link = { closed: new Promise<Error>(() => {}), close: () => {} };
-  const connections = new Connections<Connection>(
-    async () => link as unknown as Connection,
+const opened = (...servers: Entry[]) =>
+  connectionsWith(
+    servers.flatMap((entry) =>
+      entry.kind === "server" && entry.server ? [entry.server] : [],
+    ),
   );
-  for (const entry of servers) {
-    if (entry.kind === "server" && entry.server) {
-      await connections.connect(entry.server);
-    }
-  }
-  return connections;
-}
 
 suite("the Servers view", () => {
   const window = vscode.window as unknown as Record<string, unknown>;
@@ -332,7 +333,7 @@ suite("the Servers view", () => {
     assert.deepStrictEqual(user(), {});
   });
 
-  test("Connect, Make Active and Disconnect take the server whose row they're run on", async () => {
+  test("Connect, Make Active, Disconnect and Dismiss take the server whose row they're run on", async () => {
     const connections = await opened();
     await connect(connections, tp);
     await connect(connections, rdb);
@@ -345,5 +346,148 @@ suite("the Servers view", () => {
       connections.servers.map(({ path }) => path),
       [rdb.path],
     );
+    // A failed connect stays active until it's dismissed, leaving none
+    const failed = await connectionsWith([rdbServer], [tpServer]);
+    assert.strictEqual(failed.active?.id, id(tp.path));
+    await dismiss(failed, tp);
+    assert.deepStrictEqual(
+      failed.servers.map(({ path }) => path),
+      [rdb.path],
+    );
+    assert.strictEqual(failed.active, undefined);
+  });
+
+  test("from the palette, Dismiss takes the only closed one, says when there's none, and forgets the one picked", async () => {
+    const quick = window.showQuickPick;
+    const inform = window.showInformationMessage;
+    const told: string[] = [];
+    let asked = 0;
+    window.showQuickPick = async (items: { label: string }[]) => {
+      asked++;
+      return items[1];
+    };
+    window.showInformationMessage = async (message: string) => {
+      told.push(message);
+      return undefined;
+    };
+    try {
+      const none = await connectionsWith([rdbServer]);
+      await dismiss(none);
+      assert.deepStrictEqual(told, ["kdb+/q: No connection is closed."]);
+      assert.strictEqual(none.servers.length, 1);
+
+      const one = await connectionsWith([rdbServer], [tpServer]);
+      await dismiss(one);
+      assert.strictEqual(asked, 0);
+      assert.deepStrictEqual(
+        one.servers.map(({ path }) => path),
+        [rdb.path],
+      );
+
+      const two = await connectionsWith([rdbServer], [tpServer, ref]);
+      await dismiss(two);
+      assert.strictEqual(asked, 1);
+      assert.deepStrictEqual(
+        two.servers.map(({ path }) => path),
+        [rdb.path, tp.path],
+      );
+    } finally {
+      window.showQuickPick = quick;
+      window.showInformationMessage = inform;
+    }
+  });
+
+  test("from the palette, Disconnect takes the only open one, and says when there's none", async () => {
+    const quick = window.showQuickPick;
+    const inform = window.showInformationMessage;
+    const told: string[] = [];
+    let asked = 0;
+    window.showQuickPick = async () => {
+      asked++;
+      return undefined;
+    };
+    window.showInformationMessage = async (message: string) => {
+      told.push(message);
+      return undefined;
+    };
+    try {
+      const none = await connectionsWith([], [tpServer]);
+      await disconnect(none);
+      assert.deepStrictEqual(told, ["kdb+/q: No server is connected."]);
+      assert.strictEqual(none.servers.length, 1);
+
+      const one = await connectionsWith([rdbServer], [tpServer]);
+      await disconnect(one);
+      assert.strictEqual(asked, 0);
+      assert.deepStrictEqual(
+        one.servers.map(({ path }) => path),
+        [tp.path],
+      );
+    } finally {
+      window.showQuickPick = quick;
+      window.showInformationMessage = inform;
+    }
+  });
+
+  test("from the palette, Disconnect offers those open or connecting, and Dismiss those closed", async () => {
+    const quick = window.showQuickPick;
+    const offered: string[][] = [];
+    window.showQuickPick = async (items: { label: string }[]) => {
+      offered.push(items.map(({ label }) => label));
+      return undefined;
+    };
+    try {
+      const connections = await connectionsWith(
+        [rdbServer],
+        [tpServer, ref],
+        [hdb],
+      );
+      await disconnect(connections);
+      await dismiss(connections);
+    } finally {
+      window.showQuickPick = quick;
+    }
+    assert.deepStrictEqual(offered, [
+      ["Prod › RDB", "Prod › HDB"],
+      ["Prod › TP", "Prod › REF"],
+    ]);
+  });
+
+  test("a closed row offers Dismiss on its menu, not Disconnect, and no row more than two icons", () => {
+    const manifest = JSON.parse(
+      readFileSync(path.join(__dirname, "../../package.json"), "utf8"),
+    );
+    // Whether a menu entry's when clause holds for a row in the view
+    const holds = (when: string, item: string) =>
+      when.startsWith("view == kdb-q-ext-vscode.servers && ") &&
+      (when.endsWith(`viewItem == ${item}`) ||
+        new RegExp(when.match(/viewItem =~ \/(.*)\/$/)?.[1] ?? "$^").test(
+          item,
+        ));
+    // A row's commands, inline or on its menu
+    const offered = (item: string, inline: boolean) =>
+      manifest.contributes.menus["view/item/context"]
+        .filter(
+          (entry: { when: string; group: string }) =>
+            holds(entry.when, item) &&
+            entry.group.startsWith("inline") === inline,
+        )
+        .map((entry: { command: string }) => entry.command);
+    const dismiss = "kdb-q-ext-vscode.dismiss";
+    const disconnect = "kdb-q-ext-vscode.disconnect";
+    assert.ok(offered("closed", false).includes(dismiss));
+    assert.ok(!offered("closed", false).includes(disconnect));
+    assert.ok(!offered("closed", true).includes(disconnect));
+    const items = ["idle", "connecting", "open", "active", "closed", "broken"];
+    for (const item of [...items, "folder", "brokenFolder", "setting"]) {
+      assert.ok(offered(item, true).length <= 2, item);
+      if (item !== "closed") {
+        assert.ok(
+          !offered(item, true).includes(dismiss) &&
+            !offered(item, false).includes(dismiss),
+          item,
+        );
+      }
+    }
   });
 });

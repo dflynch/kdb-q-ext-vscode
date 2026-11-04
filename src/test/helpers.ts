@@ -1,8 +1,11 @@
-// What the tests share: stand-in tabs and secure storage, and the servers
-// setting in each scope
+// What the tests share: stand-in tabs, secure storage and connections, and
+// the servers setting in each scope
 import * as vscode from "vscode";
+import type { Connection } from "../connection";
+import { Connections } from "../connections";
 import type { FromForm, ToForm } from "../form/fields";
 import type { Panels } from "../resultView";
+import type { Definition } from "../servers";
 
 // Stand-in editor tabs, keeping each one's title and what it's posted, and
 // saying what it's told to. Each can wait for the next thing posted, or for
@@ -130,4 +133,31 @@ export async function refusing<T>(
   } finally {
     workspace.getConfiguration = configuration;
   }
+}
+
+// Connections to the servers given, in turn: those open, those that failed
+// to open, so closed, and those still connecting. The last is active.
+export async function connectionsWith(
+  open: Definition[],
+  failed: Definition[] = [],
+  connecting: Definition[] = [],
+) {
+  const link = { closed: new Promise<Error>(() => {}), close: () => {} };
+  const all = new Connections<Connection>((server) =>
+    failed.includes(server)
+      ? Promise.reject(new Error("hop"))
+      : connecting.includes(server)
+        ? new Promise(() => {})
+        : Promise.resolve(link as unknown as Connection),
+  );
+  for (const server of open) {
+    await all.connect(server);
+  }
+  for (const server of failed) {
+    await all.connect(server).catch(() => {});
+  }
+  for (const server of connecting) {
+    all.connect(server);
+  }
+  return all;
 }

@@ -12,12 +12,14 @@ All notable changes to the extension are documented in this file.
   storage, asked for at every connect, or given by another extension, and
   protected evaluation
 - The **Servers** view, under the q in the activity bar: servers in their
-  folders, with each connection's state; connect, disconnect, edit and
-  remove from a row, add servers and folders, rename and remove folders,
-  and drag to move. A server with a problem in the settings is listed with
-  it, to fix in the form
+  folders, with each connection's state; connect, disconnect, dismiss,
+  edit and remove from a row, add servers and folders, rename and remove
+  folders, and drag to move. A server with a problem in the settings is
+  listed with it, to fix in the form
 - **kdb+/q: Connect to Server** and **Disconnect from Server**, with the
-  active connection, and how long its last query took, in the status bar
+  active connection, and how long its last query took, in the status bar.
+  A connection that fails to open, or drops, is kept with why until it's
+  connected again, or dismissed with **Dismiss Closed Connection**
 - **kdb+/q: Run File on Server**, also the ▶ in the editor's title bar,
   which sends the whole file as one query, and shows the result in the
   **KDB+/Q** tab of the bottom panel as q's console prints it, and a
