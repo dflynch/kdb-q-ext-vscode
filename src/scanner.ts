@@ -112,7 +112,8 @@ function lexLine(
   if (open) {
     const end = stringEnd(text, 0);
     if (end < 0) {
-      open.end = base + trimmedEnd(text);
+      // Blank lines extend it only once more of it follows
+      if (trimmedEnd(text) > 0) open.end = base + trimmedEnd(text);
       return open;
     }
     open.end = base + end;
@@ -178,8 +179,12 @@ function lexLine(
           break;
         }
       }
-      // The file verbs 0: 1: 2:
-      if (j === i + 1 && text[j] === ":") j++;
+      // The file verbs 0: 1: 2: are operators
+      if (j === i + 1 && text[j] === ":") {
+        push("operator", i, j + 1);
+        i = j + 1;
+        continue;
+      }
       push("number", i, j);
       i = j;
     } else if (isLetter(c) || (c === "." && isLetter(next))) {

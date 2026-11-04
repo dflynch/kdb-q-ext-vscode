@@ -25,12 +25,15 @@ suite("scanner against q's lexer", () => {
   const read = (file: string) => readFileSync(path.join(fixtures, file));
   const fixture: {
     lexing: string;
+    script: string;
     cases: { line: string; tokens: string[] | string }[];
   } = JSON.parse(read("lexing.json").toString());
 
   test("fixture is up to date with lexing.q (npm run fixtures)", () => {
     const md5 = createHash("md5").update(read("lexing.q")).digest("hex");
     assert.strictEqual(fixture.lexing, md5);
+    const script = createHash("md5").update(read("lex.q")).digest("hex");
+    assert.strictEqual(fixture.script, script);
   });
 
   // q's tokens without its whitespace ones, and a trailing comment from its
@@ -59,7 +62,8 @@ suite("scanner kinds", () => {
     ['"a\\"b"', ['string "a\\"b"']],
     ["x::1", ["name x", "operator ::", "number 1"]],
     ["x+:1", ["name x", "operator +:", "number 1"]],
-    ["0:", ["number 0:"]],
+    ["0:", ["operator 0:"]],
+    ["1:-1", ["operator 1:", "number -1"]],
     ["+/[x]", ["operator +", "iterator /", "open [", "name x", "close ]"]],
     ["x/:y", ["name x", "iterator /:", "name y"]],
     ["x':y", ["name x", "iterator ':", "name y"]],
@@ -159,6 +163,14 @@ suite("scanner over the corpus", () => {
   // whitespace, a shebang, or after the end of the script
   function check(text: string) {
     const script = scan(text);
+    for (const s of script.statements) {
+      s.tokens.forEach((t, i) => {
+        assert.ok(
+          i === 0 || t.start >= s.tokens[i - 1].end,
+          "in order as made",
+        );
+      });
+    }
     const all = tokens(script);
     let at = 0;
     const lines = text.split("\n");

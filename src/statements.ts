@@ -12,11 +12,13 @@ export function flatten(text: string): string[] {
 function join(text: string, statement: Statement): string {
   let out = "";
   let last: number | undefined;
+  const k = statement.tokens[0].kind === "k";
   for (const token of statement.tokens) {
     if (token.kind === "comment") continue;
     if (last !== undefined) {
       const gap = text.slice(last, token.start);
-      out += /[\r\n]/.test(gap) ? " " : gap;
+      // A line break is a space in q, and a ; in k
+      out += /[\r\n]/.test(gap) ? (k ? ";" : " ") : gap;
     }
     const written = text.slice(token.start, token.end);
     out += token.kind === "string" ? oneLine(written) : written;

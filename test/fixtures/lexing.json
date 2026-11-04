@@ -1,4 +1,4 @@
-{"lexing":"f592c310b8fcc3f369a16ea44e871179","script":"1ee06e18e1abdd8c68078e95c3ac8b1c","q":"5 2026.10.15","cases":[
+{"lexing":"43dd898d9bd0c8ed98a9031feab48b63","script":"1ee06e18e1abdd8c68078e95c3ac8b1c","q":"5 2026.10.15","cases":[
 {"line":"a -1","tokens":["a"," ","-1"]},
 {"line":"a-1","tokens":["a","-","1"]},
 {"line":"1 -1","tokens":["1"," ","-1"]},
@@ -115,6 +115,7 @@
 {"line":"0:","tokens":["0:"]},
 {"line":"2:","tokens":["2:"]},
 {"line":"0:hsym x","tokens":["0:","hsym"," ","x"]},
+{"line":"1:-1","tokens":["1:","-1"]},
 {"line":"`:f 0:x","tokens":["`:f"," ","0:","x"]},
 {"line":"\"\\t\" 0:x","tokens":["\"\\t\""," ","0:","x"]},
 {"line":"x<>y","tokens":["x","<>","y"]},
