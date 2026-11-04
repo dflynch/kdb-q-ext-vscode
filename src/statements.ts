@@ -1,82 +1,41 @@
-import * as comments from "./comments";
+import { type Statement, scan } from "./scanner";
 
 // Flatten each multi-line statement in q source onto a single line, as the q
-// REPL only accepts single-line input. As in a q script, a line starting at
-// column 0 begins a new statement and an indented line continues the previous
-// one. Comments are removed, so that joining lines cannot comment out code.
+// REPL only accepts single-line input. Comments are removed, so that joining
+// lines cannot comment out code.
 export function flatten(text: string): string[] {
-  const lines = text.split(/\r\n|\n|\r/);
-  const { blocks, scriptEnd } = comments.findBlockComments(lines);
-  const statements: string[] = [];
-  // Whether the last statement ends inside a string
-  let inString = false;
-
-  for (let i = 0; i < scriptEnd; i++) {
-    const line = lines[i];
-    // A line at column 0 begins a new statement, so ends any string
-    if (/^\S/.test(line)) {
-      inString = false;
-    }
-    // A string continues onto the next line, keeping the line break and the
-    // indentation. As in a q script, trailing whitespace is dropped and a tab
-    // at column 0 reads as a space.
-    if (inString) {
-      const scanned = stripComment(line.replace(/^\t/, " "), true);
-      statements[statements.length - 1] += `\\n${scanned.code.trimEnd()}`;
-      inString = scanned.inString;
-      continue;
-    }
-    // Skip block comments, including their marker lines
-    if (blocks.some((b) => b.open <= i && i <= (b.close ?? scriptEnd))) {
-      continue;
-    }
-    // System commands are sent verbatim, as paths such as "\l /a/b.q" may
-    // contain what would otherwise look like a comment
-    if (line.startsWith("\\")) {
-      statements.push(line.trimEnd());
-      continue;
-    }
-
-    const { code, inString: endsInString } = stripComment(line, false);
-    const trimmed = code.trim();
-    if (!trimmed) {
-      continue;
-    }
-    // Join continuation lines onto the statement they belong to
-    if (/^\s/.test(code) && statements.length > 0) {
-      statements[statements.length - 1] += ` ${trimmed}`;
-    } else {
-      statements.push(trimmed);
-    }
-    inString = endsInString;
-  }
-
-  return statements;
+  return scan(text).statements.map((s) => join(text, s));
 }
 
-// Remove a trailing comment, i.e. a "/" at the start of the line or preceded
-// by whitespace, ignoring any that appear within strings. Also returns
-// whether the line ends inside a string.
-function stripComment(
-  line: string,
-  inString: boolean,
-): { code: string; inString: boolean } {
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (inString) {
-      if (c === "\\") {
-        i++; // Skip the escaped character
-      } else if (c === '"') {
-        inString = false;
-      }
-    } else if (c === '"') {
-      inString = true;
-    } else if (
-      c === "/" &&
-      (i === 0 || line[i - 1] === " " || line[i - 1] === "\t")
-    ) {
-      return { code: line.slice(0, i), inString: false };
+// A statement's tokens as written, with comments dropped and line breaks
+// between tokens read as a space
+function join(text: string, statement: Statement): string {
+  let out = "";
+  let last: number | undefined;
+  const k = statement.tokens[0].kind === "k";
+  for (const token of statement.tokens) {
+    if (token.kind === "comment") continue;
+    if (last !== undefined) {
+      const gap = text.slice(last, token.start);
+      // A line break is a space in q, and a ; in k
+      out += /[\r\n]/.test(gap) ? (k ? ";" : " ") : gap;
     }
+    const written = text.slice(token.start, token.end);
+    out += token.kind === "string" ? oneLine(written) : written;
+    last = token.end;
   }
-  return { code: line, inString };
+  return out;
+}
+
+// A string over several lines keeps its line breaks as \n escapes. As in a q
+// script, trailing whitespace is dropped and a tab at column 0 reads as a
+// space.
+function oneLine(written: string): string {
+  const lines = written.split(/\r\n|\n|\r/);
+  return lines
+    .map((line, i) => {
+      const read = i > 0 ? line.replace(/^\t/, " ") : line;
+      return i < lines.length - 1 ? read.trimEnd() : read;
+    })
+    .join("\\n");
 }

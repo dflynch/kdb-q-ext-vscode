@@ -82,6 +82,10 @@ suite("statements.flatten", () => {
       ['f:{ "p\\n  q"; x}'],
     ],
     ["string ended by a new statement", 'a:"x\nb:"/"', ['a:"x', 'b:"/"']],
+    ["blank lines after an unterminated string", 'a:"x\n\n\nb', ['a:"x', "b"]],
+
+    // k, where a line break separates as ; does
+    ["k continuation lines", "k)a:1+\n  2", ["k)a:1+;2"]],
 
     // System commands
     ["system command with path", "\\l /a/b.q", ["\\l /a/b.q"]],
