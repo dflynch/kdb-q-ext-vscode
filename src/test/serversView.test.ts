@@ -14,11 +14,7 @@ import {
   roots,
   row,
 } from "../serversView";
-
-const config = () => vscode.workspace.getConfiguration("kdb-q-ext-vscode");
-const user = () => config().inspect("servers")?.globalValue;
-const setUser = (value: unknown) =>
-  config().update("servers", value, vscode.ConfigurationTarget.Global);
+import { secrets, setUser, user } from "./helpers";
 
 // What a row's given: nothing connected, unless a test says
 function look(states: Record<string, State> = {}, more: Partial<Look> = {}) {
@@ -42,19 +38,6 @@ const rdb: Entry = {
 const prod: Entry = { kind: "folder", path: ["Prod"], entries: [rdb, tp] };
 
 const icon = (item: vscode.TreeItem) => (item.iconPath as vscode.ThemeIcon).id;
-
-// Secure storage keeping what's stored
-function secrets(kept: Record<string, string>): vscode.SecretStorage {
-  return {
-    get: async (key: string) => kept[key],
-    store: async (key: string, value: string) => {
-      kept[key] = value;
-    },
-    delete: async (key: string) => {
-      delete kept[key];
-    },
-  } as unknown as vscode.SecretStorage;
-}
 
 // Connections with the servers given open
 async function opened(...servers: Entry[]) {
@@ -238,18 +221,17 @@ suite("the Servers view", () => {
       },
       other: { host: "kdb3", port: 1 },
     });
-    const kept: Record<string, string> = { "password:@kdb1:1": "secret" };
     const connections = await opened();
     const forms = new ServerForms(
       vscode.Uri.file("/extension"),
-      secrets(kept),
+      secrets({}),
       connections,
       async () => undefined,
     );
     const folder = entries(user() as Record<string, unknown>)[0];
     try {
       answer = undefined;
-      await removeFolder(secrets(kept), connections, forms, folder);
+      await removeFolder(connections, forms, folder);
       assert.deepStrictEqual(warned[0], [
         "Remove Prod?",
         {
@@ -261,12 +243,11 @@ suite("the Servers view", () => {
       ]);
       assert.ok("Prod" in (user() as object));
       answer = "Remove";
-      await removeFolder(secrets(kept), connections, forms, folder);
+      await removeFolder(connections, forms, folder);
     } finally {
       forms.dispose();
     }
     assert.deepStrictEqual(user(), { other: { host: "kdb3", port: 1 } });
-    assert.deepStrictEqual(kept, {});
   });
 
   test("a server dragged into a folder moves there, disconnected, unless the name's taken", async () => {
@@ -328,20 +309,19 @@ suite("the Servers view", () => {
     );
   });
 
-  test("Remove Folder of a folder with no name counts what's in it, and forgets its passwords", async () => {
+  test("Remove Folder of a folder with no name counts what's in it", async () => {
     await setUser({ " ": { TP: { host: "kdb1", port: 1, auth: "store" } } });
-    const kept: Record<string, string> = { "password:@kdb1:1": "secret" };
     const connections = await opened();
     const forms = new ServerForms(
       vscode.Uri.file("/extension"),
-      secrets(kept),
+      secrets({}),
       connections,
       async () => undefined,
     );
     const [folder] = entries(user() as Record<string, unknown>);
     try {
       answer = "Remove";
-      await removeFolder(secrets(kept), connections, forms, folder);
+      await removeFolder(connections, forms, folder);
     } finally {
       forms.dispose();
     }
@@ -350,7 +330,6 @@ suite("the Servers view", () => {
       "It and the server in it are removed from your User settings.",
     );
     assert.deepStrictEqual(user(), {});
-    assert.deepStrictEqual(kept, {});
   });
 
   test("Connect, Make Active and Disconnect take the server whose row they're run on", async () => {

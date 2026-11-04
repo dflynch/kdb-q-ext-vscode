@@ -9,6 +9,7 @@ import {
   type FromForm,
   type Login,
   problems,
+  scopeName,
   shown,
   type ToForm,
 } from "./fields";
@@ -29,6 +30,8 @@ let stored = false;
 const left = new Set<Field>();
 // A load that came while the form had changes, applied on Reload
 let pending: Extract<ToForm, { type: "load" }> | undefined;
+// Whether what the form saves is gone from the settings, until it's back
+let gone = false;
 
 function element<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -323,23 +326,18 @@ function show(message: Extract<ToForm, { type: "load" }>) {
   });
   left.clear();
   fill(message.form);
-  const { editing, folder, scopes, authExtension, workspaceOpen } =
-    message.context;
+  const { editing, folder, scopes, authExtension, targets } = message.context;
   title.textContent =
     editing === undefined ? "Add Server" : `Edit ${message.form.name}`;
   // Its folders, and for one edited, the settings it's in
   const places = [
     ...(folder.length > 0 ? [shown(folder)] : []),
-    ...(scopes.length > 0
-      ? [
-          `${listed(scopes.map((scope) => (scope === "user" ? "User" : "Workspace")))} settings`,
-        ]
-      : []),
+    ...(scopes.length > 0 ? [`${listed(scopes.map(scopeName))} settings`] : []),
   ];
   where.textContent = places.length > 0 ? `In ${places.join(", in ")}` : "";
   where.hidden = places.length === 0;
   note.hidden = !message.context.connected;
-  rows.target.row.hidden = editing !== undefined || !workspaceOpen;
+  rows.target.row.hidden = editing !== undefined || targets.length < 2;
   json.hidden = editing === undefined;
   const files = message.context.tlsFiles;
   tlsNote.replaceChildren(
@@ -389,6 +387,13 @@ window.addEventListener("message", (event: MessageEvent<ToForm>) => {
   const message = event.data;
   switch (message.type) {
     case "load":
+      // Back, as when a write that couldn't be finished is put back: there
+      // to save again, edits or not
+      if (gone) {
+        gone = false;
+        save.disabled = false;
+        test.disabled = false;
+      }
       // A form with changes keeps them until Reload
       if (changed()) {
         pending = message;
@@ -401,6 +406,7 @@ window.addEventListener("message", (event: MessageEvent<ToForm>) => {
       }
       break;
     case "gone":
+      gone = true;
       warn(`${shown(message.path)} is no longer in the settings.`);
       save.disabled = true;
       test.disabled = true;

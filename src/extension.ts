@@ -108,8 +108,7 @@ export function activate(context: vscode.ExtensionContext) {
     ),
     vscode.commands.registerCommand(
       "kdb-q-ext-vscode.removeServer",
-      (row?: Entry) =>
-        commands.removeServer(context.secrets, connections, forms, row),
+      (row?: Entry) => commands.removeServer(connections, forms, row),
     ),
     vscode.commands.registerCommand(
       "kdb-q-ext-vscode.newFolder",
@@ -121,7 +120,7 @@ export function activate(context: vscode.ExtensionContext) {
     ),
     vscode.commands.registerCommand(
       "kdb-q-ext-vscode.removeFolder",
-      (row: Entry) => removeFolder(context.secrets, connections, forms, row),
+      (row: Entry) => removeFolder(connections, forms, row),
     ),
     vscode.commands.registerCommand(
       "kdb-q-ext-vscode.openServersSetting",

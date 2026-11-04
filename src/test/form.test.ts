@@ -14,7 +14,7 @@ const context: Context = {
   folder: [],
   scopes: [],
   taken: ["old"],
-  workspaceOpen: false,
+  targets: ["user"],
   tlsFiles: [],
   connected: false,
 };

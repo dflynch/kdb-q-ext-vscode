@@ -1,10 +1,16 @@
 import * as vscode from "vscode";
-import { scopeName } from "./commands";
 import type { Connection } from "./connection";
 import type { Connections, State } from "./connections";
-import type { Scope } from "./form/fields";
+import { type Scope, scopeName } from "./form/fields";
 import type { ServerForms } from "./serverForm";
-import { forget, move, scopes, scopesOf, write } from "./serverForm";
+import {
+  move,
+  scopes,
+  scopesOf,
+  targetsIn,
+  write,
+  writeEach,
+} from "./serverForm";
 import * as servers from "./servers";
 import { describe, details } from "./status";
 
@@ -281,14 +287,24 @@ export async function moveTo(
     );
     return;
   }
-  try {
-    for (const scope of scopesOf(from, entry.kind)) {
-      await move(scope, from, to);
-    }
-  } catch (error) {
-    vscode.window.showErrorMessage(
-      `kdb+/q: ${servers.shown(from)} wasn't moved: ${(error as Error).message}`,
+  // Only into a folder in each scope it's in, as one in the other would
+  // otherwise be made there, as Add Server does
+  const written = scopesOf(from, entry.kind);
+  const missing = written.find((scope) => !targetsIn(folder).includes(scope));
+  if (missing) {
+    vscode.window.showWarningMessage(
+      `kdb+/q: ${servers.shown(from)} wasn't moved: ${servers.shown(folder)} isn't in ${scopeName(missing)} settings`,
     );
+    return;
+  }
+  try {
+    await writeEach(
+      written,
+      { name: servers.shown(from), verb: "moved", prep: "in" },
+      (scope) => move(scope, from, to),
+    );
+  } catch (error) {
+    vscode.window.showErrorMessage(`kdb+/q: ${(error as Error).message}`);
     return;
   }
   forms.close(from);
@@ -338,12 +354,7 @@ export async function newFolder(row?: servers.Entry) {
   if (typed === undefined) {
     return;
   }
-  const workspaceOpen = vscode.workspace.workspaceFolders !== undefined;
-  const candidates: Scope[] = !workspaceOpen
-    ? ["user"]
-    : parent.length === 0
-      ? ["user", "workspace"]
-      : scopesOf(parent, "folder");
+  const candidates = targetsIn(parent);
   let scope = candidates[0] ?? "user";
   if (candidates.length > 1) {
     const picked = await vscode.window.showQuickPick(
@@ -393,13 +404,13 @@ export async function renameFolder(
   }
   const to = [...parent, typed.trim()];
   try {
-    for (const scope of scopesOf(row.path, "folder")) {
-      await move(scope, row.path, to);
-    }
-  } catch (error) {
-    vscode.window.showErrorMessage(
-      `kdb+/q: ${servers.shown(row.path)} wasn't renamed: ${(error as Error).message}`,
+    await writeEach(
+      scopesOf(row.path, "folder"),
+      { name: servers.shown(row.path), verb: "renamed", prep: "in" },
+      (scope) => move(scope, row.path, to),
     );
+  } catch (error) {
+    vscode.window.showErrorMessage(`kdb+/q: ${(error as Error).message}`);
     return;
   }
   forms.close(row.path);
@@ -409,7 +420,6 @@ export async function renameFolder(
 // Remove the folder whose row it's run on, once confirmed, with everything
 // in it, from every scope it's written in, as Remove Server does a server
 export async function removeFolder(
-  secrets: vscode.SecretStorage,
   connections: Connections<Connection>,
   forms: ServerForms,
   row: servers.Entry,
@@ -441,22 +451,16 @@ export async function removeFolder(
   if (choice !== remove) {
     return;
   }
-  for (const scope of scopesOf(row.path, "folder")) {
-    try {
-      await write(scope, row.path, undefined);
-    } catch (error) {
-      vscode.window.showErrorMessage(
-        `kdb+/q: ${servers.shown(row.path)} wasn't removed from ${scopeName(scope)} settings: ${(error as Error).message}`,
-      );
-      return;
-    }
+  try {
+    await writeEach(
+      scopesOf(row.path, "folder"),
+      { name: servers.shown(row.path), verb: "removed", prep: "from" },
+      (scope) => write(scope, row.path, undefined),
+    );
+  } catch (error) {
+    vscode.window.showErrorMessage(`kdb+/q: ${(error as Error).message}`);
+    return;
   }
   forms.close(row.path);
   disconnectWithin(connections, row.path);
-  await forget(
-    secrets,
-    held.flatMap(({ server }) =>
-      server?.auth === "store" ? [servers.secretKey(server)] : [],
-    ),
-  );
 }

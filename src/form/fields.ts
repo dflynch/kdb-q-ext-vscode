@@ -40,8 +40,8 @@ export type Context = {
   scopes: Scope[];
   // The names of the rest of the folder's servers and folders
   taken: string[];
-  // Whether there's a workspace to save a server to
-  workspaceOpen: boolean;
+  // The settings a server added can be saved to: those its folder's in
+  targets: Scope[];
   // The authExtension setting, as written
   authExtension?: string;
   // The TLS files set, by their file names, as the settings give them
@@ -56,6 +56,11 @@ export type Context = {
 
 // The timeout a server added starts with, in milliseconds
 export const startingTimeout = 2000;
+
+// A scope as VS Code names it
+export function scopeName(scope: Scope): string {
+  return scope === "user" ? "User" : "Workspace";
+}
 
 // A server's name as it's shown: its folders' names and its own, as a
 // breadcrumb, Prod › trades › TP

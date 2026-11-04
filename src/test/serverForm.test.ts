@@ -1,112 +1,19 @@
 import * as assert from "node:assert";
 import * as vscode from "vscode";
-import { editServer, removeServer } from "../commands";
+import { clearPassword, editServer, removeServer } from "../commands";
 import type { Connection } from "../connection";
 import { Connections } from "../connections";
-import { blank, type Form, type FromForm, type ToForm } from "../form/fields";
-import type { Panels } from "../resultView";
+import { blank, type Form, type ToForm } from "../form/fields";
 import { formType, type Opener, ServerForms } from "../serverForm";
 import type * as servers from "../servers";
+import { config, refusing, secrets, setUser, tabs, user } from "./helpers";
 
 const extension = vscode.Uri.file("/extension");
-
-// Stand-in editor tabs, keeping each one's title and what it's posted, and
-// saying what it's told to. Each can wait for the next thing posted, or for
-// it to be closed.
-function tabs() {
-  const made: ReturnType<typeof tab>[] = [];
-  const tab = (type: string, title: string) => {
-    const posted: ToForm[] = [];
-    const waiting: ((message: ToForm) => void)[] = [];
-    let say: (message: FromForm) => void = () => {};
-    let disposed = () => {};
-    let closed = false;
-    let revealed = 0;
-    const closing = new Promise<void>((resolve) => {
-      disposed = () => {
-        closed = true;
-        resolve();
-      };
-    });
-    const panel = {
-      webview: {
-        cspSource: "https://source.example",
-        options: {},
-        html: "",
-        asWebviewUri: (uri: vscode.Uri) => uri,
-        onDidReceiveMessage: (listener: (message: FromForm) => void) => {
-          say = listener;
-        },
-        postMessage: async (message: ToForm) => {
-          posted.push(message);
-          waiting.shift()?.(message);
-          return true;
-        },
-      },
-      reveal: () => {
-        revealed += 1;
-      },
-      onDidDispose: (listener: () => void) => {
-        const then = disposed;
-        disposed = () => {
-          then();
-          listener();
-        };
-      },
-      dispose: () => disposed(),
-    } as unknown as vscode.WebviewPanel;
-    return {
-      type,
-      title,
-      panel,
-      posted,
-      get closed() {
-        return closed;
-      },
-      get revealed() {
-        return revealed;
-      },
-      closing,
-      next: () => new Promise<ToForm>((resolve) => waiting.push(resolve)),
-      say: (message: FromForm) => say(message),
-      // The form as first loaded
-      loaded: async () => {
-        const next = new Promise<ToForm>((resolve) => waiting.push(resolve));
-        say({ type: "ready" });
-        return (await next) as Extract<ToForm, { type: "load" }>;
-      },
-    };
-  };
-  const panels = ((type: string, title: string) => {
-    const made1 = tab(type, title);
-    made.push(made1);
-    return made1.panel;
-  }) as unknown as Panels;
-  return { made, panels };
-}
-
-// Secure storage keeping what's stored
-function secrets(kept: Record<string, string>): vscode.SecretStorage {
-  return {
-    get: async (key: string) => kept[key],
-    store: async (key: string, value: string) => {
-      kept[key] = value;
-    },
-    delete: async (key: string) => {
-      delete kept[key];
-    },
-  } as unknown as vscode.SecretStorage;
-}
 
 // An opener that's never used
 const nowhere: Opener = async () => {
   throw new Error("not opened");
 };
-
-const config = () => vscode.workspace.getConfiguration("kdb-q-ext-vscode");
-const user = () => config().inspect("servers")?.globalValue;
-const setUser = (value: unknown) =>
-  config().update("servers", value, vscode.ConfigurationTarget.Global);
 
 const prod: Form = {
   ...blank(),
@@ -317,43 +224,7 @@ suite("the server form", () => {
     }
   });
 
-  test("a password no server gets any more is forgotten, unless another does", async () => {
-    const login = {
-      host: "kdb1.example.com",
-      port: 5010,
-      user: "admin",
-      auth: "store",
-    };
-    await setUser({ prod: login, copy: login });
-    const kept: Record<string, string> = {
-      "password:admin@kdb1.example.com:5010": "secret",
-    };
-    const { made, forms } = open(kept);
-    forms.edit(["prod"]);
-    const { form } = await made[0].loaded();
-    made[0].say({
-      type: "save",
-      form: { ...form, host: "kdb2.example.com", password: "other" },
-    });
-    await made[0].closing;
-    // copy still gets the first
-    assert.deepStrictEqual(kept, {
-      "password:admin@kdb1.example.com:5010": "secret",
-      "password:admin@kdb2.example.com:5010": "other",
-    });
-    forms.edit(["copy"]);
-    const second = await made[1].loaded();
-    made[1].say({
-      type: "save",
-      form: { ...second.form, auth: "prompt" },
-    });
-    await made[1].closing;
-    assert.deepStrictEqual(kept, {
-      "password:admin@kdb2.example.com:5010": "other",
-    });
-  });
-
-  test("None forgets the password stored for the login", async () => {
+  test("a password's kept when its server's edited away from it, as another workspace's may get it", async () => {
     await setUser({ prod: { host: "kdb1", port: 1, auth: "store" } });
     const kept: Record<string, string> = { "password:@kdb1:1": "secret" };
     const { made, forms } = open(kept);
@@ -361,10 +232,17 @@ suite("the server form", () => {
     const { form } = await made[0].loaded();
     made[0].say({
       type: "save",
-      form: { ...form, auth: "none" },
+      form: { ...form, host: "kdb2", password: "other" },
     });
     await made[0].closing;
-    assert.deepStrictEqual(kept, {});
+    forms.edit(["prod"]);
+    const second = await made[1].loaded();
+    made[1].say({ type: "save", form: { ...second.form, auth: "none" } });
+    await made[1].closing;
+    assert.deepStrictEqual(kept, {
+      "password:@kdb1:1": "secret",
+      "password:@kdb2:1": "other",
+    });
   });
 
   test("None holds for a server sharing its login with one that stores it", async () => {
@@ -738,19 +616,15 @@ suite("editServer and removeServer", () => {
     }
   });
 
-  test("Remove, once confirmed, removes the server and forgets its password", async () => {
+  test("Remove, once confirmed, removes the server, and closes its form", async () => {
     await setUser({
       Prod: { TP: { host: "kdb1", port: 1, auth: "store" } },
       other: { host: "kdb2", port: 1, auth: "store" },
     });
-    const kept: Record<string, string> = {
-      "password:@kdb1:1": "secret",
-      "password:@kdb2:1": "kept",
-    };
     const { made, panels } = tabs();
     const forms = new ServerForms(
       extension,
-      secrets(kept),
+      secrets({}),
       connections,
       nowhere,
       panels,
@@ -758,7 +632,7 @@ suite("editServer and removeServer", () => {
     try {
       forms.edit(["Prod", "TP"]);
       answer = undefined;
-      await removeServer(secrets(kept), connections, forms);
+      await removeServer(connections, forms);
       assert.strictEqual(warned[0][0], "Remove Prod › TP?");
       assert.deepStrictEqual(warned[0][1], {
         modal: true,
@@ -768,17 +642,101 @@ suite("editServer and removeServer", () => {
         user() !== undefined && "TP" in (user() as { Prod: object }).Prod,
       );
       answer = "Remove";
-      await removeServer(secrets(kept), connections, forms);
+      await removeServer(connections, forms);
       // The folder stays, empty
       assert.deepStrictEqual(user(), {
         Prod: {},
         other: { host: "kdb2", port: 1, auth: "store" },
       });
-      assert.deepStrictEqual(kept, { "password:@kdb2:1": "kept" });
       assert.strictEqual(made[0].closed, true);
     } finally {
       forms.dispose();
     }
+  });
+
+  test("Clear Server Password says so when none is stored", async () => {
+    const say = window.showInformationMessage;
+    const said: string[] = [];
+    window.showInformationMessage = (async (text: string) => {
+      said.push(text);
+    }) as typeof say;
+    try {
+      await clearPassword(secrets({ "passphrase:/key.pem": "other" }));
+    } finally {
+      window.showInformationMessage = say;
+    }
+    assert.deepStrictEqual(said, ["kdb+/q: No passwords are stored."]);
+  });
+
+  test("a password that can't be stored once its server's saved is said apart, the form closing as saved", async () => {
+    await setUser({});
+    const error = window.showErrorMessage;
+    const errors: string[] = [];
+    window.showErrorMessage = (async (text: string) => {
+      errors.push(text);
+    }) as typeof error;
+    const { made, panels } = tabs();
+    const forms = new ServerForms(
+      extension,
+      {
+        ...secrets({}),
+        store: async () => {
+          throw new Error("keyring locked");
+        },
+      } as vscode.SecretStorage,
+      connections,
+      nowhere,
+      panels,
+    );
+    try {
+      forms.add();
+      await made[0].loaded();
+      made[0].say({ type: "save", form: { ...prod } });
+      await made[0].closing;
+    } finally {
+      window.showErrorMessage = error;
+      forms.dispose();
+    }
+    assert.deepStrictEqual(errors, [
+      "kdb+/q: prod was saved, but its password wasn't stored: keyring locked",
+    ]);
+    assert.deepStrictEqual(Object.keys(user() as object), ["prod"]);
+  });
+
+  test("Clear Server Password lists the passwords stored, with the servers here that get each, and removes the one picked", async () => {
+    const login = { host: "kdb1", port: 1, user: "admin", auth: "store" };
+    await setUser({
+      Prod: { TP: login },
+      copy: login,
+      gw: { host: "gw", port: 1 },
+    });
+    const kept: Record<string, string> = {
+      "password:admin@kdb1:1": "secret",
+      "password:@old:2": "left",
+      "passphrase:/key.pem": "other",
+    };
+    const pick = window.showQuickPick;
+    let listed: vscode.QuickPickItem[] = [];
+    window.showQuickPick = (async (items: vscode.QuickPickItem[]) => {
+      listed = items;
+      return items.find(({ label }) => label === "old:2");
+    }) as typeof pick;
+    try {
+      await clearPassword(secrets(kept));
+    } finally {
+      window.showQuickPick = pick;
+    }
+    assert.deepStrictEqual(
+      listed.map(({ label, description }) => [label, description]),
+      [
+        ["admin@kdb1:1", "Prod › TP, copy"],
+        ["old:2", "no server here"],
+      ],
+    );
+    assert.deepStrictEqual(Object.keys(kept), [
+      "password:admin@kdb1:1",
+      "passphrase:/key.pem",
+    ]);
   });
 
   test("Remove takes the server whose row it's run on, one with a problem too", async () => {
@@ -792,7 +750,7 @@ suite("editServer and removeServer", () => {
     );
     answer = "Remove";
     try {
-      await removeServer(secrets({}), connections, forms, { path: ["rdb"] });
+      await removeServer(connections, forms, { path: ["rdb"] });
     } finally {
       forms.dispose();
     }
@@ -803,23 +761,8 @@ suite("editServer and removeServer", () => {
   test("Remove that can't write the setting leaves the server, and says why", async () => {
     await setUser({ prod: { host: "kdb1", port: 1, auth: "store" } });
     const kept: Record<string, string> = { "password:@kdb1:1": "secret" };
-    const { workspace } = vscode;
-    const configuration = workspace.getConfiguration;
     const error = window.showErrorMessage;
     const errors: string[] = [];
-    // As VS Code refuses a settings file with unsaved changes
-    workspace.getConfiguration = ((
-      ...args: Parameters<typeof configuration>
-    ) => {
-      const config = configuration(...args);
-      return Object.create(config, {
-        update: {
-          value: async () => {
-            throw new Error("the file has unsaved changes");
-          },
-        },
-      });
-    }) as typeof configuration;
     window.showErrorMessage = (async (text: string) => {
       errors.push(text);
     }) as typeof error;
@@ -832,14 +775,16 @@ suite("editServer and removeServer", () => {
     );
     try {
       answer = "Remove";
-      await removeServer(secrets(kept), connections, forms);
+      await refusing(
+        () => true,
+        () => removeServer(connections, forms),
+      );
     } finally {
-      workspace.getConfiguration = configuration;
       window.showErrorMessage = error;
       forms.dispose();
     }
     assert.deepStrictEqual(errors, [
-      "kdb+/q: prod wasn't removed from User settings: the file has unsaved changes",
+      "kdb+/q: prod wasn't removed, as User settings couldn't be written: the file has unsaved changes",
     ]);
     assert.deepStrictEqual(user(), {
       prod: { host: "kdb1", port: 1, auth: "store" },
