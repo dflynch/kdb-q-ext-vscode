@@ -1,50 +1,11 @@
+import { scan } from "./scanner";
+
 // The marker lines to add and remove to toggle block comments: "/" and "\"
 // lines around each range of lines to add, and the lines to remove
 export type BlockCommentToggle = {
   add: { start: number; end: number }[];
   remove: number[];
 };
-
-// An outermost block comment from its "/" line to its "\" line, or to the end
-// when it is left open
-export type BlockComment = { open: number; close?: number };
-
-const blockStart = /^\/\s*$/;
-const blockEnd = /^\\\s*$/;
-
-// Find block comments as q reads them: blocks nest, so a lone "/" inside a
-// block opens another and a lone "\" closes the innermost. Outside a block, a
-// lone "\" comments out the rest of the script, from scriptEnd on.
-export function findBlockComments(lines: string[]): {
-  blocks: BlockComment[];
-  scriptEnd: number;
-} {
-  const blocks: BlockComment[] = [];
-  let open = 0;
-  let depth = 0;
-  let scriptEnd = lines.length;
-  for (let i = 0; i < lines.length; i++) {
-    if (blockStart.test(lines[i])) {
-      if (depth === 0) {
-        open = i;
-      }
-      depth++;
-    } else if (blockEnd.test(lines[i])) {
-      if (depth === 0) {
-        scriptEnd = i;
-        break;
-      }
-      depth--;
-      if (depth === 0) {
-        blocks.push({ open, close: i });
-      }
-    }
-  }
-  if (depth > 0) {
-    blocks.push({ open });
-  }
-  return { blocks, scriptEnd };
-}
 
 // Decide how to toggle block comments over ranges of lines (inclusive): remove
 // the markers of the outermost blocks a range touches, or else wrap the range
@@ -54,7 +15,10 @@ export function toggleBlockComment(
   lines: string[],
   ranges: { start: number; end: number }[],
 ): BlockCommentToggle {
-  const { blocks, scriptEnd } = findBlockComments(lines);
+  const script = scan(lines.join("\n"));
+  const blocks = script.blocks;
+  // Outside a block, a lone "\" comments out the rest of the script
+  const scriptEnd = script.end ?? lines.length;
   const add: { start: number; end: number }[] = [];
   const remove = new Set<number>();
   for (const { start, end } of ranges) {
