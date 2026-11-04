@@ -605,39 +605,62 @@ async function connectTo(
   }
 }
 
-// What the status bar's menu offers, in groups, by command
-export const serverMenu: { group: string; commands: [string, string][] }[] = [
-  {
-    group: "Connection",
-    commands: [
-      ["kdb-q-ext-vscode.connect", "Connect to Server"],
-      ["kdb-q-ext-vscode.disconnect", "Disconnect from Server"],
-    ],
-  },
-  {
-    group: "Servers",
-    commands: [
-      ["kdb-q-ext-vscode.addServer", "Add Server"],
-      ["kdb-q-ext-vscode.editServer", "Edit Server"],
-      ["kdb-q-ext-vscode.removeServer", "Remove Server"],
-      ["kdb-q-ext-vscode.openSettings", "Open Settings"],
-    ],
-  },
-  {
-    group: "Secrets",
-    commands: [
-      ["kdb-q-ext-vscode.setPassword", "Set Server Password"],
-      ["kdb-q-ext-vscode.clearPassword", "Clear Server Password"],
-      ["kdb-q-ext-vscode.setPassphrase", "Set Certificate Passphrase"],
-      ["kdb-q-ext-vscode.clearPassphrase", "Clear Certificate Passphrase"],
-    ],
-  },
-];
+// The servers connected to whose connection is closed, as their settings
+// defined them then
+function closedServers(connections: Connections<Connection>) {
+  return connections.servers.filter(
+    (server) => connections.state(servers.id(server.path))?.kind === "closed",
+  );
+}
+
+// Those whose connection is open or connecting
+function openServers(connections: Connections<Connection>) {
+  return connections.servers.filter(
+    (server) => connections.state(servers.id(server.path))?.kind !== "closed",
+  );
+}
+
+// What the status bar's menu offers, in groups, by command: Disconnect
+// while a connection is open or connecting, and Dismiss while one is closed
+export function serverMenu(
+  connections: Connections<Connection>,
+): { group: string; commands: [string, string][] }[] {
+  const connection: [string, string][] = [
+    ["kdb-q-ext-vscode.connect", "Connect to Server"],
+  ];
+  if (openServers(connections).length > 0) {
+    connection.push(["kdb-q-ext-vscode.disconnect", "Disconnect from Server"]);
+  }
+  if (closedServers(connections).length > 0) {
+    connection.push(["kdb-q-ext-vscode.dismiss", "Dismiss Closed Connection"]);
+  }
+  return [
+    { group: "Connection", commands: connection },
+    {
+      group: "Servers",
+      commands: [
+        ["kdb-q-ext-vscode.addServer", "Add Server"],
+        ["kdb-q-ext-vscode.editServer", "Edit Server"],
+        ["kdb-q-ext-vscode.removeServer", "Remove Server"],
+        ["kdb-q-ext-vscode.openSettings", "Open Settings"],
+      ],
+    },
+    {
+      group: "Secrets",
+      commands: [
+        ["kdb-q-ext-vscode.setPassword", "Set Server Password"],
+        ["kdb-q-ext-vscode.clearPassword", "Clear Server Password"],
+        ["kdb-q-ext-vscode.setPassphrase", "Set Certificate Passphrase"],
+        ["kdb-q-ext-vscode.clearPassphrase", "Clear Certificate Passphrase"],
+      ],
+    },
+  ];
+}
 
 // The status bar's menu, running the command picked
-export async function showServerMenu() {
+export async function showServerMenu(connections: Connections<Connection>) {
   const picked = await vscode.window.showQuickPick(
-    serverMenu.flatMap(({ group, commands }) => [
+    serverMenu(connections).flatMap(({ group, commands }) => [
       { label: group, kind: vscode.QuickPickItemKind.Separator },
       ...commands.map(([command, label]) => ({ label, command })),
     ]),
@@ -648,34 +671,57 @@ export async function showServerMenu() {
   }
 }
 
-// Close a connection: the one whose row it's run on, the only one, or one
-// picked
-export async function disconnect(
+// Close a connection that's open or connecting: the one whose row it's run
+// on, the only one, or one picked
+export function disconnect(connections: Connections<Connection>, row?: Row) {
+  return forget(
+    connections,
+    row,
+    openServers(connections),
+    "kdb+/q: Disconnect from Server",
+    "kdb+/q: No server is connected.",
+  );
+}
+
+// Forget a connection that's closed, and why: the one whose row it's run
+// on, the only one, or one picked
+export function dismiss(connections: Connections<Connection>, row?: Row) {
+  return forget(
+    connections,
+    row,
+    closedServers(connections),
+    "kdb+/q: Dismiss Closed Connection",
+    "kdb+/q: No connection is closed.",
+  );
+}
+
+// Close and forget a connection: the one whose row it's run on, or of
+// those given, the only one, or one picked
+async function forget(
   connections: Connections<Connection>,
-  row?: Row,
+  row: Row | undefined,
+  given: servers.Definition[],
+  title: string,
+  none: string,
 ) {
   if (row) {
     connections.disconnect(servers.id(row.path));
     return;
   }
-  const connected = connections.servers;
-  if (connected.length === 0) {
-    vscode.window.showInformationMessage("kdb+/q: No server is connected.");
+  if (given.length === 0) {
+    vscode.window.showInformationMessage(none);
     return;
   }
   const server =
-    connected.length === 1
-      ? connected[0]
+    given.length === 1
+      ? given[0]
       : (
           await vscode.window.showQuickPick(
-            connected.map((server) => ({
+            given.map((server) => ({
               label: servers.shown(server.path),
               server,
             })),
-            {
-              title: "kdb+/q: Disconnect from Server",
-              placeHolder: "Server",
-            },
+            { title, placeHolder: "Server" },
           )
         )?.server;
   if (server) {

@@ -55,9 +55,11 @@ export function activate(context: vscode.ExtensionContext) {
       "kdb-q-ext-vscode.disconnect",
       (row?: Entry) => commands.disconnect(connections, row),
     ),
-    vscode.commands.registerCommand(
-      "kdb-q-ext-vscode.showServerMenu",
-      commands.showServerMenu,
+    vscode.commands.registerCommand("kdb-q-ext-vscode.dismiss", (row?: Entry) =>
+      commands.dismiss(connections, row),
+    ),
+    vscode.commands.registerCommand("kdb-q-ext-vscode.showServerMenu", () =>
+      commands.showServerMenu(connections),
     ),
     vscode.commands.registerCommand("kdb-q-ext-vscode.openSettings", () =>
       vscode.commands.executeCommand(

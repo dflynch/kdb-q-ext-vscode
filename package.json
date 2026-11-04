@@ -182,6 +182,11 @@
         "icon": "$(debug-disconnect)"
       },
       {
+        "command": "kdb-q-ext-vscode.dismiss",
+        "category": "kdb+/q",
+        "title": "Dismiss Closed Connection"
+      },
+      {
         "command": "kdb-q-ext-vscode.showServerMenu",
         "category": "kdb+/q",
         "title": "Show Server Menu"
@@ -367,7 +372,12 @@
         },
         {
           "command": "kdb-q-ext-vscode.disconnect",
-          "when": "view == kdb-q-ext-vscode.servers && viewItem =~ /^(open|active|connecting|closed)$/",
+          "when": "view == kdb-q-ext-vscode.servers && viewItem =~ /^(open|active|connecting)$/",
+          "group": "1_connection@2"
+        },
+        {
+          "command": "kdb-q-ext-vscode.dismiss",
+          "when": "view == kdb-q-ext-vscode.servers && viewItem == closed",
           "group": "1_connection@2"
         },
         {

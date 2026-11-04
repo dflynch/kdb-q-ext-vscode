@@ -27,7 +27,8 @@ type Entry<L> = {
 
 // The connections open, by their server's id, and the one that's active,
 // which queries go to. A connection that closes, however it does, stays
-// until it's disconnected, with the reason, so that it can be told.
+// until it's dismissed or connected again, with the reason, so that it
+// can be told.
 export class Connections<L extends Link> {
   private entries = new Map<string, Entry<L>>();
   private current?: string;
