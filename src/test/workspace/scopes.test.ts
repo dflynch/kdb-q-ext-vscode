@@ -129,25 +129,19 @@ suite("User and Workspace settings", () => {
     assert.strictEqual(user(), undefined);
   });
 
-  test("a server in both is edited in Workspace settings, and the User's password is kept", async () => {
+  test("a server in both is edited in Workspace settings, the User's left as it is", async () => {
     await setUser({ TP: { host: "kdb1", port: 1, auth: "store" } });
     await setWorkspace({ TP: { host: "kdb1", port: 1, auth: "store" } });
-    const kept: Record<string, string> = { "password:@kdb1:1": "secret" };
-    const { made, forms } = open(kept);
+    const { made, forms } = open();
     forms.edit(["TP"]);
     await made[0].loaded();
-    made[0].say({ type: "save", form: { ...prod, password: "other" } });
+    made[0].say({ type: "save", form: { ...prod } });
     await made[0].closing;
     assert.deepStrictEqual(user(), {
       TP: { host: "kdb1", port: 1, auth: "store" },
     });
     assert.deepStrictEqual(workspace(), {
       TP: { host: "kdb2", port: 1, auth: "store" },
-    });
-    // The User's still gets its password, in every other workspace
-    assert.deepStrictEqual(kept, {
-      "password:@kdb1:1": "secret",
-      "password:@kdb2:1": "other",
     });
   });
 

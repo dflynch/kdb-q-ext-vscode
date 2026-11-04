@@ -129,16 +129,15 @@ export async function write(
   );
 }
 
-// Write each scope in the order given, the user's first. One that can't be
-// written, as when its file has unsaved changes, has those written before
-// it put back as they were, so that nothing's half done, and is refused
-// with: "TP wasn't moved, as Workspace settings couldn't be written". A
-// form's save has no name: "not saved, as Workspace settings couldn't be
-// written". Should putting back
-// fail too, it says what was done: "TP was moved in User settings but not
-// in Workspace settings". A scope's put back whole, as it was just before
-// it was written: a write to it in that moment, from another form or by
-// hand, is lost with it.
+// Write each scope in the order given, the user's first. If one can't be
+// written, as when its file has unsaved changes, those written before it
+// are put back as they were, so that nothing's half done: "TP wasn't
+// moved, as Workspace settings couldn't be written", or for a form's save,
+// which has no name, "not saved, as …". Should putting back fail too, it
+// says what was done: "TP was moved in User settings but not in Workspace
+// settings". A scope's put back whole, as it was just before it was
+// written, so a write to it in that moment, from another form or by hand,
+// is lost with it.
 export async function writeEach(
   order: Scope[],
   said: { name?: string; verb: string; prep: "in" | "from" },

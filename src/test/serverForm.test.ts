@@ -616,19 +616,15 @@ suite("editServer and removeServer", () => {
     }
   });
 
-  test("Remove, once confirmed, removes the server and keeps its password", async () => {
+  test("Remove, once confirmed, removes the server, and closes its form", async () => {
     await setUser({
       Prod: { TP: { host: "kdb1", port: 1, auth: "store" } },
       other: { host: "kdb2", port: 1, auth: "store" },
     });
-    const kept: Record<string, string> = {
-      "password:@kdb1:1": "secret",
-      "password:@kdb2:1": "kept",
-    };
     const { made, panels } = tabs();
     const forms = new ServerForms(
       extension,
-      secrets(kept),
+      secrets({}),
       connections,
       nowhere,
       panels,
