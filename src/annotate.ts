@@ -57,9 +57,6 @@ export type Handle = {
   module?: string;
   via?: string;
 };
-// Brackets deeper than this stay tokens, so the walk's recursion is bounded
-const deepest = 256;
-
 export type Use = { token: Token; module: string };
 
 export type Export = {
@@ -109,6 +106,9 @@ type Item = Token | Group;
 
 const isGroup = (item: Item | undefined): item is Group =>
   item !== undefined && "items" in item;
+
+// Brackets deeper than this stay tokens, so the walk's recursion is bounded
+const deepest = 256;
 
 // A statement's tokens as nested brackets, without comments. A close that
 // matches no open stays a token
@@ -354,8 +354,8 @@ export function annotate(
     walk(body, inner);
   };
 
-  // Arguments of @[...] and .[...]: the first is a handle, or a namespace
-  // with the second; an amend, with three or more, defines it
+  // Arguments of @[...] and .[...]: the first is a handle, or the root with
+  // the second, as @[`.;`t;...]; an amend, with three or more, defines it
   const applied = (group: Group, context: Context) => {
     const args = segments(group.items);
     const amends = args.length >= 3;
@@ -595,8 +595,9 @@ export function annotate(
     const context: Context = { namespace, column: false };
     walk(items, context);
     // system "d .foo"
-    const [command, s] = segments(items)[0];
-    if (isName(command, "system") && segments(items)[0].length === 2) {
+    const call = segments(items)[0];
+    const [command, s] = call;
+    if (isName(command, "system") && call.length === 2) {
       if (!isGroup(s) && s.kind === "string") {
         const m = /^"d\s+(\S+)"$/.exec(text.slice(s.start, s.end));
         if (m) setNamespace(m[1]);

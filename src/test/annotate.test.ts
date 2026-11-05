@@ -12,7 +12,12 @@ const md5 = (data: Buffer) => createHash("md5").update(data).digest("hex");
 const sorted = (xs: Iterable<string>) => [...new Set(xs)].sort();
 
 suite("annotate against q's value", () => {
-  const modules = ["foo/init.q", "foo/sub.q", "dyn.q"];
+  // Each module, its file under modules/ and the namespace q loads it into
+  const modules: [string, string, string][] = [
+    ["foo", "foo/init.q", ".m.foo"],
+    ["foo.sub", "foo/sub.q", ".m.foo.0sub"],
+    ["dyn", "dyn.q", ".m.dyn"],
+  ];
   const fixture: {
     scoping: string;
     script: string;
@@ -30,7 +35,7 @@ suite("annotate against q's value", () => {
     assert.strictEqual(fixture.script, md5(read("scope.q")));
     assert.strictEqual(
       fixture.digests,
-      modules.map((m) => md5(read(`modules/${m}`))).join(""),
+      modules.map(([, file]) => md5(read(`modules/${file}`))).join(""),
     );
   });
 
@@ -60,12 +65,7 @@ suite("annotate against q's value", () => {
     });
   }
 
-  const files: [string, string, string][] = [
-    ["foo", "foo/init.q", ".m.foo"],
-    ["foo.sub", "foo/sub.q", ".m.foo.0sub"],
-    ["dyn", "dyn.q", ".m.dyn"],
-  ];
-  for (const [module, file, space] of files) {
+  for (const [module, file, space] of modules) {
     test(`module ${module}`, () => {
       const a = annotate(read(`modules/${file}`).toString(), {
         namespace: space,
