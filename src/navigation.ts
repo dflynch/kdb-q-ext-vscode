@@ -10,7 +10,8 @@ export type Outlined = {
   kind: "namespace" | "function" | "variable" | "module";
   // A function's parameters, as [x;y], or a module's use`foo
   detail?: string;
-  // From the name to the end of its value; a namespace spans its globals
+  // From the name, or a handle's backtick, to the end of its value; a
+  // namespace spans its run of globals
   start: number;
   end: number;
   nameStart: number;
