@@ -89,7 +89,9 @@ suite("User and Workspace settings", () => {
     return { made, forms };
   }
 
-  test("a server in Workspace settings alone is edited, moved and removed there", async () => {
+  test("a server in Workspace settings alone is edited, moved and removed there", async function () {
+    // The first form's webview starts cold, near 2 s on CI's macOS
+    this.timeout(10000);
     await setWorkspace({
       TP: { host: "kdb1", port: 1, auth: "store" },
       Ops: {},

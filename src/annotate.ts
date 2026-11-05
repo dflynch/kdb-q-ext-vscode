@@ -153,8 +153,15 @@ function segments(items: Item[]): Item[][] {
   return out;
 }
 
+// A name with a dot at its end, as err. in err.:(::), is the global without
+// it: q assigns err a dictionary
+const bare = (name: string) =>
+  name.length > 1 && name.endsWith(".") ? name.slice(0, -1) : name;
+
 const join = (namespace: string, name: string) =>
-  name.startsWith(".") || !namespace ? name : `${namespace}.${name}`;
+  name.startsWith(".") || !namespace
+    ? bare(name)
+    : `${namespace}.${bare(name)}`;
 
 type Assign = ":" | "::" | "amend";
 
@@ -233,7 +240,7 @@ export function annotate(
     out.handles.push({
       start: element.start,
       end: element.end,
-      full,
+      full: bare(full),
       ...(defines ? { defines: true as const } : {}),
       ...(context.lambda ? { lambda: context.lambda } : {}),
     });

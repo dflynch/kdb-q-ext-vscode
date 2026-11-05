@@ -3,6 +3,7 @@ import * as commands from "./commands";
 import { Connections } from "./connections";
 import { exporting, saveCsv } from "./exporting";
 import type { Scope } from "./form/fields";
+import { registerLanguage } from "./language";
 import { ResultView, registerResultView } from "./resultView";
 import { openServers, ServerForms } from "./serverForm";
 import type { Entry } from "./servers";
@@ -31,6 +32,7 @@ export function activate(context: vscode.ExtensionContext) {
     new ServersView(connections, forms),
     connections,
     registerResultView(results),
+    registerLanguage(),
     vscode.commands.registerCommand("kdb-q-ext-vscode.keepResult", () =>
       results.keep(),
     ),
