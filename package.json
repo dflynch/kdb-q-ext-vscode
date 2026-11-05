@@ -16,7 +16,9 @@
   "categories": [
     "Programming Languages"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onLanguage:q"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "languages": [
