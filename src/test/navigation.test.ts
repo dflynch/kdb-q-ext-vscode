@@ -79,6 +79,28 @@ suite("outline", () => {
       ["function f [x]: f:{a:1; .x.y:2; b::3}"],
     ],
     ["a lambda left open", "f:{x", ["variable f: f:{x"]],
+    [
+      "a lambda assigned to several",
+      "f:g:{x}",
+      ["function f [x]: f:g:{x}", "function g [x]: g:{x}"],
+    ],
+    [
+      "a dictionary amended by its name and a dot",
+      "\\d .pm\nerr.:(::)\nerr[`f]:1",
+      ["namespace .pm", "  variable err: err.:(::) @err."],
+    ],
+    [
+      "a namespace in runs, around others",
+      ".u.a:1\nb:2\n.u.c:3\n.u.d:4",
+      [
+        "namespace .u",
+        "  variable a: .u.a:1 @.u.a",
+        "variable b: b:2",
+        "namespace .u",
+        "  variable c: .u.c:3 @.u.c",
+        "  variable d: .u.d:4 @.u.d",
+      ],
+    ],
   ];
   for (const [name, text, expected] of cases) {
     test(name, () => {
@@ -87,7 +109,7 @@ suite("outline", () => {
   }
 
   test("a namespace spans its globals", () => {
-    const text = ".a.b:1\nc:2\n.a.d:{x}";
+    const text = ".a.b:1\n.a.d:{x}";
     const [space] = outline(text, annotate(text));
     assert.strictEqual(text.slice(space.start, space.end), text);
   });
@@ -98,8 +120,13 @@ suite("outline", () => {
       const text = corpus.slice(0, i);
       const items = outline(text, annotate(text));
       for (const o of items.flatMap((o) => [o, ...(o.children ?? [])])) {
+        assert.ok(o.name, "VS Code refuses an empty name");
         assert.ok(o.start <= o.nameStart && o.nameEnd <= o.end);
       }
+      // Siblings don't overlap, so the cursor is in one at most
+      items.forEach((o, n) => {
+        assert.ok(n === 0 || items[n - 1].end <= o.start);
+      });
     }
   });
 });
@@ -147,6 +174,11 @@ suite("occurrences", () => {
       "an export, by any binding",
       "m:use`foo\nk:use`foo\nm.|f 1\nk`f",
       ["m.f read", "f read"],
+    ],
+    [
+      "a dictionary by its name with a dot",
+      "\\d .pm\n|err.:(::)\nerr[`f]:1\n.pm.err",
+      ["err. write", "err write", ".pm.err read"],
     ],
     ["a keyword", "|count x\ncount y", ["count read", "count read"]],
     ["nothing in a string", 'a:"|a"', []],

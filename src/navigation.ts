@@ -68,8 +68,10 @@ function valueEnd({ tokens, index }: Placed): number {
 }
 
 // What the file defines at top level: each global once, where it's first
-// assigned, under its namespace. A function is a global assigned a lambda;
-// a module, one assigned use`mod
+// assigned, under its namespace. A function is a global assigned a lambda,
+// as in f:{x} or f:g:{x}; a module, one assigned use`mod. Globals of a
+// namespace written apart, with others between, are in a node for each run,
+// as a node's range must hold only its own
 export function outline(text: string, a: Annotated): Outlined[] {
   const at = placed(text);
   const lambdas = new Map<number, Lambda>(
@@ -79,7 +81,6 @@ export function outline(text: string, a: Annotated): Outlined[] {
     t ? text.slice(t.start, t.end) : undefined;
   const seen = new Set<string>();
   const top: Outlined[] = [];
-  const spaces = new Map<string, Outlined>();
 
   const add = (full: string, start: number, end: number) => {
     if (seen.has(full)) return;
@@ -95,14 +96,20 @@ export function outline(text: string, a: Annotated): Outlined[] {
       nameStart: start,
       nameEnd: end,
     };
-    const [, op, value, after] = p.tokens.slice(p.index);
-    const isAssign = word(op) === ":" || word(op) === "::";
+    // Past any names assigned along with it, as g in f:g:{x}
+    let i = p.index;
+    const isAssign = (t: Token | undefined) =>
+      word(t) === ":" || word(t) === "::";
+    while (p.tokens[i + 2]?.kind === "name" && isAssign(p.tokens[i + 3])) {
+      i += 2;
+    }
+    const [, op, value, after] = p.tokens.slice(i);
     const l = value && lambdas.get(value.start);
-    if (isAssign && l?.close && l.close.end === item.end) {
+    if (isAssign(op) && l?.close && l.close.end === item.end) {
       item.kind = "function";
       item.detail = `[${l.params.join(";")}]`;
     } else if (
-      isAssign &&
+      isAssign(op) &&
       word(value) === "use" &&
       after?.kind === "symbol" &&
       after.end === item.end
@@ -117,8 +124,8 @@ export function outline(text: string, a: Annotated): Outlined[] {
     }
     const space = full.slice(0, dot);
     item.name = full.slice(dot + 1);
-    let node = spaces.get(space);
-    if (!node) {
+    let node = top[top.length - 1];
+    if (node?.kind !== "namespace" || node.name !== space) {
       node = {
         name: space,
         kind: "namespace",
@@ -128,7 +135,6 @@ export function outline(text: string, a: Annotated): Outlined[] {
         nameEnd: item.nameEnd,
         children: [],
       };
-      spaces.set(space, node);
       top.push(node);
     }
     node.children?.push(item);

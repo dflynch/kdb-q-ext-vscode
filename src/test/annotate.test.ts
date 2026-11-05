@@ -120,6 +120,11 @@ const handles = (text: string) =>
 suite("annotate names", () => {
   const cases: [string, string, string[]][] = [
     [
+      "a dictionary amended by its name and a dot",
+      "a.:1\nf:{b.:2}",
+      ["global a.=a :", "global f :", "global b.=b :"],
+    ],
+    [
       "parameters, locals and globals",
       "f:{[a] b:1; c::2; a+b+d}",
       [
@@ -295,6 +300,7 @@ suite("annotate names", () => {
 
 suite("annotate handles", () => {
   const cases: [string, string, string[]][] = [
+    ["a dictionary by its name with a dot", "`.u. set 3", [".u.=.u :"]],
     [
       "value and get",
       "value `a; get `.b.c; @[value;`d;0]",
