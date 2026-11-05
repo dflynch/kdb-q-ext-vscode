@@ -40,8 +40,9 @@ export type Name = {
   // A column's name as a variable, if the table has no such column: q reads
   // a column first, then a local or parameter, then a global
   variable?: { role: "param" | "local" | "global"; full: string };
-  // An export's module, as written in use
+  // An export's module, as written in use, and the global bound to it
   module?: string;
+  via?: string;
 };
 
 // A global passed by reference: a symbol, or part of a symbol list, naming it
@@ -54,7 +55,10 @@ export type Handle = {
   defines?: true;
   lambda?: Lambda;
   module?: string;
+  via?: string;
 };
+// Brackets deeper than this stay tokens, so the walk's recursion is bounded
+const deepest = 256;
 
 export type Use = { token: Token; module: string };
 
@@ -112,11 +116,15 @@ function tree(text: string, tokens: Token[]): Item[] {
   const pairs: Record<string, string> = { "(": ")", "[": "]", "{": "}" };
   const top: Item[] = [];
   const stack: { group: Group; close: string }[] = [];
+  // Opens past the deepest, whose closes stay tokens too
+  let over = 0;
   const add = (item: Item) =>
     (stack.length ? stack[stack.length - 1].group.items : top).push(item);
   for (const token of tokens) {
     if (token.kind === "comment") continue;
-    if (token.kind === "open") {
+    if (token.kind === "open" && stack.length >= deepest) over++;
+    else if (token.kind === "close" && over > 0) over--;
+    else if (token.kind === "open") {
       const group: Group = { open: token, items: [] };
       add(group);
       stack.push({ group, close: pairs[text[token.start]] });
@@ -187,6 +195,9 @@ export function annotate(
     !isGroup(item) &&
     item.kind === "name" &&
     (words.length === 0 || words.includes(word(item)));
+  // The name token, if the item is one (isName can't narrow: words may differ)
+  const nameOf = (item: Item | undefined) =>
+    isName(item) ? (item as Token) : undefined;
   const isSymbol = (item: Item | undefined): item is Token =>
     item !== undefined && !isGroup(item) && item.kind === "symbol";
   const opens = (item: Item | undefined, c: string): item is Group =>
@@ -205,17 +216,10 @@ export function annotate(
     }
     return out;
   };
-  // A namespace as a symbol: ` . or ` .foo, as "" or ".foo"
-  const namespaceOf = (item: Item | undefined): string | undefined => {
-    if (!isSymbol(item)) return undefined;
-    const els = elements(item);
-    const t = els[0].text;
-    return els.length === 1 && t.startsWith(".")
-      ? t === "."
-        ? ""
-        : t
-      : undefined;
-  };
+  // The root namespace as a symbol, ` . Any other, as ` .foo, can as well be
+  // a dictionary or a function, so is a handle itself
+  const isRoot = (item: Item | undefined) =>
+    isSymbol(item) && word(item) === "`.";
 
   type Context = { namespace: string; lambda?: Lambda; column: boolean };
 
@@ -225,6 +229,7 @@ export function annotate(
     context: Context,
     defines?: boolean,
   ) => {
+    if (keywords.has(full)) return;
     out.handles.push({
       start: element.start,
       end: element.end,
@@ -251,9 +256,9 @@ export function annotate(
     if (els.length > 1 && els[0].text.startsWith(".")) {
       const path = els[0].text === "." ? els.slice(1) : els;
       const full = path.map((e) => e.text).join(".");
-      const at = { start: token.start + 1, end: token.end, text: full };
-      // A path is absolute
-      if (path.every((e) => e.text)) push(at, full, context, defines);
+      // A path is absolute; its range is the name at its end
+      const last = path[path.length - 1];
+      if (path.every((e) => e.text)) push(last, full, context, defines);
       return;
     }
     handle(els[0], context, defines);
@@ -261,19 +266,14 @@ export function annotate(
       if (e.text.length > 1 && e.text.startsWith(".")) handle(e, context);
     }
   };
-  // A name in a namespace given as a symbol: ` . `t, `.[`t], @[`.;`t;...]
-  const inNamespace = (
-    namespace: string,
-    token: Token,
-    context: Context,
-    defines?: boolean,
-  ) => {
+  // A name in the root given as a symbol: ` . `t, `.[`t], @[`.;`t;...]
+  const inRoot = (token: Token, context: Context, defines?: boolean) => {
     done.add(token);
     const els = elements(token);
     if (els.length !== 1 || !els[0].text || els[0].text.startsWith(":")) {
       return;
     }
-    push(els[0], join(namespace, els[0].text), context, defines);
+    push(els[0], els[0].text, context, defines);
   };
 
   // How the name at i is assigned: x:, x::, or amended, as x+: or x[i]:
@@ -312,8 +312,9 @@ export function annotate(
     const parts = [...segments(keys.items), ...segments(rest)];
     for (const segment of parts) {
       const [name, op] = segment;
-      if (isName(name) && word(op) === ":" && !isGroup(name)) {
-        enter(name, context, { key: kind, assign: ":" });
+      const key = nameOf(name);
+      if (key && word(op) === ":") {
+        enter(key, context, { key: kind, assign: ":" });
         walk(segment.slice(2), context);
       } else {
         walk(segment, context);
@@ -342,9 +343,10 @@ export function annotate(
     if (opens(body[0], "[")) {
       l.implicit = false;
       for (const item of body[0].items) {
-        if (isName(item) && !isGroup(item)) {
-          l.params.push(word(item));
-          enter(item, inner, { declares: true });
+        const name = nameOf(item);
+        if (name) {
+          l.params.push(word(name));
+          enter(name, inner, { declares: true });
         }
       }
       body = body.slice(1);
@@ -360,10 +362,9 @@ export function annotate(
     const first = single(args[0]);
     const second = single(args[1]);
     if (isSymbol(first)) {
-      const namespace = namespaceOf(first);
-      if (namespace !== undefined && isSymbol(second)) {
+      if (isRoot(first) && isSymbol(second)) {
         done.add(first);
-        inNamespace(namespace, second, context, amends);
+        inRoot(second, context, amends);
       } else {
         dereference(first, context, amends);
       }
@@ -376,18 +377,18 @@ export function annotate(
     items: Item[],
     i: number,
     context: Context,
-    head: boolean,
+    called: boolean,
+    inPlace: boolean,
   ) => {
     const token = items[i] as Token;
     if (done.has(token)) return;
     const prev = items[i - 1];
     const next = items[i + 1];
-    const namespace = namespaceOf(token);
-    if (namespace !== undefined) {
+    if (isRoot(token)) {
       // ` . `t, `.[`t]
       if (isSymbol(next)) {
         done.add(token);
-        inNamespace(namespace, next, context);
+        inRoot(next, context);
         return;
       }
       const inside = opens(next, "[")
@@ -395,14 +396,18 @@ export function annotate(
         : undefined;
       if (isSymbol(inside)) {
         done.add(token);
-        inNamespace(namespace, inside, context);
+        inRoot(inside, context);
         return;
       }
     }
-    if (isName(prev, "value", "get", "key", "from")) {
+    if (isName(prev, "value", "get", "key")) {
       dereference(token, context);
+    } else if (isName(prev, "from")) {
+      // update and delete from `t amend it in place
+      dereference(token, context, inPlace);
     } else if (isName(next, "set", "upsert", "insert")) {
-      dereference(token, context, true);
+      // Only an atom: on a list they assign nothing
+      if (elements(token).length === 1) dereference(token, context, true);
     } else if (
       (opens(next, "[") && next.open.start === token.end) ||
       (isName(next) && !keywords.has(word(next))) ||
@@ -411,12 +416,12 @@ export function annotate(
       // `t[0], `t 0, `t i: indexes the global
       if (elements(token).length === 1) dereference(token, context);
     } else if (
-      head &&
+      called &&
       i === 0 &&
       !isGroup(next) &&
       next?.kind === "separator"
     ) {
-      // (`f;x): a call by name
+      // h(`f;x), value(`f;x): a call by name
       dereference(token, context);
     }
     if (done.has(token)) return;
@@ -425,9 +430,27 @@ export function annotate(
     }
   };
 
-  const walk = (items: Item[], context: Context, parent?: string) => {
+  // (a;b) or (a;(b;c)), assigned all at once: its names, or undefined
+  const pattern = (group: Group): Token[] | undefined => {
+    const names: Token[] = [];
+    for (const s of segments(group.items)) {
+      const item = single(s);
+      const name = nameOf(item);
+      if (name) names.push(name);
+      else if (opens(item, "(")) {
+        const inner = pattern(item);
+        if (!inner) return undefined;
+        names.push(...inner);
+      } else return undefined;
+    }
+    return names.length > 0 ? names : undefined;
+  };
+
+  const walk = (items: Item[], context: Context, called = false) => {
     // Within a qSQL query: columns before from and after where
     let query = false;
+    // update and delete, which amend a table named by a symbol in place
+    let inPlace = false;
     let column = context.column;
     // Whether the query is itself in a clause, so all of it is
     let outer = column;
@@ -444,19 +467,24 @@ export function annotate(
           literal(item, here);
         } else if (
           c === "(" &&
-          word(next) === ":" &&
-          item.items.length > 0 &&
-          segments(item.items).every((s) => isName(single(s)))
+          (word(next) === ":" || word(next) === "::") &&
+          pattern(item)
         ) {
-          // (a;b):1 2
-          for (const s of segments(item.items)) {
-            enter(s[0] as Token, here, { assign: ":" });
-          }
+          // (a;b):1 2, (a;(b;c)):(1;2 3), (a;b)::1 2
+          const assign = word(next) as Assign;
+          for (const t of pattern(item) ?? []) enter(t, here, { assign });
         } else {
           if (c === "[" && (word(prev) === "@" || word(prev) === ".")) {
             applied(item, here);
           }
-          walk(item.items, here, c);
+          // A list applied: to a handle, as h(`f;x) or neg[h](`f;x), or to
+          // value or eval
+          const call =
+            c === "(" &&
+            (isName(prev, "value", "eval", "reval") ||
+              (isName(prev) && !keywords.has(word(prev))) ||
+              (opens(prev, "[") && prev.close?.end === item.open.start));
+          walk(item.items, here, call);
           // (use`mod)`f and (use`mod)[`f]
           const [u, s] = item.items;
           if (c === "(" && item.items.length === 2 && isName(u, "use")) {
@@ -485,7 +513,7 @@ export function annotate(
         continue;
       }
       if (item.kind === "symbol") {
-        symbol(items, i, here, parent === "(");
+        symbol(items, i, here, called, query && inPlace);
         continue;
       }
       if (item.kind !== "name") continue;
@@ -493,7 +521,20 @@ export function annotate(
       if (queries.has(w)) {
         outer = column;
         query = true;
+        inPlace = w === "update" || w === "delete";
         column = true;
+      }
+      // value[`a], set[`a;1], insert[`t;x]
+      if (
+        ["value", "get", "key", "set", "upsert", "insert"].includes(w) &&
+        opens(next, "[") &&
+        next.open.start === item.end
+      ) {
+        const s = single(segments(next.items)[0]);
+        const sets = ["set", "upsert", "insert"].includes(w);
+        if (isSymbol(s) && (!sets || elements(s).length === 1)) {
+          dereference(s, here, sets);
+        }
       }
       const entry = enter(item, here, query ? { query: true } : {});
       const assign = assignment(items, i);
@@ -511,8 +552,9 @@ export function annotate(
           out.uses.push({ token: next, module });
           const target = items[i - 2];
           const after = items[i + 2];
+          // At top level, :: defines a view, not a binding
           if (
-            (word(prev) === ":" || word(prev) === "::") &&
+            (word(prev) === ":" || (word(prev) === "::" && here.lambda)) &&
             isName(target) &&
             (after === undefined ||
               (!isGroup(after) && after.kind === "separator"))
@@ -553,8 +595,8 @@ export function annotate(
     const context: Context = { namespace, column: false };
     walk(items, context);
     // system "d .foo"
-    if (isName(items[0], "system") && items.length === 2) {
-      const s = items[1];
+    const [command, s] = segments(items)[0];
+    if (isName(command, "system") && segments(items)[0].length === 2) {
       if (!isGroup(s) && s.kind === "string") {
         const m = /^"d\s+(\S+)"$/.exec(text.slice(s.start, s.end));
         if (m) setNamespace(m[1]);
@@ -575,7 +617,7 @@ export function annotate(
     }
     const target = (value: Item[]): Export["target"] => {
       const v = single(value);
-      if (isName(v) && !isGroup(v)) return { full: join(namespace, word(v)) };
+      if (nameOf(v)) return { full: join(namespace, word(v)) };
       const l = isGroup(v) ? lambdaAt.get(v.open) : undefined;
       return l ? { lambda: l } : undefined;
     };
@@ -588,12 +630,13 @@ export function annotate(
       }
       for (const s of segments(value.items[0].items)) {
         const [k, op] = s;
-        if (!isName(k) || isGroup(k) || word(op) !== ":") continue;
+        const name = nameOf(k);
+        if (!name || word(op) !== ":") continue;
         const t = target(s.slice(2));
         keys.push({
-          key: word(k),
-          start: k.start,
-          end: k.end,
+          key: word(name),
+          start: name.start,
+          end: name.end,
           ...(t ? { target: t } : {}),
         });
       }
@@ -632,14 +675,17 @@ export function annotate(
     if (e.text.includes(".") || keywords.has(e.text)) continue;
     l.locals.add(e.text);
   }
+  // Implicit parameters: x, y and z up to the highest used, but not as a
+  // column or a key, which q compiles to symbols
+  const highest = new Map<Lambda, number>();
+  for (const e of entries) {
+    if (!e.lambda || e.column || e.key) continue;
+    const n = ["x", "y", "z"].indexOf(e.text) + 1;
+    if (n > (highest.get(e.lambda) ?? 0)) highest.set(e.lambda, n);
+  }
   for (const l of out.lambdas) {
     if (l.implicit) {
-      let n = 0;
-      for (const e of entries) {
-        if (e.lambda === l)
-          n = Math.max(n, ["x", "y", "z"].indexOf(e.text) + 1);
-      }
-      l.params = ["x", "y", "z"].slice(0, Math.max(n, 1));
+      l.params = ["x", "y", "z"].slice(0, Math.max(highest.get(l) ?? 0, 1));
     }
     for (const p of l.params) l.locals.delete(p);
   }
@@ -651,14 +697,42 @@ export function annotate(
     if (l.locals.has(name)) return "local" as const;
     return undefined;
   };
-  // A binding's identity: a local in its lambda, or a global's full name
-  const identity = (e: Entry, name: string) =>
-    scoped(e, name)
-      ? `${out.lambdas.indexOf(e.lambda as Lambda)} ${name}`
-      : join(e.namespace, name);
-  const modules = new Map<string, string>();
-  for (const b of bindings)
-    modules.set(identity(b.entry, b.entry.text), b.module);
+  // Modules bound to globals, by full name, and to locals, by lambda
+  const globalModules = new Map<string, string>();
+  const localModules = new Map<Lambda, Map<string, string>>();
+  for (const { entry, module } of bindings) {
+    if (scoped(entry, entry.text) && entry.lambda) {
+      const m = localModules.get(entry.lambda) ?? new Map<string, string>();
+      m.set(entry.text, module);
+      localModules.set(entry.lambda, m);
+    } else {
+      globalModules.set(join(entry.namespace, entry.text), module);
+    }
+  }
+  // The module bound to the name, local or global, and the global's name
+  const boundTo = (e: Entry) => {
+    if (scoped(e, e.text)) {
+      const module = e.lambda && localModules.get(e.lambda)?.get(e.text);
+      return module ? { module } : undefined;
+    }
+    const via = join(e.namespace, e.text);
+    const module = globalModules.get(via);
+    return module ? { module, via } : undefined;
+  };
+  // A dotted name's export: m.f, where m, a global, is bound. q never reads
+  // a dotted name through a local
+  const exportOf = (e: Entry) => {
+    const full = join(e.namespace, e.text);
+    for (let dot = full.lastIndexOf("."); dot > 0; ) {
+      const module = globalModules.get(full.slice(0, dot));
+      if (module) {
+        const via = full.slice(0, dot);
+        return { module, via, key: full.slice(dot + 1).split(".")[0] };
+      }
+      dot = full.lastIndexOf(".", dot - 1);
+    }
+    return undefined;
+  };
 
   for (const e of entries) {
     const w = e.text;
@@ -668,9 +742,7 @@ export function annotate(
     };
     const defines = e.assign || e.declares ? { defines: true as const } : {};
     const local = scoped(e, w);
-    const dot = w.indexOf(".");
-    const module =
-      dot > 0 ? modules.get(identity(e, w.slice(0, dot))) : undefined;
+    const exported = w.includes(".") ? exportOf(e) : undefined;
     let name: Name;
     if (e.declares) {
       name = { ...base, role: "param", full: w, ...defines };
@@ -688,12 +760,13 @@ export function annotate(
           : { role: "global", full: join(e.namespace, w) },
         ...defines,
       };
-    } else if (module !== undefined) {
+    } else if (exported) {
       name = {
         ...base,
         role: "export",
-        full: w.slice(dot + 1).split(".")[0],
-        module,
+        full: exported.key,
+        module: exported.module,
+        via: exported.via,
       };
     } else if (local) {
       name = { ...base, role: local, full: w, ...defines };
@@ -709,13 +782,13 @@ export function annotate(
   }
 
   for (const { entry, element } of reached) {
-    const module = modules.get(identity(entry, entry.text));
-    if (module === undefined) continue;
+    const bound = boundTo(entry);
+    if (!bound) continue;
     out.handles.push({
       start: element.start,
       end: element.end,
       full: element.text,
-      module,
+      ...bound,
       ...(entry.lambda ? { lambda: entry.lambda } : {}),
     });
   }

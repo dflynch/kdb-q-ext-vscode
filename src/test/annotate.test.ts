@@ -221,7 +221,7 @@ suite("annotate names", () => {
     ],
     ["multiple assignment", "{(a;b):1 2}", ["local a :", "local b :"]],
     [
-      "a module's exports",
+      "a module's exports, never through a local",
       "m:use`foo\nm.f 1\n{n:use`bar; n.g}",
       [
         "global m :",
@@ -229,7 +229,7 @@ suite("annotate names", () => {
         "export m.f=f from foo",
         "local n :",
         "builtin use",
-        "export n.g=g from bar",
+        "global n.g",
       ],
     ],
   ];
@@ -246,6 +246,46 @@ suite("annotate names", () => {
     ]);
   });
 
+  test("a module bound to a dotted global", () => {
+    assert.deepStrictEqual(names(".a.m:use`foo\n.a.m.f 1"), [
+      "global .a.m :",
+      "builtin use",
+      "export .a.m.f=f from foo",
+    ]);
+    const [, , f] = annotate(".a.m:use`foo\n.a.m.f 1").names;
+    assert.strictEqual(f.via, ".a.m");
+  });
+
+  test("a view isn't a binding", () => {
+    assert.deepStrictEqual(names("p::use`foo\np.f 1"), [
+      "global p :",
+      "builtin use",
+      "global p.f",
+    ]);
+  });
+
+  test("system d with a semicolon", () => {
+    assert.deepStrictEqual(names('system "d .foo";\nf:1'), [
+      "builtin system",
+      "global f=.foo.f :",
+    ]);
+  });
+
+  test("deep brackets", () => {
+    const text = `f:${"(".repeat(5000)}a`;
+    assert.deepStrictEqual(names(text), ["global f :", "global a"]);
+  });
+
+  test("lambdas", () => {
+    const [outer, inner] = annotate("\\d .foo\nf:{[a] b:1; {c:2}}").lambdas;
+    assert.deepStrictEqual(outer.params, ["a"]);
+    assert.deepStrictEqual([...outer.locals], ["b"]);
+    assert.strictEqual(outer.namespace, ".foo");
+    assert.strictEqual(inner.outer, outer);
+    assert.deepStrictEqual(inner.params, ["x"]);
+    assert.deepStrictEqual([...inner.locals], ["c"]);
+  });
+
   test("a lambda left open", () => {
     const [l] = annotate("f:{[a] b:1").lambdas;
     assert.strictEqual(l.close, undefined);
@@ -260,11 +300,12 @@ suite("annotate handles", () => {
       "value `a; get `.b.c; @[value;`d;0]",
       ["a=a", ".b.c=.b.c", "d=d"],
     ],
-    ["a path", "value `.`t; get `.foo`t", [".`t=t", ".foo`t=.foo.t"]],
+    ["a path", "value `.`t; get `.foo`t", ["t=t", "t=.foo.t"]],
+    ["the root and a name", "`. `t; `.[`u]; @[`.;`v]", ["t=t", "u=u", "v=v"]],
     [
-      "a namespace and a name",
-      "`. `t; `.[`u]; @[`.foo;`v]",
-      ["t=t", "u=u", "v=.foo.v"],
+      "any other namespace is a handle itself",
+      "@[`.d;`k;:;3]; `.u.sub[`trade;`]",
+      [".d=.d :", ".u.sub=.u.sub"],
     ],
     [
       "amend",
@@ -277,8 +318,23 @@ suite("annotate handles", () => {
       "`a set 1; `t upsert x; `u insert y",
       ["a=a :", "t=t :", "u=u :"],
     ],
-    ["from", "delete from `t where a", ["t=t"]],
-    ["a call by name", "(`f;1)", ["f=f"]],
+    [
+      "from, in place for update and delete",
+      "select from `t; update a:1 from `u; delete from `v",
+      ["t=t", "u=u :", "v=v :"],
+    ],
+    [
+      "bracket forms",
+      "value[`a]; set[`b;1]; insert[`c;x]; upsert[`d]",
+      ["a=a", "b=b :", "c=c :", "d=d :"],
+    ],
+    ["set on a list assigns nothing", "`a`b set (1;2); `.`t set 9", []],
+    [
+      "a call by name",
+      "h(`f;1); h (`g;2); value(`k;3); neg[h](`m;4)",
+      ["f=f", "g=g", "k=k", "m=m"],
+    ],
+    ["a list, not a call", "d:(`IBM;100); (`a;`b); value(`sum;1)", []],
     [
       "a leading dot anywhere",
       ".pm.grant[`.servers.disc;`user]",
@@ -289,14 +345,14 @@ suite("annotate handles", () => {
       '.lg.o[`init;"done"]; `a`b!1 2; `sym xasc t',
       [],
     ],
-    ["file handles", "value `:data; `:a`.b set 1", [".b=.b :"]],
+    ["file handles", "value `:data; `:a`.b set 1", [".b=.b"]],
     ["at top level, the file's namespace", "\\d .foo\nvalue `a", ["a=.foo.a"]],
     ["in a lambda, the root", "\\d .foo\n{value `a}", ["a=a"]],
-    ["a path is absolute", "\\d .foo\nvalue `.`t", [".`t=t"]],
+    ["a path is absolute", "\\d .foo\nvalue `.`t", ["t=t"]],
     [
       "a module's exports",
-      "m:use`foo\nm`f; m[`g]; (use`bar)`h",
-      ["f=f from foo", "g=g from foo", "h=h from bar"],
+      "m:use`foo\nm`f; m[`g]; (use`bar)`h; {n:use`baz; n`k}",
+      ["f=f from foo", "g=g from foo", "h=h from bar", "k=k from baz"],
     ],
   ];
   for (const [name, text, expected] of cases) {

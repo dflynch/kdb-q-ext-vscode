@@ -10,6 +10,12 @@
 {[] 1}
 {{y}}
 {x+{z}}
+/ Not from names q compiles to symbols: columns and keys
+{select from t where a=y}
+{select y from t}
+{([y:1])}
+{([] z:1)}
+{update z:1 from t}
 / Locals: only a plain name: makes one, anywhere in the body
 {[a] b:1; c::2; a+b+d}
 {a :1; a}
@@ -17,6 +23,8 @@
 {$[a;b:1;c::2]}
 {f[a:1]; a}
 {(a;b):1 2}
+{(a;(b;c)):(1;2 3)}
+{(a;b)::1 2}
 {`a`b!(c:1;2); c}
 {x:1; y}
 {x::1}
@@ -25,6 +33,8 @@
 {a[0]:1; b+:1; c,::2; e.f:3}
 {.x.y+e.f+g}
 {x.a}
+/ A dotted name is never read through a local
+{m:use`foo; m.f 1}
 / No closures: a nested lambda reads globals, not the outer's locals
 {a:1; {a}; a}
 {a:1; {b:2; a+b}}
