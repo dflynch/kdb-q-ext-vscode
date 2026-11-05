@@ -10,7 +10,8 @@
     "includes": [
       "**",
       "!test/fixtures/corpus.ipc.json",
-      "!test/fixtures/lexing.json"
+      "!test/fixtures/lexing.json",
+      "!test/fixtures/scoping.json"
     ]
   },
   "formatter": {
