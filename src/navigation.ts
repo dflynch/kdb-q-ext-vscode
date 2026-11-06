@@ -1,6 +1,7 @@
 // Navigation within one file, from its annotations: the outline of what it
-// defines, and the occurrences of the name at the cursor. Pure and total, as
-// the scanner and the annotation pass are: no VS Code imports, never throws.
+// defines, and the definition and occurrences of the name at the cursor.
+// Pure and total, as the scanner and the annotation pass are: no VS Code
+// imports, never throws.
 
 import type { Annotated, Lambda, Name } from "./annotate";
 import { scan, type Token } from "./scanner";
@@ -145,12 +146,14 @@ export function outline(text: string, a: Annotated): Outlined[] {
   // Names and handles, in the order they're written
   const defined: { full: string; start: number; end: number }[] = [];
   for (const n of a.names) {
-    if (n.role === "global" && n.defines && !n.lambda) {
+    if (n.role === "global" && n.defines && !n.amends && !n.lambda) {
       defined.push({ full: n.full, start: n.token.start, end: n.token.end });
     }
   }
   for (const h of a.handles) {
-    if (h.defines && !h.lambda && h.module === undefined) defined.push(h);
+    if (h.defines && !h.amends && !h.lambda && h.module === undefined) {
+      defined.push(h);
+    }
   }
   defined.sort((x, y) => x.start - y.start);
   for (const d of defined) add(d.full, d.start, d.end);
@@ -167,6 +170,10 @@ type Target = {
   // A column's variable, if the table has no such column
   maybe?: string;
   defines: boolean;
+  // Can create it, as an amend of an existing value can't
+  creates: boolean;
+  // In a lambda, rather than run as the file loads
+  inLambda: boolean;
 };
 
 function targets(a: Annotated): Target[] {
@@ -195,6 +202,8 @@ function targets(a: Annotated): Target[] {
       ? { maybe: scoped(n.variable.role, n.variable.full, n.lambda) }
       : {}),
     defines: n.defines === true,
+    creates: n.defines === true && !n.amends,
+    inLambda: n.lambda !== undefined,
   }));
   for (const h of a.handles) {
     out.push({
@@ -205,19 +214,60 @@ function targets(a: Annotated): Target[] {
           ? `global ${h.full}`
           : `export ${h.module} ${h.full}`,
       defines: h.defines === true,
+      creates: h.defines === true && !h.amends,
+      inLambda: h.lambda !== undefined,
     });
   }
-  return out;
+  return out.sort((x, y) => x.start - y.start);
 }
 
-// Where the name at the offset occurs in the file, meaning the same thing.
-// The offset may be just after the name, as the cursor is when typing
+// The name the offset is in, else one it's just after, as the cursor is when
+// typing
+function at(all: Target[], offset: number): Target | undefined {
+  return (
+    all.find((t) => t.start <= offset && offset < t.end) ??
+    all.find((t) => t.end === offset)
+  );
+}
+
+// Where the name at the offset is defined in the file: a parameter where
+// it's declared, a local or global where it's first assigned, not where an
+// existing value is amended, as d[k]:1. For a global, an assignment at top
+// level comes before any in a lambda, as the outline has it, wherever the
+// lambda is. A column read is the variable it may be. Nothing for a keyword,
+// an export, an implicit parameter never assigned, or a name defined in
+// another file
+export function definition(
+  a: Annotated,
+  offset: number,
+): { start: number; end: number } | undefined {
+  const all = targets(a);
+  const here = at(all, offset);
+  if (!here) return undefined;
+  const first = (identity: string | undefined) => {
+    if (!identity?.startsWith("variable ") && !identity?.startsWith("global "))
+      return undefined;
+    const defs = all.filter((t) => t.identity === identity && t.creates);
+    return defs.find((t) => !t.inLambda) ?? defs[0];
+  };
+  const d = first(here.identity) ?? first(here.maybe);
+  return d && { start: d.start, end: d.end };
+}
+
+// The occurrences, for find references, without the definition unless asked
+export function references(
+  a: Annotated,
+  offset: number,
+  withDefinition: boolean,
+): { start: number; end: number }[] {
+  const d = withDefinition ? undefined : definition(a, offset);
+  return occurrences(a, offset).filter((o) => o.start !== d?.start);
+}
+
+// Where the name at the offset occurs in the file, meaning the same thing
 export function occurrences(a: Annotated, offset: number): Occurrence[] {
   const all = targets(a);
-  // A name the offset is in, else one it's just after
-  const here =
-    all.find((t) => t.start <= offset && offset < t.end) ??
-    all.find((t) => t.end === offset);
+  const here = at(all, offset);
   if (!here) return [];
   const out: Occurrence[] = [];
   for (const t of all) {
@@ -231,5 +281,5 @@ export function occurrences(a: Annotated, offset: number): Occurrence[] {
       out.push({ start: t.start, end: t.end, kind: "text" });
     }
   }
-  return out.sort((x, y) => x.start - y.start);
+  return out;
 }

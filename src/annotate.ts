@@ -35,10 +35,15 @@ export type Name = {
   full: string;
   // Assigns or amends it, or declares a parameter
   defines?: true;
+  // Defines it only by amending a value that must exist already, as d[k]:1,
+  // so isn't where it's defined: q raises 'type on an undefined name
+  amends?: true;
   // The innermost lambda it's in
   lambda?: Lambda;
-  // A column's name as a variable, if the table has no such column: q reads
-  // a column first, then a local or parameter, then a global
+  // A column read as a variable, if the table has no such column: q reads
+  // a column first, then a local or parameter, then a global. Never for one
+  // assigned, or for i, the virtual column, which q reads even over a column
+  // named i
   variable?: { role: "param" | "local" | "global"; full: string };
   // An export's module, as written in use, and the global bound to it
   module?: string;
@@ -53,6 +58,9 @@ export type Handle = {
   // Absolute, as for a name, or an export's key with module
   full: string;
   defines?: true;
+  // As for a name: @[`t;i;:;1] and update from `t amend; set, upsert,
+  // insert and @[`t;();:;1] assign
+  amends?: true;
   lambda?: Lambda;
   module?: string;
   via?: string;
@@ -163,7 +171,11 @@ const join = (namespace: string, name: string) =>
     ? bare(name)
     : `${namespace}.${bare(name)}`;
 
-type Assign = ":" | "::" | "amend";
+// An amend, as x+: or x,:, can create the name; an indexed one, as x[i]:,
+// needs it to exist
+type Assign = ":" | "::" | "amend" | "indexed";
+// How a handle is written: assigned, as by set, or amended in place
+type Write = "assigns" | "amends";
 
 // A name token met on the walk, before its role is known
 type Entry = {
@@ -234,29 +246,30 @@ export function annotate(
     element: Element,
     full: string,
     context: Context,
-    defines?: boolean,
+    write?: Write,
   ) => {
     if (keywords.has(full)) return;
     out.handles.push({
       start: element.start,
       end: element.end,
       full: bare(full),
-      ...(defines ? { defines: true as const } : {}),
+      ...(write ? { defines: true as const } : {}),
+      ...(write === "amends" ? { amends: true as const } : {}),
       ...(context.lambda ? { lambda: context.lambda } : {}),
     });
   };
   // An unqualified handle resolves where the code runs: the file's namespace
   // at top level, and the root in a lambda, as \d is set as a file loads
-  const handle = (element: Element, context: Context, defines?: boolean) =>
+  const handle = (element: Element, context: Context, write?: Write) =>
     push(
       element,
       join(context.lambda ? "" : context.namespace, element.text),
       context,
-      defines,
+      write,
     );
   // A symbol where q dereferences it: a list from a namespace is a path, as
   // `.`t or `.foo`t, and otherwise its first item names the global
-  const dereference = (token: Token, context: Context, defines?: boolean) => {
+  const dereference = (token: Token, context: Context, write?: Write) => {
     done.add(token);
     const els = elements(token).filter((e) => !e.text.startsWith(":"));
     if (els.length === 0 || !els[0].text) return;
@@ -265,36 +278,34 @@ export function annotate(
       const full = path.map((e) => e.text).join(".");
       // A path is absolute; its range is the name at its end
       const last = path[path.length - 1];
-      if (path.every((e) => e.text)) push(last, full, context, defines);
+      if (path.every((e) => e.text)) push(last, full, context, write);
       return;
     }
-    handle(els[0], context, defines);
+    handle(els[0], context, write);
     for (const e of els.slice(1)) {
       if (e.text.length > 1 && e.text.startsWith(".")) handle(e, context);
     }
   };
   // A name in the root given as a symbol: ` . `t, `.[`t], @[`.;`t;...]
-  const inRoot = (token: Token, context: Context, defines?: boolean) => {
+  const inRoot = (token: Token, context: Context, write?: Write) => {
     done.add(token);
     const els = elements(token);
     if (els.length !== 1 || !els[0].text || els[0].text.startsWith(":")) {
       return;
     }
-    push(els[0], els[0].text, context, defines);
+    push(els[0], els[0].text, context, write);
   };
 
   // How the name at i is assigned: x:, x::, or amended, as x+: or x[i]:
   const assignment = (items: Item[], i: number): Assign | undefined => {
-    let next = items[i + 1];
-    let indexed = false;
-    if (opens(next, "[")) {
-      next = items[i + 2];
-      indexed = true;
-    }
+    const index = opens(items[i + 1], "[") ? items[i + 1] : undefined;
+    const next = items[index ? i + 2 : i + 1];
     if (!next || isGroup(next) || next.kind !== "operator") return undefined;
     const op = word(next);
     if (!op.endsWith(":") || (op[0] >= "0" && op[0] <= "9")) return undefined;
-    if (indexed || (op !== ":" && op !== "::")) return "amend";
+    // x[]: replaces the whole value, as x: does
+    if (isGroup(index) && index.items.length > 0) return "indexed";
+    if (index || (op !== ":" && op !== "::")) return "amend";
     return op;
   };
 
@@ -365,15 +376,19 @@ export function annotate(
   // the second, as @[`.;`t;...]; an amend, with three or more, defines it
   const applied = (group: Group, context: Context) => {
     const args = segments(group.items);
-    const amends = args.length >= 3;
     const first = single(args[0]);
     const second = single(args[1]);
+    // At the path (), it replaces the whole value, as set does, and in the
+    // root, as @[`.;`t;:;1], it adds the key if it's new
+    const whole = isGroup(second) && second.items.length === 0;
+    const write: Write | undefined =
+      args.length < 3 ? undefined : whole ? "assigns" : "amends";
     if (isSymbol(first)) {
       if (isRoot(first) && isSymbol(second)) {
         done.add(first);
-        inRoot(second, context, amends);
+        inRoot(second, context, write && "assigns");
       } else {
-        dereference(first, context, amends);
+        dereference(first, context, write);
       }
     } else if (isName(first, "value", "get") && isSymbol(second)) {
       dereference(second, context);
@@ -411,10 +426,10 @@ export function annotate(
       dereference(token, context);
     } else if (isName(prev, "from")) {
       // update and delete from `t amend it in place
-      dereference(token, context, inPlace);
+      dereference(token, context, inPlace ? "amends" : undefined);
     } else if (isName(next, "set", "upsert", "insert")) {
       // Only an atom: on a list they assign nothing
-      if (elements(token).length === 1) dereference(token, context, true);
+      if (elements(token).length === 1) dereference(token, context, "assigns");
     } else if (
       (opens(next, "[") && next.open.start === token.end) ||
       (isName(next) && !keywords.has(word(next))) ||
@@ -540,7 +555,7 @@ export function annotate(
         const s = single(segments(next.items)[0]);
         const sets = ["set", "upsert", "insert"].includes(w);
         if (isSymbol(s) && (!sets || elements(s).length === 1)) {
-          dereference(s, here, sets);
+          dereference(s, here, sets ? "assigns" : undefined);
         }
       }
       const entry = enter(item, here, query ? { query: true } : {});
@@ -748,7 +763,10 @@ export function annotate(
       token: e.token,
       ...(e.lambda ? { lambda: e.lambda } : {}),
     };
-    const defines = e.assign || e.declares ? { defines: true as const } : {};
+    const defines = {
+      ...(e.assign || e.declares ? { defines: true as const } : {}),
+      ...(e.assign === "indexed" ? { amends: true as const } : {}),
+    };
     const local = scoped(e, w);
     const exported = w.includes(".") ? exportOf(e) : undefined;
     let name: Name;
@@ -763,9 +781,13 @@ export function annotate(
         ...base,
         role: "column",
         full: w,
-        variable: local
-          ? { role: local, full: w }
-          : { role: "global", full: join(e.namespace, w) },
+        ...(w === "i" || e.assign
+          ? {}
+          : {
+              variable: local
+                ? { role: local, full: w }
+                : { role: "global", full: join(e.namespace, w) },
+            }),
         ...defines,
       };
     } else if (exported) {

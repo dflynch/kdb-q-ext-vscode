@@ -1,11 +1,18 @@
 // q language features in the editor, from the annotation pass: the outline
-// (and breadcrumbs) and occurrence highlighting
+// (and breadcrumbs), occurrence highlighting, and definition and references
+// within a file
 
 import * as vscode from "vscode";
 import { type Annotated, annotate } from "./annotate";
-import { type Outlined, occurrences, outline } from "./navigation";
+import {
+  definition,
+  type Outlined,
+  occurrences,
+  outline,
+  references,
+} from "./navigation";
 
-// The latest annotations of each open document, as both features read them
+// The latest annotations of each open document, as each feature reads them
 const annotated = new WeakMap<
   vscode.TextDocument,
   { version: number; a: Annotated }
@@ -64,6 +71,22 @@ export function registerLanguage(): vscode.Disposable {
               highlights[o.kind],
             ),
         ),
+    }),
+    vscode.languages.registerDefinitionProvider(selector, {
+      provideDefinition: (d, position) => {
+        const found = definition(annotations(d), d.offsetAt(position));
+        return (
+          found && new vscode.Location(d.uri, range(d, found.start, found.end))
+        );
+      },
+    }),
+    vscode.languages.registerReferenceProvider(selector, {
+      provideReferences: (d, position, context) =>
+        references(
+          annotations(d),
+          d.offsetAt(position),
+          context.includeDeclaration,
+        ).map((o) => new vscode.Location(d.uri, range(d, o.start, o.end))),
     }),
   );
 }

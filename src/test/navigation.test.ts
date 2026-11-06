@@ -3,7 +3,13 @@ import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { annotate } from "../annotate";
-import { type Outlined, occurrences, outline } from "../navigation";
+import {
+  definition,
+  type Outlined,
+  occurrences,
+  outline,
+  references,
+} from "../navigation";
 
 const fixtures = path.join(__dirname, "../../test/fixtures");
 
@@ -79,6 +85,11 @@ suite("outline", () => {
       ["function f [x]: f:{a:1; .x.y:2; b::3}"],
     ],
     ["a lambda left open", "f:{x", ["variable f: f:{x"]],
+    [
+      "not an amend, as q can't create a global by one",
+      "d[`a]:1\n@[`t;0;:;1]\nd[]:2",
+      ["variable d: d[]:2"],
+    ],
     [
       "a lambda assigned to several",
       "f:g:{x}",
@@ -190,6 +201,85 @@ suite("occurrences", () => {
   }
 });
 
+// The definition of the name at the first | as "line:column name", from 1,
+// with the | taken out
+function defined(source: string): string {
+  const offset = source.indexOf("|");
+  const text = source.slice(0, offset) + source.slice(offset + 1);
+  const d = definition(annotate(text), offset);
+  if (!d) return "none";
+  const before = text.slice(0, d.start).split("\n");
+  return `${before.length}:${before[before.length - 1].length + 1} ${text.slice(d.start, d.end)}`;
+}
+
+suite("definition", () => {
+  const cases: [string, string, string][] = [
+    ["a global, where it's first assigned", "n:0\nn:1\nf:{|n}", "1:1 n"],
+    [
+      "a global assigned as the file loads, not first in a lambda",
+      "f:{n::1}\nn:0\n|n",
+      "2:1 n",
+    ],
+    ["a global only a lambda assigns", "f:{n::1}\n|n", "1:4 n"],
+    ["a global set by reference", "`t set 1\n|t", "1:2 t"],
+    ["a global from a handle", "t:1\n`|t upsert 2", "1:1 t"],
+    ["a parameter, where it's declared", "f:{[a;b] a:1; |a}", "1:5 a"],
+    ["a local, not a global of its name", "a:0\nf:{a:1; |a}", "2:4 a"],
+    [
+      "a global under \\d, by its absolute name",
+      "\\d .u\nf:1\n\\d .\n.u.|f",
+      "2:1 f",
+    ],
+    [
+      "a column, as the parameter it may be",
+      "f:{[t;n] select from t where i<|n}",
+      "1:7 n",
+    ],
+    [
+      "not the virtual column i, as q reads it over any variable",
+      "f:{[t;i] select from t where |i<1}",
+      "none",
+    ],
+    [
+      "not a column assigned, as q reads no variable there",
+      "f:{[t;n] update |n:1 from t}",
+      "none",
+    ],
+    ["the definition itself", "|n:0", "1:1 n"],
+    [
+      "not an amend, as q can't create a global by one",
+      ".h.tx[`a]:1\n@[`t;0;:;1]\nupdate a:1 from `u\nf:{|.h.tx,t,u}",
+      "none",
+    ],
+    ["an assignment, not a later amend", "f:{d[`a]:1}\nd:()!()\n|d", "2:1 d"],
+    ["a replacement in full", "d[]:1\n@[`t;();:;1]\n|t,d", "2:4 t"],
+    ["in the root, by key", "@[`.;`t;:;1]\n|t", "1:7 t"],
+    ["an implicit parameter", "f:{|x}", "none"],
+    ["an implicit parameter assigned", "f:{x:1; |x}", "1:4 x"],
+    ["a global defined in another file", "f:{|g x}", "none"],
+    ["a keyword", "|count 1", "none"],
+    ["an export", "m:use`foo\nm.|f 1", "none"],
+  ];
+  for (const [name, source, expected] of cases) {
+    test(name, () => {
+      assert.strictEqual(defined(source), expected);
+    });
+  }
+});
+
+suite("references", () => {
+  const text = "n:0\nf:{n+1}\n`n set 2";
+  const at = text.indexOf("n+1");
+  const shown = (withDefinition: boolean) =>
+    references(annotate(text), at, withDefinition).map((r) => r.start);
+  test("with the definition", () => {
+    assert.deepStrictEqual(shown(true), [0, 7, 13]);
+  });
+  test("without it", () => {
+    assert.deepStrictEqual(shown(false), [7, 13]);
+  });
+});
+
 suite("navigation in the editor", () => {
   const text = "\\d .u\nf:{[a] a+1}\n\\d .\ng:.u.f 2";
   let uri: vscode.Uri;
@@ -229,6 +319,30 @@ suite("navigation in the editor", () => {
         [1, vscode.DocumentHighlightKind.Write],
         [3, vscode.DocumentHighlightKind.Read],
       ],
+    );
+  });
+
+  test("definition", async () => {
+    const [found] = await vscode.commands.executeCommand<vscode.Location[]>(
+      "vscode.executeDefinitionProvider",
+      uri,
+      new vscode.Position(3, 5),
+    );
+    assert.deepStrictEqual(
+      [found.range.start.line, found.range.start.character],
+      [1, 0],
+    );
+  });
+
+  test("references", async () => {
+    const found = await vscode.commands.executeCommand<vscode.Location[]>(
+      "vscode.executeReferenceProvider",
+      uri,
+      new vscode.Position(3, 5),
+    );
+    assert.deepStrictEqual(
+      found.map((l) => l.range.start.line),
+      [1, 3],
     );
   });
 });
