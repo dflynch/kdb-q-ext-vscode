@@ -84,6 +84,47 @@ suite("workspace index", () => {
     ]);
   });
 
+  test("files created on disk, unless files.exclude leaves them out", async () => {
+    const files = vscode.workspace.getConfiguration("files");
+    await files.update(
+      "exclude",
+      { "**/skip": true },
+      vscode.ConfigurationTarget.Workspace,
+    );
+    const made = file("made.q");
+    const skipped = file("skip/x.q");
+    try {
+      const write = (uri: vscode.Uri, text: string) =>
+        vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(text));
+      await write(skipped, ".skip.f:{x}");
+      await write(made, ".made.f:{x}");
+      // The watcher's events come a moment after
+      const names = () =>
+        vscode.commands
+          .executeCommand<vscode.SymbolInformation[]>(
+            "vscode.executeWorkspaceSymbolProvider",
+            ".made.f",
+          )
+          .then((found) => found.map((s) => s.name));
+      for (let i = 0; i < 50 && !(await names()).length; i++) {
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      assert.deepStrictEqual(await names(), [".made.f"]);
+      const skip = await vscode.commands.executeCommand<
+        vscode.SymbolInformation[]
+      >("vscode.executeWorkspaceSymbolProvider", ".skip.f");
+      assert.deepStrictEqual(skip, []);
+    } finally {
+      await vscode.workspace.fs.delete(made);
+      await vscode.workspace.fs.delete(file("skip"), { recursive: true });
+      await files.update(
+        "exclude",
+        undefined,
+        vscode.ConfigurationTarget.Workspace,
+      );
+    }
+  });
+
   test("an unsaved edit, before it's saved", async () => {
     const d = await vscode.workspace.openTextDocument(file("config/wdb.q"));
     await vscode.window.showTextDocument(d);

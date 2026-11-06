@@ -67,6 +67,16 @@ suite("definitions across files", () => {
       ],
     ],
     [
+      "its own directory before one only named like it, or a subdirectory",
+      {
+        "/w/code-old/f.q": "f:1",
+        "/w/code/a/f.q": "f:2",
+        "/w/code/f.q": "f:3",
+        "/w/code/x.q": "|f",
+      },
+      ["/w/code/f.q 1:1 f", "/w/code/a/f.q 1:1 f", "/w/code-old/f.q 1:1 f"],
+    ],
+    [
       "at top level anywhere, before any in a lambda",
       { "/w/a.q": "init:{n::0}\n|n", "/w/b.q": "n:1" },
       ["/w/b.q 1:1 n"],
@@ -163,6 +173,17 @@ suite("references across files", () => {
     ]);
   });
 
+  test("a global, and the columns that may be it, in every file", () => {
+    const files = {
+      "/w/a.q": "|a:1",
+      "/w/b.q": "f:{select from t where a>0}",
+    };
+    assert.deepStrictEqual(opened(files).referenced(), [
+      "/w/a.q 1:1 a",
+      "/w/b.q 1:24 a",
+    ]);
+  });
+
   test("a parameter, only in its lambda", () => {
     const files = { "/w/a.q": "n:0", "/w/b.q": "f:{[n] |n+1}" };
     assert.deepStrictEqual(opened(files).referenced(), [
@@ -182,6 +203,25 @@ suite("references across files", () => {
       "/w/a.q 2:1 m.f",
       "/w/b.q 2:3 f",
       "/w/foo.q 1:10 f",
+    ]);
+  });
+
+  test("an export, without its key unless asked", () => {
+    const files = {
+      "/w/foo.q": "h:{x}\nk:{y}\nexport:`f`g!(h;k)",
+      "/w/a.q": "m:use`foo\nm.|g 1",
+    };
+    assert.deepStrictEqual(opened(files).referenced(false), ["/w/a.q 2:1 m.g"]);
+  });
+
+  test("an export, from just after a key, not the next one", () => {
+    const files = {
+      "/w/foo.q": "h:{x}\nk:{y}\nexport:`f|`g!(h;k)",
+      "/w/a.q": "m:use`foo\nm.f 1\nm.g 2",
+    };
+    assert.deepStrictEqual(opened(files).referenced(), [
+      "/w/foo.q 3:9 f",
+      "/w/a.q 2:1 m.f",
     ]);
   });
 

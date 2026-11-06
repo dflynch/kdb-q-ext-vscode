@@ -43,6 +43,22 @@ function entryOf(document: vscode.TextDocument): Entry {
   return e;
 }
 
+// Whether findFiles finds the file, as it applies files.exclude
+async function included(uri: vscode.Uri): Promise<boolean> {
+  const folder = vscode.workspace.getWorkspaceFolder(uri);
+  if (!folder) return false;
+  // Each character literal, as a glob would read [, {, * or ? in a name
+  const glob = vscode.workspace
+    .asRelativePath(uri, false)
+    .replace(/[[{}*?]/g, "[$&]");
+  const found = await vscode.workspace.findFiles(
+    new vscode.RelativePattern(folder, glob),
+    undefined,
+    1,
+  );
+  return found.length > 0;
+}
+
 // The workspace's q files, each as its open document has it, else as it's
 // saved; files.exclude leaves some out, as Explorer does. Built in the
 // background, as is each change on disk, in turn; each request waits for
@@ -55,7 +71,14 @@ class Workspace implements vscode.Disposable {
 
   constructor() {
     const watcher = vscode.workspace.createFileSystemWatcher("**/*.q");
-    const read = (uri: vscode.Uri) => this.queue(() => this.read(uri));
+    // A file new to the index only if findFiles would find it, as
+    // files.exclude may leave it out
+    const read = (uri: vscode.Uri) =>
+      this.queue(async () => {
+        if (this.files.has(uri.toString()) || (await included(uri))) {
+          await this.read(uri);
+        }
+      });
     this.disposables = [
       watcher,
       watcher.onDidCreate(read),
@@ -65,6 +88,13 @@ class Workspace implements vscode.Disposable {
           this.files.delete(uri.toString());
         }),
       ),
+      // Its text, rather than the file's, as it may differ, as when a
+      // document left unsaved is opened as VS Code starts
+      vscode.workspace.onDidOpenTextDocument((document) => {
+        if (this.files.has(document.uri.toString())) {
+          this.edited.add(document);
+        }
+      }),
       vscode.workspace.onDidChangeTextDocument(({ document }) => {
         if (this.files.has(document.uri.toString())) {
           this.edited.add(document);

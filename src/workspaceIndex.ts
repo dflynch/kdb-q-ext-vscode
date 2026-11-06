@@ -22,7 +22,8 @@ export type Entry = {
   // Where each line starts, to turn offsets into positions
   lines: number[];
   defined: Defined[];
-  // Each global named, by its absolute name, assigned or read
+  // Each global named, by its absolute name, assigned or read, and each
+  // column that may be one
   globals: (Span & { full: string })[];
   // Each export of a module named, as m.f where m:use`foo
   exports: (Span & { module: string; key: string })[];
@@ -45,12 +46,11 @@ export function entry(text: string, a: Annotated): Entry {
     exports: [],
   };
   for (const t of all) {
-    if (t.identity.startsWith("global ")) {
-      out.globals.push({
-        start: t.start,
-        end: t.end,
-        full: t.identity.slice(7),
-      });
+    const global = [t.identity, t.maybe].find((id) =>
+      id?.startsWith("global "),
+    );
+    if (global) {
+      out.globals.push({ start: t.start, end: t.end, full: global.slice(7) });
     } else if (t.identity.startsWith("export ")) {
       const [, module, key] = t.identity.split(" ");
       out.exports.push({ start: t.start, end: t.end, module, key });
@@ -126,14 +126,18 @@ export function resolve(index: Index, from: string, module: string): string[] {
   return out.sort();
 }
 
-// Nearest the file first: itself, then by the length of the path they
-// share, so the same directory comes first, then by path
+// Nearest the file first: itself, then its directory, then by how many
+// directories they share, then by path
 function nearest(file: string): (x: string, y: string) => number {
+  const directories = (f: string) => f.split("/").slice(0, -1);
+  const mine = directories(file);
   const shared = (other: string) => {
     if (other === file) return Number.POSITIVE_INFINITY;
+    const theirs = directories(other);
     let n = 0;
-    while (n < file.length && file[n] === other[n]) n++;
-    return file.lastIndexOf("/", n);
+    while (n < mine.length && mine[n] === theirs[n]) n++;
+    const same = n === mine.length && n === theirs.length;
+    return 2 * n + (same ? 1 : 0);
   };
   return (x, y) => shared(y) - shared(x) || (x < y ? -1 : x > y ? 1 : 0);
 }
@@ -159,9 +163,11 @@ function across(
     const [, module, key] = id.split(" ");
     return { modules: resolve(index, file, module), key };
   }
-  const key = index
-    .get(file)
-    ?.export?.keys?.find((k) => k.start <= offset && offset <= k.end);
+  // The key the offset is in, else one it's just after, as at() has it
+  const keys = index.get(file)?.export?.keys ?? [];
+  const key =
+    keys.find((k) => k.start <= offset && offset < k.end) ??
+    keys.find((k) => k.end === offset);
   if (key) return { modules: [file], key: key.key };
   return undefined;
 }
@@ -248,7 +254,8 @@ export function references(
       }
       continue;
     }
-    if (wanted.modules.includes(f)) {
+    // The key, as the export's declaration
+    if (withDefinition && wanted.modules.includes(f)) {
       const k = e.export?.keys?.find((k) => k.key === wanted.key);
       if (k) out.push({ file: f, ...span(k) });
     }

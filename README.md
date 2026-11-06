@@ -56,7 +56,7 @@ read.
     and overrides, has each file's definition, which VS Code lists in a
     peek opened at the nearest: the file's own, if it has one. Set
     `editor.gotoLocation.multipleDefinitions` to `goto` to jump there
-  - `` use`foo `` goes to `foo.q` or `foo/init.q` anywhere in the
+  - ``use`foo`` goes to `foo.q` or `foo/init.q` anywhere in the
     workspace, as `QPATH` isn't read
   - Names q defines (`.z`, `.Q`), and globals defined outside the workspace
 
