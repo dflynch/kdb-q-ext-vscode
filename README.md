@@ -13,8 +13,6 @@ and tables in a grid (see [Features](#features)).
 ### Planned
 
 - In the grid: copying a selection as the text you see
-- Go to definition, references, outline and workspace symbol search that
-  follow q's namespaces and know which names are local to a lambda
 
 ### The query you send is the query you wrote
 
@@ -47,6 +45,20 @@ read.
 - Editing that keeps q's layout valid: pressing Enter between brackets keeps
   the closing bracket indented, Toggle Block Comment puts the `/` and `\`
   markers on lines of their own at column 0, and block comments fold
+- Navigation that follows q's namespaces and knows which names are local
+  to a lambda: the outline and breadcrumbs, highlighting a name where it
+  occurs, Go to Definition, Find All References, and **Go to Symbol in
+  Workspace** (Cmd+T / Ctrl+T) across every `.q` file in the workspace,
+  including q 5 modules' `use` and `export`. What it can't know:
+  - Each file is read as if loaded in the root namespace: `\l` runs a file
+    in its loader's namespace, which the file doesn't say
+  - A global several files define, such as a setting with its defaults
+    and overrides, has each file's definition, nearest first, which
+    VS Code shows in a peek; set `editor.gotoLocation.multipleDefinitions`
+    to `goto` to jump to the first
+  - `` use`foo `` goes to `foo.q` or `foo/init.q` anywhere in the
+    workspace, as `QPATH` isn't read
+  - Names q defines (`.z`, `.Q`), and globals defined outside the workspace
 
 ### Servers
 

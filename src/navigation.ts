@@ -69,39 +69,54 @@ function valueEnd({ tokens, index }: Placed): number {
   return end;
 }
 
-// What the file defines at top level: each global once, where it's first
-// assigned, under its namespace. A function is a global assigned a lambda,
-// as in f:{x} or f:g:{x}; a module, one assigned use`mod. Globals of a
-// namespace written apart, with others between, are in a node for each run,
-// as a node's range must hold only its own
-export function outline(text: string, a: Annotated): Outlined[] {
+// A global's definition: where it's first assigned at top level, or first
+// in a lambda. A function is a global assigned a lambda, as in f:{x} or
+// f:g:{x}; a module, one assigned use`mod
+export type Defined = {
+  full: string;
+  kind: "function" | "variable" | "module";
+  // A function's parameters, as [x;y], or a module's use`foo
+  detail?: string;
+  // From the name, or a handle's backtick, to the end of its value
+  start: number;
+  end: number;
+  nameStart: number;
+  nameEnd: number;
+  inLambda: boolean;
+};
+
+// Each global's first definition at top level and its first in a lambda,
+// not where an existing value is amended, in the order they're written
+export function globals(text: string, a: Annotated): Defined[] {
   const at = placed(text);
   const lambdas = new Map<number, Lambda>(
     a.lambdas.map((l) => [l.open.start, l]),
   );
   const word = (t: Token | undefined) =>
     t ? text.slice(t.start, t.end) : undefined;
-  const seen = new Set<string>();
-  const top: Outlined[] = [];
+  const isAssign = (t: Token | undefined) =>
+    word(t) === ":" || word(t) === "::";
 
-  const add = (full: string, start: number, end: number) => {
-    if (seen.has(full)) return;
-    seen.add(full);
+  const described = (
+    full: string,
+    start: number,
+    end: number,
+    inLambda: boolean,
+  ): Defined | undefined => {
     const p = at(start);
-    if (!p) return;
-    const item: Outlined = {
-      name: full,
+    if (!p) return undefined;
+    const item: Defined = {
+      full,
       kind: "variable",
       // From the symbol's backtick, for a handle
       start: p.tokens[p.index].start,
       end: Math.max(end, valueEnd(p)),
       nameStart: start,
       nameEnd: end,
+      inLambda,
     };
     // Past any names assigned along with it, as g in f:g:{x}
     let i = p.index;
-    const isAssign = (t: Token | undefined) =>
-      word(t) === ":" || word(t) === "::";
     while (p.tokens[i + 2]?.kind === "name" && isAssign(p.tokens[i + 3])) {
       i += 2;
     }
@@ -119,13 +134,68 @@ export function outline(text: string, a: Annotated): Outlined[] {
       item.kind = "module";
       item.detail = text.slice(value.start, after.end);
     }
-    const dot = full.lastIndexOf(".");
+    return item;
+  };
+
+  // Names and handles, in the order they're written
+  const defined: {
+    full: string;
+    start: number;
+    end: number;
+    inLambda: boolean;
+  }[] = [];
+  for (const n of a.names) {
+    if (n.role === "global" && n.defines && !n.amends) {
+      defined.push({
+        full: n.full,
+        start: n.token.start,
+        end: n.token.end,
+        inLambda: n.lambda !== undefined,
+      });
+    }
+  }
+  for (const h of a.handles) {
+    if (h.defines && !h.amends && h.module === undefined) {
+      defined.push({ ...h, inLambda: h.lambda !== undefined });
+    }
+  }
+  defined.sort((x, y) => x.start - y.start);
+  const seen = new Set<string>();
+  const out: Defined[] = [];
+  for (const d of defined) {
+    const key = `${d.inLambda} ${d.full}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const item = described(d.full, d.start, d.end, d.inLambda);
+    if (item) out.push(item);
+  }
+  return out;
+}
+
+// What the file defines at top level: each global once, where it's first
+// assigned, under its namespace. Globals of a namespace written apart, with
+// others between, are in a node for each run, as a node's range must hold
+// only its own
+export function outline(text: string, a: Annotated): Outlined[] {
+  const top: Outlined[] = [];
+  for (const d of globals(text, a)) {
+    if (d.inLambda) continue;
+    const item: Outlined = {
+      name: d.full,
+      kind: d.kind,
+      ...(d.detail === undefined ? {} : { detail: d.detail }),
+      start: d.start,
+      end: d.end,
+      nameStart: d.nameStart,
+      nameEnd: d.nameEnd,
+    };
+    const dot = d.full.lastIndexOf(".");
     if (dot <= 0) {
       top.push(item);
-      return;
+      continue;
     }
-    const space = full.slice(0, dot);
-    item.name = full.slice(dot + 1);
+    const space = d.full.slice(0, dot);
+    item.name = d.full.slice(dot + 1);
     let node = top[top.length - 1];
     if (node?.kind !== "namespace" || node.name !== space) {
       node = {
@@ -141,29 +211,14 @@ export function outline(text: string, a: Annotated): Outlined[] {
     }
     node.children?.push(item);
     node.end = Math.max(node.end, item.end);
-  };
-
-  // Names and handles, in the order they're written
-  const defined: { full: string; start: number; end: number }[] = [];
-  for (const n of a.names) {
-    if (n.role === "global" && n.defines && !n.amends && !n.lambda) {
-      defined.push({ full: n.full, start: n.token.start, end: n.token.end });
-    }
   }
-  for (const h of a.handles) {
-    if (h.defines && !h.amends && !h.lambda && h.module === undefined) {
-      defined.push(h);
-    }
-  }
-  defined.sort((x, y) => x.start - y.start);
-  for (const d of defined) add(d.full, d.start, d.end);
   return top;
 }
 
 // What a name or handle refers to, so occurrences can be matched: a local or
 // parameter by its lambda, a global by its absolute name, an export by its
 // module and key, and a column, key or keyword by name
-type Target = {
+export type Target = {
   start: number;
   end: number;
   identity: string;
@@ -176,7 +231,7 @@ type Target = {
   inLambda: boolean;
 };
 
-function targets(a: Annotated): Target[] {
+export function targets(a: Annotated): Target[] {
   const ids = new Map<Lambda, number>(a.lambdas.map((l, i) => [l, i]));
   const scoped = (role: string, full: string, l: Lambda | undefined) =>
     role === "param" || role === "local"
@@ -223,7 +278,7 @@ function targets(a: Annotated): Target[] {
 
 // The name the offset is in, else one it's just after, as the cursor is when
 // typing
-function at(all: Target[], offset: number): Target | undefined {
+export function at(all: Target[], offset: number): Target | undefined {
   return (
     all.find((t) => t.start <= offset && offset < t.end) ??
     all.find((t) => t.end === offset)
@@ -244,14 +299,20 @@ export function definition(
   const all = targets(a);
   const here = at(all, offset);
   if (!here) return undefined;
-  const first = (identity: string | undefined) => {
-    if (!identity?.startsWith("variable ") && !identity?.startsWith("global "))
-      return undefined;
-    const defs = all.filter((t) => t.identity === identity && t.creates);
-    return defs.find((t) => !t.inLambda) ?? defs[0];
-  };
-  const d = first(here.identity) ?? first(here.maybe);
+  const d = first(all, here.identity) ?? first(all, here.maybe);
   return d && { start: d.start, end: d.end };
+}
+
+// Where a variable or global is first defined in the file, at top level
+// before any lambda
+export function first(
+  all: Target[],
+  identity: string | undefined,
+): Target | undefined {
+  if (!identity?.startsWith("variable ") && !identity?.startsWith("global "))
+    return undefined;
+  const defs = all.filter((t) => t.identity === identity && t.creates);
+  return defs.find((t) => !t.inLambda) ?? defs[0];
 }
 
 // The occurrences, for find references, without the definition unless asked

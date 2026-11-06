@@ -1,0 +1,301 @@
+// Navigation across the workspace's q files: what each file defines and
+// uses, kept as an entry per file, and the definitions, references and
+// symbols they give together. Each file is read as if loaded in the root,
+// as \l runs a file in its loader's namespace, which the file can't show.
+// Modules resolve by file name, as use`foo finds foo.q or foo/init.q in a
+// directory of QPATH, which the workspace doesn't say. Pure and total, as
+// the annotation pass is: no VS Code imports, never throws.
+
+import type { Annotated } from "./annotate";
+import {
+  at,
+  type Defined,
+  first,
+  globals,
+  references as inFile,
+  targets,
+} from "./navigation";
+
+type Span = { start: number; end: number };
+
+export type Entry = {
+  // Where each line starts, to turn offsets into positions
+  lines: number[];
+  defined: Defined[];
+  // Each global named, by its absolute name, assigned or read
+  globals: (Span & { full: string })[];
+  // Each export of a module named, as m.f where m:use`foo
+  exports: (Span & { module: string; key: string })[];
+  // The module's own export, if the file assigns one: its keys when it's a
+  // dictionary literal, each where its value is defined in the file
+  export?: Span & { keys?: (Span & { key: string; value: Span })[] };
+};
+
+// A file's entry, from its text and annotations
+export function entry(text: string, a: Annotated): Entry {
+  const lines = [0];
+  for (const m of text.matchAll(/\r\n|\r|\n/g)) {
+    lines.push(m.index + m[0].length);
+  }
+  const all = targets(a);
+  const out: Entry = {
+    lines,
+    defined: globals(text, a),
+    globals: [],
+    exports: [],
+  };
+  for (const t of all) {
+    if (t.identity.startsWith("global ")) {
+      out.globals.push({
+        start: t.start,
+        end: t.end,
+        full: t.identity.slice(7),
+      });
+    } else if (t.identity.startsWith("export ")) {
+      const [, module, key] = t.identity.split(" ");
+      out.exports.push({ start: t.start, end: t.end, module, key });
+    }
+  }
+  if (a.export) {
+    const { start, end } = a.export.at;
+    out.export = { start, end };
+    if (a.export.keys) {
+      out.export.keys = a.export.keys.map((k) => {
+        const span = { start: k.start, end: k.end };
+        const target = k.target;
+        const d =
+          target && "full" in target
+            ? first(all, `global ${target.full}`)
+            : undefined;
+        return {
+          key: k.key,
+          ...span,
+          value: d ? { start: d.start, end: d.end } : span,
+        };
+      });
+    }
+  }
+  return out;
+}
+
+// A line and column from 0, as VS Code counts them
+export function position(
+  e: Entry,
+  offset: number,
+): { line: number; character: number } {
+  let lo = 0;
+  let hi = e.lines.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (e.lines[mid] <= offset) lo = mid;
+    else hi = mid - 1;
+  }
+  return { line: lo, character: offset - e.lines[lo] };
+}
+
+// Files by their URI, as a string; the current file's entry must be fresh
+export type Index = ReadonlyMap<string, Entry>;
+
+export type Location = Span & { file: string };
+
+// The files a module named in use resolves to: foo.q or foo/init.q for
+// use`foo, foo/bar.q or foo/bar/init.q for use`foo.bar, in any directory,
+// the file before the directory's init as q looks. A relative use`.bar is
+// below an init's directory, or else below the file as if a directory, as
+// q looks
+export function resolve(index: Index, from: string, module: string): string[] {
+  const parts = module.split(".");
+  if (parts.some((p, n) => p === "" && n > 0)) return [];
+  const found = (path: string) => [`${path}.q`, `${path}/init.q`];
+  if (module.startsWith(".")) {
+    const base = /\/init\.q$/.test(from)
+      ? from.slice(0, from.lastIndexOf("/"))
+      : from;
+    const [file, init] = found(`${base}/${parts.slice(1).join("/")}`);
+    return index.has(file) ? [file] : index.has(init) ? [init] : [];
+  }
+  const [file, init] = found(`/${parts.join("/")}`);
+  const out: string[] = [];
+  for (const k of index.keys()) {
+    if (k.endsWith(file)) out.push(k);
+    else if (k.endsWith(init)) {
+      const path = k.slice(0, -"/init.q".length);
+      if (!index.has(`${path}.q`)) out.push(k);
+    }
+  }
+  return out.sort();
+}
+
+// Nearest the file first: itself, then by the length of the path they
+// share, so the same directory comes first, then by path
+function nearest(file: string): (x: string, y: string) => number {
+  const shared = (other: string) => {
+    if (other === file) return Number.POSITIVE_INFINITY;
+    let n = 0;
+    while (n < file.length && file[n] === other[n]) n++;
+    return file.lastIndexOf("/", n);
+  };
+  return (x, y) => shared(y) - shared(x) || (x < y ? -1 : x > y ? 1 : 0);
+}
+
+// What the name at the offset is, across files: a global, by its absolute
+// name; an export, by the modules it can be and its key, from a use of it or
+// the key in the module's own export; or nothing, when it's only the file's
+type Across =
+  | { global: string }
+  | { modules: string[]; key: string }
+  | undefined;
+
+function across(
+  index: Index,
+  file: string,
+  a: Annotated,
+  offset: number,
+): Across {
+  const here = at(targets(a), offset);
+  const id = here?.identity;
+  if (id?.startsWith("global ")) return { global: id.slice(7) };
+  if (id?.startsWith("export ")) {
+    const [, module, key] = id.split(" ");
+    return { modules: resolve(index, file, module), key };
+  }
+  const key = index
+    .get(file)
+    ?.export?.keys?.find((k) => k.start <= offset && offset <= k.end);
+  if (key) return { modules: [file], key: key.key };
+  return undefined;
+}
+
+// Where the name at the offset is defined. A local or parameter as in the
+// file. A global where each file first assigns it at top level, or, if none
+// does, first in a lambda, the file itself first, then the nearest. An
+// export where its module's export has the key, or where the export is
+// assigned if it's built as the module loads
+export function definitions(
+  index: Index,
+  file: string,
+  a: Annotated,
+  offset: number,
+): Location[] {
+  const all = targets(a);
+  const here = at(all, offset);
+  if (!here) return [];
+  const local = (id: string | undefined) =>
+    id?.startsWith("variable ") ? first(all, id) : undefined;
+  const found = local(here.identity);
+  if (found) return [{ file, start: found.start, end: found.end }];
+  const wanted = across(index, file, a, offset);
+  if (wanted && "global" in wanted) return defining(index, file, wanted.global);
+  if (wanted) {
+    const out: Location[] = [];
+    for (const m of wanted.modules) {
+      const ex = index.get(m)?.export;
+      if (!ex) continue;
+      if (!ex.keys) out.push({ file: m, ...span(ex) });
+      const k = ex.keys?.find((k) => k.key === wanted.key);
+      if (k) out.push({ file: m, ...span(k.value) });
+    }
+    return out;
+  }
+  // A column read, as the variable it may be
+  const maybe = local(here.maybe);
+  if (maybe) return [{ file, start: maybe.start, end: maybe.end }];
+  return here.maybe?.startsWith("global ")
+    ? defining(index, file, here.maybe.slice(7))
+    : [];
+}
+
+// Where each file first assigns a global at top level, or, if none does,
+// first in a lambda, the file itself first, then the nearest
+function defining(index: Index, file: string, global: string): Location[] {
+  const atTop: Location[] = [];
+  const inLambda: Location[] = [];
+  for (const [f, e] of index) {
+    const top = e.defined.find((d) => d.full === global && !d.inLambda);
+    const inner = e.defined.find((d) => d.full === global && d.inLambda);
+    if (top) atTop.push({ file: f, start: top.nameStart, end: top.nameEnd });
+    if (inner) {
+      inLambda.push({ file: f, start: inner.nameStart, end: inner.nameEnd });
+    }
+  }
+  const order = nearest(file);
+  return (atTop.length ? atTop : inLambda).sort((x, y) =>
+    order(x.file, y.file),
+  );
+}
+
+const span = ({ start, end }: Span): Span => ({ start, end });
+
+// Where the name at the offset occurs, meaning the same thing: a global or
+// an export in every file, anything else as in the file. Without its
+// definitions unless asked
+export function references(
+  index: Index,
+  file: string,
+  a: Annotated,
+  offset: number,
+  withDefinition: boolean,
+): Location[] {
+  const wanted = across(index, file, a, offset);
+  if (!wanted) {
+    return inFile(a, offset, withDefinition).map((r) => ({ file, ...r }));
+  }
+  const out: Location[] = [];
+  for (const [f, e] of index) {
+    if ("global" in wanted) {
+      for (const g of e.globals) {
+        if (g.full === wanted.global) out.push({ file: f, ...span(g) });
+      }
+      continue;
+    }
+    if (wanted.modules.includes(f)) {
+      const k = e.export?.keys?.find((k) => k.key === wanted.key);
+      if (k) out.push({ file: f, ...span(k) });
+    }
+    const resolved = new Map<string, boolean>();
+    for (const x of e.exports) {
+      if (x.key !== wanted.key) continue;
+      let hit = resolved.get(x.module);
+      if (hit === undefined) {
+        hit = resolve(index, f, x.module).some((m) =>
+          wanted.modules.includes(m),
+        );
+        resolved.set(x.module, hit);
+      }
+      if (hit) out.push({ file: f, ...span(x) });
+    }
+  }
+  const skip = withDefinition
+    ? []
+    : definitions(index, file, a, offset).map((d) => `${d.file} ${d.start}`);
+  const order = nearest(file);
+  return out
+    .filter((o) => !skip.includes(`${o.file} ${o.start}`))
+    .sort((x, y) => order(x.file, y.file) || x.start - y.start);
+}
+
+export type Listed = Defined & { file: string };
+
+// The globals defined across files whose names have the query's
+// characters in order, ignoring case: each file's definition at top level,
+// or its first in a lambda if it has none
+export function symbols(index: Index, query: string): Listed[] {
+  const q = query.toLowerCase().replace(/\s/g, "");
+  const matches = (name: string) => {
+    const n = name.toLowerCase();
+    let i = 0;
+    for (const c of n) if (c === q[i]) i++;
+    return i === q.length;
+  };
+  const out: Listed[] = [];
+  for (const [file, e] of index) {
+    const top = new Set(
+      e.defined.filter((d) => !d.inLambda).map((d) => d.full),
+    );
+    for (const d of e.defined) {
+      if (d.inLambda && top.has(d.full)) continue;
+      if (matches(d.full)) out.push({ ...d, file });
+    }
+  }
+  return out;
+}
