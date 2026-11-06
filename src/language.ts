@@ -4,7 +4,13 @@
 
 import * as vscode from "vscode";
 import { type Annotated, annotate } from "./annotate";
-import { definition, type Outlined, occurrences, outline } from "./navigation";
+import {
+  definition,
+  type Outlined,
+  occurrences,
+  outline,
+  references,
+} from "./navigation";
 
 // The latest annotations of each open document, as each feature reads them
 const annotated = new WeakMap<
@@ -75,16 +81,12 @@ export function registerLanguage(): vscode.Disposable {
       },
     }),
     vscode.languages.registerReferenceProvider(selector, {
-      provideReferences: (d, position, context) => {
-        const a = annotations(d);
-        const offset = d.offsetAt(position);
-        const defined = definition(a, offset);
-        return occurrences(a, offset)
-          .filter(
-            (o) => context.includeDeclaration || o.start !== defined?.start,
-          )
-          .map((o) => new vscode.Location(d.uri, range(d, o.start, o.end)));
-      },
+      provideReferences: (d, position, context) =>
+        references(
+          annotations(d),
+          d.offsetAt(position),
+          context.includeDeclaration,
+        ).map((o) => new vscode.Location(d.uri, range(d, o.start, o.end))),
     }),
   );
 }

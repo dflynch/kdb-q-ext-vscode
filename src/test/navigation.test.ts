@@ -3,7 +3,13 @@ import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { annotate } from "../annotate";
-import { definition, type Outlined, occurrences, outline } from "../navigation";
+import {
+  definition,
+  type Outlined,
+  occurrences,
+  outline,
+  references,
+} from "../navigation";
 
 const fixtures = path.join(__dirname, "../../test/fixtures");
 
@@ -79,6 +85,11 @@ suite("outline", () => {
       ["function f [x]: f:{a:1; .x.y:2; b::3}"],
     ],
     ["a lambda left open", "f:{x", ["variable f: f:{x"]],
+    [
+      "not an amend, as q can't create a global by one",
+      "d[`a]:1\n@[`t;0;:;1]\nd[]:2",
+      ["variable d: d[]:2"],
+    ],
     [
       "a lambda assigned to several",
       "f:g:{x}",
@@ -235,7 +246,16 @@ suite("definition", () => {
       "none",
     ],
     ["the definition itself", "|n:0", "1:1 n"],
+    [
+      "not an amend, as q can't create a global by one",
+      ".h.tx[`a]:1\n@[`t;0;:;1]\nupdate a:1 from `u\nf:{|.h.tx,t,u}",
+      "none",
+    ],
+    ["an assignment, not a later amend", "f:{d[`a]:1}\nd:()!()\n|d", "2:1 d"],
+    ["a replacement in full", "d[]:1\n@[`t;();:;1]\n|t,d", "2:4 t"],
+    ["in the root, by key", "@[`.;`t;:;1]\n|t", "1:7 t"],
     ["an implicit parameter", "f:{|x}", "none"],
+    ["an implicit parameter assigned", "f:{x:1; |x}", "1:4 x"],
     ["a global defined in another file", "f:{|g x}", "none"],
     ["a keyword", "|count 1", "none"],
     ["an export", "m:use`foo\nm.|f 1", "none"],
@@ -245,6 +265,19 @@ suite("definition", () => {
       assert.strictEqual(defined(source), expected);
     });
   }
+});
+
+suite("references", () => {
+  const text = "n:0\nf:{n+1}\n`n set 2";
+  const at = text.indexOf("n+1");
+  const shown = (withDefinition: boolean) =>
+    references(annotate(text), at, withDefinition).map((r) => r.start);
+  test("with the definition", () => {
+    assert.deepStrictEqual(shown(true), [0, 7, 13]);
+  });
+  test("without it", () => {
+    assert.deepStrictEqual(shown(false), [7, 13]);
+  });
 });
 
 suite("navigation in the editor", () => {

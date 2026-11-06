@@ -95,7 +95,8 @@ suite("annotate against q's value", () => {
 });
 
 // Names as "role written", with the resolved name after = when it differs,
-// " :" when it defines, and a column's variable after ?
+// " :" when it defines, "amends" when only that, and a column's variable
+// after ?
 function shown(a: Annotated, text: string): string[] {
   return a.names.map((n) => {
     const written = text.slice(n.token.start, n.token.end);
@@ -104,17 +105,18 @@ function shown(a: Annotated, text: string): string[] {
     const variable = n.variable
       ? ` ?${n.variable.role} ${n.variable.full}`
       : "";
-    return `${n.role} ${written}${full}${module}${n.defines ? " :" : ""}${variable}`;
+    return `${n.role} ${written}${full}${module}${n.defines ? " :" : ""}${n.amends ? " amends" : ""}${variable}`;
   });
 }
 const names = (text: string, namespace?: string) =>
   shown(annotate(text, namespace ? { namespace } : {}), text);
 
-// Handles as "written=full", " :" when it defines, and the module if any
+// Handles as "written=full", " :" when it defines, "amends" when only that,
+// and the module if any
 const handles = (text: string) =>
   annotate(text).handles.map(
     (h) =>
-      `${text.slice(h.start, h.end)}=${h.full}${h.defines ? " :" : ""}${h.module ? ` from ${h.module}` : ""}`,
+      `${text.slice(h.start, h.end)}=${h.full}${h.defines ? " :" : ""}${h.amends ? " amends" : ""}${h.module ? ` from ${h.module}` : ""}`,
   );
 
 suite("annotate names", () => {
@@ -144,7 +146,11 @@ suite("annotate names", () => {
       "{a:1; a+:1; a::2}",
       ["local a :", "local a :", "local a :"],
     ],
-    ["amending a global", "{a+:1; b[0]:2}", ["global a :", "global b :"]],
+    [
+      "amending a global",
+      "{a+:1; b[0]:2; c[]:3}",
+      ["global a :", "global b : amends", "global c :"],
+    ],
     ["a dotted name is global", "{e.f:1}", ["global e.f :"]],
     ["no closures", "{a:1; {a}}", ["local a :", "global a"]],
     [
@@ -171,7 +177,7 @@ suite("annotate names", () => {
         "param t :",
         "param u :",
         "builtin select",
-        "column a : ?global a",
+        "column a :",
         "column b ?global b",
         "builtin by",
         "column c ?global c",
@@ -189,7 +195,7 @@ suite("annotate names", () => {
         "param t :",
         "param i :",
         "builtin select",
-        "column j : ?global j",
+        "column j :",
         "column i",
         "builtin from",
         "param t",
@@ -326,12 +332,12 @@ suite("annotate handles", () => {
     [
       "any other namespace is a handle itself",
       "@[`.d;`k;:;3]; `.u.sub[`trade;`]",
-      [".d=.d :", ".u.sub=.u.sub"],
+      [".d=.d : amends", ".u.sub=.u.sub"],
     ],
     [
       "amend",
       "@[`.;`upd;:;f]; @[`t;0;:;1]; .[`u;();:;1]",
-      ["upd=upd :", "t=t :", "u=u :"],
+      ["upd=upd :", "t=t : amends", "u=u :"],
     ],
     ["index", "@[`t;0]; `t 0; `t[1]; `t i", ["t=t", "t=t", "t=t", "t=t"]],
     [
@@ -342,7 +348,7 @@ suite("annotate handles", () => {
     [
       "from, in place for update and delete",
       "select from `t; update a:1 from `u; delete from `v",
-      ["t=t", "u=u :", "v=v :"],
+      ["t=t", "u=u : amends", "v=v : amends"],
     ],
     [
       "bracket forms",
