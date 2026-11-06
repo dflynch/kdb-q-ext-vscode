@@ -225,6 +225,11 @@ suite("definition", () => {
       "1:7 n",
     ],
     [
+      "not the virtual column i, as q reads it over any variable",
+      "f:{[t;i] select from t where |i<1}",
+      "none",
+    ],
+    [
       "not a column assigned, as q reads no variable there",
       "f:{[t;n] update |n:1 from t}",
       "none",

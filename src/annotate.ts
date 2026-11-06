@@ -38,7 +38,8 @@ export type Name = {
   // The innermost lambda it's in
   lambda?: Lambda;
   // A column's name as a variable, if the table has no such column: q reads
-  // a column first, then a local or parameter, then a global
+  // a column first, then a local or parameter, then a global. Never for i,
+  // the virtual column, which q reads even over a column named i
   variable?: { role: "param" | "local" | "global"; full: string };
   // An export's module, as written in use, and the global bound to it
   module?: string;
@@ -763,9 +764,13 @@ export function annotate(
         ...base,
         role: "column",
         full: w,
-        variable: local
-          ? { role: local, full: w }
-          : { role: "global", full: join(e.namespace, w) },
+        ...(w === "i"
+          ? {}
+          : {
+              variable: local
+                ? { role: local, full: w }
+                : { role: "global", full: join(e.namespace, w) },
+            }),
         ...defines,
       };
     } else if (exported) {

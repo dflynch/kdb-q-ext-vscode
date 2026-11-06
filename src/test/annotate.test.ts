@@ -183,6 +183,21 @@ suite("annotate names", () => {
       ],
     ],
     [
+      "the virtual column i, never a variable",
+      "{[t;i] select j:i from t where i<1}",
+      [
+        "param t :",
+        "param i :",
+        "builtin select",
+        "column j : ?global j",
+        "column i",
+        "builtin from",
+        "param t",
+        "builtin where",
+        "column i",
+      ],
+    ],
+    [
       "a query nested in a clause",
       "select from t where a in exec b from u",
       [
