@@ -53,9 +53,9 @@ read.
   - Each file is read as if loaded in the root namespace: `\l` runs a file
     in its loader's namespace, which the file doesn't say
   - A global several files define, such as a setting with its defaults
-    and overrides, has each file's definition, nearest first, which
-    VS Code shows in a peek; set `editor.gotoLocation.multipleDefinitions`
-    to `goto` to jump to the first
+    and overrides, has each file's definition, which VS Code lists in a
+    peek opened at the nearest: the file's own, if it has one. Set
+    `editor.gotoLocation.multipleDefinitions` to `goto` to jump there
   - `` use`foo `` goes to `foo.q` or `foo/init.q` anywhere in the
     workspace, as `QPATH` isn't read
   - Names q defines (`.z`, `.Q`), and globals defined outside the workspace
