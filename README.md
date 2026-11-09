@@ -49,7 +49,11 @@ read.
   to a lambda: the outline and breadcrumbs, highlighting a name where it
   occurs, Go to Definition, Find All References, and **Go to Symbol in
   Workspace** (Cmd+T / Ctrl+T) across every `.q` file in the workspace,
-  including q 5 modules' `use` and `export`. What it can't know:
+  including q 5 modules' `use` and `export`. Find All References lists the
+  uses that pass a global by reference, naming it by a symbol as in
+  ``@[value;`.timer.enabled;0b]`` or `` `t insert x ``, under **Passed by
+  reference**, after the rest; the peek (Shift+F12) lists them with the
+  rest, as it has no groups. What it can't know:
   - Each file is read as if loaded in the root namespace: `\l` runs a file
     in its loader's namespace, which the file doesn't say
   - A global several files define, such as a setting with its defaults

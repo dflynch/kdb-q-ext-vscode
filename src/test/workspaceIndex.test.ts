@@ -41,6 +41,11 @@ function opened(files: Files) {
       references(index, cursor.file, a, cursor.offset, withDefinition).map(
         shown,
       ),
+    // Each with whether it's passed by reference
+    referencedAll: (withDefinition = true) =>
+      references(index, cursor.file, a, cursor.offset, withDefinition).map(
+        (r) => [shown(r), r.passed] as const,
+      ),
   };
 }
 
@@ -182,6 +187,39 @@ suite("references across files", () => {
       "/w/a.q 1:1 a",
       "/w/b.q 1:24 a",
     ]);
+  });
+
+  test("each passed by reference or not", () => {
+    const files = {
+      "/w/u.q": "\\d .u\nw:()\n\\d .",
+      "/w/a.q":
+        ".u.|w,:1\n`.u.w set ()\nn:@[value;`.u.w;()]\nf:{select from t where .u.w}",
+      "/w/foo.q": "export:([w:1])",
+      "/w/b.q": "m:use`foo\nm`w",
+    };
+    assert.deepStrictEqual(
+      opened(files)
+        .referencedAll()
+        .map(([s, passed]) => `${s}${passed ? " passed" : ""}`),
+      [
+        "/w/a.q 1:1 .u.w",
+        "/w/a.q 2:2 .u.w passed",
+        "/w/a.q 3:12 .u.w passed",
+        "/w/a.q 4:24 .u.w",
+        "/w/u.q 2:1 w",
+      ],
+    );
+    // An export's key, named by a symbol, isn't a global
+    const exported = {
+      "/w/foo.q": "export:([w:1])",
+      "/w/b.q": "m:use`foo\nm`|w",
+    };
+    assert.deepStrictEqual(
+      opened(exported)
+        .referencedAll()
+        .map(([, passed]) => passed),
+      [false, false],
+    );
   });
 
   test("a parameter, only in its lambda", () => {

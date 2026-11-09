@@ -70,7 +70,8 @@ All notable changes to the extension are documented in this file.
 - Navigation for q: the outline and breadcrumbs, highlighting a name where
   it occurs, Go to Definition, Find All References and Go to Symbol in
   Workspace, across the workspace's `.q` files, following namespaces,
-  lambdas' locals and q 5 modules
+  lambdas' locals and q 5 modules. Find All References lists the uses that
+  pass a global by reference under a group of their own
 
 ### Changed
 

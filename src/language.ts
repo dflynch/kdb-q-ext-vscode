@@ -1,6 +1,7 @@
 // q language features in the editor, from the annotation pass: the outline
 // (and breadcrumbs) and occurrence highlighting within a file, and
-// definition, references and symbol search across the workspace's q files
+// definition, references and symbol search across the workspace's q files,
+// references in the References view grouped by how they're passed
 
 import * as vscode from "vscode";
 import { type Annotated, annotate } from "./annotate";
@@ -10,6 +11,7 @@ import {
   occurrences,
   outline,
 } from "./navigation";
+import { type Found, ReferencesView } from "./referencesView";
 import {
   definitions,
   type Entry,
@@ -210,6 +212,22 @@ export function registerLanguage(): vscode.Disposable {
       new vscode.Range(line, character, end.line, end.character),
     );
   };
+  const found = async (
+    d: vscode.TextDocument,
+    at: vscode.Position,
+    withDefinition: boolean,
+  ): Promise<Found[]> => {
+    const index = await workspace.index(d);
+    return references(
+      index,
+      d.uri.toString(),
+      annotations(d),
+      d.offsetAt(at),
+      withDefinition,
+    ).map((r) => ({ ...r, location: location(index, r) }));
+  };
+  // As VS Code's Find All References asks, with each definition
+  const view = new ReferencesView((d, at) => found(d, at, true));
   return vscode.Disposable.from(
     workspace,
     vscode.languages.registerDocumentSymbolProvider(selector, {
@@ -237,16 +255,12 @@ export function registerLanguage(): vscode.Disposable {
         ).map((l) => location(index, l));
       },
     }),
+    view,
     vscode.languages.registerReferenceProvider(selector, {
       provideReferences: async (d, position, context) => {
-        const index = await workspace.index(d);
-        return references(
-          index,
-          d.uri.toString(),
-          annotations(d),
-          d.offsetAt(position),
-          context.includeDeclaration,
-        ).map((l) => location(index, l));
+        const out = await found(d, position, context.includeDeclaration);
+        view.offer(d.uri, position, out);
+        return out.map((r) => r.location);
       },
     }),
     vscode.languages.registerWorkspaceSymbolProvider({

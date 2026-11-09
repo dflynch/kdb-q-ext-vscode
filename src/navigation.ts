@@ -229,6 +229,8 @@ export type Target = {
   creates: boolean;
   // In a lambda, rather than run as the file loads
   inLambda: boolean;
+  // A global named by a symbol, as `t in `t insert x
+  passed: boolean;
 };
 
 export function targets(a: Annotated): Target[] {
@@ -259,6 +261,7 @@ export function targets(a: Annotated): Target[] {
     defines: n.defines === true,
     creates: n.defines === true && !n.amends,
     inLambda: n.lambda !== undefined,
+    passed: false,
   }));
   for (const h of a.handles) {
     out.push({
@@ -271,6 +274,7 @@ export function targets(a: Annotated): Target[] {
       defines: h.defines === true,
       creates: h.defines === true && !h.amends,
       inLambda: h.lambda !== undefined,
+      passed: h.module === undefined,
     });
   }
   return out.sort((x, y) => x.start - y.start);
