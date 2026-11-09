@@ -23,8 +23,8 @@ export type Entry = {
   lines: number[];
   defined: Defined[];
   // Each global named, by its absolute name, assigned or read, and each
-  // column that may be one
-  globals: (Span & { full: string })[];
+  // column that may be one; passed if named by a symbol
+  globals: (Span & { full: string; passed: boolean })[];
   // Each export of a module named, as m.f where m:use`foo
   exports: (Span & { module: string; key: string })[];
   // The module's own export, if the file assigns one: its keys when it's a
@@ -50,7 +50,12 @@ export function entry(text: string, a: Annotated): Entry {
       id?.startsWith("global "),
     );
     if (global) {
-      out.globals.push({ start: t.start, end: t.end, full: global.slice(7) });
+      out.globals.push({
+        start: t.start,
+        end: t.end,
+        full: global.slice(7),
+        passed: t.passed,
+      });
     } else if (t.identity.startsWith("export ")) {
       const [, module, key] = t.identity.split(" ");
       out.exports.push({ start: t.start, end: t.end, module, key });
@@ -97,6 +102,9 @@ export function position(
 export type Index = ReadonlyMap<string, Entry>;
 
 export type Location = Span & { file: string };
+
+// An occurrence, and whether it passes a global by reference
+export type Reference = Location & { passed: boolean };
 
 // The files a module named in use resolves to: foo.q or foo/init.q for
 // use`foo, foo/bar.q or foo/bar/init.q for use`foo.bar, in any directory,
@@ -241,23 +249,29 @@ export function references(
   a: Annotated,
   offset: number,
   withDefinition: boolean,
-): Location[] {
+): Reference[] {
   const wanted = across(index, file, a, offset);
   if (!wanted) {
-    return inFile(a, offset, withDefinition).map((r) => ({ file, ...r }));
+    return inFile(a, offset, withDefinition).map((r) => ({
+      file,
+      ...span(r),
+      passed: false,
+    }));
   }
-  const out: Location[] = [];
+  const out: Reference[] = [];
   for (const [f, e] of index) {
     if ("global" in wanted) {
       for (const g of e.globals) {
-        if (g.full === wanted.global) out.push({ file: f, ...span(g) });
+        if (g.full === wanted.global) {
+          out.push({ file: f, ...span(g), passed: g.passed });
+        }
       }
       continue;
     }
     // The key, as the export's declaration
     if (withDefinition && wanted.modules.includes(f)) {
       const k = e.export?.keys?.find((k) => k.key === wanted.key);
-      if (k) out.push({ file: f, ...span(k) });
+      if (k) out.push({ file: f, ...span(k), passed: false });
     }
     const resolved = new Map<string, boolean>();
     for (const x of e.exports) {
@@ -269,7 +283,7 @@ export function references(
         );
         resolved.set(x.module, hit);
       }
-      if (hit) out.push({ file: f, ...span(x) });
+      if (hit) out.push({ file: f, ...span(x), passed: false });
     }
   }
   const skip = withDefinition

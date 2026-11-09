@@ -218,6 +218,23 @@
         "command": "kdb-q-ext-vscode.clearPassphrase",
         "category": "kdb+/q",
         "title": "Clear Certificate Passphrase"
+      },
+      {
+        "command": "kdb-q-ext-vscode.references.dismiss",
+        "title": "Dismiss",
+        "icon": "$(close)"
+      },
+      {
+        "command": "kdb-q-ext-vscode.references.copy",
+        "title": "Copy"
+      },
+      {
+        "command": "kdb-q-ext-vscode.references.copyPath",
+        "title": "Copy Path"
+      },
+      {
+        "command": "kdb-q-ext-vscode.references.copyAll",
+        "title": "Copy All"
       }
     ],
     "menus": {
@@ -264,6 +281,22 @@
         },
         {
           "command": "kdb-q-ext-vscode.openServersSetting",
+          "when": "false"
+        },
+        {
+          "command": "kdb-q-ext-vscode.references.dismiss",
+          "when": "false"
+        },
+        {
+          "command": "kdb-q-ext-vscode.references.copy",
+          "when": "false"
+        },
+        {
+          "command": "kdb-q-ext-vscode.references.copyPath",
+          "when": "false"
+        },
+        {
+          "command": "kdb-q-ext-vscode.references.copyAll",
           "when": "false"
         }
       ],
@@ -416,6 +449,31 @@
           "command": "kdb-q-ext-vscode.openServersSetting",
           "when": "view == kdb-q-ext-vscode.servers && viewItem == setting",
           "group": "1_edit@1"
+        },
+        {
+          "command": "kdb-q-ext-vscode.references.dismiss",
+          "group": "inline",
+          "when": "view == references-view.tree && viewItem =~ /^kdb-q-ext-vscode\\.references\\./"
+        },
+        {
+          "command": "kdb-q-ext-vscode.references.dismiss",
+          "group": "1",
+          "when": "view == references-view.tree && viewItem =~ /^kdb-q-ext-vscode\\.references\\./"
+        },
+        {
+          "command": "kdb-q-ext-vscode.references.copy",
+          "group": "2@1",
+          "when": "view == references-view.tree && viewItem =~ /^kdb-q-ext-vscode\\.references\\./"
+        },
+        {
+          "command": "kdb-q-ext-vscode.references.copyPath",
+          "group": "2@2",
+          "when": "view == references-view.tree && viewItem == kdb-q-ext-vscode.references.file"
+        },
+        {
+          "command": "kdb-q-ext-vscode.references.copyAll",
+          "group": "2@3",
+          "when": "view == references-view.tree && viewItem =~ /^kdb-q-ext-vscode\\.references\\./"
         }
       ]
     },
