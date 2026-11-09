@@ -3,12 +3,7 @@
 // that pass a global by reference, as their own group, last. Pure: no
 // VS Code imports, never throws.
 
-export type Result = {
-  file: string;
-  start: number;
-  end: number;
-  passed: boolean;
-};
+import type { Reference } from "./workspaceIndex";
 
 export type Group<T> = { kind: "group"; files: File<T>[] };
 export type File<T> = {
@@ -22,7 +17,7 @@ export type Node<T> = Group<T> | File<T> | Item<T>;
 
 export const groupLabel = "Passed by reference";
 
-export class Tree<T extends Result> {
+export class Tree<T extends Reference> {
   readonly roots: (File<T> | Group<T>)[];
 
   constructor(results: T[]) {

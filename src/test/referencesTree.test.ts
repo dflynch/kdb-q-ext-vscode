@@ -1,8 +1,9 @@
 import * as assert from "node:assert";
-import { type Node, type Result, Tree } from "../referencesTree";
+import { type Node, Tree } from "../referencesTree";
+import type { Reference } from "../workspaceIndex";
 
 // Results as "file start", passed by reference if starred
-const results = (...rs: string[]): Result[] =>
+const results = (...rs: string[]): Reference[] =>
   rs.map((r) => {
     const [file, at] = r.replace("*", "").split(" ");
     const start = Number(at);
@@ -10,8 +11,8 @@ const results = (...rs: string[]): Result[] =>
   });
 
 // The tree as lines, indented by depth
-function drawn(tree: Tree<Result>): string[] {
-  const draw = (n: Node<Result>, depth: number): string[] => {
+function drawn(tree: Tree<Reference>): string[] {
+  const draw = (n: Node<Reference>, depth: number): string[] => {
     const pad = "  ".repeat(depth);
     if (n.kind === "result") return [`${pad}${n.result.start}`];
     const head = n.kind === "group" ? "Passed by reference" : n.file;
@@ -23,7 +24,7 @@ function drawn(tree: Tree<Result>): string[] {
   return tree.roots.flatMap((n) => draw(n, 0));
 }
 
-const shown = (n: Node<Result> | undefined) =>
+const shown = (n: Node<Reference> | undefined) =>
   n?.kind === "result" ? `${n.result.file} ${n.result.start}` : n?.kind;
 
 suite("references tree", () => {
@@ -87,7 +88,7 @@ suite("references tree", () => {
   test("next and previous through the group, round to the start", () => {
     const tree = sample();
     const order: (string | undefined)[] = [];
-    let n: Node<Result> = tree.items()[0];
+    let n: Node<Reference> = tree.items()[0];
     for (let i = 0; i < 7; i++) {
       order.push(shown(n));
       n = tree.next(n);

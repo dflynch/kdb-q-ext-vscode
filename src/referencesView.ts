@@ -12,9 +12,9 @@ import {
   groupLabel,
   type Item,
   type Node,
-  type Result,
   Tree,
 } from "./referencesTree";
+import type { Reference } from "./workspaceIndex";
 
 // The References view's API, as VS Code's references-view extension gives it
 type SymbolTree = {
@@ -54,7 +54,7 @@ type Model = {
 const search = "vscode.executeReferenceProvider";
 const source = "kdb-q-ext-vscode.references";
 
-export type Found = Result & { location: vscode.Location };
+export type Found = Reference & { location: vscode.Location };
 
 type Find = (
   document: vscode.TextDocument,
@@ -265,7 +265,8 @@ export class ReferencesView implements vscode.Disposable {
   }
 
   // Takes the place of VS Code's search at the same place, the first time
-  // it asks, if some result is passed by reference
+  // it asks, if some result is passed by reference. It asks with each
+  // definition, so its results are the tree's
   offer(uri: vscode.Uri, position: vscode.Position, found: Found[]) {
     const view = vscode.extensions.getExtension<SymbolTree>(
       "vscode.references-view",
