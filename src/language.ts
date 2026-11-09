@@ -193,11 +193,20 @@ const highlights: Record<Occurrence["kind"], vscode.DocumentHighlightKind> = {
 // in the peek
 const peekDefinitions = "kdb-q-ext-vscode.peekDefinitions";
 
-// Text in markdown as written: its punctuation escaped, each line its own
-const plain = (text: string) =>
+// Text in markdown as written: its punctuation escaped, each line its own.
+// A URL stays as written, for markdown to link: escaped, its backslashes
+// would show, and break the link
+export const plain = (text: string) =>
   text
     .split("\n")
-    .map((l) => l.replace(/[\\`*_{}[\]()<>#+\-.!|~&]/g, "\\$&"))
+    .map((l) =>
+      l
+        .split(/(\b(?:https?|ftp):\/\/[^\s<>]+)/)
+        .map((part, i) =>
+          i % 2 ? part : part.replace(/[\\`*_{}[\]()<>#+\-=.!|~&]/g, "\\$&"),
+        )
+        .join(""),
+    )
     .join("  \n");
 
 // Code in a q block, its fence longer than any run of backticks in it
@@ -325,8 +334,12 @@ export function registerLanguage(): vscode.Disposable {
         if (builtin && defined.length) parts.push("---");
         if (defined.length) parts.push(...described(defined[0], d.uri, index));
         const out = new vscode.MarkdownString();
-        if (defined.length > 1) {
-          const more = defined.length - 1;
+        // As many as the peek lists, as an export's may differ
+        const more =
+          defined.length &&
+          definitions(index, d.uri.toString(), annotations(d), offset).length -
+            1;
+        if (more > 0) {
           const args = encodeURIComponent(
             JSON.stringify([d.uri.toString(), at.line, at.character]),
           );

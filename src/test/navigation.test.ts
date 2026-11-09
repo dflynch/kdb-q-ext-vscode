@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { annotate } from "../annotate";
+import { plain } from "../language";
 import {
   globals,
   type Outlined,
@@ -198,6 +199,16 @@ suite("documentation", () => {
     ],
     ["none", "f:{x}", { f: undefined }],
     [
+      "with CRLF and CR line breaks",
+      "/ f's\r\nf:{x}\r\n/\r\n  g's\r\n\\\r\ng:{x}\r/ h's\rh:{x}",
+      { f: "f's", g: "g's", h: "h's" },
+    ],
+    [
+      "not trailing after another definition on its line",
+      "a:1; b:2 / about b\nf:{x}; show 1 / f's",
+      { a: undefined, b: undefined, f: "f's" },
+    ],
+    [
       "from the first line, after a line break",
       "\n/ c\nf:1;/ d\n/\n \n[",
       { f: "c" },
@@ -206,6 +217,26 @@ suite("documentation", () => {
   for (const [name, text, expected] of cases) {
     test(name, () => assert.deepStrictEqual(docs(text), expected));
   }
+});
+
+suite("documentation's text", () => {
+  test("punctuation, and = as an underline, are escaped", () =>
+    assert.strictEqual(
+      plain("Formats *a* message\n=========="),
+      "Formats \\*a\\* message  \n\\=\\=\\=\\=\\=\\=\\=\\=\\=\\=",
+    ));
+  test("a URL stays as written, for markdown to link", () =>
+    assert.strictEqual(
+      plain("see http://gw.example.com/x_y."),
+      "see http://gw.example.com/x_y.",
+    ));
+  test("a large file's comments are found in linear time", () => {
+    const text = "/ c\nf:{x} / t\n".repeat(40000);
+    const start = Date.now();
+    const found = globals(text, annotate(text));
+    assert.strictEqual(found[0].doc, "c");
+    assert.ok(Date.now() - start < 2000, `${Date.now() - start} ms`);
+  });
 });
 
 suite("occurrences", () => {

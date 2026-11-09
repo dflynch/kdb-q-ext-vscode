@@ -99,6 +99,8 @@ const overrides = {
     summary: "load a module",
     syntax: "use`module",
   },
+  // The page writes z.ws:f, without its dot
+  ".z.ws": { page: "ref/dotz.md", syntax: ".z.ws:f" },
   ".Q.addmonths": { page: "ref/dotq.md", summary: "add months" },
   ".z.s": {
     page: "ref/dotz.md",

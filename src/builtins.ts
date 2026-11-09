@@ -191,7 +191,7 @@ export const builtins: ReadonlyMap<string, Builtin> = new Map([
   [".z.w", {"syntax":".z.w","summary":"handle","url":"https://code.kx.com/q/ref/dotz/#zw-handle"}],
   [".z.wc", {"syntax":".z.wc:f","summary":"websocket close","url":"https://code.kx.com/q/ref/dotz/#zwc-websocket-close"}],
   [".z.wo", {"syntax":".z.wo:f","summary":"websocket open","url":"https://code.kx.com/q/ref/dotz/#zwo-websocket-open"}],
-  [".z.ws", {"syntax":"z.ws:f","summary":"websockets","url":"https://code.kx.com/q/ref/dotz/#zws-websockets"}],
+  [".z.ws", {"syntax":".z.ws:f","summary":"websockets","url":"https://code.kx.com/q/ref/dotz/#zws-websockets"}],
   [".z.x", {"syntax":".z.x","summary":"argv","url":"https://code.kx.com/q/ref/dotz/#zx-argv"}],
   [".z.z", {"syntax":".z.z","summary":"UTC datetime","url":"https://code.kx.com/q/ref/dotz/#zz-utc-datetime"}],
   [".z.zd", {"syntax":".z.zd:(lbs;alg;lvl)\n.z.zd:dict","summary":"compression/encryption defaults","url":"https://code.kx.com/q/ref/dotz/#zzd-compressionencryption-defaults"}],

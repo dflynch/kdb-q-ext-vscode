@@ -92,7 +92,6 @@ export type Defined = {
 export function globals(text: string, a: Annotated): Defined[] {
   const script = scan(text);
   const at = placed(script);
-  const documented = docs(text, script);
   const lambdas = new Map<number, Lambda>(
     a.lambdas.map((l) => [l.open.start, l]),
   );
@@ -166,6 +165,11 @@ export function globals(text: string, a: Annotated): Defined[] {
     }
   }
   defined.sort((x, y) => x.start - y.start);
+  const documented = docs(
+    text,
+    script,
+    defined.map((d) => d.start),
+  );
   const seen = new Set<string>();
   const out: Defined[] = [];
   for (const d of defined) {
@@ -201,10 +205,12 @@ function uncommented(text: string, c: Token): string[] {
 
 // The comment documenting a definition at the offset, if the definition
 // starts its line: the comment lines, or a block comment, directly above it
-// with no line between, else a comment trailing on its line
+// with no line between, else a comment trailing on its line, unless another
+// definition, one of starts, comes between
 function docs(
   text: string,
   script: Script,
+  starts: number[],
 ): (offset: number) => string | undefined {
   const comments = [
     ...script.comments,
@@ -212,42 +218,64 @@ function docs(
       s.tokens.filter((t) => t.kind === "comment"),
     ),
   ].sort((x, y) => x.start - y.start);
-  // From before the offset: lastIndexOf reads a negative start as 0
-  const lineStart = (offset: number) =>
-    offset <= 0
-      ? 0
-      : Math.max(
-          text.lastIndexOf("\n", offset - 1),
-          text.lastIndexOf("\r", offset - 1),
-        ) + 1;
+  const lines = [0];
+  for (const m of text.matchAll(/\r\n|\r|\n/g)) {
+    lines.push(m.index + m[0].length);
+  }
+  // The line the offset is on, from 0
+  const lineOf = (offset: number) => {
+    let lo = 0;
+    let hi = lines.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (lines[mid] <= offset) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo;
+  };
+  // The first of the sorted offsets after the offset
+  const after = (sorted: number[], offset: number) => {
+    let lo = 0;
+    let hi = sorted.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (sorted[mid] <= offset) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  };
   // Whether only spaces come before the offset on its line
   const first = (offset: number) =>
-    text.slice(lineStart(offset), offset).trim() === "";
-  // Each comment that starts its line, by the start of the line it ends on
+    text.slice(lines[lineOf(offset)], offset).trim() === "";
+  // Each comment that starts its line, by the line it ends on
   const ending = new Map<number, Token>();
   for (const c of comments) {
-    if (first(c.start)) ending.set(lineStart(c.end), c);
+    if (first(c.start)) ending.set(lineOf(c.end), c);
   }
-  const joined = (lines: string[]) => {
-    const doc = lines.join("\n").trim();
-    return doc === "" ? undefined : doc;
+  const commentStarts = comments.map((c) => c.start);
+  const sortedStarts = [...starts].sort((x, y) => x - y);
+  const joined = (doc: string[]) => {
+    const out = doc.join("\n").trim();
+    return out === "" ? undefined : out;
   };
   return (offset) => {
-    const line = lineStart(offset);
-    if (text.slice(line, offset).trim() !== "") return undefined;
+    if (!first(offset)) return undefined;
+    const line = lineOf(offset);
     const above: Token[] = [];
-    for (let at = line; at > 0; ) {
-      const c = ending.get(lineStart(at - 1));
+    for (let n = line; n > 0; ) {
+      const c = ending.get(n - 1);
       if (!c) break;
       above.unshift(c);
-      at = lineStart(c.start);
+      n = lineOf(c.start);
     }
     if (above.length) {
       return joined(above.flatMap((c) => uncommented(text, c)));
     }
-    const end = text.slice(offset).search(/\r|\n|$/) + offset;
-    const trailing = comments.find((c) => c.start > offset && c.start < end);
-    return trailing && joined(uncommented(text, trailing));
+    const trailing = comments[after(commentStarts, offset)];
+    if (!trailing || lineOf(trailing.start) !== line) return undefined;
+    const next = sortedStarts[after(sortedStarts, offset)];
+    if (next !== undefined && next < trailing.start) return undefined;
+    return joined(uncommented(text, trailing));
   };
 }
 
