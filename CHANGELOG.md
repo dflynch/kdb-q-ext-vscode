@@ -67,6 +67,10 @@ All notable changes to the extension are documented in this file.
   and reals wherever a result is written, `sizeLimit`, the largest result
   taken, and `rowLimit`, the most rows shown, as the Grid's memory goes by
   its rows
+- Navigation for q: the outline and breadcrumbs, highlighting a name where
+  it occurs, Go to Definition, Find All References and Go to Symbol in
+  Workspace, across the workspace's `.q` files, following namespaces,
+  lambdas' locals and q 5 modules
 
 ### Changed
 

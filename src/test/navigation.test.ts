@@ -3,13 +3,8 @@ import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { annotate } from "../annotate";
-import {
-  definition,
-  type Outlined,
-  occurrences,
-  outline,
-  references,
-} from "../navigation";
+import { type Outlined, occurrences, outline, references } from "../navigation";
+import { definitions, entry } from "../workspaceIndex";
 
 const fixtures = path.join(__dirname, "../../test/fixtures");
 
@@ -202,17 +197,25 @@ suite("occurrences", () => {
 });
 
 // The definition of the name at the first | as "line:column name", from 1,
-// with the | taken out
+// with the | taken out, in a workspace of the one file
 function defined(source: string): string {
   const offset = source.indexOf("|");
   const text = source.slice(0, offset) + source.slice(offset + 1);
-  const d = definition(annotate(text), offset);
+  const a = annotate(text);
+  const found = definitions(
+    new Map([["/a.q", entry(text, a)]]),
+    "/a.q",
+    a,
+    offset,
+  );
+  assert.ok(found.length <= 1);
+  const [d] = found;
   if (!d) return "none";
   const before = text.slice(0, d.start).split("\n");
   return `${before.length}:${before[before.length - 1].length + 1} ${text.slice(d.start, d.end)}`;
 }
 
-suite("definition", () => {
+suite("definition in a file", () => {
   const cases: [string, string, string][] = [
     ["a global, where it's first assigned", "n:0\nn:1\nf:{|n}", "1:1 n"],
     [
