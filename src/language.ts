@@ -4,7 +4,12 @@
 
 import * as vscode from "vscode";
 import { type Annotated, annotate } from "./annotate";
-import { type Outlined, occurrences, outline } from "./navigation";
+import {
+  type Occurrence,
+  type Outlined,
+  occurrences,
+  outline,
+} from "./navigation";
 import {
   definitions,
   type Entry,
@@ -174,10 +179,7 @@ const kinds: Record<Outlined["kind"], vscode.SymbolKind> = {
   module: vscode.SymbolKind.Module,
 };
 
-const highlights: Record<
-  ReturnType<typeof occurrences>[number]["kind"],
-  vscode.DocumentHighlightKind
-> = {
+const highlights: Record<Occurrence["kind"], vscode.DocumentHighlightKind> = {
   read: vscode.DocumentHighlightKind.Read,
   write: vscode.DocumentHighlightKind.Write,
   text: vscode.DocumentHighlightKind.Text,

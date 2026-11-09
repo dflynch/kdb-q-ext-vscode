@@ -292,7 +292,7 @@ export function at(all: Target[], offset: number): Target | undefined {
 // lambda is. A column read is the variable it may be. Nothing for a keyword,
 // an export, an implicit parameter never assigned, or a name defined in
 // another file
-export function definition(
+function definition(
   a: Annotated,
   offset: number,
 ): { start: number; end: number } | undefined {
