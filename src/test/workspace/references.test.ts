@@ -16,6 +16,14 @@ type Input = {
 };
 type SymbolTree = { getInput(): Input | undefined };
 
+const references = async () => {
+  const view = vscode.extensions.getExtension<SymbolTree>(
+    "vscode.references-view",
+  );
+  assert.ok(view);
+  return view.activate();
+};
+
 const ours = "kdb-q-ext-vscode.references";
 
 const file = (path: string) => {
@@ -28,11 +36,7 @@ const file = (path: string) => {
 // gives the view's new input once ours has replaced VS Code's, else
 // VS Code's
 async function findAll(path: string, line: number, character: number) {
-  const view = vscode.extensions.getExtension<SymbolTree>(
-    "vscode.references-view",
-  );
-  assert.ok(view);
-  const tree = await view.activate();
+  const tree = await references();
   const editor = await vscode.window.showTextDocument(
     await vscode.workspace.openTextDocument(file(path)),
   );
@@ -42,7 +46,13 @@ async function findAll(path: string, line: number, character: number) {
   await vscode.commands.executeCommand("references-view.findReferences");
   for (let i = 0; i < 20; i++) {
     const input = tree.getInput();
-    if (input !== before && input?.contextValue === ours) return input;
+    if (input !== before && input?.contextValue === ours) {
+      // Once the view has revealed the search's result: a search run
+      // sooner, as the next test's, has VS Code's view finish the reveal
+      // with the next tree, and log its error
+      await new Promise((r) => setTimeout(r, 500));
+      return input;
+    }
     await new Promise((r) => setTimeout(r, 50));
   }
   return tree.getInput();
@@ -112,7 +122,47 @@ suite("references view", () => {
     assert.strictEqual((await model.provider.getChildren())?.length, 2);
   });
 
-  test("VS Code's own tree, with nothing passed by reference", async () => {
+  test("found afresh when resolved again, as Refresh does", async () => {
+    const input = await findAll("code/wdb.q", 4, 26);
+    assert.ok(input);
+    const editor = vscode.window.activeTextEditor;
+    assert.ok(editor);
+    try {
+      await editor.edit((e) =>
+        e.insert(new vscode.Position(5, 0), "`.merge.limit set 1b"),
+      );
+      const model = await input.resolve();
+      assert.strictEqual(model?.message, "5 results in 2 files");
+    } finally {
+      await vscode.commands.executeCommand("workbench.action.files.revert");
+    }
+  });
+
+  test("a peek at the place leaves VS Code's search", async function () {
+    this.timeout(10000);
+    // run, which nothing passes by reference, yet
+    const input = await findAll("code/wdb.q", 4, 1);
+    assert.strictEqual(input?.contextValue, "vscode.executeReferenceProvider");
+    const editor = vscode.window.activeTextEditor;
+    assert.ok(editor);
+    try {
+      await editor.edit((e) =>
+        e.insert(new vscode.Position(5, 0), "`run set 1"),
+      );
+      const found = await vscode.commands.executeCommand<vscode.Location[]>(
+        "vscode.executeReferenceProvider",
+        editor.document.uri,
+        new vscode.Position(4, 1),
+      );
+      assert.strictEqual(found.length, 2);
+      assert.strictEqual((await references()).getInput(), input);
+    } finally {
+      await vscode.commands.executeCommand("workbench.action.files.revert");
+    }
+  });
+
+  test("VS Code's own tree, with nothing passed by reference", async function () {
+    this.timeout(10000);
     // t, a parameter
     const input = await findAll("code/wdb.q", 4, 6);
     assert.strictEqual(input?.contextValue, "vscode.executeReferenceProvider");

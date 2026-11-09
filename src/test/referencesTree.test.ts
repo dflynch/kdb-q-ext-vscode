@@ -102,9 +102,11 @@ suite("references tree", () => {
       "/a.q 1",
     ]);
     assert.strictEqual(shown(tree.previous(tree.items()[0])), "/c.q 3");
-    // From the group, its first; before it, the last outside it
-    const group = tree.roots[2];
-    assert.strictEqual(shown(tree.next(group)), "/a.q 5");
+    // From a file or the group, the first after it, or the last before it
+    const [, b, group] = tree.roots;
+    assert.strictEqual(shown(tree.next(b)), "/a.q 5");
+    assert.strictEqual(shown(tree.previous(b)), "/a.q 1");
+    assert.strictEqual(shown(tree.next(group)), "/a.q 1");
     assert.strictEqual(shown(tree.previous(group)), "/b.q 9");
   });
 

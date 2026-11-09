@@ -94,12 +94,13 @@ export class Tree<T extends Result> {
   }
 
   // The next result, or previous, round to the start, as F4 steps; from a
-  // file or group, its first, or the one before it
+  // file or group, the first after it, or the last before it, as VS Code's
+  // tree steps from a file
   next(node: Node<T>): Node<T> {
     const all = this.items();
-    const inside = this.items(node);
-    if (node.kind !== "result") return inside[0] ?? node;
-    return all[(all.indexOf(node) + 1) % all.length] ?? node;
+    const last = this.items(node).at(-1);
+    if (!last) return node;
+    return all[(all.indexOf(last) + 1) % all.length] ?? node;
   }
 
   previous(node: Node<T>): Node<T> {

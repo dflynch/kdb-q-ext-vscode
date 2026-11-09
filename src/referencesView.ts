@@ -87,10 +87,20 @@ function preview(
   return { head, inside, tail };
 }
 
+// The tree each node is in, for the commands on a row, as the view may have
+// dropped the tree a later one replaced
+const shownBy = new WeakMap<Node<Found>, Shown>();
+
 class Shown {
   private readonly changed = new vscode.EventEmitter<Node<Found> | undefined>();
 
-  constructor(readonly tree: Tree<Found>) {}
+  constructor(readonly tree: Tree<Found>) {
+    const add = (node: Node<Found>) => {
+      shownBy.set(node, this);
+      for (const child of tree.children(node)) add(child);
+    };
+    for (const root of tree.roots) add(root);
+  }
 
   uri(node: Node<Found>): vscode.Uri | undefined {
     return this.tree.items(node)[0]?.result.location.uri;
@@ -216,15 +226,18 @@ class Shown {
 }
 
 export class ReferencesView implements vscode.Disposable {
-  // The tree the view shows, if it's ours
-  private shown?: Shown;
+  // VS Code's searches offered already: only the first call, the view's
+  // own, can replace one, not a peek or another extension's at the place
+  private readonly offered = new WeakSet<Input>();
   private readonly disposables: vscode.Disposable[];
 
   constructor(private readonly find: Find) {
     const on =
       (f: (shown: Shown, node: Node<Found>) => unknown) =>
-      (node?: Node<Found>) =>
-        this.shown && node ? f(this.shown, node) : undefined;
+      (node?: Node<Found>) => {
+        const shown = node && shownBy.get(node);
+        return shown && node ? f(shown, node) : undefined;
+      };
     const copy = (text: string) => vscode.env.clipboard.writeText(text);
     this.disposables = [
       vscode.commands.registerCommand(
@@ -251,38 +264,55 @@ export class ReferencesView implements vscode.Disposable {
     ];
   }
 
-  // Takes the place of VS Code's search at the same place, if the view is
-  // running it and some result is passed by reference
+  // Takes the place of VS Code's search at the same place, the first time
+  // it asks, if some result is passed by reference
   offer(uri: vscode.Uri, position: vscode.Position, found: Found[]) {
-    if (!found.some((f) => f.passed)) return;
     const view = vscode.extensions.getExtension<SymbolTree>(
       "vscode.references-view",
     );
     if (!view?.isActive) return;
     const input = view.exports.getInput();
     if (
-      input?.contextValue === search &&
-      input.location.uri.toString() === uri.toString() &&
-      input.location.range.start.isEqual(position)
+      !input ||
+      input.contextValue !== search ||
+      input.location.uri.toString() !== uri.toString() ||
+      !input.location.range.start.isEqual(position) ||
+      this.offered.has(input)
     ) {
-      view.exports.setInput(this.input(input.title, input.location));
+      return;
+    }
+    this.offered.add(input);
+    if (found.some((f) => f.passed)) {
+      view.exports.setInput(this.input(input.title, input.location, found));
     }
   }
 
-  private input(title: string, location: vscode.Location): Input {
+  // Drawn first from the results the search found, then found afresh, as
+  // Refresh and a run from history resolve the same input again
+  private input(
+    title: string,
+    location: vscode.Location,
+    first?: Found[],
+  ): Input {
+    let given = first;
     return {
       contextValue: source,
       title,
       location,
       resolve: async () => {
-        const document = await vscode.workspace.openTextDocument(location.uri);
-        const found = await this.find(document, location.range.start);
+        let found = given;
+        given = undefined;
+        if (!found) {
+          const document = await vscode.workspace.openTextDocument(
+            location.uri,
+          );
+          found = await this.find(document, location.range.start);
+        }
         if (!found.length) return undefined;
         // Shown first, as the view reveals the search's own result only if
         // it's visible, and ours is ready sooner than VS Code's
         await vscode.commands.executeCommand("references-view.tree.focus");
-        this.shown = new Shown(new Tree(found));
-        return this.shown.model();
+        return new Shown(new Tree(found)).model();
       },
       with: (l) => this.input(title, l),
     };
