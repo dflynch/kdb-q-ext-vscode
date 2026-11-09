@@ -67,8 +67,9 @@ read.
   and what it does, from [KX's reference](https://code.kx.com/q/ref/),
   linked; on a global, its signature, or its name, with the comment that
   documents it, and the file it's in. That comment is the lines directly
-  above the definition, or failing that one trailing on its line, and only
-  where the definition starts its line. A global several files define shows
+  above the definition, or failing that one trailing on its line with no
+  other definition before it, and only where the definition starts its
+  line. A global several files define shows
   the nearest definition, with a link that peeks at the rest.
 
 ### Servers
