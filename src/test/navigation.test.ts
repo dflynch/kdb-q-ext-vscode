@@ -3,7 +3,13 @@ import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { annotate } from "../annotate";
-import { type Outlined, occurrences, outline, references } from "../navigation";
+import {
+  globals,
+  type Outlined,
+  occurrences,
+  outline,
+  references,
+} from "../navigation";
 import { definitions, entry } from "../workspaceIndex";
 
 const fixtures = path.join(__dirname, "../../test/fixtures");
@@ -146,6 +152,61 @@ function marked(source: string): string[] {
     (o) => `${text.slice(o.start, o.end)} ${o.kind}`,
   );
 }
+
+suite("documentation", () => {
+  // Each global's comment, by name
+  const docs = (text: string) =>
+    Object.fromEntries(
+      globals(text, annotate(text)).map((d) => [d.full, d.doc]),
+    );
+  const cases: [string, string, Record<string, string | undefined>][] = [
+    [
+      "the comment lines above, without slashes",
+      "// Adds\n// two numbers\nf:{x+y}",
+      { f: "Adds\ntwo numbers" },
+    ],
+    [
+      "TorQ's dashes",
+      "/ - Forward fill\na:{x}\n/-load csv\nb:{x}\n/-1 means none\nc:1",
+      { a: "Forward fill", b: "load csv", c: "-1 means none" },
+    ],
+    [
+      "a block comment above",
+      "/\n  Opens\n  a handle\n\\\nf:{x}",
+      { f: "Opens\na handle" },
+    ],
+    ["not across a blank line", "/ section\n\nf:{x}", { f: undefined }],
+    [
+      "else a comment trailing on its line",
+      "enabled:0b // whether checks run\nf:{[a]  / the first line\n  a}",
+      { enabled: "whether checks run", f: "the first line" },
+    ],
+    [
+      "only for a definition first on its line",
+      "/ a's\na:1;b:{x} / b's",
+      { a: "a's", b: undefined },
+    ],
+    [
+      "not a trailing comment on the line above",
+      "a:1 / a's\nb:2",
+      { a: "a's", b: undefined },
+    ],
+    [
+      "inside a lambda",
+      "f:{\n  / the count\n  .c.n::count x}",
+      { f: undefined, ".c.n": "the count" },
+    ],
+    ["none", "f:{x}", { f: undefined }],
+    [
+      "from the first line, after a line break",
+      "\n/ c\nf:1;/ d\n/\n \n[",
+      { f: "c" },
+    ],
+  ];
+  for (const [name, text, expected] of cases) {
+    test(name, () => assert.deepStrictEqual(docs(text), expected));
+  }
+});
 
 suite("occurrences", () => {
   const cases: [string, string, string[]][] = [

@@ -4,7 +4,7 @@
 // imports, never throws.
 
 import type { Annotated, Lambda, Name } from "./annotate";
-import { scan, type Token } from "./scanner";
+import { type Script, scan, type Token } from "./scanner";
 
 export type Outlined = {
   name: string;
@@ -32,9 +32,9 @@ export type Occurrence = {
 // offset
 type Placed = { tokens: Token[]; index: number };
 
-function placed(text: string): (offset: number) => Placed | undefined {
+function placed(script: Script): (offset: number) => Placed | undefined {
   const all: Placed[] = [];
-  for (const s of scan(text).statements) {
+  for (const s of script.statements) {
     const tokens = s.tokens.filter((t) => t.kind !== "comment");
     for (let index = 0; index < tokens.length; index++) {
       all.push({ tokens, index });
@@ -83,12 +83,16 @@ export type Defined = {
   nameStart: number;
   nameEnd: number;
   inLambda: boolean;
+  // The comment that documents it, without its slashes
+  doc?: string;
 };
 
 // Each global's first definition at top level and its first in a lambda,
 // not where an existing value is amended, in the order they're written
 export function globals(text: string, a: Annotated): Defined[] {
-  const at = placed(text);
+  const script = scan(text);
+  const at = placed(script);
+  const documented = docs(text, script);
   const lambdas = new Map<number, Lambda>(
     a.lambdas.map((l) => [l.open.start, l]),
   );
@@ -115,6 +119,8 @@ export function globals(text: string, a: Annotated): Defined[] {
       nameEnd: end,
       inLambda,
     };
+    const doc = documented(item.start);
+    if (doc !== undefined) item.doc = doc;
     // Past any names assigned along with it, as g in f:g:{x}
     let i = p.index;
     while (p.tokens[i + 2]?.kind === "name" && isAssign(p.tokens[i + 3])) {
@@ -170,6 +176,79 @@ export function globals(text: string, a: Annotated): Defined[] {
     if (item) out.push(item);
   }
   return out;
+}
+
+// A comment's text without its slashes, line by line: a block comment's
+// lines between its / and \, and a comment line's after its slashes and
+// any dash after them, as TorQ's /- and / - have it
+function uncommented(text: string, c: Token): string[] {
+  const lines = text.slice(c.start, c.end).split(/\r\n|\n|\r/);
+  if (lines.length > 1 && /^\/\s*$/.test(lines[0])) {
+    const inner = lines.slice(
+      1,
+      /^\\\s*$/.test(lines[lines.length - 1]) ? -1 : undefined,
+    );
+    return inner.map((l) => l.trim());
+  }
+  return lines.map((l) =>
+    l
+      .trim()
+      .replace(/^\/+\s*/, "")
+      .replace(/^-(?=\s|[A-Za-z])\s*/, "")
+      .trim(),
+  );
+}
+
+// The comment documenting a definition at the offset, if the definition
+// starts its line: the comment lines, or a block comment, directly above it
+// with no line between, else a comment trailing on its line
+function docs(
+  text: string,
+  script: Script,
+): (offset: number) => string | undefined {
+  const comments = [
+    ...script.comments,
+    ...script.statements.flatMap((s) =>
+      s.tokens.filter((t) => t.kind === "comment"),
+    ),
+  ].sort((x, y) => x.start - y.start);
+  // From before the offset: lastIndexOf reads a negative start as 0
+  const lineStart = (offset: number) =>
+    offset <= 0
+      ? 0
+      : Math.max(
+          text.lastIndexOf("\n", offset - 1),
+          text.lastIndexOf("\r", offset - 1),
+        ) + 1;
+  // Whether only spaces come before the offset on its line
+  const first = (offset: number) =>
+    text.slice(lineStart(offset), offset).trim() === "";
+  // Each comment that starts its line, by the start of the line it ends on
+  const ending = new Map<number, Token>();
+  for (const c of comments) {
+    if (first(c.start)) ending.set(lineStart(c.end), c);
+  }
+  const joined = (lines: string[]) => {
+    const doc = lines.join("\n").trim();
+    return doc === "" ? undefined : doc;
+  };
+  return (offset) => {
+    const line = lineStart(offset);
+    if (text.slice(line, offset).trim() !== "") return undefined;
+    const above: Token[] = [];
+    for (let at = line; at > 0; ) {
+      const c = ending.get(lineStart(at - 1));
+      if (!c) break;
+      above.unshift(c);
+      at = lineStart(c.start);
+    }
+    if (above.length) {
+      return joined(above.flatMap((c) => uncommented(text, c)));
+    }
+    const end = text.slice(offset).search(/\r|\n|$/) + offset;
+    const trailing = comments.find((c) => c.start > offset && c.start < end);
+    return trailing && joined(uncommented(text, trailing));
+  };
 }
 
 // What the file defines at top level: each global once, where it's first

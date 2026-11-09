@@ -7,6 +7,7 @@
 // the annotation pass is: no VS Code imports, never throws.
 
 import type { Annotated } from "./annotate";
+import { type Builtin, builtins } from "./builtins";
 import {
   at,
   type Defined,
@@ -222,20 +223,60 @@ export function definitions(
 // Where each file first assigns a global at top level, or, if none does,
 // first in a lambda, the file itself first, then the nearest
 function defining(index: Index, file: string, global: string): Location[] {
-  const atTop: Location[] = [];
-  const inLambda: Location[] = [];
+  return defined(index, file, global).map((d) => ({
+    file: d.file,
+    start: d.nameStart,
+    end: d.nameEnd,
+  }));
+}
+
+// Each file's definition of a global, as defining() orders them
+function defined(index: Index, file: string, global: string): Listed[] {
+  const atTop: Listed[] = [];
+  const inLambda: Listed[] = [];
   for (const [f, e] of index) {
     const top = e.defined.find((d) => d.full === global && !d.inLambda);
     const inner = e.defined.find((d) => d.full === global && d.inLambda);
-    if (top) atTop.push({ file: f, start: top.nameStart, end: top.nameEnd });
-    if (inner) {
-      inLambda.push({ file: f, start: inner.nameStart, end: inner.nameEnd });
-    }
+    if (top) atTop.push({ ...top, file: f });
+    if (inner) inLambda.push({ ...inner, file: f });
   }
   const order = nearest(file);
   return (atTop.length ? atTop : inLambda).sort((x, y) =>
     order(x.file, y.file),
   );
+}
+
+// What a hover over the offset says: q's own entry for a keyword or a name
+// in .Q, .z, .h or .j, and a global's definitions, in definitions()'s order.
+// An export's, where its module's export has the key and the module defines
+// its value. Nothing for a local, a parameter, a column or a key
+export function hover(
+  index: Index,
+  file: string,
+  a: Annotated,
+  offset: number,
+): { builtin?: Builtin; defined: Listed[] } | undefined {
+  const here = at(targets(a), offset);
+  if (!here) return undefined;
+  if (here.identity.startsWith("builtin ")) {
+    const builtin = builtins.get(here.identity.slice(8));
+    return builtin && { builtin, defined: [] };
+  }
+  const wanted = across(index, file, a, offset);
+  if (!wanted) return undefined;
+  if ("global" in wanted) {
+    const builtin = builtins.get(wanted.global);
+    const found = defined(index, file, wanted.global);
+    if (!builtin && !found.length) return undefined;
+    return { ...(builtin ? { builtin } : {}), defined: found };
+  }
+  const found: Listed[] = [];
+  for (const m of wanted.modules) {
+    const k = index.get(m)?.export?.keys?.find((k) => k.key === wanted.key);
+    const d = k && index.get(m)?.defined.find((d) => d.start === k.value.start);
+    if (d) found.push({ ...d, file: m });
+  }
+  return found.length ? { defined: found } : undefined;
 }
 
 const span = ({ start, end }: Span): Span => ({ start, end });

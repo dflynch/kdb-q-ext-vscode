@@ -1,7 +1,7 @@
 // q language features in the editor, from the annotation pass: the outline
 // (and breadcrumbs) and occurrence highlighting within a file, and
-// definition, references and symbol search across the workspace's q files,
-// references in the References view grouped by how they're passed
+// definition, references, hover and symbol search across the workspace's q
+// files, references in the References view grouped by how they're passed
 
 import * as vscode from "vscode";
 import { type Annotated, annotate } from "./annotate";
@@ -16,7 +16,9 @@ import {
   definitions,
   type Entry,
   entry,
+  hover,
   type Index,
+  type Listed,
   type Location,
   position,
   references,
@@ -187,6 +189,48 @@ const highlights: Record<Occurrence["kind"], vscode.DocumentHighlightKind> = {
   text: vscode.DocumentHighlightKind.Text,
 };
 
+// Runs from a hover's link: the definitions of the name at the position,
+// in the peek
+const peekDefinitions = "kdb-q-ext-vscode.peekDefinitions";
+
+// Text in markdown as written: its punctuation escaped, each line its own
+const plain = (text: string) =>
+  text
+    .split("\n")
+    .map((l) => l.replace(/[\\`*_{}[\]()<>#+\-.!|~&]/g, "\\$&"))
+    .join("  \n");
+
+// Code in a q block, its fence longer than any run of backticks in it
+const code = (text: string) => {
+  const fence = "`".repeat(
+    Math.max(3, ...[...text.matchAll(/`+/g)].map((m) => m[0].length + 1)),
+  );
+  return `${fence}q\n${text}\n${fence}`;
+};
+
+// How a definition reads in a hover: its signature, or its name, then its
+// comment as written, and the file it's in if it's another
+function described(d: Listed, from: vscode.Uri, index: Index): string[] {
+  const signature =
+    d.kind === "function"
+      ? `${d.full}${d.detail}`
+      : d.kind === "module"
+        ? `${d.full}:${d.detail}`
+        : d.full;
+  const out = [code(signature)];
+  if (d.doc !== undefined) out.push(plain(d.doc));
+  if (d.file !== from.toString()) {
+    const uri = vscode.Uri.parse(d.file);
+    const { line, character } = position(
+      index.get(d.file) as Entry,
+      d.nameStart,
+    );
+    const at = uri.with({ fragment: `L${line + 1},${character + 1}` });
+    out.push(`[${plain(vscode.workspace.asRelativePath(uri))}](${at})`);
+  }
+  return out;
+}
+
 export function registerLanguage(): vscode.Disposable {
   const selector: vscode.DocumentSelector = { language: "q" };
   const range = (d: vscode.TextDocument, start: number, end: number) =>
@@ -263,6 +307,61 @@ export function registerLanguage(): vscode.Disposable {
         return out.map((r) => r.location);
       },
     }),
+    vscode.languages.registerHoverProvider(selector, {
+      provideHover: async (d, at) => {
+        const index = await workspace.index(d);
+        const offset = d.offsetAt(at);
+        const found = hover(index, d.uri.toString(), annotations(d), offset);
+        if (!found) return undefined;
+        const { builtin, defined } = found;
+        const parts: string[] = [];
+        if (builtin) {
+          parts.push(
+            code(builtin.syntax),
+            plain(builtin.summary),
+            `[code.kx.com](${builtin.url})`,
+          );
+        }
+        if (builtin && defined.length) parts.push("---");
+        if (defined.length) parts.push(...described(defined[0], d.uri, index));
+        const out = new vscode.MarkdownString();
+        if (defined.length > 1) {
+          const more = defined.length - 1;
+          const args = encodeURIComponent(
+            JSON.stringify([d.uri.toString(), at.line, at.character]),
+          );
+          parts.push(
+            `[${more} more definition${more === 1 ? "" : "s"}](command:${peekDefinitions}?${args})`,
+          );
+          out.isTrusted = { enabledCommands: [peekDefinitions] };
+        }
+        out.appendMarkdown(parts.join("\n\n"));
+        return new vscode.Hover(out);
+      },
+    }),
+    vscode.commands.registerCommand(
+      peekDefinitions,
+      async (uri: string, line: number, character: number) => {
+        const d = await vscode.workspace.openTextDocument(
+          vscode.Uri.parse(uri),
+        );
+        const at = new vscode.Position(line, character);
+        const index = await workspace.index(d);
+        const all = definitions(
+          index,
+          d.uri.toString(),
+          annotations(d),
+          d.offsetAt(at),
+        ).map((l) => location(index, l));
+        await vscode.commands.executeCommand(
+          "editor.action.peekLocations",
+          d.uri,
+          at,
+          all,
+          "peek",
+        );
+      },
+    ),
     vscode.languages.registerWorkspaceSymbolProvider({
       provideWorkspaceSymbols: async (query) => {
         const active = vscode.window.activeTextEditor?.document;

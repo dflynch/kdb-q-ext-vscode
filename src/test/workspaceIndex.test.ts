@@ -3,6 +3,7 @@ import { annotate } from "../annotate";
 import {
   definitions,
   entry,
+  hover,
   type Index,
   position,
   references,
@@ -41,6 +42,21 @@ function opened(files: Files) {
       references(index, cursor.file, a, cursor.offset, withDefinition).map(
         shown,
       ),
+    // q's entry's syntax, then each definition as "file line:column
+    // signature doc"
+    hovered: () => {
+      const h = hover(index, cursor.file, a, cursor.offset);
+      return (
+        h && [
+          ...(h.builtin ? [h.builtin.syntax] : []),
+          ...h.defined.map(
+            (d) =>
+              `${shown({ file: d.file, start: d.nameStart, end: d.nameEnd })}` +
+              `${d.detail ?? ""} ${d.doc ?? "-"}`,
+          ),
+        ]
+      );
+    },
     // Each with whether it's passed by reference
     referencedAll: (withDefinition = true) =>
       references(index, cursor.file, a, cursor.offset, withDefinition).map(
@@ -273,6 +289,40 @@ suite("references across files", () => {
       "/w/a.q 2:1 m.f",
     ]);
   });
+});
+
+suite("hover", () => {
+  const cases: [string, Files, string[] | undefined][] = [
+    ["a keyword", { "/w/a.q": "|count 1 2" }, ["count x     count[x]"]],
+    [
+      "a global, each file's, the nearest first",
+      {
+        "/w/a.q": "/ adds one\nf:{x+1}",
+        "/w/b/c.q": "f:{[a] a}",
+        "/w/b/d.q": "g:|f 2",
+      },
+      ["/w/b/c.q 1:1 f[a] -", "/w/a.q 2:1 f[x] adds one"],
+    ],
+    [
+      "a callback q has, and the file's definition",
+      { "/w/a.q": "/ logs\n|.z.pg:{value x}" },
+      [".z.pg:f", "/w/a.q 2:1 .z.pg[x] logs"],
+    ],
+    [
+      "an export, as its module defines it",
+      {
+        "/w/m.q": "/ middle\nmid:{x}\nexport:([mid:mid])",
+        "/w/a.q": "s:use`m\ns.|mid 1",
+      },
+      ["/w/m.q 2:1 mid[x] middle"],
+    ],
+    ["a global defined nowhere", { "/w/a.q": "|g 1" }, undefined],
+    ["a local", { "/w/a.q": "f:{a:1;|a}" }, undefined],
+    ["a column", { "/w/a.q": "a:1\nselect |a from t" }, undefined],
+  ];
+  for (const [name, files, expected] of cases) {
+    test(name, () => assert.deepStrictEqual(opened(files).hovered(), expected));
+  }
 });
 
 suite("modules by file name", () => {
