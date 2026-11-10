@@ -4,7 +4,7 @@
 import * as assert from "node:assert";
 import { annotate, keywords } from "../annotate";
 import { builtins } from "../builtins";
-import { at, globals, type Outlined, outline, targets } from "../navigation";
+import { globals, type Outlined, outline, targets } from "../navigation";
 import {
   definitions,
   type Entry,
@@ -67,7 +67,9 @@ const written = (random: (n: number) => number, most: number) =>
   ).join("");
 
 suite("properties", () => {
-  test("a hover lists what Go to Definition does, and never throws", () => {
+  // For a global, hover() and definitions() read the same list, so this
+  // tests an export's mapping, and what a hover shows at all
+  test("a hover shows a name's definitions, each named where it is", () => {
     const random = randomly(1);
     for (let n = 0; n < 1500; n++) {
       const files: Record<string, string> = {
@@ -86,16 +88,31 @@ suite("properties", () => {
         const found = hover(index, "/w/a.q", a, offset);
         const defs = definitions(index, "/w/a.q", a, offset);
         references(index, "/w/a.q", a, offset, true);
+        const inside = all.find((t) => t.start <= offset && offset < t.end);
+        // Nothing but over a name
+        if (!inside) assert.strictEqual(found, undefined, context);
         if (found) {
+          // Go to Definition's locations, in its order
           assert.deepStrictEqual(
             found.defined.map((d) => `${d.file} ${d.nameSpan.start}`),
             defs.map((d) => `${d.file} ${d.start}`),
             context,
           );
+          // Each one's name written where it says, as the last part of it
+          for (const d of found.defined) {
+            const written = files[d.file].slice(
+              d.nameSpan.start,
+              d.nameSpan.end,
+            );
+            const last = d.full.slice(d.full.lastIndexOf(".") + 1);
+            assert.ok(
+              written.endsWith(last),
+              `${context} ${d.full} ${written}`,
+            );
+          }
         }
-        // A global or export Go to Definition finds has a hover
-        const id = at(all, offset)?.identity ?? "";
-        if (/^(global|export) /.test(id) && defs.length) {
+        // A global or an export Go to Definition finds has a hover
+        if (/^(global|export) /.test(inside?.identity ?? "") && defs.length) {
           assert.ok(found?.defined.length, context);
         }
       }

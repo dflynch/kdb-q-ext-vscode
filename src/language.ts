@@ -198,10 +198,10 @@ const peekDefinitions = "kdb-q-ext-vscode.peekDefinitions";
 // it, wherever the run is, as a fence indented up to three spaces closes a
 // block too, and VS Code's appendCodeblock looks only at a line's start
 function codeblock(out: vscode.MarkdownString, code: string): void {
-  const longest = Math.max(
-    2,
-    ...(code.match(/`+/g) ?? []).map((m) => m.length),
-  );
+  let longest = 2;
+  for (const [run] of code.matchAll(/`+/g)) {
+    longest = Math.max(longest, run.length);
+  }
   const fence = "`".repeat(longest + 1);
   out.appendMarkdown(`\n${fence}q\n${code}\n${fence}\n`);
 }

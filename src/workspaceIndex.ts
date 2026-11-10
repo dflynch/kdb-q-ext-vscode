@@ -246,14 +246,17 @@ function defined(index: Index, file: string, global: string): Listed[] {
 // in .Q, .z, .h or .j, and a global's or an export's definitions, as
 // definitions() gives them, each the global defined there. An export's key
 // whose value is written in the export, as ([f:{[a;b] a}]), as itself, a
-// function if a lambda. Nothing for a local, a parameter, a column or a key
+// function if a lambda. Nothing for a local, a parameter, a column, a key
+// or anything but a name, as a glyph just after one
 export function hover(
   index: Index,
   file: string,
   a: Annotated,
   offset: number,
 ): { builtin?: Builtin; defined: Listed[] } | undefined {
-  const here = at(targets(a), offset);
+  // The name the offset is in, not one it's just after: VS Code asks at the
+  // start of the character under the mouse, which may be a glyph after it
+  const here = targets(a).find((t) => t.start <= offset && offset < t.end);
   if (!here) return undefined;
   if (here.identity.startsWith("builtin ")) {
     const builtin = builtins.get(here.identity.slice(8));

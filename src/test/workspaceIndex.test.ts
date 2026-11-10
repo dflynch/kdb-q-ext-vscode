@@ -342,6 +342,13 @@ suite("hover", () => {
     ["a name in .h", { "/w/a.q": "|.h.ht 1" }, [".h.ht x"]],
     ["a name in .j", { "/w/a.q": "|.j.j 1" }, [".j.j x"]],
     ["a glyph", { "/w/a.q": "1|+2" }, undefined],
+    ["a glyph just after a global", { "/w/a.q": "f:{x}\nf|+1" }, undefined],
+    ["a glyph just after a keyword", { "/w/a.q": "count|+1" }, undefined],
+    [
+      "a name's last character",
+      { "/w/a.q": "coun|t 1" },
+      ["count x     count[x]"],
+    ],
     ["a dictionary's key", { "/w/a.q": "([|k:1])" }, undefined],
     ["a global defined nowhere", { "/w/a.q": "|g 1" }, undefined],
     ["a local", { "/w/a.q": "f:{a:1;|a}" }, undefined],
