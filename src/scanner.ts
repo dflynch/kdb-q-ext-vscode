@@ -258,7 +258,7 @@ export function scan(text: string): Script {
       current.end = current.tokens[current.tokens.length - 1].end;
       script.statements.push(current);
     }
-    script.comments.push(...pending);
+    for (const t of pending) script.comments.push(t);
     pending = [];
     current = undefined;
     open = undefined;
@@ -333,7 +333,7 @@ export function scan(text: string): Script {
       begin(line.start + first);
     } else {
       // A continuation line: comment lines since the last line are inside
-      current.tokens.push(...pending);
+      for (const t of pending) current.tokens.push(t);
       pending = [];
     }
     const statement = current as Statement;

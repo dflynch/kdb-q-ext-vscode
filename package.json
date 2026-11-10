@@ -694,6 +694,7 @@
     "test": "vscode-test",
     "package": "vsce package",
     "format": "biome check --write",
+    "builtins": "node scripts/builtins.mjs",
     "fixtures": "cd test/fixtures && q fixtures.q -q && q lex.q -q && QPATH=$PWD/modules q scope.q -q",
     "fuzz": "npm run compile && node test/fuzz/fuzz.js"
   },

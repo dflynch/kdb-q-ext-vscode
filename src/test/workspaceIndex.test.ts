@@ -3,6 +3,7 @@ import { annotate } from "../annotate";
 import {
   definitions,
   entry,
+  hover,
   type Index,
   position,
   references,
@@ -41,6 +42,21 @@ function opened(files: Files) {
       references(index, cursor.file, a, cursor.offset, withDefinition).map(
         shown,
       ),
+    // q's entry's syntax, then each definition as "file line:column
+    // signature doc"
+    hovered: () => {
+      const h = hover(index, cursor.file, a, cursor.offset);
+      return (
+        h && [
+          ...(h.builtin ? [h.builtin.syntax] : []),
+          ...h.defined.map(
+            (d) =>
+              `${shown({ file: d.file, ...d.nameSpan })}` +
+              `${d.detail ?? ""} ${d.doc ?? "-"}`,
+          ),
+        ]
+      );
+    },
     // Each with whether it's passed by reference
     referencedAll: (withDefinition = true) =>
       references(index, cursor.file, a, cursor.offset, withDefinition).map(
@@ -273,6 +289,110 @@ suite("references across files", () => {
       "/w/a.q 2:1 m.f",
     ]);
   });
+});
+
+suite("hover", () => {
+  const cases: [string, Files, string[] | undefined][] = [
+    ["a keyword", { "/w/a.q": "|count 1 2" }, ["count x     count[x]"]],
+    [
+      "a global, each file's, the nearest first",
+      {
+        "/w/a.q": "/ adds one\nf:{x+1}",
+        "/w/b/c.q": "f:{[a] a}",
+        "/w/b/d.q": "g:|f 2",
+      },
+      ["/w/b/c.q 1:1 f[a] -", "/w/a.q 2:1 f[x] / adds one"],
+    ],
+    [
+      "a callback q has, and the file's definition",
+      { "/w/a.q": "/ logs\n|.z.pg:{value x}" },
+      [".z.pg:f", "/w/a.q 2:1 .z.pg[x] / logs"],
+    ],
+    [
+      "an export, as its module defines it",
+      {
+        "/w/m.q": "/ middle\nmid:{x}\nexport:([mid:mid])",
+        "/w/a.q": "s:use`m\ns.|mid 1",
+      },
+      ["/w/m.q 2:1 mid[x] / middle"],
+    ],
+    [
+      "an export its module sets by handle",
+      {
+        "/w/m.q": "/ middle\n`mid set {x}\nexport:([mid:mid])",
+        "/w/a.q": "s:use`m\ns.|mid 1",
+      },
+      ["/w/m.q 2:2 mid[x] / middle"],
+    ],
+    [
+      "an export, first as Go to Definition lists it",
+      {
+        "/w/x/m.q": "mid:{x}\nexport:.z.m",
+        "/w/y/m.q": "/ y\nmid:{x}\nexport:([mid:mid])",
+        "/w/a.q": "s:use`m\ns.|mid 1",
+      },
+      ["/w/x/m.q 2:1 export -", "/w/y/m.q 2:1 mid[x] / y"],
+    ],
+    [
+      "an export written out in its module's export, a lambda",
+      { "/w/m.q": "export:([mid:{x}])", "/w/a.q": "s:use`m\ns.|mid 1" },
+      ["/w/m.q 1:10 mid[x] -"],
+    ],
+    ["a name in .Q", { "/w/a.q": "|.Q.s 1" }, [".Q.s x"]],
+    ["a name in .h", { "/w/a.q": "|.h.ht 1" }, [".h.ht x"]],
+    ["a name in .j", { "/w/a.q": "|.j.j 1" }, [".j.j x"]],
+    ["a glyph", { "/w/a.q": "1|+2" }, undefined],
+    ["a glyph just after a global", { "/w/a.q": "f:{x}\nf|+1" }, undefined],
+    ["a glyph just after a keyword", { "/w/a.q": "count|+1" }, undefined],
+    [
+      "a name's last character",
+      { "/w/a.q": "coun|t 1" },
+      ["count x     count[x]"],
+    ],
+    ["a dictionary's key", { "/w/a.q": "([|k:1])" }, undefined],
+    ["a global defined nowhere", { "/w/a.q": "|g 1" }, undefined],
+    [
+      "a global named as qSQL's by, defined nowhere",
+      { "/w/a.q": "(1;|by)" },
+      undefined,
+    ],
+    [
+      "a global named as qSQL's by",
+      { "/w/a.q": "by:3\n|by+1" },
+      ["/w/a.q 1:1 by -"],
+    ],
+    ["a local", { "/w/a.q": "f:{a:1;|a}" }, undefined],
+    [
+      "a column, as the global it may be",
+      { "/w/a.q": "a:1\nselect |a from t" },
+      ["/w/a.q 1:1 a -"],
+    ],
+    [
+      "a function in a query",
+      { "/w/a.q": "/ scales\nf:{[a] 2*a}\nupdate c:|f[a] from t" },
+      ["/w/a.q 2:1 f[a] / scales"],
+    ],
+    ["a column defined nowhere", { "/w/a.q": "select |a from t" }, undefined],
+    ["a column assigned", { "/w/a.q": "c:1\nselect |c:1 from t" }, undefined],
+    [
+      "a column, as the parameter it may be",
+      { "/w/a.q": "a:1\nf:{[a] select |a from t}" },
+      undefined,
+    ],
+    [
+      "a name in .z in a query",
+      { "/w/a.q": "select from t where d=|.z.p" },
+      [".z.p"],
+    ],
+    [
+      "a name in .Q in a query",
+      { "/w/a.q": "update s:|.Q.s c from t" },
+      [".Q.s x"],
+    ],
+  ];
+  for (const [name, files, expected] of cases) {
+    test(name, () => assert.deepStrictEqual(opened(files).hovered(), expected));
+  }
 });
 
 suite("modules by file name", () => {

@@ -13,3 +13,4 @@ esbuild.mjs
 biome.json
 icons/ink.svg
 test/**
+scripts/**

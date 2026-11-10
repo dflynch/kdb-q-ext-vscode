@@ -87,7 +87,7 @@ export type Annotated = {
 
 // q's reserved words and .q functions, as q 5.0 lists them in .Q.res and
 // key `.q. They resolve before any global, and can't be assigned
-const keywords = new Set(
+export const keywords: ReadonlySet<string> = new Set(
   (
     "abs acos asin atan avg bin binr cor cos cov delete dev div do enlist " +
     "exec exit exp getenv hopen if in insert last like log max min prd " +
@@ -462,7 +462,7 @@ export function annotate(
       else if (opens(item, "(")) {
         const inner = pattern(item);
         if (!inner) return undefined;
-        names.push(...inner);
+        for (const n of inner) names.push(n);
       } else return undefined;
     }
     return names.length > 0 ? names : undefined;
