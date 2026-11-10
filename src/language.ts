@@ -10,6 +10,7 @@ import {
   type Outlined,
   occurrences,
   outline,
+  type Span,
 } from "./navigation";
 import { type Found, ReferencesView } from "./referencesView";
 import {
@@ -231,7 +232,7 @@ function described(d: Listed, from: vscode.Uri, index: Index): string[] {
     const uri = vscode.Uri.parse(d.file);
     const { line, character } = position(
       index.get(d.file) as Entry,
-      d.nameStart,
+      d.nameSpan.start,
     );
     const at = uri.with({ fragment: `L${line + 1},${character + 1}` });
     out.push(`[${plain(vscode.workspace.asRelativePath(uri))}](${at})`);
@@ -241,15 +242,15 @@ function described(d: Listed, from: vscode.Uri, index: Index): string[] {
 
 export function registerLanguage(): vscode.Disposable {
   const selector: vscode.DocumentSelector = { language: "q" };
-  const range = (d: vscode.TextDocument, start: number, end: number) =>
+  const range = (d: vscode.TextDocument, { start, end }: Span) =>
     new vscode.Range(d.positionAt(start), d.positionAt(end));
   const symbol = (d: vscode.TextDocument, o: Outlined) => {
     const s = new vscode.DocumentSymbol(
       o.name,
       o.detail ?? "",
       kinds[o.kind],
-      range(d, o.start, o.end),
-      range(d, o.nameStart, o.nameEnd),
+      range(d, o.span),
+      range(d, o.nameSpan),
     );
     s.children = (o.children ?? []).map((c) => symbol(d, c));
     return s;
@@ -289,11 +290,7 @@ export function registerLanguage(): vscode.Disposable {
     vscode.languages.registerDocumentHighlightProvider(selector, {
       provideDocumentHighlights: (d, position) =>
         occurrences(annotations(d), d.offsetAt(position)).map(
-          (o) =>
-            new vscode.DocumentHighlight(
-              range(d, o.start, o.end),
-              highlights[o.kind],
-            ),
+          (o) => new vscode.DocumentHighlight(range(d, o), highlights[o.kind]),
         ),
     }),
     vscode.languages.registerDefinitionProvider(selector, {
@@ -387,11 +384,7 @@ export function registerLanguage(): vscode.Disposable {
               s.full,
               kinds[s.kind],
               s.detail ?? "",
-              location(index, {
-                file: s.file,
-                start: s.nameStart,
-                end: s.nameEnd,
-              }),
+              location(index, { file: s.file, ...s.nameSpan }),
             ),
         );
       },

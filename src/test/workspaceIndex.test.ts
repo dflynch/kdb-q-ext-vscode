@@ -51,7 +51,7 @@ function opened(files: Files) {
           ...(h.builtin ? [h.builtin.syntax] : []),
           ...h.defined.map(
             (d) =>
-              `${shown({ file: d.file, start: d.nameStart, end: d.nameEnd })}` +
+              `${shown({ file: d.file, ...d.nameSpan })}` +
               `${d.detail ?? ""} ${d.doc ?? "-"}`,
           ),
         ]

@@ -8,16 +8,16 @@
 
 import type { Annotated } from "./annotate";
 import { type Builtin, builtins } from "./builtins";
+import { lineOf, lineStarts } from "./lines";
 import {
   at,
   type Defined,
   first,
   globals,
   references as inFile,
+  type Span,
   targets,
 } from "./navigation";
-
-type Span = { start: number; end: number };
 
 export type Entry = {
   // Where each line starts, to turn offsets into positions
@@ -35,10 +35,7 @@ export type Entry = {
 
 // A file's entry, from its text and annotations
 export function entry(text: string, a: Annotated): Entry {
-  const lines = [0];
-  for (const m of text.matchAll(/\r\n|\r|\n/g)) {
-    lines.push(m.index + m[0].length);
-  }
+  const lines = lineStarts(text);
   const all = targets(a);
   const out: Entry = {
     lines,
@@ -89,14 +86,8 @@ export function position(
   e: Entry,
   offset: number,
 ): { line: number; character: number } {
-  let lo = 0;
-  let hi = e.lines.length - 1;
-  while (lo < hi) {
-    const mid = (lo + hi + 1) >> 1;
-    if (e.lines[mid] <= offset) lo = mid;
-    else hi = mid - 1;
-  }
-  return { line: lo, character: offset - e.lines[lo] };
+  const line = lineOf(e.lines, offset);
+  return { line, character: offset - e.lines[line] };
 }
 
 // Files by their URI, as a string; the current file's entry must be fresh
@@ -225,8 +216,7 @@ export function definitions(
 function defining(index: Index, file: string, global: string): Location[] {
   return defined(index, file, global).map((d) => ({
     file: d.file,
-    start: d.nameStart,
-    end: d.nameEnd,
+    ...d.nameSpan,
   }));
 }
 
@@ -274,7 +264,8 @@ export function hover(
   for (const m of wanted.modules) {
     const k = index.get(m)?.export?.keys?.find((k) => k.key === wanted.key);
     const d =
-      k && index.get(m)?.defined.find((d) => d.nameStart === k.value.start);
+      k &&
+      index.get(m)?.defined.find((d) => d.nameSpan.start === k.value.start);
     if (d) found.push({ ...d, file: m });
   }
   return found.length ? { defined: found } : undefined;

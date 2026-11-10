@@ -4,6 +4,7 @@
 // imports, never throws.
 
 import type { Annotated, Lambda, Name } from "./annotate";
+import { lineOf, lineStarts } from "./lines";
 import { type Script, scan, type Token } from "./scanner";
 
 export type Outlined = {
@@ -11,12 +12,10 @@ export type Outlined = {
   kind: "namespace" | "function" | "variable" | "module";
   // A function's parameters, as [x;y], or a module's use`foo
   detail?: string;
-  // From the name, or a handle's backtick, to the end of its value; a
-  // namespace spans its run of globals
-  start: number;
-  end: number;
-  nameStart: number;
-  nameEnd: number;
+  // As a definition's; a namespace spans its run of globals, and is named
+  // where its first is
+  span: Span;
+  nameSpan: Span;
   children?: Outlined[];
 };
 
@@ -69,19 +68,32 @@ function valueEnd({ tokens, index }: Placed): number {
   return end;
 }
 
+// The index of the close of the brackets the token is in
+function closing({ tokens, index }: Placed): number | undefined {
+  let depth = 0;
+  for (let j = index + 1; j < tokens.length; j++) {
+    const t = tokens[j];
+    if (t.kind === "open") depth++;
+    else if (t.kind === "close" && depth-- === 0) return j;
+  }
+  return undefined;
+}
+
+export type Span = { start: number; end: number };
+
 // A global's definition: where it's first assigned at top level, or first
 // in a lambda. A function is a global assigned a lambda, as in f:{x},
-// f:g:{x} or `f set {x}; a module, one assigned use`mod
+// f:g:{x}, `f set {x} or set[`f;{x}]; a module, one assigned use`mod
 export type Defined = {
   full: string;
   kind: "function" | "variable" | "module";
   // A function's parameters, as [x;y], or a module's use`foo
   detail?: string;
-  // From the name, or a handle's backtick, to the end of its value
-  start: number;
-  end: number;
-  nameStart: number;
-  nameEnd: number;
+  // The whole definition: from the name, a handle's backtick, or the set
+  // of set[`f;x], to the end of its value
+  span: Span;
+  // The name, without a handle's backtick
+  nameSpan: Span;
   inLambda: boolean;
   // The comment that documents it, without its slashes
   doc?: string;
@@ -102,53 +114,51 @@ export function globals(text: string, a: Annotated): Defined[] {
 
   const described = (
     full: string,
-    start: number,
-    end: number,
+    nameSpan: Span,
     inLambda: boolean,
   ): Defined | undefined => {
-    const p = at(start);
+    const p = at(nameSpan.start);
     if (!p) return undefined;
-    const item: Defined = {
-      full,
-      kind: "variable",
-      // From the symbol's backtick, for a handle
-      start: p.tokens[p.index].start,
-      end: Math.max(end, valueEnd(p)),
-      nameStart: start,
-      nameEnd: end,
-      inLambda,
-    };
-    const doc = documented(item.start, item.end);
+    const { tokens, index } = p;
+    const beside = (k: number) => word(tokens[index + k]);
+    const handle = tokens[index].kind === "symbol";
+    // set[`f;x], to its ]
+    const close =
+      handle && beside(-2) === "set" && beside(-1) === "[" && beside(1) === ";"
+        ? closing(p)
+        : undefined;
+    const span =
+      close === undefined
+        ? {
+            start: tokens[index].start,
+            end: Math.max(nameSpan.end, valueEnd(p)),
+          }
+        : { start: tokens[index - 2].start, end: tokens[close].end };
+    const item: Defined = { full, kind: "variable", span, nameSpan, inLambda };
+    const doc = documented(span);
     if (doc !== undefined) item.doc = doc;
     // Past any names assigned along with it, as g in f:g:{x}
-    let i = p.index;
-    while (p.tokens[i + 2]?.kind === "name" && isAssign(p.tokens[i + 3])) {
+    let i = index;
+    while (tokens[i + 2]?.kind === "name" && isAssign(tokens[i + 3])) {
       i += 2;
     }
-    const [, op, value, after] = p.tokens.slice(i);
+    const [, op, value, after] = tokens.slice(i);
     const l = value && lambdas.get(value.start);
-    // A lambda assigned, or set by handle, as `f set {x} or set[`f;{x}]
-    const handle = p.tokens[p.index].kind === "symbol";
-    const beside = (k: number) => word(p.tokens[p.index + k]);
-    const inSet =
-      handle && beside(-2) === "set" && beside(-1) === "[" && beside(1) === ";";
-    const closed =
-      inSet && l?.close
-        ? p.tokens.find((t) => t.start >= (l.close?.end ?? 0))
-        : undefined;
-    if (
-      l?.close &&
-      (((isAssign(op) || (handle && word(op) === "set")) &&
-        l.close.end === item.end) ||
-        (inSet && word(closed) === "]"))
-    ) {
+    // The lambda is the whole value: to the end of the definition, or to
+    // set's ]
+    const whole =
+      close === undefined
+        ? (isAssign(op) || (handle && word(op) === "set")) &&
+          l?.close?.end === span.end
+        : l?.close?.start === tokens[close - 1].start;
+    if (l && whole) {
       item.kind = "function";
       item.detail = `[${l.params.join(";")}]`;
     } else if (
       isAssign(op) &&
       word(value) === "use" &&
       after?.kind === "symbol" &&
-      after.end === item.end
+      after.end === span.end
     ) {
       item.kind = "module";
       item.detail = text.slice(value.start, after.end);
@@ -157,40 +167,39 @@ export function globals(text: string, a: Annotated): Defined[] {
   };
 
   // Names and handles, in the order they're written
-  const defined: {
-    full: string;
-    start: number;
-    end: number;
-    inLambda: boolean;
-  }[] = [];
+  const defined: { full: string; nameSpan: Span; inLambda: boolean }[] = [];
   for (const n of a.names) {
     if (n.role === "global" && n.defines && !n.amends) {
       defined.push({
         full: n.full,
-        start: n.token.start,
-        end: n.token.end,
+        nameSpan: { start: n.token.start, end: n.token.end },
         inLambda: n.lambda !== undefined,
       });
     }
   }
   for (const h of a.handles) {
     if (h.defines && !h.amends && h.module === undefined) {
-      defined.push({ ...h, inLambda: h.lambda !== undefined });
+      defined.push({
+        full: h.full,
+        nameSpan: { start: h.start, end: h.end },
+        inLambda: h.lambda !== undefined,
+      });
     }
   }
-  defined.sort((x, y) => x.start - y.start);
-  const documented = docs(
-    text,
-    script,
-    defined.map((d) => d.start),
-  );
+  defined.sort((x, y) => x.nameSpan.start - y.nameSpan.start);
+  // Every name assigned, local or global, and every handle
+  const assigned = [
+    ...a.names.filter((n) => n.defines).map((n) => n.token.start),
+    ...a.handles.filter((h) => h.defines).map((h) => h.start),
+  ].sort((x, y) => x - y);
+  const documented = docs(text, script, assigned);
   const seen = new Set<string>();
   const out: Defined[] = [];
   for (const d of defined) {
     const key = `${d.inLambda} ${d.full}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    const item = described(d.full, d.start, d.end, d.inLambda);
+    const item = described(d.full, d.nameSpan, d.inLambda);
     if (item) out.push(item);
   }
   return out;
@@ -217,76 +226,63 @@ function uncommented(text: string, c: Token): string[] {
   );
 }
 
-// The comment documenting a definition from the offset to end, if it starts
-// its line: the comment lines, or a block comment, directly above it with no
-// line between, else a comment trailing on its line, unless another
-// definition's name, one of names, in order, comes between it and its end
+// The index of the first of the sorted offsets after the offset
+function after(sorted: readonly number[], offset: number): number {
+  let lo = 0;
+  let hi = sorted.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (sorted[mid] <= offset) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+// The comment documenting a definition, if the definition starts its line:
+// the comment lines, or a block comment, directly above it with no line
+// between, else a comment trailing on its line, unless something else is
+// assigned after it there. Names are where each name is assigned, in order
 function docs(
   text: string,
   script: Script,
-  names: number[],
-): (offset: number, end: number) => string | undefined {
+  names: readonly number[],
+): (definition: Span) => string | undefined {
   const comments = [
     ...script.comments,
     ...script.statements.flatMap((s) =>
       s.tokens.filter((t) => t.kind === "comment"),
     ),
   ].sort((x, y) => x.start - y.start);
-  const lines = [0];
-  for (const m of text.matchAll(/\r\n|\r|\n/g)) {
-    lines.push(m.index + m[0].length);
-  }
-  // The line the offset is on, from 0
-  const lineOf = (offset: number) => {
-    let lo = 0;
-    let hi = lines.length - 1;
-    while (lo < hi) {
-      const mid = (lo + hi + 1) >> 1;
-      if (lines[mid] <= offset) lo = mid;
-      else hi = mid - 1;
-    }
-    return lo;
-  };
-  // The first of the sorted offsets after the offset
-  const after = (sorted: number[], offset: number) => {
-    let lo = 0;
-    let hi = sorted.length;
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1;
-      if (sorted[mid] <= offset) lo = mid + 1;
-      else hi = mid;
-    }
-    return lo;
-  };
+  const starts = lineStarts(text);
+  const line = (offset: number) => lineOf(starts, offset);
   // Whether only spaces come before the offset on its line
   const first = (offset: number) =>
-    text.slice(lines[lineOf(offset)], offset).trim() === "";
+    text.slice(starts[line(offset)], offset).trim() === "";
   // Each comment that starts its line, by the line it ends on
   const ending = new Map<number, Token>();
   for (const c of comments) {
-    if (first(c.start)) ending.set(lineOf(c.end), c);
+    if (first(c.start)) ending.set(line(c.end), c);
   }
   const commentStarts = comments.map((c) => c.start);
   const joined = (doc: string[]) => {
     const out = doc.join("\n").trim();
     return out === "" ? undefined : out;
   };
-  return (offset, end) => {
-    if (!first(offset)) return undefined;
-    const line = lineOf(offset);
+  return ({ start, end }) => {
+    if (!first(start)) return undefined;
+    const own = line(start);
     const above: Token[] = [];
-    for (let n = line; n > 0; ) {
+    for (let n = own; n > 0; ) {
       const c = ending.get(n - 1);
       if (!c) break;
       above.push(c);
-      n = lineOf(c.start);
+      n = line(c.start);
     }
-    above.reverse();
     if (above.length) {
-      return joined(above.flatMap((c) => uncommented(text, c)));
+      return joined(above.reverse().flatMap((c) => uncommented(text, c)));
     }
-    const trailing = comments[after(commentStarts, offset)];
-    if (!trailing || lineOf(trailing.start) !== line) return undefined;
+    const trailing = comments[after(commentStarts, start)];
+    if (!trailing || line(trailing.start) !== own) return undefined;
     const next = names[after(names, end - 1)];
     if (next !== undefined && next < trailing.start) return undefined;
     return joined(uncommented(text, trailing));
@@ -305,10 +301,8 @@ export function outline(text: string, a: Annotated): Outlined[] {
       name: d.full,
       kind: d.kind,
       ...(d.detail === undefined ? {} : { detail: d.detail }),
-      start: d.start,
-      end: d.end,
-      nameStart: d.nameStart,
-      nameEnd: d.nameEnd,
+      span: { ...d.span },
+      nameSpan: d.nameSpan,
     };
     const dot = d.full.lastIndexOf(".");
     if (dot <= 0) {
@@ -322,16 +316,14 @@ export function outline(text: string, a: Annotated): Outlined[] {
       node = {
         name: space,
         kind: "namespace",
-        start: item.start,
-        end: item.end,
-        nameStart: item.nameStart,
-        nameEnd: item.nameEnd,
+        span: { ...item.span },
+        nameSpan: item.nameSpan,
         children: [],
       };
       top.push(node);
     }
     node.children?.push(item);
-    node.end = Math.max(node.end, item.end);
+    node.span.end = Math.max(node.span.end, item.span.end);
   }
   return top;
 }

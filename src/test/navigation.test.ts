@@ -19,10 +19,12 @@ const fixtures = path.join(__dirname, "../../test/fixtures");
 function shown(text: string): string[] {
   const lines: string[] = [];
   const add = (o: Outlined, indent: string) => {
-    const name = text.slice(o.nameStart, o.nameEnd);
+    const name = text.slice(o.nameSpan.start, o.nameSpan.end);
     lines.push(
       `${indent}${o.kind} ${o.name}${o.detail ? ` ${o.detail}` : ""}` +
-        (o.kind === "namespace" ? "" : `: ${text.slice(o.start, o.end)}`) +
+        (o.kind === "namespace"
+          ? ""
+          : `: ${text.slice(o.span.start, o.span.end)}`) +
         (name !== o.name && o.kind !== "namespace" ? ` @${name}` : ""),
     );
     for (const c of o.children ?? []) add(c, `${indent}  `);
@@ -81,7 +83,7 @@ suite("outline", () => {
       "`f set {[a;b] a}\nset[`g;{x}]\n`h set {x} 1",
       [
         "function f [a;b]: `f set {[a;b] a}",
-        "function g [x]: `g",
+        "function g [x]: set[`g;{x}]",
         "variable h: `h set {x} 1",
       ],
     ],
@@ -133,7 +135,7 @@ suite("outline", () => {
   test("a namespace spans its globals", () => {
     const text = ".a.b:1\n.a.d:{x}";
     const [space] = outline(text, annotate(text));
-    assert.strictEqual(text.slice(space.start, space.end), text);
+    assert.strictEqual(text.slice(space.span.start, space.span.end), text);
   });
 
   test("never throws on a half-typed file", () => {
@@ -143,11 +145,13 @@ suite("outline", () => {
       const items = outline(text, annotate(text));
       for (const o of items.flatMap((o) => [o, ...(o.children ?? [])])) {
         assert.ok(o.name, "VS Code refuses an empty name");
-        assert.ok(o.start <= o.nameStart && o.nameEnd <= o.end);
+        assert.ok(
+          o.span.start <= o.nameSpan.start && o.nameSpan.end <= o.span.end,
+        );
       }
       // Siblings don't overlap, so the cursor is in one at most
       items.forEach((o, n) => {
-        assert.ok(n === 0 || items[n - 1].end <= o.start);
+        assert.ok(n === 0 || items[n - 1].span.end <= o.span.start);
       });
     }
   });
@@ -169,77 +173,86 @@ suite("documentation", () => {
     Object.fromEntries(
       globals(text, annotate(text)).map((d) => [d.full, d.doc]),
     );
-  const cases: [string, string, Record<string, string | undefined>][] = [
-    [
-      "the comment lines above, without slashes",
-      "// Adds\n// two numbers\nf:{x+y}",
-      { f: "Adds\ntwo numbers" },
-    ],
-    [
-      "TorQ's dashes",
-      "/ - Forward fill\na:{x}\n/-load csv\nb:{x}\n/-1 means none\nc:1",
-      { a: "Forward fill", b: "load csv", c: "-1 means none" },
-    ],
-    [
-      "a block comment above",
-      "/\n  Opens\n  a handle\n\\\nf:{x}",
-      { f: "Opens\na handle" },
-    ],
-    ["not across a blank line", "/ section\n\nf:{x}", { f: undefined }],
-    [
-      "else a comment trailing on its line",
-      "enabled:0b // whether checks run\nf:{[a]  / the first line\n  a}",
-      { enabled: "whether checks run", f: "the first line" },
-    ],
-    [
-      "only for a definition first on its line",
-      "/ a's\na:1;b:{x} / b's",
-      { a: "a's", b: undefined },
-    ],
-    [
-      "not a trailing comment on the line above",
-      "a:1 / a's\nb:2",
-      { a: "a's", b: undefined },
-    ],
-    [
-      "inside a lambda",
-      "f:{\n  / the count\n  .c.n::count x}",
-      { f: undefined, ".c.n": "the count" },
-    ],
-    ["none", "f:{x}", { f: undefined }],
-    [
-      "with CRLF and CR line breaks",
-      "/ f's\r\nf:{x}\r\n/\r\n  g's\r\n\\\r\ng:{x}\r/ h's\rh:{x}",
-      { f: "f's", g: "g's", h: "h's" },
-    ],
-    [
-      "not trailing after another definition on its line",
-      "a:1; b:2 / about b\nf:{x}; show 1 / f's",
-      { a: undefined, b: undefined, f: "f's" },
-    ],
-    [
-      "trailing a handle's definition",
-      "`.a.b set 1 / about b\n`.a.c set 2; `.a.d set 3 / d's",
-      { ".a.b": "about b", ".a.c": undefined, ".a.d": undefined },
-    ],
-    [
-      "trailing, past a global its own lambda defines",
-      "f:{[x] .c.n::x} / sets n",
-      { f: "sets n", ".c.n": undefined },
-    ],
-    [
-      "TorQ's dashes alone on a line",
-      "/-\n/- real\nf:1\n/ -\ng:1",
-      { f: "real", g: undefined },
-    ],
-    [
-      "from the first line, after a line break",
-      "\n/ c\nf:1;/ d\n/\n \n[",
-      { f: "c" },
-    ],
+  const endings = { LF: "\n", CRLF: "\r\n", CR: "\r" };
+
+  // Every way to define a global, each with every placement of a comment,
+  // at every line ending: the global's name, its line, and whether it's in
+  // a lambda
+  const forms: [string, string, string, boolean][] = [
+    ["a name", "f", "f:{x}", false],
+    ["a name assigned along with another", "f", "f:g:{x}", false],
+    ["a handle", "f", "`f set {x}", false],
+    ["set", "f", "set[`f;{x}]", false],
+    ["a name whose lambda defines a global", "f", "f:{[x] .c.n::x}", false],
+    ["a name in a lambda", ".c.f", ".c.f::1", true],
+    ["a handle in a lambda", ".c.f", "`.c.f set 1", true],
   ];
-  for (const [name, text, expected] of cases) {
-    test(name, () => assert.deepStrictEqual(docs(text), expected));
+  // Lines, D for the definition's, and the comment it gets
+  const placements: [string, string[], string | undefined][] = [
+    ["a comment line above", ["/ about", "D"], "about"],
+    ["comment lines above", ["// one", "/ two", "D"], "one\ntwo"],
+    [
+      "TorQ's dashes above",
+      ["/- about", "/-", "/ - more", "D"],
+      "about\n\nmore",
+    ],
+    ["a block comment above", ["/", " about", "\\", "D"], "about"],
+    ["a comment trailing", ["D / about"], "about"],
+    ["none", ["D"], undefined],
+    ["not across a blank line", ["/ about", "", "D"], undefined],
+    ["not the line above's trailing comment", ["z:0 / about", "D"], undefined],
+    ["not when not first on its line", ["/ about", "z:0; D"], undefined],
+    ["not trailing another assignment", ["D; z:0 / about"], undefined],
+  ];
+  for (const [form, name, line, inLambda] of forms) {
+    for (const [placement, lines, expected] of placements) {
+      // q's block comments are only at top level
+      if (inLambda && lines.includes("\\")) continue;
+      test(`${form}: ${placement}`, () => {
+        for (const [ending, eol] of Object.entries(endings)) {
+          const body = lines.map((l) => l.replace("D", line));
+          const text = inLambda
+            ? ["h:{[]", ...body.map((l) => ` ${l}`), " }"].join(eol)
+            : body.join(eol);
+          assert.strictEqual(docs(text)[name], expected, ending);
+        }
+      });
+    }
+  }
+
+  test("TorQ's dashes, not a minus", () =>
+    assert.deepStrictEqual(docs("/ - Forward fill\na:1\n/-1 means none\nc:1"), {
+      a: "Forward fill",
+      c: "-1 means none",
+    }));
+  test("trailing a lambda's first line", () =>
+    assert.deepStrictEqual(docs("f:{[a]  / the first line\n  a}"), {
+      f: "the first line",
+    }));
+  test("from the first line, after a line break", () =>
+    assert.deepStrictEqual(docs("\n/ c\nf:1;/ d\n/\n \n["), { f: "c" }));
+
+  // Every form, each with comments above and trailing, many times over
+  for (const [ending, eol] of Object.entries(endings)) {
+    test(`a large file, in linear time: ${ending}`, () => {
+      const one = forms
+        .filter(([, , , inLambda]) => !inLambda)
+        .map(([, , line]) => `/ about${eol}${line} / trailing`)
+        .join(eol);
+      const text = `${one}${eol}`.repeat(15000);
+      const start = Date.now();
+      assert.strictEqual(globals(text, annotate(text))[0].doc, "about");
+      assert.ok(Date.now() - start < 2000, `${Date.now() - start} ms`);
+    });
+    test(`a long run of comment lines, in linear time: ${ending}`, () => {
+      const text = `${`/ c${eol}`.repeat(80000)}f:1`;
+      const start = Date.now();
+      assert.strictEqual(
+        globals(text, annotate(text))[0].doc?.length,
+        80000 * 2 - 1,
+      );
+      assert.ok(Date.now() - start < 2000, `${Date.now() - start} ms`);
+    });
   }
 });
 
@@ -259,22 +272,6 @@ suite("documentation's text", () => {
       plain("see <http://gw.example.com/__x__>"),
       "see \\<<http://gw.example.com/__x__>\\>",
     ));
-  test("a long run of comment lines is found in linear time", () => {
-    const text = `${"/ c\n".repeat(80000)}f:1`;
-    const start = Date.now();
-    assert.strictEqual(
-      globals(text, annotate(text))[0].doc?.length,
-      80000 * 2 - 1,
-    );
-    assert.ok(Date.now() - start < 2000);
-  });
-  test("a large file's comments are found in linear time", () => {
-    const text = "/ c\nf:{x} / t\n".repeat(40000);
-    const start = Date.now();
-    const found = globals(text, annotate(text));
-    assert.strictEqual(found[0].doc, "c");
-    assert.ok(Date.now() - start < 2000, `${Date.now() - start} ms`);
-  });
 });
 
 suite("occurrences", () => {
