@@ -194,15 +194,17 @@ const highlights: Record<Occurrence["kind"], vscode.DocumentHighlightKind> = {
 // in the peek, given back for tests
 const peekDefinitions = "kdb-q-ext-vscode.peekDefinitions";
 
-// Text in markdown as written: its punctuation escaped, each line its own.
+// Text in markdown as written: its punctuation escaped.
 // A URL as a link, in any case, as markdown finds one even inside a word
 const escaped = (text: string) =>
   text.replace(/[\\`*_{}[\]()<>#+\-=.!|~&]/g, "\\$&");
 
 // A URL's own part of what looks like one: without the punctuation that
-// ends a sentence after it, or a ) it didn't open
+// ends a sentence after it, or a ) it didn't open; and up to a character
+// reference, as &amp;, which markdown would read in a link
 function url(text: string): string {
-  let out = text;
+  const reference = text.search(/&(?:#\d+|#x[\da-f]+|\w+);/i);
+  let out = reference < 0 ? text : text.slice(0, reference);
   for (;;) {
     const trimmed = out.replace(/[.,;:!?'"\]]+$/, "");
     const opened = (trimmed.match(/\(/g) ?? []).length;
@@ -212,20 +214,31 @@ function url(text: string): string {
   }
 }
 
+// A line: each URL linked and the text around it escaped, looking for the
+// next URL from where each link ends
+function linked(line: string): string {
+  const found = /(?:https?|ftp):\/\/[^\s<>]+/gi;
+  let out = "";
+  let from = 0;
+  for (let m = found.exec(line); m; m = found.exec(line)) {
+    const own = url(m[0]);
+    out += `${escaped(line.slice(from, m.index))}<${own}>`;
+    from = m.index + own.length;
+    found.lastIndex = from;
+  }
+  return out + escaped(line.slice(from));
+}
+
+// Each line its own: a line break between lines with text, and a blank
+// line as a paragraph's end
 export const plain = (text: string) =>
   text
     .split("\n")
-    .map((l) =>
-      l
-        .split(/((?:https?|ftp):\/\/[^\s<>]+)/i)
-        .map((part, i) => {
-          if (i % 2 === 0) return escaped(part);
-          const own = url(part);
-          return `<${own}>${escaped(part.slice(own.length))}`;
-        })
-        .join(""),
-    )
-    .join("  \n");
+    .map(linked)
+    .reduce((out, l, n, all) => {
+      if (n === 0) return l;
+      return out + (l && all[n - 1] ? "  \n" : "\n") + l;
+    }, "");
 
 // Code in a q block: neither a signature nor q's syntax has a line of
 // backticks to end it early

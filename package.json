@@ -709,6 +709,7 @@
     "@vscode/vsce": "^4.0.0",
     "ag-grid-community": "36.2.0",
     "esbuild": "^0.28.2",
+    "marked": "16.4.2",
     "typescript": "^7.0.2",
     "uplot": "^1.6.32",
     "vscode-oniguruma": "^2.0.1",

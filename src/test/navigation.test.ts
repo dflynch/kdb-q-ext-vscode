@@ -1,6 +1,7 @@
 import * as assert from "node:assert";
 import { readFileSync } from "node:fs";
 import * as path from "node:path";
+import { parse as rendered } from "marked";
 import * as vscode from "vscode";
 import { annotate } from "../annotate";
 import { plain } from "../language";
@@ -274,6 +275,79 @@ suite("documentation", () => {
 });
 
 suite("documentation's text", () => {
+  // What markdown shows, as VS Code's marked renders it: the text, with a
+  // line break or a paragraph's as a line break or two. Each link must go
+  // where its text says, and not stop before a ) closing its own (
+  const decoded = (html: string) =>
+    html
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+      .replace(/&amp;/g, "&");
+  const shown = (markdown: string) => {
+    const html = rendered(markdown, { async: false });
+    for (const m of html.matchAll(/<a href="([^"]*)">(.*?)<\/a>(.?)/g)) {
+      const [, href, text, next] = m.map(decoded);
+      assert.strictEqual(decodeURI(href), text, html);
+      const open = text.split("(").length - text.split(")").length;
+      assert.ok(open <= 0 || next !== ")", html);
+    }
+    return decoded(
+      html
+        .replace(/<br>\n?/g, "\n")
+        .replace(/<\/p>\n<p>/g, "\n\n")
+        .replace(/<[^>]+>/g, ""),
+    ).trim();
+  };
+  // Pieces of comments: markdown's punctuation, entities, HTML and URLs
+  const pieces = [
+    ..."*_`#-+=!.[](){}<>&|~\\:/'\"",
+    ..."ab1",
+    " ",
+    "  ",
+    "1.",
+    "- ",
+    "# ",
+    "> ",
+    "```",
+    "---",
+    "&amp;",
+    "&#65;",
+    "<b>",
+    "</b>",
+    "http://a.com/x",
+    "HTTPS://B.ORG/(c)",
+    "ftp://c.net/d_e_",
+    "www.d.com",
+    "e@f.com",
+  ];
+  test("any comment's text shows as written", () => {
+    let seed = 1;
+    const random = (n: number) => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return (seed >>> 16) % n;
+    };
+    for (let n = 0; n < 20000; n++) {
+      // Some lines one piece over and over, as === under a heading
+      const lines = Array.from({ length: 1 + random(3) }, () => {
+        if (random(4) === 0) {
+          return pieces[random(pieces.length)].repeat(1 + random(4)).trim();
+        }
+        return Array.from(
+          { length: random(8) },
+          () => pieces[random(pieces.length)],
+        )
+          .join("")
+          .trim();
+      });
+      // As a comment gives it: lines trimmed, blank lines as one break
+      const text = lines.join("\n").replace(/\n\n+/g, "\n\n").trim();
+      assert.strictEqual(shown(plain(text)), text, JSON.stringify(text));
+    }
+  });
+
   test("punctuation, and = as an underline, are escaped", () =>
     assert.strictEqual(
       plain("Formats *a* message\n=========="),
