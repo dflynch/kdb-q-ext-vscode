@@ -229,6 +229,23 @@ suite("documentation", () => {
     assert.deepStrictEqual(docs("f:{[a]  / the first line\n  a}"), {
       f: "the first line",
     }));
+  test("not past an assignment in its value, on its first line", () =>
+    assert.deepStrictEqual(docs("f:{a:1; / about a\n x}"), { f: undefined }));
+  test("past a parameter, a column or a key, which aren't assigned", () =>
+    assert.deepStrictEqual(
+      docs(
+        "f:1; {[a] a}[1] / f's\ng:1; update c:2 from t / g's\nh:1; ([k:1]) / h's",
+      ),
+      { f: "f's", g: "g's", h: "h's" },
+    ));
+  test("a long statement, in linear time", () => {
+    const text = Array.from({ length: 100000 }, (_, n) => `a${n}:${n}`).join(
+      ";",
+    );
+    const start = Date.now();
+    assert.strictEqual(globals(text, annotate(text)).length, 100000);
+    assert.ok(Date.now() - start < 2000, `${Date.now() - start} ms`);
+  });
   test("from the first line, after a line break", () =>
     assert.deepStrictEqual(docs("\n/ c\nf:1;/ d\n/\n \n["), { f: "c" }));
 
@@ -271,6 +288,16 @@ suite("documentation's text", () => {
     assert.strictEqual(
       plain("see <http://gw.example.com/__x__>"),
       "see \\<<http://gw.example.com/__x__>\\>",
+    ));
+  test("a URL in any case, and inside a word", () =>
+    assert.strictEqual(
+      plain("HTTPS://GW.EXAMPLE.COM _http://a.com/x_"),
+      "<HTTPS://GW.EXAMPLE.COM> \\_<http://a.com/x_>",
+    ));
+  test("a URL keeps the ) it opens, not one it doesn't", () =>
+    assert.strictEqual(
+      plain("(see https://en.wikipedia.org/wiki/Q_(programming_language))."),
+      "\\(see <https://en.wikipedia.org/wiki/Q_(programming_language)>\\)\\.",
     ));
 });
 

@@ -69,8 +69,8 @@ read.
   documents it, and the file it's in. That comment is the lines directly
   above the definition, or failing that one trailing on its line if
   nothing else is assigned after it there, and only where the definition
-  starts its line. A global several files define shows the nearest definition, with
-  a link that peeks at the rest.
+  starts its line. A global several files define shows the nearest
+  definition, with a link that peeks at the rest.
 
 ### Servers
 

@@ -1,5 +1,6 @@
 // Where a text's lines start, and the line an offset is on, at any line
-// ending: \n, \r\n or a lone \r. Pure and total.
+// ending: \n, \r\n or a lone \r; and a search of sorted offsets. Pure and
+// total.
 
 // Each line's start, the first at 0
 export function lineStarts(text: string): number[] {
@@ -10,12 +11,17 @@ export function lineStarts(text: string): number[] {
 
 // The line the offset is on, from 0
 export function lineOf(starts: readonly number[], offset: number): number {
+  return Math.max(0, after(starts, offset) - 1);
+}
+
+// The index of the first of the sorted offsets after the offset
+export function after(sorted: readonly number[], offset: number): number {
   let lo = 0;
-  let hi = starts.length - 1;
+  let hi = sorted.length;
   while (lo < hi) {
-    const mid = (lo + hi + 1) >> 1;
-    if (starts[mid] <= offset) lo = mid;
-    else hi = mid - 1;
+    const mid = (lo + hi) >> 1;
+    if (sorted[mid] <= offset) lo = mid + 1;
+    else hi = mid;
   }
   return lo;
 }

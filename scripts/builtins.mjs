@@ -4,8 +4,8 @@
 // saying what it is, and its page on code.kx.com. Run by hand when the
 // reference changes, after moving the commit:
 //   npm run builtins
-// It fails, rather than writing an entry without syntax or a line, and lists
-// each one to add to the overrides.
+// It fails, rather than writing an entry without syntax or a line, or
+// skipping a heading it can't read, and lists each one to fix.
 import { writeFileSync } from "node:fs";
 
 const commit = "70279f6b947161c57ef8fe207f796494dc3d8651";
@@ -102,15 +102,11 @@ const overrides = {
   // The page writes z.ws:f, without its dot
   ".z.ws": { page: "ref/dotz.md", syntax: ".z.ws:f" },
   ".Q.addmonths": { page: "ref/dotq.md", summary: "add months" },
-  ".z.s": {
-    page: "ref/dotz.md",
-    anchor: "zs-self",
-    summary: "self",
-    syntax: ".z.s",
-  },
 };
 
 const entries = new Map();
+// Headings naming an entry the script can't read
+const unread = [];
 const add = (name, entry) => {
   if (!entries.has(name)) entries.set(name, entry);
 };
@@ -133,7 +129,8 @@ for (const row of (await page("ref/ref.csv")).filter(Boolean)) {
   }
 }
 
-// The namespaces: a ## section for each name, headed `name` (what it is)
+// The namespaces: a ## section for each name, or names sharing it, headed
+// `name` (what it is) or `name` `name` (what they are)
 const namespaces = [
   ["ref/dotq.md", ".Q."],
   ["ref/dotz.md", ".z."],
@@ -143,17 +140,23 @@ const namespaces = [
 for (const [file, prefix] of namespaces) {
   const lines = await page(file);
   for (const heading of lines) {
-    const m = heading.match(/^## `([^`]+)`\s*(?:\((.*)\))?\s*$/);
-    if (!m) continue;
-    const name = m[1].startsWith(".") ? m[1] : `${prefix}${m[1]}`;
-    if (!name.startsWith(prefix)) continue;
-    const own = section(lines, m[1]);
-    add(name, {
-      // A value, as .z.a, has none: it's its name
-      syntax: syntax(own, name) ?? name,
-      summary: m[2] ?? italic(own),
-      url: `${site}${file.replace(/\.md$/, "/")}#${anchorOf(heading)}`,
-    });
+    if (!/^## `/.test(heading)) continue;
+    const m = heading.match(/^## ((?:`[^`]+`\s*)+)(?:\((.*)\))?\s*$/);
+    if (!m) {
+      unread.push(`${file}: ${heading}`);
+      continue;
+    }
+    for (const [, written] of m[1].matchAll(/`([^`]+)`/g)) {
+      const name = written.startsWith(".") ? written : `${prefix}${written}`;
+      if (!name.startsWith(prefix)) continue;
+      const own = section(lines, written);
+      add(name, {
+        // A value, as .z.a, has none: it's its name
+        syntax: syntax(own, name) ?? name,
+        summary: m[2] ?? italic(own),
+        url: `${site}${file.replace(/\.md$/, "/")}#${anchorOf(heading)}`,
+      });
+    }
   }
 }
 
@@ -178,9 +181,12 @@ for (const [name, o] of Object.entries(overrides)) {
   });
 }
 
-const missing = [...entries]
-  .filter(([, e]) => !e.syntax || !e.summary)
-  .map(([name, e]) => `${name}: no ${e.syntax ? "line" : "syntax"}`);
+const missing = [
+  ...unread.map((h) => `unread heading ${h}`),
+  ...[...entries]
+    .filter(([, e]) => !e.syntax || !e.summary)
+    .map(([name, e]) => `${name}: no ${e.syntax ? "line" : "syntax"}`),
+];
 if (missing.length) {
   console.error(missing.join("\n"));
   process.exit(1);

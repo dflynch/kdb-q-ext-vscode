@@ -4,7 +4,7 @@
 // imports, never throws.
 
 import type { Annotated, Lambda, Name } from "./annotate";
-import { lineOf, lineStarts } from "./lines";
+import { after, lineOf, lineStarts } from "./lines";
 import { type Script, scan, type Token } from "./scanner";
 
 export type Outlined = {
@@ -135,14 +135,14 @@ export function globals(text: string, a: Annotated): Defined[] {
           }
         : { start: tokens[index - 2].start, end: tokens[close].end };
     const item: Defined = { full, kind: "variable", span, nameSpan, inLambda };
-    const doc = documented(span);
+    const doc = documented(span, nameSpan);
     if (doc !== undefined) item.doc = doc;
     // Past any names assigned along with it, as g in f:g:{x}
     let i = index;
     while (tokens[i + 2]?.kind === "name" && isAssign(tokens[i + 3])) {
       i += 2;
     }
-    const [, op, value, after] = tokens.slice(i);
+    const [op, value, then] = [tokens[i + 1], tokens[i + 2], tokens[i + 3]];
     const l = value && lambdas.get(value.start);
     // The lambda is the whole value: to the end of the definition, or to
     // set's ]
@@ -157,11 +157,11 @@ export function globals(text: string, a: Annotated): Defined[] {
     } else if (
       isAssign(op) &&
       word(value) === "use" &&
-      after?.kind === "symbol" &&
-      after.end === span.end
+      then?.kind === "symbol" &&
+      then.end === span.end
     ) {
       item.kind = "module";
-      item.detail = text.slice(value.start, after.end);
+      item.detail = text.slice(value.start, then.end);
     }
     return item;
   };
@@ -189,7 +189,9 @@ export function globals(text: string, a: Annotated): Defined[] {
   defined.sort((x, y) => x.nameSpan.start - y.nameSpan.start);
   // Every name assigned, local or global, and every handle
   const assigned = [
-    ...a.names.filter((n) => n.defines).map((n) => n.token.start),
+    ...a.names
+      .filter((n) => n.defines && (n.role === "local" || n.role === "global"))
+      .map((n) => n.token.start),
     ...a.handles.filter((h) => h.defines).map((h) => h.start),
   ].sort((x, y) => x - y);
   const documented = docs(text, script, assigned);
@@ -226,27 +228,17 @@ function uncommented(text: string, c: Token): string[] {
   );
 }
 
-// The index of the first of the sorted offsets after the offset
-function after(sorted: readonly number[], offset: number): number {
-  let lo = 0;
-  let hi = sorted.length;
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1;
-    if (sorted[mid] <= offset) lo = mid + 1;
-    else hi = mid;
-  }
-  return lo;
-}
-
 // The comment documenting a definition, if the definition starts its line:
 // the comment lines, or a block comment, directly above it with no line
 // between, else a comment trailing on its line, unless something else is
-// assigned after it there. Names are where each name is assigned, in order
+// assigned between them: past its value, if that ends before the comment,
+// else past its name, as in f:{a:1; / a's. Names are where each local and
+// global is assigned, in order
 function docs(
   text: string,
   script: Script,
   names: readonly number[],
-): (definition: Span) => string | undefined {
+): (definition: Span, name: Span) => string | undefined {
   const comments = [
     ...script.comments,
     ...script.statements.flatMap((s) =>
@@ -256,20 +248,20 @@ function docs(
   const starts = lineStarts(text);
   const line = (offset: number) => lineOf(starts, offset);
   // Whether only spaces come before the offset on its line
-  const first = (offset: number) =>
+  const leads = (offset: number) =>
     text.slice(starts[line(offset)], offset).trim() === "";
   // Each comment that starts its line, by the line it ends on
   const ending = new Map<number, Token>();
   for (const c of comments) {
-    if (first(c.start)) ending.set(line(c.end), c);
+    if (leads(c.start)) ending.set(line(c.end), c);
   }
   const commentStarts = comments.map((c) => c.start);
   const joined = (doc: string[]) => {
     const out = doc.join("\n").trim();
     return out === "" ? undefined : out;
   };
-  return ({ start, end }) => {
-    if (!first(start)) return undefined;
+  return ({ start, end }, name) => {
+    if (!leads(start)) return undefined;
     const own = line(start);
     const above: Token[] = [];
     for (let n = own; n > 0; ) {
@@ -283,7 +275,8 @@ function docs(
     }
     const trailing = comments[after(commentStarts, start)];
     if (!trailing || line(trailing.start) !== own) return undefined;
-    const next = names[after(names, end - 1)];
+    const past = end <= trailing.start ? end : name.end;
+    const next = names[after(names, past - 1)];
     if (next !== undefined && next < trailing.start) return undefined;
     return joined(uncommented(text, trailing));
   };
@@ -301,7 +294,7 @@ export function outline(text: string, a: Annotated): Outlined[] {
       name: d.full,
       kind: d.kind,
       ...(d.detail === undefined ? {} : { detail: d.detail }),
-      span: { ...d.span },
+      span: d.span,
       nameSpan: d.nameSpan,
     };
     const dot = d.full.lastIndexOf(".");

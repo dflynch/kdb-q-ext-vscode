@@ -237,9 +237,10 @@ function defined(index: Index, file: string, global: string): Listed[] {
 }
 
 // What a hover over the offset says: q's own entry for a keyword or a name
-// in .Q, .z, .h or .j, and a global's definitions, in definitions()'s order.
-// An export's, where its module's export has the key and the module defines
-// its value. Nothing for a local, a parameter, a column or a key
+// in .Q, .z, .h or .j, and a global's or an export's definitions, as
+// definitions() gives them; an export's key as itself, where its module's
+// export isn't a dictionary written out. Nothing for a local, a parameter,
+// a column or a key
 export function hover(
   index: Index,
   file: string,
@@ -260,14 +261,21 @@ export function hover(
     if (!builtin && !found.length) return undefined;
     return { ...(builtin ? { builtin } : {}), defined: found };
   }
-  const found: Listed[] = [];
-  for (const m of wanted.modules) {
-    const k = index.get(m)?.export?.keys?.find((k) => k.key === wanted.key);
-    const d =
-      k &&
-      index.get(m)?.defined.find((d) => d.nameSpan.start === k.value.start);
-    if (d) found.push({ ...d, file: m });
-  }
+  const found = definitions(index, file, a, offset).map((l): Listed => {
+    const d = index
+      .get(l.file)
+      ?.defined.find((d) => d.nameSpan.start === l.start);
+    if (d) return { ...d, file: l.file };
+    const span = { start: l.start, end: l.end };
+    return {
+      full: wanted.key,
+      kind: "variable",
+      span,
+      nameSpan: span,
+      inLambda: false,
+      file: l.file,
+    };
+  });
   return found.length ? { defined: found } : undefined;
 }
 

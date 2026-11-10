@@ -195,19 +195,33 @@ const highlights: Record<Occurrence["kind"], vscode.DocumentHighlightKind> = {
 const peekDefinitions = "kdb-q-ext-vscode.peekDefinitions";
 
 // Text in markdown as written: its punctuation escaped, each line its own.
-// A URL as a link, without the punctuation that ends a sentence after it
+// A URL as a link, in any case, as markdown finds one even inside a word
 const escaped = (text: string) =>
   text.replace(/[\\`*_{}[\]()<>#+\-=.!|~&]/g, "\\$&");
+
+// A URL's own part of what looks like one: without the punctuation that
+// ends a sentence after it, or a ) it didn't open
+function url(text: string): string {
+  let out = text;
+  for (;;) {
+    const trimmed = out.replace(/[.,;:!?'"\]]+$/, "");
+    const opened = (trimmed.match(/\(/g) ?? []).length;
+    const closed = (trimmed.match(/\)/g) ?? []).length;
+    if (!trimmed.endsWith(")") || closed <= opened) return trimmed;
+    out = trimmed.slice(0, -1);
+  }
+}
+
 export const plain = (text: string) =>
   text
     .split("\n")
     .map((l) =>
       l
-        .split(/(\b(?:https?|ftp):\/\/[^\s<>]+)/)
+        .split(/((?:https?|ftp):\/\/[^\s<>]+)/i)
         .map((part, i) => {
           if (i % 2 === 0) return escaped(part);
-          const url = part.replace(/[.,;:!?'")\]]+$/, "");
-          return `<${url}>${escaped(part.slice(url.length))}`;
+          const own = url(part);
+          return `<${own}>${escaped(part.slice(own.length))}`;
         })
         .join(""),
     )
@@ -330,11 +344,8 @@ export function registerLanguage(): vscode.Disposable {
         if (builtin && defined.length) parts.push("---");
         if (defined.length) parts.push(...described(defined[0], d.uri, index));
         const out = new vscode.MarkdownString();
-        // As many as the peek lists, as an export's may differ
-        const more =
-          defined.length &&
-          definitions(index, d.uri.toString(), annotations(d), offset).length -
-            1;
+        // The peek lists the same
+        const more = defined.length - 1;
         if (more > 0) {
           const args = encodeURIComponent(
             JSON.stringify([d.uri.toString(), at.line, at.character]),
