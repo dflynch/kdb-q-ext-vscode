@@ -362,7 +362,33 @@ suite("hover", () => {
       ["/w/a.q 1:1 by -"],
     ],
     ["a local", { "/w/a.q": "f:{a:1;|a}" }, undefined],
-    ["a column", { "/w/a.q": "a:1\nselect |a from t" }, undefined],
+    [
+      "a column, as the global it may be",
+      { "/w/a.q": "a:1\nselect |a from t" },
+      ["/w/a.q 1:1 a -"],
+    ],
+    [
+      "a function in a query",
+      { "/w/a.q": "/ scales\nf:{[a] 2*a}\nupdate c:|f[a] from t" },
+      ["/w/a.q 2:1 f[a] / scales"],
+    ],
+    ["a column defined nowhere", { "/w/a.q": "select |a from t" }, undefined],
+    ["a column assigned", { "/w/a.q": "c:1\nselect |c:1 from t" }, undefined],
+    [
+      "a column, as the parameter it may be",
+      { "/w/a.q": "a:1\nf:{[a] select |a from t}" },
+      undefined,
+    ],
+    [
+      "a name in .z in a query",
+      { "/w/a.q": "select from t where d=|.z.p" },
+      [".z.p"],
+    ],
+    [
+      "a name in .Q in a query",
+      { "/w/a.q": "update s:|.Q.s c from t" },
+      [".Q.s x"],
+    ],
   ];
   for (const [name, files, expected] of cases) {
     test(name, () => assert.deepStrictEqual(opened(files).hovered(), expected));

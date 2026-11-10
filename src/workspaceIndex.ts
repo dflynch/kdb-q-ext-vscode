@@ -246,8 +246,9 @@ function defined(index: Index, file: string, global: string): Listed[] {
 // in .Q, .z, .h or .j, and a global's or an export's definitions, as
 // definitions() gives them, each the global defined there. An export's key
 // whose value is written in the export, as ([f:{[a;b] a}]), as itself, a
-// function if a lambda. Nothing for a local, a parameter, a column, a key
-// or anything but a name, as a glyph just after one
+// function if a lambda. A column read, as the global it may be. Nothing for
+// a local, a parameter, another column, a key or anything but a name, as a
+// glyph just after one
 export function hover(
   index: Index,
   file: string,
@@ -263,18 +264,24 @@ export function hover(
     const builtin = builtins.get(here.identity.slice(8));
     return builtin && { name, builtin, defined: [] };
   }
-  const wanted = across(index, file, a, offset);
-  if (!wanted) return undefined;
-  if ("global" in wanted) {
+  const ofGlobal = (global: string) => {
     // q's own, only in its namespaces: a keyword is never a global, and
     // from and by are qSQL's only in a query
-    const builtin = /^\.[Qzhj]\./.test(wanted.global)
-      ? builtins.get(wanted.global)
+    const builtin = /^\.[Qzhj]\./.test(global)
+      ? builtins.get(global)
       : undefined;
-    const found = defined(index, file, wanted.global);
+    const found = defined(index, file, global);
     if (!builtin && !found.length) return undefined;
     return { name, ...(builtin ? { builtin } : {}), defined: found };
+  };
+  const wanted = across(index, file, a, offset);
+  // A column read, as the global it may be, as definitions() takes it
+  if (!wanted) {
+    return here.maybe?.startsWith("global ")
+      ? ofGlobal(here.maybe.slice(7))
+      : undefined;
   }
+  if ("global" in wanted) return ofGlobal(wanted.global);
   const found = definitions(index, file, a, offset).map((l): Listed => {
     const d = index
       .get(l.file)

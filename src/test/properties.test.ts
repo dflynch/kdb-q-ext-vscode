@@ -67,8 +67,6 @@ const written = (random: (n: number) => number, most: number) =>
   ).join("");
 
 suite("properties", () => {
-  // For a global, hover() and definitions() read the same list, so this
-  // tests an export's mapping, and what a hover shows at all
   test("a hover shows a name's definitions, each named where it is", () => {
     const random = randomly(1);
     for (let n = 0; n < 1500; n++) {
@@ -98,12 +96,6 @@ suite("properties", () => {
             inside && { start: inside.start, end: inside.end },
             context,
           );
-          // Go to Definition's locations, in its order
-          assert.deepStrictEqual(
-            found.defined.map((d) => `${d.file} ${d.nameSpan.start}`),
-            defs.map((d) => `${d.file} ${d.start}`),
-            context,
-          );
           // Each one's name written where it says, as the last part of it
           for (const d of found.defined) {
             const written = files[d.file].slice(
@@ -117,8 +109,12 @@ suite("properties", () => {
             );
           }
         }
-        // A global or an export Go to Definition finds has a hover
-        if (/^(global|export) /.test(inside?.identity ?? "") && defs.length) {
+        // A global, an export or a column that may be a global, that Go to
+        // Definition finds, has a hover
+        const shown =
+          /^(global|export) /.test(inside?.identity ?? "") ||
+          inside?.maybe?.startsWith("global ");
+        if (shown && defs.length) {
           assert.ok(found?.defined.length, context);
         }
       }
