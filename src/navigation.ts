@@ -118,7 +118,7 @@ export function globals(text: string, a: Annotated): Defined[] {
       nameEnd: end,
       inLambda,
     };
-    const doc = documented(item.start);
+    const doc = documented(item.start, start);
     if (doc !== undefined) item.doc = doc;
     // Past any names assigned along with it, as g in f:g:{x}
     let i = p.index;
@@ -203,15 +203,16 @@ function uncommented(text: string, c: Token): string[] {
   );
 }
 
-// The comment documenting a definition at the offset, if the definition
-// starts its line: the comment lines, or a block comment, directly above it
-// with no line between, else a comment trailing on its line, unless another
-// definition, one of starts, comes between
+// The comment documenting a definition at the offset, its name at own, if
+// the definition starts its line: the comment lines, or a block comment,
+// directly above it with no line between, else a comment trailing on its
+// line, unless another definition's name, one of names, in order, comes
+// between
 function docs(
   text: string,
   script: Script,
-  starts: number[],
-): (offset: number) => string | undefined {
+  names: number[],
+): (offset: number, own: number) => string | undefined {
   const comments = [
     ...script.comments,
     ...script.statements.flatMap((s) =>
@@ -253,12 +254,11 @@ function docs(
     if (first(c.start)) ending.set(lineOf(c.end), c);
   }
   const commentStarts = comments.map((c) => c.start);
-  const sortedStarts = [...starts].sort((x, y) => x - y);
   const joined = (doc: string[]) => {
     const out = doc.join("\n").trim();
     return out === "" ? undefined : out;
   };
-  return (offset) => {
+  return (offset, own) => {
     if (!first(offset)) return undefined;
     const line = lineOf(offset);
     const above: Token[] = [];
@@ -273,7 +273,7 @@ function docs(
     }
     const trailing = comments[after(commentStarts, offset)];
     if (!trailing || lineOf(trailing.start) !== line) return undefined;
-    const next = sortedStarts[after(sortedStarts, offset)];
+    const next = names[after(names, own)];
     if (next !== undefined && next < trailing.start) return undefined;
     return joined(uncommented(text, trailing));
   };

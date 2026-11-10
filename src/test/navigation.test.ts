@@ -209,6 +209,11 @@ suite("documentation", () => {
       { a: undefined, b: undefined, f: "f's" },
     ],
     [
+      "trailing a handle's definition",
+      "`.a.b set 1 / about b\n`.a.c set 2; `.a.d set 3 / d's",
+      { ".a.b": "about b", ".a.c": undefined, ".a.d": undefined },
+    ],
+    [
       "from the first line, after a line break",
       "\n/ c\nf:1;/ d\n/\n \n[",
       { f: "c" },

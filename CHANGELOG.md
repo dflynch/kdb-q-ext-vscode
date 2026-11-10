@@ -74,7 +74,8 @@ All notable changes to the extension are documented in this file.
   pass a global by reference under a group of their own
 - Hover for q: a keyword's, or a `.Q`, `.z`, `.h` or `.j` name's, syntax and
   description from KX's reference, linked; a global's signature and the
-  comment above its definition, with a link to its other definitions
+  comment above or trailing its definition, with a link to its other
+  definitions
 
 ### Changed
 
