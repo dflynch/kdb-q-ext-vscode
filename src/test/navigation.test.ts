@@ -77,6 +77,15 @@ suite("outline", () => {
       ],
     ],
     [
+      "a lambda set by handle is a function",
+      "`f set {[a;b] a}\nset[`g;{x}]\n`h set {x} 1",
+      [
+        "function f [a;b]: `f set {[a;b] a}",
+        "function g [x]: `g",
+        "variable h: `h set {x} 1",
+      ],
+    ],
+    [
       "modules",
       "m:use`foo\nn:(use`bar)`f",
       ["module m use`foo: m:use`foo", "variable n: n:(use`bar)`f"],
@@ -214,6 +223,16 @@ suite("documentation", () => {
       { ".a.b": "about b", ".a.c": undefined, ".a.d": undefined },
     ],
     [
+      "trailing, past a global its own lambda defines",
+      "f:{[x] .c.n::x} / sets n",
+      { f: "sets n", ".c.n": undefined },
+    ],
+    [
+      "TorQ's dashes alone on a line",
+      "/-\n/- real\nf:1\n/ -\ng:1",
+      { f: "real", g: undefined },
+    ],
+    [
       "from the first line, after a line break",
       "\n/ c\nf:1;/ d\n/\n \n[",
       { f: "c" },
@@ -230,11 +249,25 @@ suite("documentation's text", () => {
       plain("Formats *a* message\n=========="),
       "Formats \\*a\\* message  \n\\=\\=\\=\\=\\=\\=\\=\\=\\=\\=",
     ));
-  test("a URL stays as written, for markdown to link", () =>
+  test("a URL as a link, without a sentence's full stop", () =>
     assert.strictEqual(
       plain("see http://gw.example.com/x_y."),
-      "see http://gw.example.com/x_y.",
+      "see <http://gw.example.com/x_y>\\.",
     ));
+  test("a URL in angle brackets", () =>
+    assert.strictEqual(
+      plain("see <http://gw.example.com/__x__>"),
+      "see \\<<http://gw.example.com/__x__>\\>",
+    ));
+  test("a long run of comment lines is found in linear time", () => {
+    const text = `${"/ c\n".repeat(80000)}f:1`;
+    const start = Date.now();
+    assert.strictEqual(
+      globals(text, annotate(text))[0].doc?.length,
+      80000 * 2 - 1,
+    );
+    assert.ok(Date.now() - start < 2000);
+  });
   test("a large file's comments are found in linear time", () => {
     const text = "/ c\nf:{x} / t\n".repeat(40000);
     const start = Date.now();

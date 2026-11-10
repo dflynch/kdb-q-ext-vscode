@@ -60,9 +60,7 @@ suite("hover", () => {
     );
   });
 
-  test("a comment above, in the other file", async () => {
-    const d = await vscode.workspace.openTextDocument(file("config/wdb.q"));
-    await vscode.window.showTextDocument(d);
+  test("a comment above, in the file itself", async () => {
     assert.deepStrictEqual(await hovered("config/wdb.q", 2, 3), [
       "```q\n.merge.limit\n```\n\nDefaults, as a process's settings set them\n\n" +
         "[1 more definition](command:kdb-q-ext-vscode.peekDefinitions?" +
@@ -79,16 +77,23 @@ suite("hover", () => {
     ]);
   });
 
-  test("the link's command opens the peek", async () => {
+  test("the link's command peeks at every definition", async () => {
     const d = await vscode.workspace.openTextDocument(file("code/wdb.q"));
     await vscode.window.showTextDocument(d);
-    await vscode.commands.executeCommand(
+    const peeked = await vscode.commands.executeCommand<vscode.Location[]>(
       "kdb-q-ext-vscode.peekDefinitions",
       d.uri.toString(),
       4,
       24,
     );
     await vscode.commands.executeCommand("closeReferenceSearch");
+    assert.deepStrictEqual(
+      peeked.map(
+        (l) =>
+          `${vscode.workspace.asRelativePath(l.uri)} ${l.range.start.line}`,
+      ),
+      ["index/code/wdb.q 0", "index/config/wdb.q 1"],
+    );
   });
 
   test("nothing for a parameter", async () => {

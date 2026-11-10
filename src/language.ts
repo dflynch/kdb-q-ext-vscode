@@ -190,32 +190,31 @@ const highlights: Record<Occurrence["kind"], vscode.DocumentHighlightKind> = {
 };
 
 // Runs from a hover's link: the definitions of the name at the position,
-// in the peek
+// in the peek, given back for tests
 const peekDefinitions = "kdb-q-ext-vscode.peekDefinitions";
 
 // Text in markdown as written: its punctuation escaped, each line its own.
-// A URL stays as written, for markdown to link: escaped, its backslashes
-// would show, and break the link
+// A URL as a link, without the punctuation that ends a sentence after it
+const escaped = (text: string) =>
+  text.replace(/[\\`*_{}[\]()<>#+\-=.!|~&]/g, "\\$&");
 export const plain = (text: string) =>
   text
     .split("\n")
     .map((l) =>
       l
         .split(/(\b(?:https?|ftp):\/\/[^\s<>]+)/)
-        .map((part, i) =>
-          i % 2 ? part : part.replace(/[\\`*_{}[\]()<>#+\-=.!|~&]/g, "\\$&"),
-        )
+        .map((part, i) => {
+          if (i % 2 === 0) return escaped(part);
+          const url = part.replace(/[.,;:!?'")\]]+$/, "");
+          return `<${url}>${escaped(part.slice(url.length))}`;
+        })
         .join(""),
     )
     .join("  \n");
 
-// Code in a q block, its fence longer than any run of backticks in it
-const code = (text: string) => {
-  const fence = "`".repeat(
-    Math.max(3, ...[...text.matchAll(/`+/g)].map((m) => m[0].length + 1)),
-  );
-  return `${fence}q\n${text}\n${fence}`;
-};
+// Code in a q block: neither a signature nor q's syntax has a line of
+// backticks to end it early
+const code = (text: string) => `\`\`\`q\n${text}\n\`\`\``;
 
 // How a definition reads in a hover: its signature, or its name, then its
 // comment as written, and the file it's in if it's another
@@ -373,6 +372,7 @@ export function registerLanguage(): vscode.Disposable {
           all,
           "peek",
         );
+        return all;
       },
     ),
     vscode.languages.registerWorkspaceSymbolProvider({

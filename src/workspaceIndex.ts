@@ -273,7 +273,8 @@ export function hover(
   const found: Listed[] = [];
   for (const m of wanted.modules) {
     const k = index.get(m)?.export?.keys?.find((k) => k.key === wanted.key);
-    const d = k && index.get(m)?.defined.find((d) => d.start === k.value.start);
+    const d =
+      k && index.get(m)?.defined.find((d) => d.nameStart === k.value.start);
     if (d) found.push({ ...d, file: m });
   }
   return found.length ? { defined: found } : undefined;

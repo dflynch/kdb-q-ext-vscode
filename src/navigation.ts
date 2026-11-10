@@ -70,8 +70,8 @@ function valueEnd({ tokens, index }: Placed): number {
 }
 
 // A global's definition: where it's first assigned at top level, or first
-// in a lambda. A function is a global assigned a lambda, as in f:{x} or
-// f:g:{x}; a module, one assigned use`mod
+// in a lambda. A function is a global assigned a lambda, as in f:{x},
+// f:g:{x} or `f set {x}; a module, one assigned use`mod
 export type Defined = {
   full: string;
   kind: "function" | "variable" | "module";
@@ -118,7 +118,7 @@ export function globals(text: string, a: Annotated): Defined[] {
       nameEnd: end,
       inLambda,
     };
-    const doc = documented(item.start, start);
+    const doc = documented(item.start, item.end);
     if (doc !== undefined) item.doc = doc;
     // Past any names assigned along with it, as g in f:g:{x}
     let i = p.index;
@@ -127,7 +127,21 @@ export function globals(text: string, a: Annotated): Defined[] {
     }
     const [, op, value, after] = p.tokens.slice(i);
     const l = value && lambdas.get(value.start);
-    if (isAssign(op) && l?.close && l.close.end === item.end) {
+    // A lambda assigned, or set by handle, as `f set {x} or set[`f;{x}]
+    const handle = p.tokens[p.index].kind === "symbol";
+    const beside = (k: number) => word(p.tokens[p.index + k]);
+    const inSet =
+      handle && beside(-2) === "set" && beside(-1) === "[" && beside(1) === ";";
+    const closed =
+      inSet && l?.close
+        ? p.tokens.find((t) => t.start >= (l.close?.end ?? 0))
+        : undefined;
+    if (
+      l?.close &&
+      (((isAssign(op) || (handle && word(op) === "set")) &&
+        l.close.end === item.end) ||
+        (inSet && word(closed) === "]"))
+    ) {
       item.kind = "function";
       item.detail = `[${l.params.join(";")}]`;
     } else if (
@@ -198,21 +212,20 @@ function uncommented(text: string, c: Token): string[] {
     l
       .trim()
       .replace(/^\/+\s*/, "")
-      .replace(/^-(?=\s|[A-Za-z])\s*/, "")
+      .replace(/^-(?=\s|[A-Za-z]|$)\s*/, "")
       .trim(),
   );
 }
 
-// The comment documenting a definition at the offset, its name at own, if
-// the definition starts its line: the comment lines, or a block comment,
-// directly above it with no line between, else a comment trailing on its
-// line, unless another definition's name, one of names, in order, comes
-// between
+// The comment documenting a definition from the offset to end, if it starts
+// its line: the comment lines, or a block comment, directly above it with no
+// line between, else a comment trailing on its line, unless another
+// definition's name, one of names, in order, comes between it and its end
 function docs(
   text: string,
   script: Script,
   names: number[],
-): (offset: number, own: number) => string | undefined {
+): (offset: number, end: number) => string | undefined {
   const comments = [
     ...script.comments,
     ...script.statements.flatMap((s) =>
@@ -258,22 +271,23 @@ function docs(
     const out = doc.join("\n").trim();
     return out === "" ? undefined : out;
   };
-  return (offset, own) => {
+  return (offset, end) => {
     if (!first(offset)) return undefined;
     const line = lineOf(offset);
     const above: Token[] = [];
     for (let n = line; n > 0; ) {
       const c = ending.get(n - 1);
       if (!c) break;
-      above.unshift(c);
+      above.push(c);
       n = lineOf(c.start);
     }
+    above.reverse();
     if (above.length) {
       return joined(above.flatMap((c) => uncommented(text, c)));
     }
     const trailing = comments[after(commentStarts, offset)];
     if (!trailing || lineOf(trailing.start) !== line) return undefined;
-    const next = names[after(names, own)];
+    const next = names[after(names, end - 1)];
     if (next !== undefined && next < trailing.start) return undefined;
     return joined(uncommented(text, trailing));
   };

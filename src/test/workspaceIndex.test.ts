@@ -316,6 +316,14 @@ suite("hover", () => {
       },
       ["/w/m.q 2:1 mid[x] middle"],
     ],
+    [
+      "an export its module sets by handle",
+      {
+        "/w/m.q": "/ middle\n`mid set {x}\nexport:([mid:mid])",
+        "/w/a.q": "s:use`m\ns.|mid 1",
+      },
+      ["/w/m.q 2:2 mid[x] middle"],
+    ],
     ["a global defined nowhere", { "/w/a.q": "|g 1" }, undefined],
     ["a local", { "/w/a.q": "f:{a:1;|a}" }, undefined],
     ["a column", { "/w/a.q": "a:1\nselect |a from t" }, undefined],
