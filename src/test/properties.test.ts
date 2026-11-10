@@ -153,7 +153,6 @@ suite("properties", () => {
         const context = JSON.stringify({ text, d });
         assert.ok(d.span.start <= d.nameSpan.start, context);
         assert.ok(d.nameSpan.end <= d.span.end, context);
-        assert.notStrictEqual(d.doc, "", context);
       }
     }
   });

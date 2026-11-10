@@ -10,17 +10,12 @@ export function lineStarts(text: string): number[] {
 
 // The line the offset is on, from 0
 export function lineOf(starts: readonly number[], offset: number): number {
-  return Math.max(0, after(starts, offset) - 1);
-}
-
-// The index of the first of the sorted offsets after the offset
-function after(sorted: readonly number[], offset: number): number {
   let lo = 0;
-  let hi = sorted.length;
+  let hi = starts.length;
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
-    if (sorted[mid] <= offset) lo = mid + 1;
+    if (starts[mid] <= offset) lo = mid + 1;
     else hi = mid;
   }
-  return lo;
+  return Math.max(0, lo - 1);
 }

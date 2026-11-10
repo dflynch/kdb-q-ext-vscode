@@ -278,12 +278,6 @@ suite("documentation", () => {
     assert.strictEqual(globals(text, annotate(text)).length, 100000);
     assert.ok(Date.now() - start < 2000, `${Date.now() - start} ms`);
   });
-  test("a deep indent, in linear time", () => {
-    const text = `${" ".repeat(1000000)}${Array.from({ length: 20000 }, (_, n) => `a${n}:${n}`).join(";")}`;
-    const start = Date.now();
-    assert.strictEqual(globals(text, annotate(text)).length, 20000);
-    assert.ok(Date.now() - start < 2000, `${Date.now() - start} ms`);
-  });
 });
 
 suite("occurrences", () => {

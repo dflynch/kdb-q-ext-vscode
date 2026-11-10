@@ -244,11 +244,11 @@ function defined(index: Index, file: string, global: string): Listed[] {
 
 // What a hover over the offset says, and the name it's over: q's own entry
 // for a keyword or a name in .Q, .z, .h or .j, and a global's or an export's
-// definitions, as definitions() gives them, each the global defined there. An export's key
-// whose value is written in the export, as ([f:{[a;b] a}]), as itself, a
-// function if a lambda. A column read, as the global it may be. Nothing for
-// a local, a parameter, another column, a key or anything but a name, as a
-// glyph just after one
+// definitions, as definitions() gives them, each the global defined there.
+// An export's key whose value is written in the export, as ([f:{[a;b] a}]),
+// as itself, a function if a lambda. A column read, as the global it may
+// be. Nothing for a local, a parameter, another column, a key or anything
+// but a name, as a glyph just after one
 export function hover(
   index: Index,
   file: string,
