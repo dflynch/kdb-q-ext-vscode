@@ -100,7 +100,9 @@ suite("properties", () => {
         }
       }
     }
-  });
+  })
+    // Many workspaces, not a measure of speed: CI's machines are slower
+    .timeout(20000);
 
   test("an outline's names are in their spans, its children in their parents", () => {
     const random = randomly(2);
