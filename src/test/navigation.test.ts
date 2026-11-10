@@ -211,8 +211,11 @@ suite("documentation", () => {
           const text = inLambda
             ? ["h:{[]", ...body.map((l) => `  ${l}`), " }"].join(eol)
             : body.join(eol);
+          const found = docs(text);
+          // Defined, so no comment means no comment
+          assert.ok(name in found, ending);
           assert.strictEqual(
-            docs(text)[name],
+            found[name],
             inLambda ? undefined : expected,
             ending,
           );
@@ -221,6 +224,8 @@ suite("documentation", () => {
     }
   }
 
+  test("a comment's trailing spaces, as written", () =>
+    assert.deepStrictEqual(docs("/ about  \r\nf:1"), { f: "/ about  " }));
   test("a comment's own indent, as written", () =>
     assert.deepStrictEqual(docs("/ one\n/    two\nf:1"), {
       f: "/ one\n/    two",

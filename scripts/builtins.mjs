@@ -71,18 +71,16 @@ const italic = (lines) =>
     .slice(1, -1);
 
 // Names q has that the reference's index leaves out, and qSQL's templates,
-// whose pages write their syntax in HTML. Syntax as the page writes it
+// whose pages write their syntax in HTML. Syntax as the page writes it; a
+// page only for a name the reference has no entry for
 const overrides = {
   select: {
-    page: "ref/select.md",
     syntax: "select [Lexp] [ps] [by pb] from texp [where pw]",
   },
   exec: {
-    page: "ref/exec.md",
     syntax: "exec [distinct] ps [by pb] from texp [where pw]",
   },
   update: {
-    page: "ref/update.md",
     syntax: "update ps [by pb] from texp [where pw]",
   },
   from: {
@@ -102,8 +100,8 @@ const overrides = {
     syntax: "use`module",
   },
   // The page writes z.ws:f, without its dot
-  ".z.ws": { page: "ref/dotz.md", syntax: ".z.ws:f" },
-  ".Q.addmonths": { page: "ref/dotq.md", summary: "add months" },
+  ".z.ws": { syntax: ".z.ws:f" },
+  ".Q.addmonths": { summary: "add months" },
 };
 
 const entries = new Map();
@@ -190,14 +188,31 @@ function headings(lines) {
   return out;
 }
 
+// Each override's fields in place of the reference's; one that changes
+// nothing, or a new entry without a page, is a mistake
+const overridden = [];
 for (const [name, o] of Object.entries(overrides)) {
-  const url = `${site}${o.page.replace(/\.md$/, "/")}${o.anchor ? `#${o.anchor}` : ""}`;
   const known = entries.get(name);
-  entries.set(name, {
+  const url =
+    o.page &&
+    `${site}${o.page.replace(/\.md$/, "/")}${o.anchor ? `#${o.anchor}` : ""}`;
+  const e = {
     syntax: o.syntax ?? known?.syntax,
-    summary: known?.summary ?? o.summary,
-    url: known?.url ?? url,
-  });
+    summary: o.summary ?? known?.summary,
+    url: url ?? known?.url,
+  };
+  if (!e.url) overridden.push(`${name}: no page`);
+  for (const field of ["syntax", "summary", "url"]) {
+    if (
+      known &&
+      known[field] &&
+      e[field] === known[field] &&
+      (field === "url" ? url : o[field])
+    ) {
+      overridden.push(`${name}: its ${field} is the reference's`);
+    }
+  }
+  entries.set(name, e);
 }
 
 // Each entry's page must exist, and its anchor be one of the page's headings
@@ -215,6 +230,7 @@ for (const [name, e] of entries) {
 
 const missing = [
   ...unread.map((h) => `unread heading ${h}`),
+  ...overridden,
   ...broken,
   ...[...entries]
     .filter(([, e]) => !e.syntax || !e.summary)

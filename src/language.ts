@@ -313,7 +313,7 @@ export function registerLanguage(): vscode.Disposable {
         const offset = d.offsetAt(at);
         const found = hover(index, d.uri.toString(), annotations(d), offset);
         if (!found) return undefined;
-        const { builtin, defined } = found;
+        const { name, builtin, defined } = found;
         // q in code blocks, KX's line and a path as text, escaped by VS Code
         const out = new vscode.MarkdownString();
         if (builtin) {
@@ -334,7 +334,7 @@ export function registerLanguage(): vscode.Disposable {
           );
           out.isTrusted = { enabledCommands: [peekDefinitions] };
         }
-        return new vscode.Hover(out);
+        return new vscode.Hover(out, range(d, name));
       },
     }),
     vscode.commands.registerCommand(

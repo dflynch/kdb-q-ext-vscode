@@ -242,7 +242,7 @@ function defined(index: Index, file: string, global: string): Listed[] {
   );
 }
 
-// What a hover over the offset says: q's own entry for a keyword or a name
+// What a hover over the offset says, and the name it's over: q's own entry for a keyword or a name
 // in .Q, .z, .h or .j, and a global's or an export's definitions, as
 // definitions() gives them, each the global defined there. An export's key
 // whose value is written in the export, as ([f:{[a;b] a}]), as itself, a
@@ -253,22 +253,27 @@ export function hover(
   file: string,
   a: Annotated,
   offset: number,
-): { builtin?: Builtin; defined: Listed[] } | undefined {
+): { name: Span; builtin?: Builtin; defined: Listed[] } | undefined {
   // The name the offset is in, not one it's just after: VS Code asks at the
   // start of the character under the mouse, which may be a glyph after it
   const here = targets(a).find((t) => t.start <= offset && offset < t.end);
   if (!here) return undefined;
+  const name = span(here);
   if (here.identity.startsWith("builtin ")) {
     const builtin = builtins.get(here.identity.slice(8));
-    return builtin && { builtin, defined: [] };
+    return builtin && { name, builtin, defined: [] };
   }
   const wanted = across(index, file, a, offset);
   if (!wanted) return undefined;
   if ("global" in wanted) {
-    const builtin = builtins.get(wanted.global);
+    // q's own, only in its namespaces: a keyword is never a global, and
+    // from and by are qSQL's only in a query
+    const builtin = /^\.[Qzhj]\./.test(wanted.global)
+      ? builtins.get(wanted.global)
+      : undefined;
     const found = defined(index, file, wanted.global);
     if (!builtin && !found.length) return undefined;
-    return { ...(builtin ? { builtin } : {}), defined: found };
+    return { name, ...(builtin ? { builtin } : {}), defined: found };
   }
   const found = definitions(index, file, a, offset).map((l): Listed => {
     const d = index
@@ -289,7 +294,7 @@ export function hover(
       file: l.file,
     };
   });
-  return found.length ? { defined: found } : undefined;
+  return found.length ? { name, defined: found } : undefined;
 }
 
 const span = ({ start, end }: Span): Span => ({ start, end });

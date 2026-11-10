@@ -351,6 +351,16 @@ suite("hover", () => {
     ],
     ["a dictionary's key", { "/w/a.q": "([|k:1])" }, undefined],
     ["a global defined nowhere", { "/w/a.q": "|g 1" }, undefined],
+    [
+      "a global named as qSQL's by, defined nowhere",
+      { "/w/a.q": "(1;|by)" },
+      undefined,
+    ],
+    [
+      "a global named as qSQL's by",
+      { "/w/a.q": "by:3\n|by+1" },
+      ["/w/a.q 1:1 by -"],
+    ],
     ["a local", { "/w/a.q": "f:{a:1;|a}" }, undefined],
     ["a column", { "/w/a.q": "a:1\nselect |a from t" }, undefined],
   ];

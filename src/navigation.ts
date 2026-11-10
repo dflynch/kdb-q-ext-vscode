@@ -95,7 +95,7 @@ export type Defined = {
   // The name, without a handle's backtick
   nameSpan: Span;
   inLambda: boolean;
-  // The comment lines above it, as written, without the indent they share
+  // The comment lines above it, as written
   doc?: string;
 };
 
@@ -238,7 +238,6 @@ function docs(
       .slice(starts[line(first.start)], starts[own])
       .split(/\r\n|\r|\n/)
       .slice(0, -1)
-      .map((l) => l.trimEnd())
       .join("\n");
   };
 }

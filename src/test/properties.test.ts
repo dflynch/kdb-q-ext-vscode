@@ -92,6 +92,12 @@ suite("properties", () => {
         // Nothing but over a name
         if (!inside) assert.strictEqual(found, undefined, context);
         if (found) {
+          // Over the name the offset is in, whole
+          assert.deepStrictEqual(
+            found.name,
+            inside && { start: inside.start, end: inside.end },
+            context,
+          );
           // Go to Definition's locations, in its order
           assert.deepStrictEqual(
             found.defined.map((d) => `${d.file} ${d.nameSpan.start}`),

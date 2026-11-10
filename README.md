@@ -71,7 +71,7 @@ read.
   in. A comment indented, as in a lambda, is about the code it's in, and
   one trailing a line could be about either line, so neither is shown. A
   global several files define shows the nearest definition, with a link
-  that peeks at the rest.
+  that peeks at all of them, as Go to Definition does.
 
 ### Servers
 
