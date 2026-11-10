@@ -311,9 +311,9 @@ export function registerLanguage(): vscode.Disposable {
       provideHover: async (d, at) => {
         const index = await workspace.index(d);
         const offset = d.offsetAt(at);
-        const found = hover(index, d.uri.toString(), annotations(d), offset);
-        if (!found) return undefined;
-        const { name, builtin, defined } = found;
+        const shown = hover(index, d.uri.toString(), annotations(d), offset);
+        if (!shown) return undefined;
+        const { name, builtin, defined } = shown;
         // q in code blocks, KX's line and a path as text, escaped by VS Code
         const out = new vscode.MarkdownString();
         if (builtin) {

@@ -188,11 +188,21 @@ function headings(lines) {
   return out;
 }
 
-// Each override's fields in place of the reference's; one that changes
+// Each override's fields in place of the reference's; a field it doesn't
+// know, an anchor without its page, one that sets nothing or changes
 // nothing, or a new entry without a page, is a mistake
 const overridden = [];
 for (const [name, o] of Object.entries(overrides)) {
   const known = entries.get(name);
+  for (const field of Object.keys(o)) {
+    if (!["syntax", "summary", "page", "anchor"].includes(field)) {
+      overridden.push(`${name}: no field ${field}`);
+    }
+  }
+  if (o.anchor && !o.page) overridden.push(`${name}: an anchor without a page`);
+  if (!o.syntax && !o.summary && !o.page) {
+    overridden.push(`${name}: sets nothing`);
+  }
   const url =
     o.page &&
     `${site}${o.page.replace(/\.md$/, "/")}${o.anchor ? `#${o.anchor}` : ""}`;

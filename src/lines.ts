@@ -1,6 +1,5 @@
 // Where a text's lines start, and the line an offset is on, at any line
-// ending: \n, \r\n or a lone \r; and a search of sorted offsets. Pure and
-// total.
+// ending: \n, \r\n or a lone \r. Pure and total.
 
 // Each line's start, the first at 0
 export function lineStarts(text: string): number[] {

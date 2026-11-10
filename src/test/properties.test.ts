@@ -1,6 +1,7 @@
 // Rules that hold for any input, checked over random q: navigation never
-// throws, a hover lists what Go to Definition does, an outline's spans nest;
-// and the hover's entries from KX's reference cover q's keywords
+// throws, a hover lists what Go to Definition does for a global, an export
+// or a column that may be a global, an outline's spans nest; and the hover's
+// entries from KX's reference cover q's keywords
 import * as assert from "node:assert";
 import { annotate, keywords } from "../annotate";
 import { builtins } from "../builtins";
@@ -109,13 +110,17 @@ suite("properties", () => {
             );
           }
         }
-        // A global, an export or a column that may be a global, that Go to
-        // Definition finds, has a hover
+        // A global, an export or a column that may be a global: what Go to
+        // Definition finds, all of it, in its order
         const shown =
           /^(global|export) /.test(inside?.identity ?? "") ||
           inside?.maybe?.startsWith("global ");
-        if (shown && defs.length) {
-          assert.ok(found?.defined.length, context);
+        if (shown) {
+          assert.deepStrictEqual(
+            (found?.defined ?? []).map((d) => `${d.file} ${d.nameSpan.start}`),
+            defs.map((d) => `${d.file} ${d.start}`),
+            context,
+          );
         }
       }
     }
