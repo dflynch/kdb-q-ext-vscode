@@ -7,16 +7,17 @@
 // the annotation pass is: no VS Code imports, never throws.
 
 import type { Annotated } from "./annotate";
+import { type Builtin, builtins } from "./builtins";
+import { lineOf, lineStarts } from "./lines";
 import {
   at,
   type Defined,
   first,
   globals,
   references as inFile,
+  type Span,
   targets,
 } from "./navigation";
-
-type Span = { start: number; end: number };
 
 export type Entry = {
   // Where each line starts, to turn offsets into positions
@@ -29,15 +30,15 @@ export type Entry = {
   exports: (Span & { module: string; key: string })[];
   // The module's own export, if the file assigns one: its keys when it's a
   // dictionary literal, each where its value is defined in the file
-  export?: Span & { keys?: (Span & { key: string; value: Span })[] };
+  // and, for a lambda written in it, as ([f:{[a;b] a}]), its parameters
+  export?: Span & {
+    keys?: (Span & { key: string; value: Span; params?: string[] })[];
+  };
 };
 
 // A file's entry, from its text and annotations
 export function entry(text: string, a: Annotated): Entry {
-  const lines = [0];
-  for (const m of text.matchAll(/\r\n|\r|\n/g)) {
-    lines.push(m.index + m[0].length);
-  }
+  const lines = lineStarts(text);
   const all = targets(a);
   const out: Entry = {
     lines,
@@ -76,6 +77,9 @@ export function entry(text: string, a: Annotated): Entry {
           key: k.key,
           ...span,
           value: d ? { start: d.start, end: d.end } : span,
+          ...(target && "lambda" in target
+            ? { params: target.lambda.params }
+            : {}),
         };
       });
     }
@@ -88,14 +92,8 @@ export function position(
   e: Entry,
   offset: number,
 ): { line: number; character: number } {
-  let lo = 0;
-  let hi = e.lines.length - 1;
-  while (lo < hi) {
-    const mid = (lo + hi + 1) >> 1;
-    if (e.lines[mid] <= offset) lo = mid;
-    else hi = mid - 1;
-  }
-  return { line: lo, character: offset - e.lines[lo] };
+  const line = lineOf(e.lines, offset);
+  return { line, character: offset - e.lines[line] };
 }
 
 // Files by their URI, as a string; the current file's entry must be fresh
@@ -222,20 +220,73 @@ export function definitions(
 // Where each file first assigns a global at top level, or, if none does,
 // first in a lambda, the file itself first, then the nearest
 function defining(index: Index, file: string, global: string): Location[] {
-  const atTop: Location[] = [];
-  const inLambda: Location[] = [];
+  return defined(index, file, global).map((d) => ({
+    file: d.file,
+    ...d.nameSpan,
+  }));
+}
+
+// Each file's definition of a global, as defining() orders them
+function defined(index: Index, file: string, global: string): Listed[] {
+  const atTop: Listed[] = [];
+  const inLambda: Listed[] = [];
   for (const [f, e] of index) {
     const top = e.defined.find((d) => d.full === global && !d.inLambda);
     const inner = e.defined.find((d) => d.full === global && d.inLambda);
-    if (top) atTop.push({ file: f, start: top.nameStart, end: top.nameEnd });
-    if (inner) {
-      inLambda.push({ file: f, start: inner.nameStart, end: inner.nameEnd });
-    }
+    if (top) atTop.push({ ...top, file: f });
+    if (inner) inLambda.push({ ...inner, file: f });
   }
   const order = nearest(file);
   return (atTop.length ? atTop : inLambda).sort((x, y) =>
     order(x.file, y.file),
   );
+}
+
+// What a hover over the offset says: q's own entry for a keyword or a name
+// in .Q, .z, .h or .j, and a global's or an export's definitions, as
+// definitions() gives them, each the global defined there. An export's key
+// whose value is written in the export, as ([f:{[a;b] a}]), as itself, a
+// function if a lambda. Nothing for a local, a parameter, a column or a key
+export function hover(
+  index: Index,
+  file: string,
+  a: Annotated,
+  offset: number,
+): { builtin?: Builtin; defined: Listed[] } | undefined {
+  const here = at(targets(a), offset);
+  if (!here) return undefined;
+  if (here.identity.startsWith("builtin ")) {
+    const builtin = builtins.get(here.identity.slice(8));
+    return builtin && { builtin, defined: [] };
+  }
+  const wanted = across(index, file, a, offset);
+  if (!wanted) return undefined;
+  if ("global" in wanted) {
+    const builtin = builtins.get(wanted.global);
+    const found = defined(index, file, wanted.global);
+    if (!builtin && !found.length) return undefined;
+    return { ...(builtin ? { builtin } : {}), defined: found };
+  }
+  const found = definitions(index, file, a, offset).map((l): Listed => {
+    const d = index
+      .get(l.file)
+      ?.defined.find((d) => d.nameSpan.start === l.start);
+    if (d) return { ...d, file: l.file };
+    const params = index
+      .get(l.file)
+      ?.export?.keys?.find((k) => k.start === l.start)?.params;
+    return {
+      full: wanted.key,
+      ...(params
+        ? { kind: "function", detail: `[${params.join(";")}]` }
+        : { kind: "variable" }),
+      span: span(l),
+      nameSpan: span(l),
+      inLambda: false,
+      file: l.file,
+    };
+  });
+  return found.length ? { defined: found } : undefined;
 }
 
 const span = ({ start, end }: Span): Span => ({ start, end });

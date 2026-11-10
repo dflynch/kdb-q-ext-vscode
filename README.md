@@ -63,6 +63,13 @@ read.
   - ``use`foo`` goes to `foo.q` or `foo/init.q` anywhere in the
     workspace, as `QPATH` isn't read
   - Names q defines (`.z`, `.Q`), and globals defined outside the workspace
+- Hover: on a q keyword or a name in `.Q`, `.z`, `.h` or `.j`, its syntax
+  and what it does, from [KX's reference](https://code.kx.com/q/ref/),
+  linked. On a global, the comment lines directly above its definition,
+  exactly as written, then its signature, or its name, and the file it's
+  in. A comment trailing a line isn't shown, as which definition it's
+  about can't be told. A global several files define shows the nearest
+  definition, with a link that peeks at the rest.
 
 ### Servers
 

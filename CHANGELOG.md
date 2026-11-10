@@ -72,6 +72,10 @@ All notable changes to the extension are documented in this file.
   Workspace, across the workspace's `.q` files, following namespaces,
   lambdas' locals and q 5 modules. Find All References lists the uses that
   pass a global by reference under a group of their own
+- Hover for q: a keyword's, or a `.Q`, `.z`, `.h` or `.j` name's, syntax and
+  description from KX's reference, linked; a global's comment above its
+  definition, as written, and its signature, with a link to its other
+  definitions
 
 ### Changed
 

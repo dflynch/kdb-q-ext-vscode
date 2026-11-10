@@ -11,7 +11,8 @@
       "**",
       "!test/fixtures/corpus.ipc.json",
       "!test/fixtures/lexing.json",
-      "!test/fixtures/scoping.json"
+      "!test/fixtures/scoping.json",
+      "!src/builtins.ts"
     ]
   },
   "formatter": {

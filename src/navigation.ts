@@ -4,19 +4,18 @@
 // imports, never throws.
 
 import type { Annotated, Lambda, Name } from "./annotate";
-import { scan, type Token } from "./scanner";
+import { lineOf, lineStarts } from "./lines";
+import { type Script, scan, type Token } from "./scanner";
 
 export type Outlined = {
   name: string;
   kind: "namespace" | "function" | "variable" | "module";
   // A function's parameters, as [x;y], or a module's use`foo
   detail?: string;
-  // From the name, or a handle's backtick, to the end of its value; a
-  // namespace spans its run of globals
-  start: number;
-  end: number;
-  nameStart: number;
-  nameEnd: number;
+  // As a definition's; a namespace spans its run of globals, and is named
+  // where its first is
+  span: Span;
+  nameSpan: Span;
   children?: Outlined[];
 };
 
@@ -32,9 +31,9 @@ export type Occurrence = {
 // offset
 type Placed = { tokens: Token[]; index: number };
 
-function placed(text: string): (offset: number) => Placed | undefined {
+function placed(script: Script): (offset: number) => Placed | undefined {
   const all: Placed[] = [];
-  for (const s of scan(text).statements) {
+  for (const s of script.statements) {
     const tokens = s.tokens.filter((t) => t.kind !== "comment");
     for (let index = 0; index < tokens.length; index++) {
       all.push({ tokens, index });
@@ -69,26 +68,42 @@ function valueEnd({ tokens, index }: Placed): number {
   return end;
 }
 
+// The index of the close of the brackets the token is in
+function closing({ tokens, index }: Placed): number | undefined {
+  let depth = 0;
+  for (let j = index + 1; j < tokens.length; j++) {
+    const t = tokens[j];
+    if (t.kind === "open") depth++;
+    else if (t.kind === "close" && depth-- === 0) return j;
+  }
+  return undefined;
+}
+
+export type Span = { start: number; end: number };
+
 // A global's definition: where it's first assigned at top level, or first
-// in a lambda. A function is a global assigned a lambda, as in f:{x} or
-// f:g:{x}; a module, one assigned use`mod
+// in a lambda. A function is a global assigned a lambda, as in f:{x},
+// f:g:{x}, `f set {x} or set[`f;{x}]; a module, one assigned use`mod
 export type Defined = {
   full: string;
   kind: "function" | "variable" | "module";
   // A function's parameters, as [x;y], or a module's use`foo
   detail?: string;
-  // From the name, or a handle's backtick, to the end of its value
-  start: number;
-  end: number;
-  nameStart: number;
-  nameEnd: number;
+  // The whole definition: from the name, a handle's backtick, or the set
+  // of set[`f;x], to the end of its value
+  span: Span;
+  // The name, without a handle's backtick
+  nameSpan: Span;
   inLambda: boolean;
+  // The comment lines above it, as written, without the indent they share
+  doc?: string;
 };
 
 // Each global's first definition at top level and its first in a lambda,
 // not where an existing value is amended, in the order they're written
 export function globals(text: string, a: Annotated): Defined[] {
-  const at = placed(text);
+  const script = scan(text);
+  const at = placed(script);
   const lambdas = new Map<number, Lambda>(
     a.lambdas.map((l) => [l.open.start, l]),
   );
@@ -99,77 +114,147 @@ export function globals(text: string, a: Annotated): Defined[] {
 
   const described = (
     full: string,
-    start: number,
-    end: number,
+    nameSpan: Span,
     inLambda: boolean,
   ): Defined | undefined => {
-    const p = at(start);
+    const p = at(nameSpan.start);
     if (!p) return undefined;
-    const item: Defined = {
-      full,
-      kind: "variable",
-      // From the symbol's backtick, for a handle
-      start: p.tokens[p.index].start,
-      end: Math.max(end, valueEnd(p)),
-      nameStart: start,
-      nameEnd: end,
-      inLambda,
-    };
+    const { tokens, index } = p;
+    const beside = (k: number) => word(tokens[index + k]);
+    const handle = tokens[index].kind === "symbol";
+    // set[`f;x], to its ]
+    const close =
+      handle && beside(-2) === "set" && beside(-1) === "[" && beside(1) === ";"
+        ? closing(p)
+        : undefined;
+    const span =
+      close === undefined
+        ? {
+            start: tokens[index].start,
+            end: Math.max(nameSpan.end, valueEnd(p)),
+          }
+        : { start: tokens[index - 2].start, end: tokens[close].end };
+    const item: Defined = { full, kind: "variable", span, nameSpan, inLambda };
+    const doc = documented(span.start);
+    if (doc !== undefined) item.doc = doc;
     // Past any names assigned along with it, as g in f:g:{x}
-    let i = p.index;
-    while (p.tokens[i + 2]?.kind === "name" && isAssign(p.tokens[i + 3])) {
+    let i = index;
+    while (tokens[i + 2]?.kind === "name" && isAssign(tokens[i + 3])) {
       i += 2;
     }
-    const [, op, value, after] = p.tokens.slice(i);
+    const [op, value, then] = [tokens[i + 1], tokens[i + 2], tokens[i + 3]];
     const l = value && lambdas.get(value.start);
-    if (isAssign(op) && l?.close && l.close.end === item.end) {
+    // The lambda is the whole value: to the end of the definition, or to
+    // set's ]
+    const whole =
+      close === undefined
+        ? (isAssign(op) || (handle && word(op) === "set")) &&
+          l?.close?.end === span.end
+        : l?.close?.start === tokens[close - 1].start;
+    if (l && whole) {
       item.kind = "function";
       item.detail = `[${l.params.join(";")}]`;
     } else if (
       isAssign(op) &&
       word(value) === "use" &&
-      after?.kind === "symbol" &&
-      after.end === item.end
+      then?.kind === "symbol" &&
+      then.end === span.end
     ) {
       item.kind = "module";
-      item.detail = text.slice(value.start, after.end);
+      item.detail = text.slice(value.start, then.end);
     }
     return item;
   };
 
   // Names and handles, in the order they're written
-  const defined: {
-    full: string;
-    start: number;
-    end: number;
-    inLambda: boolean;
-  }[] = [];
+  const defined: { full: string; nameSpan: Span; inLambda: boolean }[] = [];
   for (const n of a.names) {
     if (n.role === "global" && n.defines && !n.amends) {
       defined.push({
         full: n.full,
-        start: n.token.start,
-        end: n.token.end,
+        nameSpan: { start: n.token.start, end: n.token.end },
         inLambda: n.lambda !== undefined,
       });
     }
   }
   for (const h of a.handles) {
     if (h.defines && !h.amends && h.module === undefined) {
-      defined.push({ ...h, inLambda: h.lambda !== undefined });
+      defined.push({
+        full: h.full,
+        nameSpan: { start: h.start, end: h.end },
+        inLambda: h.lambda !== undefined,
+      });
     }
   }
-  defined.sort((x, y) => x.start - y.start);
+  defined.sort((x, y) => x.nameSpan.start - y.nameSpan.start);
+  const documented = docs(text, script);
   const seen = new Set<string>();
   const out: Defined[] = [];
   for (const d of defined) {
     const key = `${d.inLambda} ${d.full}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    const item = described(d.full, d.start, d.end, d.inLambda);
+    const item = described(d.full, d.nameSpan, d.inLambda);
     if (item) out.push(item);
   }
   return out;
+}
+
+// The comment documenting a definition starting at the offset, if it
+// starts its line: the comment lines, or a block comment, ending directly
+// above it, as written, without the indent they share. A comment trailing a
+// line documents nothing, as which definition it's about can't be told
+function docs(
+  text: string,
+  script: Script,
+): (offset: number) => string | undefined {
+  const starts = lineStarts(text);
+  const line = (offset: number) => lineOf(starts, offset);
+  // Where each line's text starts, past its spaces, found once a line
+  const indents = new Map<number, number>();
+  const indent = (n: number) => {
+    let at = indents.get(n);
+    if (at === undefined) {
+      const end = starts[n + 1] ?? text.length;
+      at = starts[n];
+      while (at < end && (text[at] === " " || text[at] === "\t")) at++;
+      indents.set(n, at);
+    }
+    return at;
+  };
+  // Each comment that starts its line, by the line it ends on
+  const ending = new Map<number, Token>();
+  for (const s of [
+    script.comments,
+    ...script.statements.map((s) => s.tokens),
+  ]) {
+    for (const t of s) {
+      if (t.kind === "comment" && indent(line(t.start)) === t.start) {
+        ending.set(line(t.end), t);
+      }
+    }
+  }
+  return (offset) => {
+    const own = line(offset);
+    if (indent(own) !== offset) return undefined;
+    let first: Token | undefined;
+    for (let n = own; n > 0; ) {
+      const c = ending.get(n - 1);
+      if (!c) break;
+      first = c;
+      n = line(c.start);
+    }
+    if (!first) return undefined;
+    const lines = text
+      .slice(starts[line(first.start)], starts[own])
+      .split(/\r\n|\r|\n/)
+      .slice(0, -1)
+      .map((l) => l.trimEnd());
+    const shared = Math.min(
+      ...lines.filter((l) => l).map((l) => l.length - l.trimStart().length),
+    );
+    return lines.map((l) => l.slice(shared)).join("\n");
+  };
 }
 
 // What the file defines at top level: each global once, where it's first
@@ -184,10 +269,8 @@ export function outline(text: string, a: Annotated): Outlined[] {
       name: d.full,
       kind: d.kind,
       ...(d.detail === undefined ? {} : { detail: d.detail }),
-      start: d.start,
-      end: d.end,
-      nameStart: d.nameStart,
-      nameEnd: d.nameEnd,
+      span: d.span,
+      nameSpan: d.nameSpan,
     };
     const dot = d.full.lastIndexOf(".");
     if (dot <= 0) {
@@ -201,16 +284,14 @@ export function outline(text: string, a: Annotated): Outlined[] {
       node = {
         name: space,
         kind: "namespace",
-        start: item.start,
-        end: item.end,
-        nameStart: item.nameStart,
-        nameEnd: item.nameEnd,
+        span: { ...item.span },
+        nameSpan: item.nameSpan,
         children: [],
       };
       top.push(node);
     }
     node.children?.push(item);
-    node.end = Math.max(node.end, item.end);
+    node.span.end = Math.max(node.span.end, item.span.end);
   }
   return top;
 }

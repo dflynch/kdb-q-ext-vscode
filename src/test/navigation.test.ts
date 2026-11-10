@@ -3,7 +3,13 @@ import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { annotate } from "../annotate";
-import { type Outlined, occurrences, outline, references } from "../navigation";
+import {
+  globals,
+  type Outlined,
+  occurrences,
+  outline,
+  references,
+} from "../navigation";
 import { definitions, entry } from "../workspaceIndex";
 
 const fixtures = path.join(__dirname, "../../test/fixtures");
@@ -12,10 +18,12 @@ const fixtures = path.join(__dirname, "../../test/fixtures");
 function shown(text: string): string[] {
   const lines: string[] = [];
   const add = (o: Outlined, indent: string) => {
-    const name = text.slice(o.nameStart, o.nameEnd);
+    const name = text.slice(o.nameSpan.start, o.nameSpan.end);
     lines.push(
       `${indent}${o.kind} ${o.name}${o.detail ? ` ${o.detail}` : ""}` +
-        (o.kind === "namespace" ? "" : `: ${text.slice(o.start, o.end)}`) +
+        (o.kind === "namespace"
+          ? ""
+          : `: ${text.slice(o.span.start, o.span.end)}`) +
         (name !== o.name && o.kind !== "namespace" ? ` @${name}` : ""),
     );
     for (const c of o.children ?? []) add(c, `${indent}  `);
@@ -70,6 +78,15 @@ suite("outline", () => {
       ],
     ],
     [
+      "a lambda set by handle is a function",
+      "`f set {[a;b] a}\nset[`g;{x}]\n`h set {x} 1",
+      [
+        "function f [a;b]: `f set {[a;b] a}",
+        "function g [x]: set[`g;{x}]",
+        "variable h: `h set {x} 1",
+      ],
+    ],
+    [
       "modules",
       "m:use`foo\nn:(use`bar)`f",
       ["module m use`foo: m:use`foo", "variable n: n:(use`bar)`f"],
@@ -117,7 +134,7 @@ suite("outline", () => {
   test("a namespace spans its globals", () => {
     const text = ".a.b:1\n.a.d:{x}";
     const [space] = outline(text, annotate(text));
-    assert.strictEqual(text.slice(space.start, space.end), text);
+    assert.strictEqual(text.slice(space.span.start, space.span.end), text);
   });
 
   test("never throws on a half-typed file", () => {
@@ -127,11 +144,13 @@ suite("outline", () => {
       const items = outline(text, annotate(text));
       for (const o of items.flatMap((o) => [o, ...(o.children ?? [])])) {
         assert.ok(o.name, "VS Code refuses an empty name");
-        assert.ok(o.start <= o.nameStart && o.nameEnd <= o.end);
+        assert.ok(
+          o.span.start <= o.nameSpan.start && o.nameSpan.end <= o.span.end,
+        );
       }
       // Siblings don't overlap, so the cursor is in one at most
       items.forEach((o, n) => {
-        assert.ok(n === 0 || items[n - 1].end <= o.start);
+        assert.ok(n === 0 || items[n - 1].span.end <= o.span.start);
       });
     }
   });
@@ -146,6 +165,104 @@ function marked(source: string): string[] {
     (o) => `${text.slice(o.start, o.end)} ${o.kind}`,
   );
 }
+
+suite("documentation", () => {
+  // Each global's comment, by name
+  const docs = (text: string) =>
+    Object.fromEntries(
+      globals(text, annotate(text)).map((d) => [d.full, d.doc]),
+    );
+  const endings = { LF: "\n", CRLF: "\r\n", CR: "\r" };
+
+  // Every way to define a global, each with every placement of a comment,
+  // at every line ending: the global's name, its line, and whether it's in
+  // a lambda
+  const forms: [string, string, string, boolean][] = [
+    ["a name", "f", "f:{x}", false],
+    ["a name assigned along with another", "f", "f:g:{x}", false],
+    ["a handle", "f", "`f set {x}", false],
+    ["set", "f", "set[`f;{x}]", false],
+    ["a name in a lambda", ".c.f", ".c.f::1", true],
+    ["a handle in a lambda", ".c.f", "`.c.f set 1", true],
+  ];
+  // Lines, D for the definition's, and the comment it gets: the lines
+  // above, as written
+  const placements: [string, string[], string | undefined][] = [
+    ["a comment line above", ["/ about", "D"], "/ about"],
+    ["comment lines above", ["// one", "/  two", "D"], "// one\n/  two"],
+    [
+      "TorQ's dashes above",
+      ["/- about", "/ -p port", "D"],
+      "/- about\n/ -p port",
+    ],
+    ["a block comment above", ["/", "  about", "\\", "D"], "/\n  about\n\\"],
+    ["none", ["D"], undefined],
+    ["not across a blank line", ["/ about", "", "D"], undefined],
+    ["not a comment trailing", ["D / about"], undefined],
+    ["not the line above's trailing comment", ["z:0 / about", "D"], undefined],
+    ["not when not first on its line", ["/ about", "z:0; D"], undefined],
+  ];
+  for (const [form, name, line, inLambda] of forms) {
+    for (const [placement, lines, expected] of placements) {
+      // The scanner doesn't yet read a block comment in a lambda, as q does
+      if (inLambda && lines.includes("\\")) continue;
+      test(`${form}: ${placement}`, () => {
+        for (const [ending, eol] of Object.entries(endings)) {
+          const body = lines.map((l) => l.replace("D", line));
+          // Indented in a lambda, the indent they share taken off
+          const text = inLambda
+            ? ["h:{[]", ...body.map((l) => `  ${l}`), " }"].join(eol)
+            : body.join(eol);
+          assert.strictEqual(docs(text)[name], expected, ending);
+        }
+      });
+    }
+  }
+
+  test("only the indent the lines share is taken off", () =>
+    assert.deepStrictEqual(docs("  / one\n    / two\n  f:1"), {
+      f: "/ one\n  / two",
+    }));
+  test("from the first line, after a line break", () =>
+    assert.deepStrictEqual(docs("\n/ c\nf:1;/ d\n/\n \n["), { f: "/ c" }));
+
+  // Every form, each with a comment above, many times over
+  for (const [ending, eol] of Object.entries(endings)) {
+    test(`a large file, in linear time: ${ending}`, () => {
+      const one = forms
+        .filter(([, , , inLambda]) => !inLambda)
+        .map(([, , line]) => `/ about${eol}${line} / trailing`)
+        .join(eol);
+      const text = `${one}${eol}`.repeat(15000);
+      const start = Date.now();
+      assert.strictEqual(globals(text, annotate(text))[0].doc, "/ about");
+      assert.ok(Date.now() - start < 2000, `${Date.now() - start} ms`);
+    });
+    test(`a long run of comment lines, in linear time: ${ending}`, () => {
+      const text = `${`/ c${eol}`.repeat(80000)}f:1`;
+      const start = Date.now();
+      assert.strictEqual(
+        globals(text, annotate(text))[0].doc?.length,
+        80000 * 4 - 1,
+      );
+      assert.ok(Date.now() - start < 2000, `${Date.now() - start} ms`);
+    });
+  }
+  test("a long statement, in linear time", () => {
+    const text = Array.from({ length: 100000 }, (_, n) => `a${n}:${n}`).join(
+      ";",
+    );
+    const start = Date.now();
+    assert.strictEqual(globals(text, annotate(text)).length, 100000);
+    assert.ok(Date.now() - start < 2000, `${Date.now() - start} ms`);
+  });
+  test("a deep indent, in linear time", () => {
+    const text = `${" ".repeat(1000000)}${Array.from({ length: 20000 }, (_, n) => `a${n}:${n}`).join(";")}`;
+    const start = Date.now();
+    assert.strictEqual(globals(text, annotate(text)).length, 20000);
+    assert.ok(Date.now() - start < 2000, `${Date.now() - start} ms`);
+  });
+});
 
 suite("occurrences", () => {
   const cases: [string, string, string[]][] = [
