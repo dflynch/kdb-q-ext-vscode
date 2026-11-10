@@ -45,7 +45,7 @@ suite("hover", () => {
   test("a function in another file: its signature and file", async () => {
     assert.deepStrictEqual(await hovered("code/main.q", 3, 3), [
       "\n```q\n.u.upd[t;x]\n```\n\n\n" +
-        "[` index/code/wdb.q `](<…//code/wdb.q#L3%2C1>)",
+        "[index/code/wdb.q](<…//code/wdb.q#L3%2C1>)",
     ]);
   });
 
@@ -72,9 +72,16 @@ suite("hover", () => {
     ]);
   });
 
+  test("a comment holding a fence, in a longer one", async () => {
+    assert.deepStrictEqual(await hovered("code/doc.q", 7, 1), [
+      "\n````q\n/\n Doubles a number:\n  ```\n  twice 2\n  ```\n\\\n" +
+        "twice[x]\n````\n",
+    ]);
+  });
+
   test("an export, as its module defines it", async () => {
     assert.deepStrictEqual(await hovered("code/main.q", 2, 5), [
-      "\n```q\nmean[x]\n```\n\n\n[` index/mods/stats/init.q `](<…//mods/stats/init.q#L1%2C1>)",
+      "\n```q\nmean[x]\n```\n\n\n[index/mods/stats/init.q](<…//mods/stats/init.q#L1%2C1>)",
     ]);
   });
 

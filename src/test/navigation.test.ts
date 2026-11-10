@@ -209,11 +209,20 @@ suite("documentation", () => {
       test(`${form}: ${placement}`, () => {
         for (const [ending, eol] of Object.entries(endings)) {
           const body = lines.map((l) => l.replace("D", line));
-          // Indented in a lambda, the indent they share taken off
+          // Indented in a lambda, the indent they share taken off but one
           const text = inLambda
             ? ["h:{[]", ...body.map((l) => `  ${l}`), " }"].join(eol)
             : body.join(eol);
-          assert.strictEqual(docs(text)[name], expected, ending);
+          assert.strictEqual(
+            docs(text)[name],
+            inLambda && expected !== undefined
+              ? expected
+                  .split("\n")
+                  .map((l) => (l ? ` ${l}` : l))
+                  .join("\n")
+              : expected,
+            ending,
+          );
         }
       });
     }
@@ -223,6 +232,15 @@ suite("documentation", () => {
     assert.deepStrictEqual(docs("  / one\n    / two\n  f:1"), {
       f: "/ one\n  / two",
     }));
+  test("only the spaces and tabs the lines share, alike", () =>
+    assert.deepStrictEqual(docs("  / a\n\t/ b\n  f:1"), {
+      f: "  / a\n\t/ b",
+    }));
+  test("in a lambda, a lone / indented, as q reads it there", () =>
+    assert.deepStrictEqual(
+      docs("h:{[]\n  / about\n  /\n  / more\n  .c.f::1 }"),
+      { h: undefined, ".c.f": " / about\n /\n / more" },
+    ));
   test("from the first line, after a line break", () =>
     assert.deepStrictEqual(docs("\n/ c\nf:1;/ d\n/\n \n["), { f: "/ c" }));
 
@@ -248,6 +266,14 @@ suite("documentation", () => {
       assert.ok(Date.now() - start < 2000, `${Date.now() - start} ms`);
     });
   }
+  test("a long block comment, without running out of stack", () => {
+    const text = `/\n${" c\n".repeat(300000)}\\\nf:1`;
+    assert.strictEqual(globals(text, annotate(text))[0].doc?.length, 900003);
+  });
+  test("a long run of comment lines, without running out of stack", () => {
+    const text = `${"/ c\n".repeat(300000)}f:1`;
+    assert.strictEqual(globals(text, annotate(text))[0].doc?.length, 1199999);
+  });
   test("a long statement, in linear time", () => {
     const text = Array.from({ length: 100000 }, (_, n) => `a${n}:${n}`).join(
       ";",

@@ -462,7 +462,7 @@ export function annotate(
       else if (opens(item, "(")) {
         const inner = pattern(item);
         if (!inner) return undefined;
-        names.push(...inner);
+        for (const n of inner) names.push(n);
       } else return undefined;
     }
     return names.length > 0 ? names : undefined;

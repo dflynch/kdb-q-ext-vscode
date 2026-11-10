@@ -89,7 +89,7 @@ suite("properties", () => {
         if (found) {
           assert.deepStrictEqual(
             found.defined.map((d) => `${d.file} ${d.nameSpan.start}`),
-            found.defined.length ? defs.map((d) => `${d.file} ${d.start}`) : [],
+            defs.map((d) => `${d.file} ${d.start}`),
             context,
           );
         }

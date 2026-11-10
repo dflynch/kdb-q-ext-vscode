@@ -194,20 +194,21 @@ const highlights: Record<Occurrence["kind"], vscode.DocumentHighlightKind> = {
 // in the peek, given back for tests
 const peekDefinitions = "kdb-q-ext-vscode.peekDefinitions";
 
-// Code in a line, as a link's text: fenced by more backticks than any run
-// in it, so it shows as written
-function inline(text: string): string {
+// q code in a block, as written: fenced by more backticks than any run in
+// it, wherever the run is, as a fence indented up to three spaces closes a
+// block too, and VS Code's appendCodeblock looks only at a line's start
+function codeblock(out: vscode.MarkdownString, code: string): void {
   const longest = Math.max(
-    0,
-    ...(text.match(/`+/g) ?? []).map((m) => m.length),
+    2,
+    ...(code.match(/`+/g) ?? []).map((m) => m.length),
   );
   const fence = "`".repeat(longest + 1);
-  return `${fence} ${text} ${fence}`;
+  out.appendMarkdown(`\n${fence}q\n${code}\n${fence}\n`);
 }
 
 // How a definition reads in a hover, in one q block: the comment above it as
 // written, then its signature, or its name; then the file it's in, if it's
-// another
+// another, its path as text
 function described(
   out: vscode.MarkdownString,
   d: Listed,
@@ -220,10 +221,7 @@ function described(
       : d.kind === "module"
         ? `${d.full}:${d.detail}`
         : d.full;
-  out.appendCodeblock(
-    d.doc === undefined ? signature : `${d.doc}\n${signature}`,
-    "q",
-  );
+  codeblock(out, d.doc === undefined ? signature : `${d.doc}\n${signature}`);
   if (d.file !== from.toString()) {
     const uri = vscode.Uri.parse(d.file);
     const { line, character } = position(
@@ -231,9 +229,9 @@ function described(
       d.nameSpan.start,
     );
     const at = uri.with({ fragment: `L${line + 1},${character + 1}` });
-    out.appendMarkdown(
-      `\n\n[${inline(vscode.workspace.asRelativePath(uri))}](<${at}>)`,
-    );
+    out.appendMarkdown("\n\n[");
+    out.appendText(vscode.workspace.asRelativePath(uri));
+    out.appendMarkdown(`](<${at}>)`);
   }
 }
 
@@ -316,10 +314,10 @@ export function registerLanguage(): vscode.Disposable {
         const found = hover(index, d.uri.toString(), annotations(d), offset);
         if (!found) return undefined;
         const { builtin, defined } = found;
-        // Built with VS Code's own escaping: code blocks, KX's line as text
+        // q in code blocks, KX's line and a path as text, escaped by VS Code
         const out = new vscode.MarkdownString();
         if (builtin) {
-          out.appendCodeblock(builtin.syntax, "q");
+          codeblock(out, builtin.syntax);
           out.appendText(builtin.summary);
           out.appendMarkdown(`\n\n[code.kx.com](<${builtin.url}>)`);
         }

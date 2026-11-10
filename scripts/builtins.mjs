@@ -162,15 +162,32 @@ for (const [file, prefix] of namespaces) {
   }
 }
 
-// MkDocs' anchor for a heading: lower case, spaces as dashes, without
-// anything else but letters, digits, dashes and underscores
+// MkDocs' anchor for a heading, as Python-Markdown's slugify makes it:
+// without anything but letters, digits, underscores, dashes and spaces,
+// trimmed, lower case, each run of dashes and spaces one dash
 function anchorOf(heading) {
   return heading
     .replace(/^#+\s*/, "")
-    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/\P{ASCII}/gu, "")
     .replace(/[^\w\s-]/g, "")
     .trim()
-    .replace(/\s+/g, "-");
+    .toLowerCase()
+    .replace(/[-\s]+/g, "-");
+}
+
+// A page's headings, without lines in a fenced code block
+function headings(lines) {
+  const out = [];
+  let fence;
+  for (const l of lines) {
+    const f = l.match(/^ {0,3}(`{3,}|~{3,})/)?.[1];
+    if (fence) {
+      if (f && f[0] === fence[0] && f.length >= fence.length) fence = undefined;
+    } else if (f) fence = f;
+    else if (/^#+\s/.test(l)) out.push(l);
+  }
+  return out;
 }
 
 for (const [name, o] of Object.entries(overrides)) {
@@ -191,10 +208,7 @@ for (const [name, e] of entries) {
     () => undefined,
   );
   if (!lines) broken.push(`${name}: no page ${path}`);
-  else if (
-    anchor &&
-    !lines.some((l) => /^#+\s/.test(l) && anchorOf(l) === anchor)
-  ) {
+  else if (anchor && !headings(lines).some((l) => anchorOf(l) === anchor)) {
     broken.push(`${name}: no #${anchor} on ${path}`);
   }
 }

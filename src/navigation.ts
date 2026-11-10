@@ -135,7 +135,7 @@ export function globals(text: string, a: Annotated): Defined[] {
           }
         : { start: tokens[index - 2].start, end: tokens[close].end };
     const item: Defined = { full, kind: "variable", span, nameSpan, inLambda };
-    const doc = documented(span.start);
+    const doc = documented(span.start, inLambda);
     if (doc !== undefined) item.doc = doc;
     // Past any names assigned along with it, as g in f:g:{x}
     let i = index;
@@ -202,12 +202,14 @@ export function globals(text: string, a: Annotated): Defined[] {
 
 // The comment documenting a definition starting at the offset, if it
 // starts its line: the comment lines, or a block comment, ending directly
-// above it, as written, without the indent they share. A comment trailing a
+// above it, as written, without the indent they share. In a lambda, one
+// character of it stays, as q reads a line there only indented: a lone /
+// is a comment line, not a block comment's start. A comment trailing a
 // line documents nothing, as which definition it's about can't be told
 function docs(
   text: string,
   script: Script,
-): (offset: number) => string | undefined {
+): (offset: number, inLambda: boolean) => string | undefined {
   const starts = lineStarts(text);
   const line = (offset: number) => lineOf(starts, offset);
   // Where each line's text starts, past its spaces, found once a line
@@ -234,7 +236,7 @@ function docs(
       }
     }
   }
-  return (offset) => {
+  return (offset, inLambda) => {
     const own = line(offset);
     if (indent(own) !== offset) return undefined;
     let first: Token | undefined;
@@ -250,10 +252,20 @@ function docs(
       .split(/\r\n|\r|\n/)
       .slice(0, -1)
       .map((l) => l.trimEnd());
-    const shared = Math.min(
-      ...lines.filter((l) => l).map((l) => l.length - l.trimStart().length),
-    );
-    return lines.map((l) => l.slice(shared)).join("\n");
+    // The spaces and tabs every line but a blank one starts with, alike
+    let shared: string | undefined;
+    for (const l of lines) {
+      if (!l) continue;
+      const lead = l.slice(0, l.length - l.trimStart().length);
+      if (shared === undefined) shared = lead;
+      else {
+        let k = 0;
+        while (k < shared.length && shared[k] === lead[k]) k++;
+        shared = shared.slice(0, k);
+      }
+    }
+    const cut = Math.max(0, (shared?.length ?? 0) - (inLambda ? 1 : 0));
+    return lines.map((l) => l.slice(cut)).join("\n");
   };
 }
 

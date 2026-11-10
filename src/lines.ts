@@ -15,7 +15,7 @@ export function lineOf(starts: readonly number[], offset: number): number {
 }
 
 // The index of the first of the sorted offsets after the offset
-export function after(sorted: readonly number[], offset: number): number {
+function after(sorted: readonly number[], offset: number): number {
   let lo = 0;
   let hi = sorted.length;
   while (lo < hi) {
