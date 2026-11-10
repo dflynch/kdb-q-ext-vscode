@@ -464,5 +464,8 @@ suite("annotate over the corpus", () => {
 
   test("never throws on a half-typed file", () => {
     for (let i = 0; i < corpus.length; i += 3) check(corpus.slice(0, i));
-  });
+  })
+    // Every prefix of the corpus, not a measure of speed: CI's machines are
+    // slower
+    .timeout(20000);
 });

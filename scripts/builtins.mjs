@@ -204,8 +204,7 @@ for (const [name, o] of Object.entries(overrides)) {
   if (!e.url) overridden.push(`${name}: no page`);
   for (const field of ["syntax", "summary", "url"]) {
     if (
-      known &&
-      known[field] &&
+      known?.[field] &&
       e[field] === known[field] &&
       (field === "url" ? url : o[field])
     ) {

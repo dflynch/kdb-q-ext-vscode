@@ -153,7 +153,10 @@ suite("outline", () => {
         assert.ok(n === 0 || items[n - 1].span.end <= o.span.start);
       });
     }
-  });
+  })
+    // Every prefix of the corpus, not a measure of speed: CI's machines are
+    // slower
+    .timeout(20000);
 });
 
 // The occurrences of the name at the first | as "text kind", with the |
