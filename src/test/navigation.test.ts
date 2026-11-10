@@ -176,7 +176,7 @@ suite("documentation", () => {
 
   // Every way to define a global, each with every placement of a comment,
   // at every line ending: the global's name, its line, and whether it's in
-  // a lambda
+  // a lambda, where no comment documents it
   const forms: [string, string, string, boolean][] = [
     ["a name", "f", "f:{x}", false],
     ["a name assigned along with another", "f", "f:g:{x}", false],
@@ -201,26 +201,19 @@ suite("documentation", () => {
     ["not a comment trailing", ["D / about"], undefined],
     ["not the line above's trailing comment", ["z:0 / about", "D"], undefined],
     ["not when not first on its line", ["/ about", "z:0; D"], undefined],
+    ["not a comment indented", ["z:0", " / about", "D"], undefined],
   ];
   for (const [form, name, line, inLambda] of forms) {
     for (const [placement, lines, expected] of placements) {
-      // The scanner doesn't yet read a block comment in a lambda, as q does
-      if (inLambda && lines.includes("\\")) continue;
       test(`${form}: ${placement}`, () => {
         for (const [ending, eol] of Object.entries(endings)) {
           const body = lines.map((l) => l.replace("D", line));
-          // Indented in a lambda, the indent they share taken off but one
           const text = inLambda
             ? ["h:{[]", ...body.map((l) => `  ${l}`), " }"].join(eol)
             : body.join(eol);
           assert.strictEqual(
             docs(text)[name],
-            inLambda && expected !== undefined
-              ? expected
-                  .split("\n")
-                  .map((l) => (l ? ` ${l}` : l))
-                  .join("\n")
-              : expected,
+            inLambda ? undefined : expected,
             ending,
           );
         }
@@ -228,19 +221,14 @@ suite("documentation", () => {
     }
   }
 
-  test("only the indent the lines share is taken off", () =>
-    assert.deepStrictEqual(docs("  / one\n    / two\n  f:1"), {
-      f: "/ one\n  / two",
+  test("a comment's own indent, as written", () =>
+    assert.deepStrictEqual(docs("/ one\n/    two\nf:1"), {
+      f: "/ one\n/    two",
     }));
-  test("only the spaces and tabs the lines share, alike", () =>
-    assert.deepStrictEqual(docs("  / a\n\t/ b\n  f:1"), {
-      f: "  / a\n\t/ b",
+  test("not a comment in a statement indented", () =>
+    assert.deepStrictEqual(docs("if[1b;\n  /\n  / more\n  g:{[a] a}]"), {
+      g: undefined,
     }));
-  test("in a lambda, a lone / indented, as q reads it there", () =>
-    assert.deepStrictEqual(
-      docs("h:{[]\n  / about\n  /\n  / more\n  .c.f::1 }"),
-      { h: undefined, ".c.f": " / about\n /\n / more" },
-    ));
   test("from the first line, after a line break", () =>
     assert.deepStrictEqual(docs("\n/ c\nf:1;/ d\n/\n \n["), { f: "/ c" }));
 

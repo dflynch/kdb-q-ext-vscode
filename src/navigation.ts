@@ -135,7 +135,7 @@ export function globals(text: string, a: Annotated): Defined[] {
           }
         : { start: tokens[index - 2].start, end: tokens[close].end };
     const item: Defined = { full, kind: "variable", span, nameSpan, inLambda };
-    const doc = documented(span.start, inLambda);
+    const doc = documented(span.start);
     if (doc !== undefined) item.doc = doc;
     // Past any names assigned along with it, as g in f:g:{x}
     let i = index;
@@ -200,45 +200,32 @@ export function globals(text: string, a: Annotated): Defined[] {
   return out;
 }
 
-// The comment documenting a definition starting at the offset, if it
-// starts its line: the comment lines, or a block comment, ending directly
-// above it, as written, without the indent they share. In a lambda, one
-// character of it stays, as q reads a line there only indented: a lone /
-// is a comment line, not a block comment's start. A comment trailing a
-// line documents nothing, as which definition it's about can't be told
+// The comment documenting a definition starting at the offset, if it starts
+// its line, at its first column: the comment lines, or a block comment,
+// ending directly above it, each starting its line too, as written. Not a
+// comment indented, as one in a lambda, which is about the code it's in, nor
+// one trailing a line, as which definition it's about can't be told
 function docs(
   text: string,
   script: Script,
-): (offset: number, inLambda: boolean) => string | undefined {
+): (offset: number) => string | undefined {
   const starts = lineStarts(text);
   const line = (offset: number) => lineOf(starts, offset);
-  // Where each line's text starts, past its spaces, found once a line
-  const indents = new Map<number, number>();
-  const indent = (n: number) => {
-    let at = indents.get(n);
-    if (at === undefined) {
-      const end = starts[n + 1] ?? text.length;
-      at = starts[n];
-      while (at < end && (text[at] === " " || text[at] === "\t")) at++;
-      indents.set(n, at);
-    }
-    return at;
-  };
-  // Each comment that starts its line, by the line it ends on
+  // Each comment at a line's first column, by the line it ends on
   const ending = new Map<number, Token>();
   for (const s of [
     script.comments,
     ...script.statements.map((s) => s.tokens),
   ]) {
     for (const t of s) {
-      if (t.kind === "comment" && indent(line(t.start)) === t.start) {
+      if (t.kind === "comment" && starts[line(t.start)] === t.start) {
         ending.set(line(t.end), t);
       }
     }
   }
-  return (offset, inLambda) => {
+  return (offset) => {
     const own = line(offset);
-    if (indent(own) !== offset) return undefined;
+    if (starts[own] !== offset) return undefined;
     let first: Token | undefined;
     for (let n = own; n > 0; ) {
       const c = ending.get(n - 1);
@@ -247,25 +234,12 @@ function docs(
       n = line(c.start);
     }
     if (!first) return undefined;
-    const lines = text
+    return text
       .slice(starts[line(first.start)], starts[own])
       .split(/\r\n|\r|\n/)
       .slice(0, -1)
-      .map((l) => l.trimEnd());
-    // The spaces and tabs every line but a blank one starts with, alike
-    let shared: string | undefined;
-    for (const l of lines) {
-      if (!l) continue;
-      const lead = l.slice(0, l.length - l.trimStart().length);
-      if (shared === undefined) shared = lead;
-      else {
-        let k = 0;
-        while (k < shared.length && shared[k] === lead[k]) k++;
-        shared = shared.slice(0, k);
-      }
-    }
-    const cut = Math.max(0, (shared?.length ?? 0) - (inLambda ? 1 : 0));
-    return lines.map((l) => l.slice(cut)).join("\n");
+      .map((l) => l.trimEnd())
+      .join("\n");
   };
 }
 

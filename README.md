@@ -65,10 +65,11 @@ read.
   - Names q defines (`.z`, `.Q`), and globals defined outside the workspace
 - Hover: on a q keyword or a name in `.Q`, `.z`, `.h` or `.j`, its syntax
   and what it does, from [KX's reference](https://code.kx.com/q/ref/),
-  linked. On a global, or a name a module exports, the comment lines
-  directly above its definition, exactly as written, then its signature,
-  or its name, and, if it's another, the file it's in. A comment trailing
-  a line isn't shown, as which definition it's about can't be told. A
+  linked. On a global, or a name a module exports, defined at the start
+  of a line, the comment lines directly above it, exactly as written,
+  then its signature, or its name, and, if it's another, the file it's
+  in. A comment indented, as in a lambda, is about the code it's in, and
+  one trailing a line could be about either line, so neither is shown. A
   global several files define shows the nearest definition, with a link
   that peeks at the rest.
 
