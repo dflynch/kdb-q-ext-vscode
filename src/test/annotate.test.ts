@@ -319,6 +319,183 @@ suite("annotate names", () => {
   });
 });
 
+// Each parameter of a list is a pattern, as on the left of : (q 4.1)
+suite("annotate parameter lists", () => {
+  // The list; the names its parameters bind, "" if none; each parameter as
+  // written; the names in the list, as shown; and how it binds a, if it does
+  const forms: [string, string[], string[], string[], string?][] = [
+    ["[a;b]", ["a", "b"], ["a", "b"], ["param a :", "param b :"], "param"],
+    [
+      "[a:`j;b]",
+      ["a", "b"],
+      ["a:`j", "b"],
+      ["param a :", "param b :"],
+      "param",
+    ],
+    [
+      "[ a : `j ; b ]",
+      ["a", "b"],
+      ["a : `j", "b"],
+      ["param a :", "param b :"],
+      "param",
+    ],
+    // A filter's names are code the lambda runs: a global, a parameter
+    // before it, a nested lambda's
+    [
+      "[a:j;b]",
+      ["a", "b"],
+      ["a:j", "b"],
+      ["param a :", "global j", "param b :"],
+      "param",
+    ],
+    ["[a:tc]", ["a"], ["a:tc"], ["param a :", "global tc"], "param"],
+    [
+      "[a;b:a+]",
+      ["a", "b"],
+      ["a", "b:a+"],
+      ["param a :", "param b :", "param a"],
+      "param",
+    ],
+    ["[a:{x+1}]", ["a"], ["a:{x+1}"], ["param a :", "param x"], "param"],
+    ["[a:x]", ["a"], ["a:x"], ["param a :", "global x"], "param"],
+    ["[x:`j]", ["x"], ["x:`j"], ["param x :"]],
+    [
+      "[a;;b]",
+      ["a", "", "b"],
+      ["a", "", "b"],
+      ["param a :", "param b :"],
+      "param",
+    ],
+    ["[]", [""], [""], []],
+    ["[;]", ["", ""], ["", ""], []],
+    // A list, dictionary or table pattern binds locals, as (a;b):x does
+    [
+      "[(src:`j;dst:`j);speed:`f]",
+      ["", "speed"],
+      ["(src:`j;dst:`j)", "speed:`f"],
+      ["local src :", "local dst :", "param speed :"],
+    ],
+    ["[(a)]", ["a"], ["(a)"], ["param a :"], "param"],
+    [
+      "[(a;b);c]",
+      ["", "c"],
+      ["(a;b)", "c"],
+      ["local a :", "local b :", "param c :"],
+      "local",
+    ],
+    [
+      "[([a;weight])]",
+      [""],
+      ["([a;weight])"],
+      ["local a :", "local weight :"],
+      "local",
+    ],
+    // A key with a pattern binds the pattern's names; `j alone is a value
+    // to match
+    [
+      "[([k:a;v:`j])]",
+      [""],
+      ["([k:a;v:`j])"],
+      ["key k", "local a :", "key v"],
+      "local",
+    ],
+    ["[([]c:a)]", [""], ["([]c:a)"], ["column c", "local a :"], "local"],
+    // A constant, or anything else, is a value to match
+    ["[1;b]", ["", "b"], ["1", "b"], ["param b :"]],
+    ["[a b]", [""], ["a b"], ["global a", "global b"]],
+    // A keyword is a value to match, but from and by bind, as q has them
+    ["[til;b]", ["", "b"], ["til", "b"], ["builtin til", "param b :"]],
+    [
+      "[from;by]",
+      ["from", "by"],
+      ["from", "by"],
+      ["param from :", "param by :"],
+    ],
+  ];
+
+  for (const [list, params, signature, inList] of forms) {
+    test(list, () => {
+      const text = `{${list} 0}`;
+      const [l] = annotate(text).lambdas;
+      assert.deepStrictEqual(l.params, params);
+      assert.deepStrictEqual(l.signature, signature);
+      assert.deepStrictEqual(names(text), inList);
+    });
+  }
+
+  // Across lines, with a comment, in each line ending: the same parameters,
+  // each as written
+  for (const [ending, eol] of [
+    ["LF", "\n"],
+    ["CRLF", "\r\n"],
+    ["CR", "\r"],
+  ]) {
+    test(`across lines, ${ending}`, () => {
+      for (const [list, params, signature] of forms) {
+        const text = `f:{[${signature.join(`; / a note${eol}  `)}] 0}`;
+        const [l] = annotate(text).lambdas;
+        assert.deepStrictEqual(l.params, params, list);
+        assert.deepStrictEqual(l.signature, signature, list);
+      }
+    });
+  }
+
+  // a in the body, wherever it's used, as the list binds it
+  const uses: [string, (bound: string) => string][] = [
+    ["read", (r) => `${r} a`],
+    ["assigned", (r) => `${r} a :`],
+    ["amended", (r) => `${r} a :`],
+    ["in a where clause", (r) => `column a ?${r} a`],
+  ];
+  const bodies: Record<string, string> = {
+    read: "a",
+    assigned: "a:2",
+    amended: "a+:1",
+    "in a where clause": "select from t where c=a",
+  };
+  for (const [list, , , inList, bound] of forms) {
+    if (!bound) continue;
+    for (const [use, expected] of uses) {
+      test(`${list}, a ${use}`, () => {
+        const shownAll = names(`g:{${list} ${bodies[use]}}`);
+        const body = shownAll.slice(1 + inList.length);
+        const a = body.filter((n) => / a( |$)/.test(n));
+        assert.deepStrictEqual(a, [expected(bound)]);
+      });
+    }
+  }
+
+  // A parameter's comments and line breaks: on one line, without comments
+  for (const [ending, eol] of [
+    ["LF", "\n"],
+    ["CRLF", "\r\n"],
+    ["CR", "\r"],
+  ]) {
+    test(`a parameter across lines, ${ending}`, () => {
+      const text = `f:{[a / a note${eol}  :\`j;b:f[1;${eol}  2];(c; / c${eol} d)] a}`;
+      const [l] = annotate(text).lambdas;
+      assert.deepStrictEqual(l.params, ["a", "b", ""]);
+      assert.deepStrictEqual(l.signature, ["a :`j", "b:f[1; 2]", "(c; d)"]);
+    });
+  }
+
+  test("a lambda left open in its parameters", () => {
+    const [l] = annotate("f:{[a:`j;(b;c").lambdas;
+    assert.deepStrictEqual(l.params, ["a", ""]);
+    assert.deepStrictEqual(l.signature, ["a:`j", "(b;c"]);
+  });
+
+  test("implicit parameters' signature is its own", () => {
+    const [l] = annotate("{x+y}").lambdas;
+    assert.notStrictEqual(l.signature, l.params);
+    assert.deepStrictEqual(l.signature, ["x", "y"]);
+  });
+
+  test("a parameter named as its type", () => {
+    assert.deepStrictEqual(names("{[j:`j] j}"), ["param j :", "param j"]);
+  });
+});
+
 suite("annotate handles", () => {
   const cases: [string, string, string[]][] = [
     ["a dictionary by its name with a dot", "`.u. set 3", [".u.=.u :"]],

@@ -338,6 +338,19 @@ suite("hover", () => {
       { "/w/m.q": "export:([mid:{x}])", "/w/a.q": "s:use`m\ns.|mid 1" },
       ["/w/m.q 1:10 mid[x] -"],
     ],
+    [
+      "an export written out as a lambda with typed parameters",
+      {
+        "/w/m.q": "export:([mid:{[a:`j;b] a}])",
+        "/w/a.q": "s:use`m\ns.|mid 1",
+      },
+      ["/w/m.q 1:10 mid[a:`j;b] -"],
+    ],
+    [
+      "a global with typed parameters",
+      { "/w/a.q": "f:{[a:`j;(b;c)] a}\n|f 1" },
+      ["/w/a.q 1:1 f[a:`j;(b;c)] -"],
+    ],
     ["a name in .Q", { "/w/a.q": "|.Q.s 1" }, [".Q.s x"]],
     ["a name in .h", { "/w/a.q": "|.h.ht 1" }, [".h.ht x"]],
     ["a name in .j", { "/w/a.q": "|.j.j 1" }, [".j.j x"]],

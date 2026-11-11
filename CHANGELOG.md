@@ -75,7 +75,8 @@ All notable changes to the extension are documented in this file.
 - Hover for q: a keyword's, or a `.Q`, `.z`, `.h` or `.j` name's, syntax and
   description from KX's reference, linked; a global's, or a module
   export's, comment above its definition, as written, and its signature,
-  with a link to its other definitions
+  with a link to its other definitions. A signature shows each parameter as
+  written, typed (``[a:`j;b]``) or as a pattern (`[(src;dst);speed]`)
 
 ### Changed
 
@@ -103,6 +104,9 @@ All notable changes to the extension are documented in this file.
   prints a datetime infinity), are highlighted as one literal
 - Names under a namespace member, such as `.z.ts.x`, are highlighted as one
   name
+- In a parameter list, a type or filter after a parameter's colon, as in
+  ``{[a:`j;b:f[1]] …}``, and a pattern, as `(a;b)`, are highlighted as
+  code, not as more parameters, and comments as comments
 
 ## [1.1.0]
 

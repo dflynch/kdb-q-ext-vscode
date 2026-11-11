@@ -18,8 +18,12 @@ export type Role =
 export type Lambda = {
   open: Token;
   close?: Token;
-  // The explicit list, or x, y and z up to the highest the body uses
+  // The name each parameter binds, "" if none, as in [;b] or [(a;b)]; or
+  // x, y and z up to the highest the body uses
   params: string[];
+  // Each parameter as the signature writes it, as a:`j or (a;b), or as
+  // params for x, y and z
+  signature: string[];
   implicit: boolean;
   locals: Set<string>;
   // Where its globals resolve: "" for the root, else as ".foo"
@@ -108,12 +112,28 @@ export const keywords: ReadonlySet<string> = new Set(
 const queries = new Set(["select", "exec", "update", "delete"]);
 // Keywords only in a query: elsewhere they're names, as (a;from)
 const queryWords = new Set(["from", "by"]);
+// Keywords a parameter list binds, as q 5 does; any other is a value to match
+const bindable = new Set(["do", "if", "while", "from", "by", ".z.s"]);
 
 type Group = { open: Token; items: Item[]; close?: Token };
 type Item = Token | Group;
 
 const isGroup = (item: Item | undefined): item is Group =>
   item !== undefined && "items" in item;
+
+// Items' tokens, in order, brackets included
+function flat(items: Item[], out: Token[] = []): Token[] {
+  for (const item of items) {
+    if (!isGroup(item)) {
+      out.push(item);
+      continue;
+    }
+    out.push(item.open);
+    flat(item.items, out);
+    if (item.close) out.push(item.close);
+  }
+  return out;
+}
 
 // Brackets deeper than this stay tokens, so the walk's recursion is bounded
 const deepest = 256;
@@ -209,6 +229,18 @@ export function annotate(
 
   const word = (item: Item | undefined) =>
     item && !isGroup(item) ? text.slice(item.start, item.end) : "";
+  // Items as written, without comments, on one line: a space wherever there
+  // was any
+  const written = (items: Item[]) => {
+    let out = "";
+    let end: number | undefined;
+    for (const t of flat(items)) {
+      if (end !== undefined && t.start > end) out += " ";
+      out += text.slice(t.start, t.end);
+      end = t.end;
+    }
+    return out;
+  };
   const isName = (item: Item | undefined, ...words: string[]) =>
     item !== undefined &&
     !isGroup(item) &&
@@ -323,28 +355,37 @@ export function annotate(
     return entry;
   };
 
-  // A dictionary or table literal: ([a:1]), ([] a:1 2), ([k:1] v:2)
-  const literal = (group: Group, context: Context) => {
+  // A dictionary or table, as ([a:1]), ([] a:1 2) or ([k:1] v:2): each key
+  // or column, with how it's entered, and its value, or each item without one
+  const keyed = (
+    group: Group,
+    context: Context,
+    how: Partial<Entry>,
+    value: (items: Item[]) => void,
+  ) => {
     const [keys, ...rest] = group.items as [Group, ...Item[]];
     const kind = rest.length === 0 ? "key" : "column";
-    const parts = [...segments(keys.items), ...segments(rest)];
-    for (const segment of parts) {
-      const [name, op] = segment;
-      const key = nameOf(name);
-      if (key && word(op) === ":") {
-        enter(key, context, { key: kind, assign: ":" });
-        walk(segment.slice(2), context);
+    for (const segment of [...segments(keys.items), ...segments(rest)]) {
+      const key = nameOf(segment[0]);
+      if (key && word(segment[1]) === ":") {
+        enter(key, context, { key: kind, ...how });
+        value(segment.slice(2));
       } else {
-        walk(segment, context);
+        value(segment);
       }
     }
   };
+
+  // A literal assigns its keys and columns
+  const literal = (group: Group, context: Context) =>
+    keyed(group, context, { assign: ":" }, (items) => walk(items, context));
 
   const lambda = (group: Group, context: Context) => {
     const l: Lambda = {
       open: group.open,
       ...(group.close ? { close: group.close } : {}),
       params: [],
+      signature: [],
       implicit: true,
       locals: new Set(),
       namespace: context.namespace,
@@ -360,16 +401,43 @@ export function annotate(
     let body = group.items;
     if (opens(body[0], "[")) {
       l.implicit = false;
-      for (const item of body[0].items) {
-        const name = nameOf(item);
-        if (name) {
-          l.params.push(word(name));
-          enter(name, inner, { declares: true });
-        }
+      for (const s of segments(body[0].items)) {
+        l.params.push(bind(s, inner, { declares: true }));
+        l.signature.push(written(s));
       }
       body = body.slice(1);
     }
     walk(body, inner);
+  };
+
+  // A parameter, read as a pattern, and the name it binds, or "" if none (q
+  // reads the left of : the same way; pattern() reads that). A name binds
+  // alone or with a type or filter after its colon, which is code the lambda
+  // runs on the value; a keyword doesn't, except those q binds; (p) is p, a
+  // list (p;q) and a dictionary ([k;v:p]) or table ([] c:p) bind their names
+  // as locals; anything else is code whose value the argument must match
+  const bind = (segment: Item[], context: Context, how: Partial<Entry>) => {
+    const [first, op] = segment;
+    const name = nameOf(first);
+    const keyword = keywords.has(word(name)) && !bindable.has(word(name));
+    if (name && !keyword && (!op || word(op) === ":")) {
+      enter(name, context, how);
+      walk(segment.slice(2), context);
+      return word(name);
+    }
+    const group = segment.length === 1 && opens(first, "(") ? first : null;
+    if (group && opens(group.items[0], "[")) {
+      keyed(group, context, {}, (items) =>
+        bind(items, context, { assign: ":" }),
+      );
+    } else if (group) {
+      const parts = segments(group.items);
+      if (parts.length === 1) return bind(parts[0], context, how);
+      for (const s of parts) bind(s, context, { assign: ":" });
+    } else {
+      walk(segment, context);
+    }
+    return "";
   };
 
   // Arguments of @[...] and .[...]: the first is a handle, or the root with
@@ -709,6 +777,7 @@ export function annotate(
   for (const l of out.lambdas) {
     if (l.implicit) {
       l.params = ["x", "y", "z"].slice(0, Math.max(highest.get(l) ?? 0, 1));
+      l.signature = [...l.params];
     }
     for (const p of l.params) l.locals.delete(p);
   }

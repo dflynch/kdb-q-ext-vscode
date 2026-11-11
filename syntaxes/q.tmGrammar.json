@@ -313,6 +313,33 @@
           "end": "\\]",
           "patterns": [
             {
+              "include": "#comments"
+            },
+            {
+              "comment": "A type or filter after a parameter's colon: code",
+              "begin": ":",
+              "beginCaptures": {
+                "0": {
+                  "name": "keyword.operator.assignment.q"
+                }
+              },
+              "end": "(?=[;\\]])",
+              "patterns": [
+                {
+                  "include": "#comments"
+                },
+                {
+                  "include": "#grouped"
+                },
+                {
+                  "include": "#expression"
+                }
+              ]
+            },
+            {
+              "include": "#grouped"
+            },
+            {
               "name": "variable.parameter.q",
               "match": "\\.?[a-zA-Z][a-zA-Z0-9_]*(?:\\.[a-zA-Z0-9_]+)*"
             },
@@ -323,6 +350,41 @@
         },
         {
           "match": "\\.?[a-zA-Z][a-zA-Z0-9_]*(?:\\.[a-zA-Z0-9_]+)*"
+        }
+      ]
+    },
+    "grouped": {
+      "comment": "Code in parentheses or brackets, where ; separates items",
+      "patterns": [
+        {
+          "begin": "\\(",
+          "end": "\\)",
+          "patterns": [
+            {
+              "include": "#comments"
+            },
+            {
+              "include": "#grouped"
+            },
+            {
+              "include": "#expression"
+            }
+          ]
+        },
+        {
+          "begin": "\\[",
+          "end": "\\]",
+          "patterns": [
+            {
+              "include": "#comments"
+            },
+            {
+              "include": "#grouped"
+            },
+            {
+              "include": "#expression"
+            }
+          ]
         }
       ]
     },
