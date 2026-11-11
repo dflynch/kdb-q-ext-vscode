@@ -1,7 +1,8 @@
 // Rules that hold for any input, checked over random q: navigation never
 // throws, a hover lists what Go to Definition does for a global, an export
-// or a column that may be a global, an outline's spans nest; and the hover's
-// entries from KX's reference cover q's keywords
+// or a column that may be a global, an outline's spans nest, a call's
+// signatures are its name's hover's; and the hover's entries from KX's
+// reference cover q's keywords, each form of theirs a call
 import * as assert from "node:assert";
 import { annotate, keywords } from "../annotate";
 import { builtins } from "../builtins";
@@ -12,6 +13,7 @@ import {
   entry,
   hover,
   references,
+  signatures,
 } from "../workspaceIndex";
 
 // The same numbers on every run, from a seed
@@ -156,6 +158,82 @@ suite("properties", () => {
         const context = JSON.stringify({ text, d });
         assert.ok(d.span.start <= d.nameSpan.start, context);
         assert.ok(d.nameSpan.end <= d.span.end, context);
+      }
+    }
+  });
+
+  test("signatures are the innermost call's with any, as its hover has them", () => {
+    const random = randomly(3);
+    for (let n = 0; n < 3000; n++) {
+      const files: Record<string, string> = {
+        "/w/a.q": written(random, 30),
+        "/w/m.q": written(random, 20),
+      };
+      const index = new Map<string, Entry>(
+        Object.entries(files).map(([f, t]) => [f, entry(t, annotate(t))]),
+      );
+      const text = files["/w/a.q"];
+      const a = annotate(text);
+      // Each call's labels: q's forms, then its definitions that are
+      // functions, as the hover writes them
+      const labels = a.calls.map((c) => {
+        const h = hover(index, "/w/a.q", a, c.name.start);
+        return [
+          ...(h?.builtin?.forms ?? []),
+          ...(h?.defined ?? [])
+            .filter((d) => d.kind === "function")
+            .map((d) => `${d.full}${d.detail}`),
+        ];
+      });
+      for (let offset = -1; offset <= text.length + 1; offset++) {
+        const context = JSON.stringify({ files, offset });
+        const found = signatures(index, "/w/a.q", a, offset);
+        // The innermost call around the offset with any
+        let n = a.calls.length - 1;
+        for (; n >= 0; n--) {
+          const c = a.calls[n];
+          const inside = c.open.end <= offset && offset <= c.end;
+          if (inside && labels[n].length) break;
+        }
+        if (n < 0) {
+          assert.strictEqual(found, undefined, context);
+          continue;
+        }
+        const call = a.calls[n];
+        assert.ok(found, context);
+        assert.deepStrictEqual(
+          found.signatures.map((s) => s.label),
+          labels[n],
+          context,
+        );
+        assert.strictEqual(
+          found.active,
+          call.separators.filter((t) => t.start < offset).length,
+          context,
+        );
+        // Each parameter in its label's brackets, in order
+        for (const s of found.signatures) {
+          let last = s.label.indexOf("[") + 1;
+          for (const [start, end] of s.params) {
+            assert.ok(last <= start && start <= end, context);
+            last = end;
+          }
+          assert.ok(last < s.label.length, context);
+        }
+      }
+    }
+  })
+    // Many workspaces, not a measure of speed: CI's machines are slower
+    .timeout(20000);
+
+  test("every form of q's own is one call of its name, all of it", () => {
+    for (const [name, b] of builtins) {
+      for (const form of b.forms) {
+        const { calls } = annotate(form);
+        assert.strictEqual(calls.length, 1, form);
+        const [call] = calls;
+        assert.strictEqual(form.slice(0, call.name.end), name, form);
+        assert.strictEqual(call.close?.end, form.length, form);
       }
     }
   });

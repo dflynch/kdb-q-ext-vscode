@@ -4,6 +4,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import { annotate } from "../annotate";
 import {
+  callsAt,
   globals,
   type Outlined,
   occurrences,
@@ -421,6 +422,102 @@ suite("references", () => {
   });
   test("without it", () => {
     assert.deepStrictEqual(shown(false), [7, 13]);
+  });
+});
+
+suite("calls at the cursor", () => {
+  const endings = { LF: "\n", CRLF: "\r\n", CR: "\r" };
+  // Each call the cursor, |, is in, innermost first, as "name parameter"
+  const found = (source: string) => {
+    const offset = source.indexOf("|");
+    const text = source.replace("|", "");
+    return callsAt(annotate(text), offset).map(
+      ({ call, active }) =>
+        `${text.slice(call.name.start, call.name.end)} ${active}`,
+    );
+  };
+  const everywhere = (source: string, expected: string[]) => {
+    for (const [ending, eol] of Object.entries(endings)) {
+      assert.deepStrictEqual(
+        found(source.replaceAll("\n", eol)),
+        expected,
+        ending,
+      );
+    }
+  };
+
+  // Every way to write a call, its arguments A and B, and its name
+  const forms: [string, string, string][] = [
+    ["bracket notation", "f[A;B]", "f"],
+    ["a space before the bracket", "f [A;B]", "f"],
+    ["not closed yet", "f[A;B", "f"],
+    ["over lines", "f[A;\n  B]", "f"],
+    ["in another call's brackets", "g[1;f[A;B]]", "f"],
+    ["in a list", "(1;f[A;B])", "f"],
+    ["in a lambda", "{f[A;B]}", "f"],
+    ["in a query", "select c:f[A;B] from t", "f"],
+    ["an export", "m.f[A;B]", "m.f"],
+    ["a keyword", "ssr[A;B]", "ssr"],
+    ["a name in .Q", ".Q.s1[A;B]", ".Q.s1"],
+  ];
+  // Where the cursor is, as A and B, and the parameter it's at
+  const positions: [string, string, string, number][] = [
+    ["just after the bracket", "|", "", 0],
+    ["before a separator", "1|", "2", 0],
+    ["after a separator", "1", "|2", 1],
+    ["at the close", "1", "2|", 1],
+    ["in a string holding a separator", '"a;|b"', "2", 0],
+    ["in a comment holding a separator", "1 / a;|b\n ", "2", 0],
+    ["in a list's brackets", "(1;|2)", "3", 0],
+    ["in a lambda's", "{x;|y}", "3", 0],
+    ["after a call in it", "g[1;2]|", "3", 0],
+  ];
+  for (const [form, written, name] of forms) {
+    for (const [position, a, b, active] of positions) {
+      test(`${form}: ${position}`, () => {
+        const source = written.replace("A", a).replace("B", b);
+        const all = found(source);
+        assert.strictEqual(all[0], `${name} ${active}`, source);
+        everywhere(source, all);
+      });
+    }
+  }
+
+  const cases: [string, string, string[]][] = [
+    ["each call it's in", "f[a; t[`c|]]", ["t 0", "f 1"]],
+    ["an index after it", "f[a; x[1]|]", ["f 1"]],
+    ["calls in a call not closed", "f[1; g[2;|", ["g 1", "f 1"]],
+    ["the end of a call's last line", "f[1; |  ", ["f 1"]],
+    ["past the last parameter", "f[1;2;|3]", ["f 2"]],
+    ["empty brackets", "f[|]", ["f 0"]],
+    ["before the bracket", "f|[1]", []],
+    ["after the close", "f[1]|", []],
+    ["after the close, before another", "f[1]|[2]", []],
+    ["a bracket after a bracket", "f[1][|2]", []],
+    ["a glyph applied", "$[1;|2]", []],
+    ["a glyph applied: @", "@[x;|1]", []],
+    ["a glyph applied: .", ".[f;|1]", []],
+    ["a lambda's parameters", "{[a;|b] a}", []],
+    ["a lambda applied", "{x}[|1]", []],
+    ["qSQL's row limit", "select[|2] from t", []],
+    ["qSQL's exec", "exec[|", []],
+    ["infix", "x bin |", []],
+    ["prefix", "count |x", []],
+    ["in a string", '"f[|"', []],
+    ["in a comment", "/ f[|", []],
+    ["a symbol", "`f[|1]", []],
+    ["another statement", "f[1\n|g", []],
+  ];
+  for (const [name, source, expected] of cases) {
+    test(name, () => everywhere(source, expected));
+  }
+
+  test("never throws on a half-typed file", () => {
+    const text = "f[a; {[b;c] g[(1;";
+    const a = annotate(text);
+    for (let offset = -1; offset <= text.length + 1; offset++) {
+      callsAt(a, offset);
+    }
   });
 });
 

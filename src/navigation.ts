@@ -1,9 +1,10 @@
 // Navigation within one file, from its annotations: the outline of what it
-// defines, and the definition and occurrences of the name at the cursor.
+// defines, the definition and occurrences of the name at the cursor, and
+// the calls the cursor is in.
 // Pure and total, as the scanner and the annotation pass are: no VS Code
 // imports, never throws.
 
-import type { Annotated, Lambda, Name } from "./annotate";
+import type { Annotated, Call, Lambda, Name } from "./annotate";
 import { lineOf, lineStarts } from "./lines";
 import { type Script, scan, type Token } from "./scanner";
 
@@ -91,6 +92,8 @@ export type Defined = {
   // A function's signature, each parameter as written, as [x;y] or
   // [a:`j;b], or a module's use`foo
   detail?: string;
+  // A function's parameters, each as written
+  signature?: string[];
   // The whole definition: from the name, a handle's backtick, or the set
   // of set[`f;x], to the end of its value
   span: Span;
@@ -156,6 +159,7 @@ export function globals(text: string, a: Annotated): Defined[] {
     if (l && whole) {
       item.kind = "function";
       item.detail = `[${l.signature.join(";")}]`;
+      item.signature = l.signature;
     } else if (
       isAssign(op) &&
       word(value) === "use" &&
@@ -301,7 +305,19 @@ export type Target = {
   passed: boolean;
 };
 
-export function targets(a: Annotated): Target[] {
+// Each annotation's, once: every request reads them, several times over
+const targeted = new WeakMap<Annotated, readonly Target[]>();
+
+export function targets(a: Annotated): readonly Target[] {
+  let found = targeted.get(a);
+  if (!found) {
+    found = targetsOf(a);
+    targeted.set(a, found);
+  }
+  return found;
+}
+
+function targetsOf(a: Annotated): Target[] {
   const ids = new Map<Lambda, number>(a.lambdas.map((l, i) => [l, i]));
   const scoped = (role: string, full: string, l: Lambda | undefined) =>
     role === "param" || role === "local"
@@ -350,7 +366,7 @@ export function targets(a: Annotated): Target[] {
 
 // The name the offset is in, else one it's just after, as the cursor is when
 // typing
-export function at(all: Target[], offset: number): Target | undefined {
+export function at(all: readonly Target[], offset: number): Target | undefined {
   return (
     all.find((t) => t.start <= offset && offset < t.end) ??
     all.find((t) => t.end === offset)
@@ -378,7 +394,7 @@ function definition(
 // Where a variable or global is first defined in the file, at top level
 // before any lambda
 export function first(
-  all: Target[],
+  all: readonly Target[],
   identity: string | undefined,
 ): Target | undefined {
   if (!identity?.startsWith("variable ") && !identity?.startsWith("global "))
@@ -415,4 +431,21 @@ export function occurrences(a: Annotated, offset: number): Occurrence[] {
     }
   }
   return out;
+}
+
+// The calls whose brackets the offset is in, innermost first, each with the
+// parameter it's at: how many of the call's own separators are before it.
+// In is after the open, up to the close, or the end of the statement's last
+// line if there's none yet
+export function callsAt(
+  a: Annotated,
+  offset: number,
+): { call: Call; active: number }[] {
+  return a.calls
+    .filter((c) => c.open.end <= offset && offset <= c.end)
+    .reverse()
+    .map((call) => ({
+      call,
+      active: call.separators.filter((t) => t.start < offset).length,
+    }));
 }

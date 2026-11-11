@@ -74,6 +74,15 @@ read.
   that peeks at all of them, as Go to Definition does. A name in a query
   may be a column or a global, so, as Go to Definition does, it shows the
   global of that name, if there is one.
+- Parameter hints: typing a call's arguments in brackets, as `f[a;b]`,
+  shows its signature with the current parameter highlighted, in VS Code's
+  own widget: each definition's, nearest first, or each of a q keyword's
+  forms, ↑ and ↓ to move between them. Inside an argument that indexes,
+  as ``t[`c]``, the call's own stays. Ctrl+Shift+Space (Cmd+Shift+Space on
+  macOS) shows it again, and `editor.parameterHints.enabled` turns it off.
+  q's functions KX writes only in prefix notation, as `.Q.s1 x`, show in
+  bracket notation, `.Q.s1[x]`; a call written in prefix or infix notation,
+  as `count x` or `x bin y`, has none, nor has a qSQL query
 
 ### Servers
 

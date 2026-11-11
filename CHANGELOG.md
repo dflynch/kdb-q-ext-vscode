@@ -77,6 +77,9 @@ All notable changes to the extension are documented in this file.
   export's, comment above its definition, as written, and its signature,
   with a link to its other definitions. A signature shows each parameter as
   written, typed (``[a:`j;b]``) or as a pattern (`[(src;dst);speed]`)
+- Parameter hints for q: a call's signatures while typing its arguments in
+  brackets, the current parameter highlighted; a definition's comment and
+  file, or q's forms from KX's reference, as the hover has them
 
 ### Changed
 
