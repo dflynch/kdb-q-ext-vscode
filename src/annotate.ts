@@ -119,15 +119,19 @@ type Item = Token | Group;
 const isGroup = (item: Item | undefined): item is Group =>
   item !== undefined && "items" in item;
 
-// Where an item is written: a group to its close, or, if it has none, to the
-// end of what's in it
-const startOf = (item: Item) => (isGroup(item) ? item.open.start : item.start);
-const endOf = (item: Item): number => {
-  if (!isGroup(item)) return item.end;
-  if (item.close) return item.close.end;
-  const last = item.items[item.items.length - 1];
-  return last ? endOf(last) : item.open.end;
-};
+// Items' tokens, in order, brackets included
+function flat(items: Item[], out: Token[] = []): Token[] {
+  for (const item of items) {
+    if (!isGroup(item)) {
+      out.push(item);
+      continue;
+    }
+    out.push(item.open);
+    flat(item.items, out);
+    if (item.close) out.push(item.close);
+  }
+  return out;
+}
 
 // Brackets deeper than this stay tokens, so the walk's recursion is bounded
 const deepest = 256;
@@ -223,6 +227,18 @@ export function annotate(
 
   const word = (item: Item | undefined) =>
     item && !isGroup(item) ? text.slice(item.start, item.end) : "";
+  // Items as written, without comments, on one line: a space wherever there
+  // was any
+  const written = (items: Item[]) => {
+    let out = "";
+    let end: number | undefined;
+    for (const t of flat(items)) {
+      if (end !== undefined && t.start > end) out += " ";
+      out += text.slice(t.start, t.end);
+      end = t.end;
+    }
+    return out;
+  };
   const isName = (item: Item | undefined, ...words: string[]) =>
     item !== undefined &&
     !isGroup(item) &&
@@ -337,22 +353,30 @@ export function annotate(
     return entry;
   };
 
-  // A dictionary or table literal: ([a:1]), ([] a:1 2), ([k:1] v:2)
-  const literal = (group: Group, context: Context) => {
+  // A dictionary or table, as ([a:1]), ([] a:1 2) or ([k:1] v:2): each key
+  // or column, with how it's entered, and its value, or each item without one
+  const keyed = (
+    group: Group,
+    context: Context,
+    how: Partial<Entry>,
+    value: (items: Item[]) => void,
+  ) => {
     const [keys, ...rest] = group.items as [Group, ...Item[]];
     const kind = rest.length === 0 ? "key" : "column";
-    const parts = [...segments(keys.items), ...segments(rest)];
-    for (const segment of parts) {
-      const [name, op] = segment;
-      const key = nameOf(name);
-      if (key && word(op) === ":") {
-        enter(key, context, { key: kind, assign: ":" });
-        walk(segment.slice(2), context);
+    for (const segment of [...segments(keys.items), ...segments(rest)]) {
+      const key = nameOf(segment[0]);
+      if (key && word(segment[1]) === ":") {
+        enter(key, context, { key: kind, ...how });
+        value(segment.slice(2));
       } else {
-        walk(segment, context);
+        value(segment);
       }
     }
   };
+
+  // A literal assigns its keys and columns
+  const literal = (group: Group, context: Context) =>
+    keyed(group, context, { assign: ":" }, (items) => walk(items, context));
 
   const lambda = (group: Group, context: Context) => {
     const l: Lambda = {
@@ -377,9 +401,7 @@ export function annotate(
       l.implicit = false;
       for (const s of segments(body[0].items)) {
         l.params.push(bind(s, inner, { declares: true }));
-        l.signature.push(
-          s.length ? text.slice(startOf(s[0]), endOf(s[s.length - 1])) : "",
-        );
+        l.signature.push(written(s));
       }
       body = body.slice(1);
     }
@@ -388,30 +410,24 @@ export function annotate(
 
   // A pattern, as in a parameter list or on the left of :, and the name it
   // binds, or "" if none. A name binds alone or with a type or filter after
-  // its colon, which is code the lambda runs on the value; (p) is p, a list
-  // (p;q) and a dictionary ([k;v:p]) or table ([] c:p) bind their names as
-  // locals; anything else is code whose value the argument must match
+  // its colon, which is code the lambda runs on the value, but a keyword
+  // never does, but from and by; (p) is p, a list (p;q) and a dictionary
+  // ([k;v:p]) or table ([] c:p) bind their names as locals; anything else is
+  // code whose value the argument must match
   const bind = (segment: Item[], context: Context, how: Partial<Entry>) => {
     const [first, op] = segment;
     const name = nameOf(first);
-    if (name && (!op || word(op) === ":")) {
+    const keyword = keywords.has(word(name)) && !queryWords.has(word(name));
+    if (name && !keyword && (!op || word(op) === ":")) {
       enter(name, context, how);
       walk(segment.slice(2), context);
       return word(name);
     }
     const group = segment.length === 1 && opens(first, "(") ? first : null;
     if (group && opens(group.items[0], "[")) {
-      const [keys, ...rest] = group.items as [Group, ...Item[]];
-      const key = rest.length === 0 ? "key" : "column";
-      for (const s of [...segments(keys.items), ...segments(rest)]) {
-        const k = nameOf(s[0]);
-        if (k && s.length > 1 && word(s[1]) === ":") {
-          enter(k, context, { key });
-          bind(s.slice(2), context, { assign: ":" });
-        } else {
-          bind(s, context, { assign: ":" });
-        }
-      }
+      keyed(group, context, {}, (items) =>
+        bind(items, context, { assign: ":" }),
+      );
     } else if (group) {
       const parts = segments(group.items);
       if (parts.length === 1) return bind(parts[0], context, how);
@@ -759,7 +775,7 @@ export function annotate(
   for (const l of out.lambdas) {
     if (l.implicit) {
       l.params = ["x", "y", "z"].slice(0, Math.max(highest.get(l) ?? 0, 1));
-      l.signature = l.params;
+      l.signature = [...l.params];
     }
     for (const p of l.params) l.locals.delete(p);
   }

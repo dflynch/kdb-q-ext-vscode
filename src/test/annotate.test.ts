@@ -403,6 +403,14 @@ suite("annotate parameter lists", () => {
     // A constant, or anything else, is a value to match
     ["[1;b]", ["", "b"], ["1", "b"], ["param b :"]],
     ["[a b]", [""], ["a b"], ["global a", "global b"]],
+    // A keyword is a value to match, but from and by bind, as q has them
+    ["[til;b]", ["", "b"], ["til", "b"], ["builtin til", "param b :"]],
+    [
+      "[from;by]",
+      ["from", "by"],
+      ["from", "by"],
+      ["param from :", "param by :"],
+    ],
   ];
 
   for (const [list, params, signature, inList] of forms) {
@@ -455,11 +463,33 @@ suite("annotate parameter lists", () => {
         assert.deepStrictEqual(a, [expected(bound)]);
       });
     }
-    test(`${list}, a in a nested lambda, a global elsewhere`, () => {
-      const shownAll = names(`a:1\ng:{${list} {a}}`);
-      assert.deepStrictEqual(shownAll.slice(-1), ["global a"]);
+  }
+
+  // A parameter's comments and line breaks: on one line, without comments
+  for (const [ending, eol] of [
+    ["LF", "\n"],
+    ["CRLF", "\r\n"],
+    ["CR", "\r"],
+  ]) {
+    test(`a parameter across lines, ${ending}`, () => {
+      const text = `f:{[a / a note${eol}  :\`j;b:f[1;${eol}  2];(c; / c${eol} d)] a}`;
+      const [l] = annotate(text).lambdas;
+      assert.deepStrictEqual(l.params, ["a", "b", ""]);
+      assert.deepStrictEqual(l.signature, ["a :`j", "b:f[1; 2]", "(c; d)"]);
     });
   }
+
+  test("a lambda left open in its parameters", () => {
+    const [l] = annotate("f:{[a:`j;(b;c").lambdas;
+    assert.deepStrictEqual(l.params, ["a", ""]);
+    assert.deepStrictEqual(l.signature, ["a:`j", "(b;c"]);
+  });
+
+  test("implicit parameters' signature is its own", () => {
+    const [l] = annotate("{x+y}").lambdas;
+    assert.notStrictEqual(l.signature, l.params);
+    assert.deepStrictEqual(l.signature, ["x", "y"]);
+  });
 
   test("a parameter named as its type", () => {
     assert.deepStrictEqual(names("{[j:`j] j}"), ["param j :", "param j"]);

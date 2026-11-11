@@ -76,7 +76,7 @@ All notable changes to the extension are documented in this file.
   description from KX's reference, linked; a global's, or a module
   export's, comment above its definition, as written, and its signature,
   with a link to its other definitions. A signature shows each parameter as
-  written, typed (`` [a:`j;b] ``) or as a pattern (`[(src;dst);speed]`)
+  written, typed (``[a:`j;b]``) or as a pattern (`[(src;dst);speed]`)
 
 ### Changed
 
@@ -105,7 +105,8 @@ All notable changes to the extension are documented in this file.
 - Names under a namespace member, such as `.z.ts.x`, are highlighted as one
   name
 - In a parameter list, a type or filter after a parameter's colon, as in
-  `` {[a:`j;b:f[1]] …} ``, is highlighted as code, not as more parameters
+  ``{[a:`j;b:f[1]] …}``, and a pattern, as `(a;b)`, are highlighted as
+  code, not as more parameters, and comments as comments
 
 ## [1.1.0]
 
