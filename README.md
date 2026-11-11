@@ -56,10 +56,11 @@ read.
   rest, as it has no groups. What it can't know:
   - Each file is read as if loaded in the root namespace: `\l` runs a file
     in its loader's namespace, which the file doesn't say
-  - A global several files define, such as a setting with its defaults
-    and overrides, has each file's definition, which VS Code lists in a
-    peek opened at the nearest: the file's own, if it has one. Set
-    `editor.gotoLocation.multipleDefinitions` to `goto` to jump there
+  - A global defined more than once, in a file or in several, such as a
+    setting with its defaults and overrides, has every definition, which
+    VS Code lists in a peek opened at the nearest: the file's own, if it
+    has one. Set `editor.gotoLocation.multipleDefinitions` to `goto` to
+    jump there
   - ``use`foo`` goes to `foo.q` or `foo/init.q` anywhere in the
     workspace, as `QPATH` isn't read
   - Names q defines (`.z`, `.Q`), and globals defined outside the workspace
@@ -70,8 +71,9 @@ read.
   above it, exactly as written, as parameter hints show them, and, if
   it's another, the file it's in. A comment indented, as in a lambda, is
   about the code it's in, and one trailing a line could be about either
-  line, so neither is shown. A
-  global several files define shows the nearest definition, with a link
+  line, so neither is shown. A global defined more than once shows the
+  nearest file's latest definition, what the global holds once that file
+  has loaded, with a link
   that peeks at all of them, as Go to Definition does. A name in a query
   may be a column or a global, so, as Go to Definition does, it shows the
   global of that name, if there is one.

@@ -60,6 +60,20 @@ suite("workspace index", () => {
     ]);
   });
 
+  test("each definition in a file", async () => {
+    const d = await vscode.workspace.openTextDocument(file("code/again.q"));
+    const found = await vscode.commands.executeCommand<vscode.Location[]>(
+      "vscode.executeDefinitionProvider",
+      d.uri,
+      new vscode.Position(5, 0),
+    );
+    // In VS Code's order, by file and position
+    assert.deepStrictEqual(shown(found), [
+      "code/again.q 1:1",
+      "code/again.q 4:1",
+    ]);
+  });
+
   test("an export, in its module", async () => {
     const d = await vscode.workspace.openTextDocument(file("code/main.q"));
     const found = await vscode.commands.executeCommand<vscode.Location[]>(

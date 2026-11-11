@@ -13,7 +13,7 @@ import {
   at,
   callsAt,
   type Defined,
-  first,
+  defining as definedInFile,
   firsts,
   globals,
   references as inFile,
@@ -24,20 +24,19 @@ import {
 export type Entry = {
   // Where each line starts, to turn offsets into positions
   lines: number[];
+  // Each definition of a global, in the order they're written
   defined: Defined[];
-  // Each definition that's a function, as a global may be defined again
-  functions: Defined[];
   // Each global named, by its absolute name, assigned or read, and each
   // column that may be one; passed if named by a symbol
   globals: (Span & { full: string; passed: boolean })[];
   // Each export of a module named, as m.f where m:use`foo
   exports: (Span & { module: string; key: string })[];
   // The module's own export, if the file assigns one: its keys when it's a
-  // dictionary literal, each where its value is defined in the file
-  // and, for a lambda written in it, as ([f:{[a;b] a}]), its signature:
-  // each parameter as written
+  // dictionary literal, each where its value is defined in the file, as
+  // a global's definitions, else the key itself, and, for a lambda written
+  // in it, as ([f:{[a;b] a}]), its signature: each parameter as written
   export?: Span & {
-    keys?: (Span & { key: string; value: Span; signature?: string[] })[];
+    keys?: (Span & { key: string; values: Span[]; signature?: string[] })[];
   };
 };
 
@@ -45,11 +44,9 @@ export type Entry = {
 export function entry(text: string, a: Annotated): Entry {
   const lines = lineStarts(text);
   const all = targets(a);
-  const every = globals(text, a, true);
   const out: Entry = {
     lines,
-    defined: firsts(every),
-    functions: every.filter((d) => d.kind === "function"),
+    defined: globals(text, a, true),
     globals: [],
     exports: [],
   };
@@ -76,14 +73,16 @@ export function entry(text: string, a: Annotated): Entry {
       out.export.keys = a.export.keys.map((k) => {
         const span = { start: k.start, end: k.end };
         const target = k.target;
-        const d =
+        const defs =
           target && "full" in target
-            ? first(all, `global ${target.full}`)
-            : undefined;
+            ? definedInFile(all, `global ${target.full}`).map(
+                ({ start, end }) => ({ start, end }),
+              )
+            : [];
         return {
           key: k.key,
           ...span,
-          value: d ? { start: d.start, end: d.end } : span,
+          values: defs.length ? defs : [span],
           ...(target && "lambda" in target
             ? { signature: target.lambda.signature }
             : {}),
@@ -186,10 +185,10 @@ function across(
 }
 
 // Where the name at the offset is defined. A local or parameter as in the
-// file. A global where each file first assigns it at top level, or, if none
-// does, first in a lambda, the file itself first, then the nearest. An
-// export where its module's export has the key, or where the export is
-// assigned if it's built as the module loads
+// file. A global where each file assigns it at top level, or, if none does,
+// in a lambda, the file itself first, then the nearest, and each file's the
+// latest first. An export where its module's export has the key, or where
+// the export is assigned if it's built as the module loads
 export function definitions(
   index: Index,
   file: string,
@@ -200,9 +199,11 @@ export function definitions(
   const here = at(all, offset);
   if (!here) return [];
   const local = (id: string | undefined) =>
-    id?.startsWith("variable ") ? first(all, id) : undefined;
+    id?.startsWith("variable ")
+      ? definedInFile(all, id).map((d) => ({ file, ...span(d) }))
+      : [];
   const found = local(here.identity);
-  if (found) return [{ file, start: found.start, end: found.end }];
+  if (found.length) return found;
   const wanted = across(index, file, a, offset);
   if (wanted && "global" in wanted) return defining(index, file, wanted.global);
   if (wanted) {
@@ -212,20 +213,21 @@ export function definitions(
       if (!ex) continue;
       if (!ex.keys) out.push({ file: m, ...span(ex) });
       const k = ex.keys?.find((k) => k.key === wanted.key);
-      if (k) out.push({ file: m, ...span(k.value) });
+      for (const v of k?.values ?? []) out.push({ file: m, ...v });
     }
     return out;
   }
   // A column read, as the variable it may be
   const maybe = local(here.maybe);
-  if (maybe) return [{ file, start: maybe.start, end: maybe.end }];
+  if (maybe.length) return maybe;
   return here.maybe?.startsWith("global ")
     ? defining(index, file, here.maybe.slice(7))
     : [];
 }
 
-// Where each file first assigns a global at top level, or, if none does,
-// first in a lambda, the file itself first, then the nearest
+// Where each file assigns a global at top level, or, if none does, in a
+// lambda, the file itself first, then the nearest, each file's the latest
+// first
 function defining(index: Index, file: string, global: string): Location[] {
   return defined(index, file, global).map((d) => ({
     file: d.file,
@@ -233,19 +235,19 @@ function defining(index: Index, file: string, global: string): Location[] {
   }));
 }
 
-// Each file's definition of a global, as defining() orders them
+// Each file's definitions of a global, as defining() orders them
 function defined(index: Index, file: string, global: string): Listed[] {
   const atTop: Listed[] = [];
   const inLambda: Listed[] = [];
   for (const [f, e] of index) {
-    const top = e.defined.find((d) => d.full === global && !d.inLambda);
-    const inner = e.defined.find((d) => d.full === global && d.inLambda);
-    if (top) atTop.push({ ...top, file: f });
-    if (inner) inLambda.push({ ...inner, file: f });
+    for (const d of e.defined) {
+      if (d.full === global)
+        (d.inLambda ? inLambda : atTop).push({ ...d, file: f });
+    }
   }
   const order = nearest(file);
-  return (atTop.length ? atTop : inLambda).sort((x, y) =>
-    order(x.file, y.file),
+  return (atTop.length ? atTop : inLambda).sort(
+    (x, y) => order(x.file, y.file) || y.nameSpan.start - x.nameSpan.start,
   );
 }
 
@@ -322,10 +324,8 @@ export type Signature = {
 
 // The signatures for the innermost call the offset is in that has any, and
 // the parameter it's at: a call's are the hover's for its name, q's forms
-// first, then, for each global the hover lists, every definition in its
-// file that's a function, the latest first, as it's what the global holds
-// once the file has loaded. A call with none, as an index, a local or a
-// variable, gives way to the next call out
+// first, then each definition it lists that's a function. A call with none,
+// as an index, a local or a variable, gives way to the next call out
 export function signatures(
   index: Index,
   file: string,
@@ -340,20 +340,7 @@ export function signatures(
     if (builtin) {
       for (const form of builtin.forms) out.push({ ...parsed(form), builtin });
     }
-    // Each file's definitions of a global; an export written in its
-    // module's export as itself
-    const functions = defined.flatMap((d) => {
-      const e = index.get(d.file);
-      const global = e?.defined.some(
-        (g) => g.nameSpan.start === d.nameSpan.start,
-      );
-      if (!global) return [d];
-      return (e?.functions ?? [])
-        .filter((f) => f.full === d.full && f.inLambda === d.inLambda)
-        .reverse()
-        .map((f) => ({ ...f, file: d.file }));
-    });
-    for (const d of functions) {
+    for (const d of defined) {
       if (d.kind !== "function" || !d.signature) continue;
       let label = `${d.full}[`;
       const params: [number, number][] = [];
@@ -451,8 +438,8 @@ export function references(
 export type Listed = Defined & { file: string };
 
 // The globals defined across files whose names have the query's
-// characters in order, ignoring case: each file's definition at top level,
-// or its first in a lambda if it has none
+// characters in order, ignoring case: where each file first assigns it at
+// top level, or first in a lambda if it has none
 export function symbols(index: Index, query: string): Listed[] {
   const q = query.toLowerCase().replace(/\s/g, "");
   const matches = (name: string) => {
@@ -463,10 +450,9 @@ export function symbols(index: Index, query: string): Listed[] {
   };
   const out: Listed[] = [];
   for (const [file, e] of index) {
-    const top = new Set(
-      e.defined.filter((d) => !d.inLambda).map((d) => d.full),
-    );
-    for (const d of e.defined) {
+    const defined = firsts(e.defined);
+    const top = new Set(defined.filter((d) => !d.inLambda).map((d) => d.full));
+    for (const d of defined) {
       if (d.inLambda && top.has(d.full)) continue;
       if (matches(d.full)) out.push({ ...d, file });
     }

@@ -87,6 +87,10 @@ suite("properties", () => {
       const text = files["/w/a.q"];
       const a = annotate(text);
       const all = targets(a);
+      // Every definition in each file, as written
+      const every = Object.entries(files).flatMap(([file, t]) =>
+        globals(t, annotate(t), true).map((d) => ({ ...d, file })),
+      );
       for (let offset = -1; offset <= text.length + 1; offset++) {
         const context = JSON.stringify({ files, offset });
         const found = hover(index, "/w/a.q", a, offset);
@@ -124,6 +128,37 @@ suite("properties", () => {
           assert.deepStrictEqual(
             (found?.defined ?? []).map((d) => `${d.file} ${d.nameSpan.start}`),
             defs.map((d) => `${d.file} ${d.start}`),
+            context,
+          );
+        }
+        // A global, or a column that may be one: every definition of it in
+        // each file it lists, at top level, or, if no file has one, in a
+        // lambda, each file's together, the latest first, and every file
+        // that has one
+        const global = inside?.identity.startsWith("global ")
+          ? inside.identity
+          : inside?.identity.startsWith("column ")
+            ? inside.maybe
+            : undefined;
+        if (global?.startsWith("global ")) {
+          const of = every.filter((d) => d.full === global.slice(7));
+          const top = of.filter((d) => !d.inLambda);
+          const chosen = top.length ? top : of;
+          const listed = found?.defined ?? [];
+          const order = [...new Set(listed.map((d) => d.file))];
+          assert.deepStrictEqual(
+            [...order].sort(),
+            [...new Set(chosen.map((d) => d.file))].sort(),
+            context,
+          );
+          assert.deepStrictEqual(
+            listed.map((d) => `${d.file} ${d.nameSpan.start}`),
+            order.flatMap((f) =>
+              chosen
+                .filter((d) => d.file === f)
+                .reverse()
+                .map((d) => `${d.file} ${d.nameSpan.start}`),
+            ),
             context,
           );
         }
@@ -174,30 +209,13 @@ suite("properties", () => {
       );
       const text = files["/w/a.q"];
       const a = annotate(text);
-      // Every definition in each file, as written
-      const every = Object.fromEntries(
-        Object.entries(files).map(([f, t]) => [
-          f,
-          globals(t, annotate(t), true),
-        ]),
-      );
-      // Each call's labels: q's forms, then, for each definition the hover
-      // lists that's a global, every one in its file that's a function, the
-      // latest first, else the definition itself, as the hover writes them
+      // Each call's labels: q's forms, then each definition the hover lists
+      // that's a function, as the hover writes them
       const labels = a.calls.map((c) => {
         const h = hover(index, "/w/a.q", a, c.name.start);
-        const all = (h?.defined ?? []).flatMap((d) => {
-          const global = every[d.file].some(
-            (g) => g.nameSpan.start === d.nameSpan.start,
-          );
-          if (!global) return [d];
-          return every[d.file]
-            .filter((g) => g.full === d.full && g.inLambda === d.inLambda)
-            .reverse();
-        });
         return [
           ...(h?.builtin?.forms ?? []),
-          ...all
+          ...(h?.defined ?? [])
             .filter((d) => d.kind === "function")
             .map((d) => `${d.full}${d.detail}`),
         ];
