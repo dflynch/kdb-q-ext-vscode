@@ -174,13 +174,30 @@ suite("properties", () => {
       );
       const text = files["/w/a.q"];
       const a = annotate(text);
-      // Each call's labels: q's forms, then its definitions that are
-      // functions, as the hover writes them
+      // Every definition in each file, as written
+      const every = Object.fromEntries(
+        Object.entries(files).map(([f, t]) => [
+          f,
+          globals(t, annotate(t), true),
+        ]),
+      );
+      // Each call's labels: q's forms, then, for each definition the hover
+      // lists that's a global, every one in its file that's a function, the
+      // latest first, else the definition itself, as the hover writes them
       const labels = a.calls.map((c) => {
         const h = hover(index, "/w/a.q", a, c.name.start);
+        const all = (h?.defined ?? []).flatMap((d) => {
+          const global = every[d.file].some(
+            (g) => g.nameSpan.start === d.nameSpan.start,
+          );
+          if (!global) return [d];
+          return every[d.file]
+            .filter((g) => g.full === d.full && g.inLambda === d.inLambda)
+            .reverse();
+        });
         return [
           ...(h?.builtin?.forms ?? []),
-          ...(h?.defined ?? [])
+          ...all
             .filter((d) => d.kind === "function")
             .map((d) => `${d.full}${d.detail}`),
         ];

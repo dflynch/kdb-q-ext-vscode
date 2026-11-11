@@ -434,6 +434,40 @@ suite("signatures", () => {
       ["f[x] /w/b/c.q 1:1 f -", "f[a;«b»] /w/a.q 2:1 f / adds"],
     ],
     [
+      "a global defined again in its file: each, the latest first",
+      { "/w/a.q": "f:{[a;b] a+b}\n\nf:{[c;d] c-d}\n\nf[|]" },
+      ["f[«c»;d] /w/a.q 3:1 f -", "f[«a»;b] /w/a.q 1:1 f -"],
+    ],
+    [
+      "defined again, as a variable between",
+      { "/w/a.q": "/ one\nf:{[a] a}\nf:1\nf:{[b] b}\nf[|]" },
+      ["f[«b»] /w/a.q 4:1 f -", "f[«a»] /w/a.q 2:1 f / one"],
+    ],
+    [
+      "defined again in several files, the nearest file first",
+      {
+        "/w/a.q": "f:{[a] a}\nf:{[b] b}",
+        "/w/c/d.q": "f:{[c] c}\nf:{[d] d}",
+        "/w/c/e.q": "f[|]",
+      },
+      [
+        "f[«d»] /w/c/d.q 2:1 f -",
+        "f[«c»] /w/c/d.q 1:1 f -",
+        "f[«b»] /w/a.q 2:1 f -",
+        "f[«a»] /w/a.q 1:1 f -",
+      ],
+    ],
+    [
+      "defined at top level: not as well in a lambda",
+      { "/w/a.q": "f:{[a] a}\ng:{f::{[b] b}}\nf[|]" },
+      ["f[«a»] /w/a.q 1:1 f -"],
+    ],
+    [
+      "defined only in lambdas: each",
+      { "/w/a.q": "g:{f::{[a] a}}\nh:{f::{[b] b}}\nf[|]" },
+      ["f[«b»] /w/a.q 2:4 f -", "f[«a»] /w/a.q 1:4 f -"],
+    ],
+    [
       "parameters as written",
       { "/w/a.q": ".foo.f:{[a:`j;(b;c)] a}\n.foo.f[1;|]" },
       [".foo.f[a:`j;«(b;c)»] /w/a.q 1:1 .foo.f -"],
@@ -465,6 +499,14 @@ suite("signatures", () => {
         "/w/a.q": "s:use`m\ns.mid[1;|]",
       },
       ["mid[a;«b»] /w/m.q 2:1 mid / middle"],
+    ],
+    [
+      "an export written out, beside a global of its name",
+      {
+        "/w/m.q": "mid:{[z] z}\nexport:([mid:{[a;b] a}])",
+        "/w/a.q": "s:use`m\ns.mid[|]",
+      },
+      ["mid[«a»;b] /w/m.q 2:10 mid -"],
     ],
     [
       "an export written out in its module's export",

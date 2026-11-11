@@ -105,8 +105,9 @@ export type Defined = {
 };
 
 // Each global's first definition at top level and its first in a lambda,
-// not where an existing value is amended, in the order they're written
-export function globals(text: string, a: Annotated): Defined[] {
+// or, if every, each of its definitions, not where an existing value is
+// amended, in the order they're written
+export function globals(text: string, a: Annotated, every = false): Defined[] {
   const script = scan(text);
   const at = placed(script);
   const lambdas = new Map<number, Lambda>(
@@ -194,16 +195,23 @@ export function globals(text: string, a: Annotated): Defined[] {
   }
   defined.sort((x, y) => x.nameSpan.start - y.nameSpan.start);
   const documented = docs(text, script);
-  const seen = new Set<string>();
   const out: Defined[] = [];
   for (const d of defined) {
-    const key = `${d.inLambda} ${d.full}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
     const item = described(d.full, d.nameSpan, d.inLambda);
     if (item) out.push(item);
   }
-  return out;
+  return every ? out : firsts(out);
+}
+
+// Each global's first definition at top level and its first in a lambda
+export function firsts(all: Defined[]): Defined[] {
+  const seen = new Set<string>();
+  return all.filter((d) => {
+    const key = `${d.inLambda} ${d.full}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 // The comment documenting a definition starting at the offset, if it starts

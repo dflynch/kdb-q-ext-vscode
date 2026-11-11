@@ -14,6 +14,7 @@ import {
   callsAt,
   type Defined,
   first,
+  firsts,
   globals,
   references as inFile,
   type Span,
@@ -24,6 +25,8 @@ export type Entry = {
   // Where each line starts, to turn offsets into positions
   lines: number[];
   defined: Defined[];
+  // Each definition that's a function, as a global may be defined again
+  functions: Defined[];
   // Each global named, by its absolute name, assigned or read, and each
   // column that may be one; passed if named by a symbol
   globals: (Span & { full: string; passed: boolean })[];
@@ -42,9 +45,11 @@ export type Entry = {
 export function entry(text: string, a: Annotated): Entry {
   const lines = lineStarts(text);
   const all = targets(a);
+  const every = globals(text, a, true);
   const out: Entry = {
     lines,
-    defined: globals(text, a),
+    defined: firsts(every),
+    functions: every.filter((d) => d.kind === "function"),
     globals: [],
     exports: [],
   };
@@ -317,8 +322,10 @@ export type Signature = {
 
 // The signatures for the innermost call the offset is in that has any, and
 // the parameter it's at: a call's are the hover's for its name, q's forms
-// first, then each definition that's a function. A call with none, as an
-// index, a local or a variable, gives way to the next call out
+// first, then, for each global the hover lists, every definition in its
+// file that's a function, the latest first, as it's what the global holds
+// once the file has loaded. A call with none, as an index, a local or a
+// variable, gives way to the next call out
 export function signatures(
   index: Index,
   file: string,
@@ -333,7 +340,20 @@ export function signatures(
     if (builtin) {
       for (const form of builtin.forms) out.push({ ...parsed(form), builtin });
     }
-    for (const d of defined) {
+    // Each file's definitions of a global; an export written in its
+    // module's export as itself
+    const functions = defined.flatMap((d) => {
+      const e = index.get(d.file);
+      const global = e?.defined.some(
+        (g) => g.nameSpan.start === d.nameSpan.start,
+      );
+      if (!global) return [d];
+      return (e?.functions ?? [])
+        .filter((f) => f.full === d.full && f.inLambda === d.inLambda)
+        .reverse()
+        .map((f) => ({ ...f, file: d.file }));
+    });
+    for (const d of functions) {
       if (d.kind !== "function" || !d.signature) continue;
       let label = `${d.full}[`;
       const params: [number, number][] = [];

@@ -77,7 +77,8 @@ read.
 - Parameter hints: typing a call's arguments in brackets, as `f[a;b]`,
   shows its signature with the current parameter highlighted, in VS Code's
   own widget: each of q's forms for the name, then each definition's,
-  nearest first, ↑ and ↓ to move between them. Inside an argument that indexes,
+  nearest file first and, in a file that defines it again, the latest
+  first, ↑ and ↓ to move between them. Inside an argument that indexes,
   as ``t[`c]``, the call's own stays. Ctrl+Shift+Space (Cmd+Shift+Space on
   macOS) shows it again, and `editor.parameterHints.enabled` turns it off.
   q's functions KX writes only in prefix notation, as `.Q.s1 x`, show in
