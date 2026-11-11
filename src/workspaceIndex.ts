@@ -32,7 +32,7 @@ export type Entry = {
   // dictionary literal, each where its value is defined in the file
   // and, for a lambda written in it, as ([f:{[a;b] a}]), its parameters
   export?: Span & {
-    keys?: (Span & { key: string; value: Span; params?: string[] })[];
+    keys?: (Span & { key: string; value: Span; signature?: string[] })[];
   };
 };
 
@@ -78,7 +78,7 @@ export function entry(text: string, a: Annotated): Entry {
           ...span,
           value: d ? { start: d.start, end: d.end } : span,
           ...(target && "lambda" in target
-            ? { params: target.lambda.params }
+            ? { signature: target.lambda.signature }
             : {}),
         };
       });
@@ -287,13 +287,13 @@ export function hover(
       .get(l.file)
       ?.defined.find((d) => d.nameSpan.start === l.start);
     if (d) return { ...d, file: l.file };
-    const params = index
+    const signature = index
       .get(l.file)
-      ?.export?.keys?.find((k) => k.start === l.start)?.params;
+      ?.export?.keys?.find((k) => k.start === l.start)?.signature;
     return {
       full: wanted.key,
-      ...(params
-        ? { kind: "function", detail: `[${params.join(";")}]` }
+      ...(signature
+        ? { kind: "function", detail: `[${signature.join(";")}]` }
         : { kind: "variable" }),
       span: span(l),
       nameSpan: span(l),

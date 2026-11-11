@@ -49,6 +49,14 @@ suite("outline", () => {
       ["variable n: n:0", "function f [x]: f:{n::2}"],
     ],
     [
+      "parameters as written, typed and as patterns",
+      "f:{[a:`j;b] a}\ng:{[(src;dst);speed:`f;] 0}",
+      [
+        "function f [a:`j;b]: f:{[a:`j;b] a}",
+        "function g [(src;dst);speed:`f;]: g:{[(src;dst);speed:`f;] 0}",
+      ],
+    ],
+    [
       "namespaces, dotted and by \\d",
       ".u.init:{x}\n\\d .u\nsub:{[t;s] t}\n\\d .\ntop:1",
       [

@@ -9,7 +9,9 @@ hex:{raze string x}
 digest:{hex md5 "c"$read1 x}
 cases:{x where not (x like "/*") or 0=count each x} read0 `:scoping.q
 names:{string x where not null x}
-scope:{v:value value x; `params`locals`globals!(names v 1;names v 2;names 1_v 3)}
+/ An unnamed parameter, as in {[;b]} or {[]}, q names null or by its place
+unnamed:{{$[all x in .Q.n;"";x]} each string x}
+scope:{v:value value x; `params`locals`globals!(unnamed v 1;names v 2;names 1_v 3)}
 entry:{r:@[scope;x;{`$x}]; `line`scope!(x;$[-11h=type r;string r;r])}
 modfiles:`:modules/foo/init.q`:modules/foo/sub.q`:modules/dyn.q
 module:{r:@[use;x;{`$x}]; `module`export!(string x;$[-11h=type r;string r;99h=type r;string key r;"dynamic"])}

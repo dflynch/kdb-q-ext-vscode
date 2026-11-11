@@ -18,8 +18,12 @@ export type Role =
 export type Lambda = {
   open: Token;
   close?: Token;
-  // The explicit list, or x, y and z up to the highest the body uses
+  // The name each parameter binds, "" if none, as in [;b] or [(a;b)]; or
+  // x, y and z up to the highest the body uses
   params: string[];
+  // Each parameter as the signature writes it, as a:`j or (a;b), or as
+  // params for x, y and z
+  signature: string[];
   implicit: boolean;
   locals: Set<string>;
   // Where its globals resolve: "" for the root, else as ".foo"
@@ -114,6 +118,16 @@ type Item = Token | Group;
 
 const isGroup = (item: Item | undefined): item is Group =>
   item !== undefined && "items" in item;
+
+// Where an item is written: a group to its close, or, if it has none, to the
+// end of what's in it
+const startOf = (item: Item) => (isGroup(item) ? item.open.start : item.start);
+const endOf = (item: Item): number => {
+  if (!isGroup(item)) return item.end;
+  if (item.close) return item.close.end;
+  const last = item.items[item.items.length - 1];
+  return last ? endOf(last) : item.open.end;
+};
 
 // Brackets deeper than this stay tokens, so the walk's recursion is bounded
 const deepest = 256;
@@ -345,6 +359,7 @@ export function annotate(
       open: group.open,
       ...(group.close ? { close: group.close } : {}),
       params: [],
+      signature: [],
       implicit: true,
       locals: new Set(),
       namespace: context.namespace,
@@ -360,16 +375,51 @@ export function annotate(
     let body = group.items;
     if (opens(body[0], "[")) {
       l.implicit = false;
-      for (const item of body[0].items) {
-        const name = nameOf(item);
-        if (name) {
-          l.params.push(word(name));
-          enter(name, inner, { declares: true });
-        }
+      for (const s of segments(body[0].items)) {
+        l.params.push(bind(s, inner, { declares: true }));
+        l.signature.push(
+          s.length ? text.slice(startOf(s[0]), endOf(s[s.length - 1])) : "",
+        );
       }
       body = body.slice(1);
     }
     walk(body, inner);
+  };
+
+  // A pattern, as in a parameter list or on the left of :, and the name it
+  // binds, or "" if none. A name binds alone or with a type or filter after
+  // its colon, which is code the lambda runs on the value; (p) is p, a list
+  // (p;q) and a dictionary ([k;v:p]) or table ([] c:p) bind their names as
+  // locals; anything else is code whose value the argument must match
+  const bind = (segment: Item[], context: Context, how: Partial<Entry>) => {
+    const [first, op] = segment;
+    const name = nameOf(first);
+    if (name && (!op || word(op) === ":")) {
+      enter(name, context, how);
+      walk(segment.slice(2), context);
+      return word(name);
+    }
+    const group = segment.length === 1 && opens(first, "(") ? first : null;
+    if (group && opens(group.items[0], "[")) {
+      const [keys, ...rest] = group.items as [Group, ...Item[]];
+      const key = rest.length === 0 ? "key" : "column";
+      for (const s of [...segments(keys.items), ...segments(rest)]) {
+        const k = nameOf(s[0]);
+        if (k && s.length > 1 && word(s[1]) === ":") {
+          enter(k, context, { key });
+          bind(s.slice(2), context, { assign: ":" });
+        } else {
+          bind(s, context, { assign: ":" });
+        }
+      }
+    } else if (group) {
+      const parts = segments(group.items);
+      if (parts.length === 1) return bind(parts[0], context, how);
+      for (const s of parts) bind(s, context, { assign: ":" });
+    } else {
+      walk(segment, context);
+    }
+    return "";
   };
 
   // Arguments of @[...] and .[...]: the first is a handle, or the root with
@@ -709,6 +759,7 @@ export function annotate(
   for (const l of out.lambdas) {
     if (l.implicit) {
       l.params = ["x", "y", "z"].slice(0, Math.max(highest.get(l) ?? 0, 1));
+      l.signature = l.params;
     }
     for (const p of l.params) l.locals.delete(p);
   }

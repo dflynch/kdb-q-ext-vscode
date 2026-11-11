@@ -8,6 +8,14 @@
 {z}
 {1}
 {[] 1}
+/ Patterns: a list, dictionary or constant gives an unnamed parameter. q
+/ compiles a typed one, as a:`j, so too, with a local: annotate names tests it
+{[;b] b}
+{[a;;b] a}
+{[(a;b);c] a+b+c}
+{[([k;v])] k+v}
+{[1;b] b}
+{[a b] a}
 {{y}}
 {x+{z}}
 / Not from names q compiles to symbols: columns and keys

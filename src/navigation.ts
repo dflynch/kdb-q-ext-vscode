@@ -153,7 +153,7 @@ export function globals(text: string, a: Annotated): Defined[] {
         : l?.close?.start === tokens[close - 1].start;
     if (l && whole) {
       item.kind = "function";
-      item.detail = `[${l.params.join(";")}]`;
+      item.detail = `[${l.signature.join(";")}]`;
     } else if (
       isAssign(op) &&
       word(value) === "use" &&
