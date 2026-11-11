@@ -10,7 +10,8 @@ import { type Script, scan, type Token } from "./scanner";
 export type Outlined = {
   name: string;
   kind: "namespace" | "function" | "variable" | "module";
-  // A function's parameters, as [x;y], or a module's use`foo
+  // A function's signature, each parameter as written, as [x;y] or
+  // [a:`j;b], or a module's use`foo
   detail?: string;
   // As a definition's; a namespace spans its run of globals, and is named
   // where its first is
@@ -87,7 +88,8 @@ export type Span = { start: number; end: number };
 export type Defined = {
   full: string;
   kind: "function" | "variable" | "module";
-  // A function's parameters, as [x;y], or a module's use`foo
+  // A function's signature, each parameter as written, as [x;y] or
+  // [a:`j;b], or a module's use`foo
   detail?: string;
   // The whole definition: from the name, a handle's backtick, or the set
   // of set[`f;x], to the end of its value

@@ -2,20 +2,24 @@
 / parameters, locals and globals q itself finds in each (value on the lambda)
 / into scoping.json. Lines starting with / are notes, skipped. Not loaded as a
 / script: q only compiles each line.
-/ Parameters: explicit, implicit up to the highest used, none
+/ Parameters: explicit, implicit up to the highest used, none, and an empty
+/ list, one unnamed parameter
 {[a;b] a+b}
 {x+y}
 {z}
 {1}
 {[] 1}
 / Patterns: a list, dictionary or constant gives an unnamed parameter. q
-/ compiles a typed one, as a:`j, so too, with a local: annotate names tests it
+/ compiles a typed one, as a:`j, so too, with a local: annotate parameter
+/ lists tests it. A keyword is a value to match, but those q binds
 {[;b] b}
 {[a;;b] a}
 {[(a;b);c] a+b+c}
 {[([k;v])] k+v}
 {[1;b] b}
 {[a b] a}
+{[til;count] 0}
+{[do;if;while;from;by;.z.s] 0}
 {{y}}
 {x+{z}}
 / Not from names q compiles to symbols: columns and keys

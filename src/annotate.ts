@@ -112,6 +112,8 @@ export const keywords: ReadonlySet<string> = new Set(
 const queries = new Set(["select", "exec", "update", "delete"]);
 // Keywords only in a query: elsewhere they're names, as (a;from)
 const queryWords = new Set(["from", "by"]);
+// Keywords a parameter list binds, as q 5 does; any other is a value to match
+const bindable = new Set(["do", "if", "while", "from", "by", ".z.s"]);
 
 type Group = { open: Token; items: Item[]; close?: Token };
 type Item = Token | Group;
@@ -408,16 +410,16 @@ export function annotate(
     walk(body, inner);
   };
 
-  // A pattern, as in a parameter list or on the left of :, and the name it
-  // binds, or "" if none. A name binds alone or with a type or filter after
-  // its colon, which is code the lambda runs on the value, but a keyword
-  // never does, but from and by; (p) is p, a list (p;q) and a dictionary
-  // ([k;v:p]) or table ([] c:p) bind their names as locals; anything else is
-  // code whose value the argument must match
+  // A parameter, read as a pattern, and the name it binds, or "" if none (q
+  // reads the left of : the same way; pattern() reads that). A name binds
+  // alone or with a type or filter after its colon, which is code the lambda
+  // runs on the value; a keyword doesn't, except those q binds; (p) is p, a
+  // list (p;q) and a dictionary ([k;v:p]) or table ([] c:p) bind their names
+  // as locals; anything else is code whose value the argument must match
   const bind = (segment: Item[], context: Context, how: Partial<Entry>) => {
     const [first, op] = segment;
     const name = nameOf(first);
-    const keyword = keywords.has(word(name)) && !queryWords.has(word(name));
+    const keyword = keywords.has(word(name)) && !bindable.has(word(name));
     if (name && !keyword && (!op || word(op) === ":")) {
       enter(name, context, how);
       walk(segment.slice(2), context);

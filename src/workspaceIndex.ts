@@ -30,7 +30,8 @@ export type Entry = {
   exports: (Span & { module: string; key: string })[];
   // The module's own export, if the file assigns one: its keys when it's a
   // dictionary literal, each where its value is defined in the file
-  // and, for a lambda written in it, as ([f:{[a;b] a}]), its parameters
+  // and, for a lambda written in it, as ([f:{[a;b] a}]), its signature:
+  // each parameter as written
   export?: Span & {
     keys?: (Span & { key: string; value: Span; signature?: string[] })[];
   };
