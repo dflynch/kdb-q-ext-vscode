@@ -75,7 +75,8 @@ suite("hover", () => {
 
   test("a global defined again in its file: the latest", async () => {
     assert.deepStrictEqual(await hovered("code/again.q", 6, 1), [
-      "\n```q\n/ Subtract d from c\nop[c;d]\n```\n\n\n" +
+      "\n```q\nop[c;d]\n```\n" +
+        "\n```q\n/ Subtract d from c\n```\n\n\n" +
         "[1 more definition](command:kdb-q-ext-vscode.peekDefinitions?" +
         encodeURIComponent(
           JSON.stringify([file("code/again.q").toString(), 5, 0]),
