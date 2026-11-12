@@ -813,12 +813,14 @@ export function annotate(
       for (const s of segments(value.items[0].items)) {
         const [k, op] = s;
         const name = nameOf(k);
-        // A name alone is its own key and value, as ([f;g]) is ([f:f;g:g])
+        // A name alone is its own value, keyed by its last part, as
+        // ([f;.ns.g]) is ([f:f;g:.ns.g])
         const alone = name && s.length === 1;
         if (!name || (!alone && word(op) !== ":")) continue;
         const t = target(alone ? s : s.slice(2));
+        const key = word(name);
         keys.push({
-          key: word(name),
+          key: alone ? key.slice(key.lastIndexOf(".") + 1) : key,
           start: name.start,
           end: name.end,
           ...(t ? { target: t } : {}),

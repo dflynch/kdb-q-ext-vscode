@@ -26,7 +26,8 @@ function complete(files: Record<string, string>, newline: string) {
   );
   if (!found) return undefined;
   return {
-    replaced: cursor.text.slice(found.range.start, found.range.end),
+    replaced: cursor.text.slice(found.inserting.start, found.inserting.end),
+    whole: cursor.text.slice(found.replacing.start, found.replacing.end),
     items: new Map(found.items.map((c) => [c.label, c])),
   };
 }
@@ -106,21 +107,29 @@ for (const [ending, newline] of [
       );
     });
 
-    test("after \\d, the namespace's by their names in it", () => {
+    test("after \\d, only the namespace's, by their names in it", () => {
       const files = {
         "/w/a.q": "\\d .ns\nf:1\n|",
-        "/w/b.q": ".ns.g:{x}\n.other.h:1\nr:1",
+        "/w/b.q": ".ns.g:{x}\n.ns.sub.k:1\n.other.h:1\nr:1",
       };
-      assert.deepStrictEqual(offered(at(files), ["f", "g", "h", "r"]), {
-        f: "variable 1",
-        g: "function 1",
-        h: "-",
-        r: "variable 1",
-      });
+      // q reads r there as .ns.r: the root's isn't seen (q 5)
+      assert.deepStrictEqual(
+        offered(at(files), ["f", "g", "sub", "sub.k", "h", "r", "count"]),
+        {
+          f: "variable 1",
+          g: "function 1",
+          sub: "namespace 1",
+          "sub.k": "-",
+          h: "-",
+          r: "-",
+          count: "keyword 2",
+        },
+      );
       const back = { ...files, "/w/a.q": "\\d .ns\nf:1\n\\d .\n|" };
-      assert.deepStrictEqual(offered(at(back), ["f", "g"]), {
+      assert.deepStrictEqual(offered(at(back), ["f", "g", "r"]), {
         f: "-",
         g: "-",
+        r: "variable 1",
       });
     });
 
@@ -135,6 +144,47 @@ for (const [ending, newline] of [
       const found = at({ "/w/a.q": "g:1\nx:|" });
       assert.strictEqual(found?.replaced, "");
       assert.deepStrictEqual(offered(found, ["g"]), { g: "variable 1" });
+    });
+
+    test("a parameter over a global of its name", () => {
+      assert.deepStrictEqual(
+        offered(at({ "/w/a.q": "g:1\nh:{[g] |}" }), ["g"]),
+        { g: "param 0" },
+      );
+    });
+
+    test("in a file broken mid-edit", () => {
+      assert.deepStrictEqual(
+        offered(at({ "/w/a.q": "x:(1;2\ng:1]\nh:{[p] |}" }), ["p", "g"]),
+        { p: "param 0", g: "variable 1" },
+      );
+    });
+
+    test("a lambda left open, on an indented line after it", () => {
+      assert.deepStrictEqual(
+        offered(at({ "/w/a.q": "f:{[a]\n  b:1;\n  |" }), ["a", "b"]),
+        { a: "param 0", b: "local 0" },
+      );
+      assert.deepStrictEqual(
+        offered(at({ "/w/a.q": "f:{[a]\n  b:1;\n\n  |" }), ["a"]),
+        { a: "param 0" },
+      );
+      // At column 0, a new statement starts
+      assert.deepStrictEqual(
+        offered(at({ "/w/a.q": "f:{[a]\n  b:1;\n|" }), ["a", "b"]),
+        { a: "-", b: "-" },
+      );
+    });
+
+    test("inside a name, replacing the whole of it", () => {
+      const found = at({ "/w/a.q": "f:{[abc] a|b}" });
+      assert.strictEqual(found?.replaced, "a");
+      assert.strictEqual(found?.whole, "ab");
+      const dotted = at({ "/w/a.q": ".ns.f:1\nx:.n|s.f" });
+      assert.strictEqual(dotted?.replaced, ".n");
+      assert.strictEqual(dotted?.whole, ".ns.f");
+      const symbol = at({ "/w/a.q": ".ns.f:1\nx:`.n|s.f`b" });
+      assert.strictEqual(symbol?.whole, ".ns.f");
     });
 
     test("just after a string's close", () => {
@@ -227,14 +277,24 @@ for (const [ending, newline] of [
         "s.v": "variable 1",
       });
       assert.strictEqual(found?.items.get("s.f")?.defined?.detail, "[a;b]");
-      // Bound in another file
+      // Bound in another file, none, as Go to Definition follows only a
+      // module bound in the file
       const elsewhere = {
         ...files,
         "/w/b.q": "t:use`mod",
         "/w/a.q": "x:t.|",
       };
-      assert.deepStrictEqual(offered(at(elsewhere), ["t.f"]), {
-        "t.f": "function 1",
+      assert.deepStrictEqual(offered(at(elsewhere), ["t.f"]), { "t.f": "-" });
+    });
+
+    test("a module's export of a dotted name alone, by its last part", () => {
+      const found = at({
+        "/w/mod.q": ".ns.k:5\nexport:([.ns.k])",
+        "/w/a.q": "s:use`mod\nx:s.|",
+      });
+      assert.deepStrictEqual(offered(found, ["s.k", "s..ns.k"]), {
+        "s.k": "variable 1",
+        "s..ns.k": "-",
       });
     });
 
@@ -279,6 +339,10 @@ for (const [ending, newline] of [
       ["in another language's line", "p)g|"],
       ["in a k line", "k)g|"],
       ["after the script's end", "g:1\n\\\ng|"],
+      ["after spaces in a string left open", 'g:1\nx:"a |'],
+      ["after spaces in a trailing comment", "g:1\nx:1 / note |"],
+      ["after spaces in another language's line", "g:1\np)x = |"],
+      ["after spaces in a system command", "g:1\n\\l |"],
     ]) {
       test(what, () => {
         assert.strictEqual(at({ "/w/a.q": source }), undefined);

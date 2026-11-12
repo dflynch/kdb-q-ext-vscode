@@ -14,6 +14,8 @@ async function offered(d: vscode.TextDocument, trigger?: string) {
     d.uri,
     d.positionAt(d.getText().length),
     trigger,
+    // Resolve each, for its documentation
+    10000,
   );
   return new Map(
     list.items.map((i) => [
@@ -25,8 +27,8 @@ async function offered(d: vscode.TextDocument, trigger?: string) {
 
 const replaced = (d: vscode.TextDocument, i: vscode.CompletionItem) => {
   const r = i.range;
-  assert.ok(r instanceof vscode.Range);
-  return d.getText(r);
+  assert.ok(r && !(r instanceof vscode.Range));
+  return d.getText(r.inserting);
 };
 
 const documented = (i: vscode.CompletionItem | undefined) => {

@@ -11,7 +11,13 @@ import type { Annotated, Lambda } from "./annotate";
 import { type Builtin, builtins } from "./builtins";
 import type { Span } from "./navigation";
 import type { Token } from "./scanner";
-import { type Index, type Listed, nearest, resolve } from "./workspaceIndex";
+import {
+  exported,
+  type Index,
+  type Listed,
+  preferred,
+  resolve,
+} from "./workspaceIndex";
 
 export type Completion = {
   // As inserted, and as typed text is matched against: the whole name
@@ -31,19 +37,20 @@ export type Completion = {
   defined?: Listed;
 };
 
-// The completions at the offset, and the text they replace: the name typed
-// up to it, from its first character, dots and all
+// The completions at the offset, and the text they go in place of: the name
+// typed up to it, from its first character, dots and all, inserting, and
+// the whole name, replacing, as VS Code's editor.suggest.insertMode chooses
 export function completions(
   index: Index,
   file: string,
   text: string,
   a: Annotated,
   offset: number,
-): { range: Span; items: Completion[] } | undefined {
+): { inserting: Span; replacing: Span; items: Completion[] } | undefined {
   const typed = typing(text, a, offset);
   if (typed === undefined) return undefined;
-  const { prefix, symbol } = typed;
-  const range = { start: offset - prefix.length, end: offset };
+  const { prefix, symbol, end } = typed;
+  const start = offset - prefix.length;
   const namespace = namespaceAt(a, offset);
   const dot = prefix.lastIndexOf(".");
   let items: Completion[];
@@ -56,48 +63,77 @@ export function completions(
   } else {
     items = bare(index, file, namespace, lambdaAt(text, a, offset));
   }
-  return { range, items };
+  return {
+    inserting: { start, end: offset },
+    replacing: { start, end },
+    items,
+  };
 }
 
-// The name being typed, or an empty one where a name could start, or
-// undefined where nothing's offered
+// Nothing typed yet, where a name could start
+const nothing = (offset: number) => ({
+  prefix: "",
+  symbol: false,
+  end: offset,
+});
+
+// The name being typed up to the offset, and where the whole of it ends;
+// an empty one where a name could start; or undefined where nothing's
+// offered
 function typing(
   text: string,
   a: Annotated,
   offset: number,
-): { prefix: string; symbol: boolean } | undefined {
+): { prefix: string; symbol: boolean; end: number } | undefined {
   if (ended(text, a, offset)) return undefined;
   const t = tokenAt(a, offset);
-  if (!t) return { prefix: "", symbol: false };
+  if (!t) {
+    // Past spaces after a comment, a command, another language's line or a
+    // string left open, which run to the end of the line, still in it
+    let at = offset;
+    while (text[at - 1] === " " || text[at - 1] === "\t") at--;
+    const before = at < offset ? tokenAt(a, at) : undefined;
+    return before && !open(before) ? undefined : nothing(offset);
+  }
   switch (t.kind) {
     case "name":
-      return { prefix: text.slice(t.start, offset), symbol: false };
+      return { prefix: text.slice(t.start, offset), symbol: false, end: t.end };
     case "symbol": {
       // The symbol from its last backtick before the offset, if it names a
       // namespace: anything else is data, as `a or `:file
       const from = text.lastIndexOf("`", offset - 1) + 1;
       const prefix = text.slice(from, offset);
-      return prefix.startsWith(".") ? { prefix, symbol: true } : undefined;
+      const next = text.indexOf("`", offset);
+      const end = next < 0 || next > t.end ? t.end : next;
+      return prefix.startsWith(".") ? { prefix, symbol: true, end } : undefined;
     }
     case "operator":
       // A dot alone, as a namespace starts: q's . otherwise, which is rare
       // before a name
       return text.slice(t.start, offset) === "."
-        ? { prefix: ".", symbol: false }
-        : { prefix: "", symbol: false };
+        ? { prefix: ".", symbol: false, end: offset }
+        : nothing(offset);
+    default:
+      return open(t) && offset === t.end ? nothing(offset) : undefined;
+  }
+}
+
+// Whether a name can follow the token: not in a comment, a number, a
+// command, k, another language's line or a string left open
+function open(t: Token): boolean {
+  switch (t.kind) {
     case "string":
-      // Just after a string's close is outside it
-      return t.unterminated || offset < t.end
-        ? undefined
-        : { prefix: "", symbol: false };
+      return !t.unterminated;
     case "open":
     case "close":
     case "separator":
     case "iterator":
-      return { prefix: "", symbol: false };
+    case "operator":
+    case "name":
+    case "symbol":
+      return true;
     default:
-      // A comment, a number, a command, k or another language's line
-      return undefined;
+      return false;
   }
 }
 
@@ -139,7 +175,8 @@ function namespaceAt(a: Annotated, offset: number): string {
 }
 
 // The innermost lambda the offset is in: after its open, up to its close,
-// or, if there's none yet, the end of its statement's last line
+// or, if there's none yet, its statement, with the indented lines after it
+// that q would join on, blank so far
 function lambdaAt(
   text: string,
   a: Annotated,
@@ -148,38 +185,40 @@ function lambdaAt(
   let found: Lambda | undefined;
   for (const l of a.lambdas) {
     if (l.open.end > offset) continue;
-    const end = l.close?.start ?? statementEnd(text, a, l.open.start);
-    if (offset <= end && (!found || l.open.start > found.open.start)) {
-      found = l;
-    }
+    const inside = l.close
+      ? offset <= l.close.start
+      : continues(text, a, l.open.start, offset);
+    if (inside && (!found || l.open.start > found.open.start)) found = l;
   }
   return found;
 }
 
-// The end of the statement's last line, past spaces after it, as a call's
-// end is
-function statementEnd(text: string, a: Annotated, at: number): number {
+// Whether the offset is in the statement at, or after it on its last line,
+// or on an indented line after it with only spaces between
+function continues(
+  text: string,
+  a: Annotated,
+  at: number,
+  offset: number,
+): boolean {
   const s = a.script.statements.find((s) => s.start <= at && at < s.end);
-  let end = s ? s.end : at;
-  while (text[end] === " " || text[end] === "\t") end++;
-  return end;
+  if (!s || offset <= s.end) return true;
+  const between = text.slice(s.end, offset);
+  if (!/^\s*$/.test(between)) return false;
+  // Lines break at \n, as q's do: a lone \r is a space
+  const line = between.slice(between.lastIndexOf("\n") + 1);
+  return !between.includes("\n") || line.length > 0;
 }
 
-// Each global's definition the hover would show first: at top level before
-// in a lambda, then the nearest file's, then the latest
+// Each global's definition the hover would show first
 function globals(index: Index, file: string): Map<string, Listed> {
-  const order = nearest(file);
+  const better = preferred(file);
   const out = new Map<string, Listed>();
   for (const [f, e] of index) {
     for (const d of e.defined) {
       const had = out.get(d.full);
-      const better =
-        !had ||
-        (had.inLambda && !d.inLambda) ||
-        (had.inLambda === d.inLambda &&
-          (order(f, had.file) < 0 ||
-            (f === had.file && d.nameSpan.start > had.nameSpan.start)));
-      if (better) out.set(d.full, { ...d, file: f });
+      const listed = { ...d, file: f };
+      if (!had || better(listed, had) < 0) out.set(d.full, listed);
     }
   }
   return out;
@@ -202,8 +241,9 @@ const ofBuiltin = (label: string, builtin: Builtin): Completion => ({
   builtin,
 });
 
-// A bare name: the lambda's parameters and locals, the globals in the root,
-// or, after \d, the namespace's by their names in it, and q's keywords
+// A bare name: the lambda's parameters and locals; the globals in the root,
+// or, after \d, the namespace's, by their names in it, and its namespaces,
+// as q reads names there and nowhere else; and q's keywords
 function bare(
   index: Index,
   file: string,
@@ -220,17 +260,12 @@ function bare(
     }
     for (const l of lambda.locals) add({ label: l, kind: "local", group: 0 });
   }
-  const all = globals(index, file);
   if (namespace) {
-    for (const [full, d] of all) {
-      const name = full.slice(namespace.length + 1);
-      if (full.startsWith(`${namespace}.`) && !name.includes(".")) {
-        add(ofDefined(name, d, 1));
-      }
+    for (const c of children(globals(index, file), namespace, "")) add(c);
+  } else {
+    for (const [full, d] of globals(index, file)) {
+      if (!full.includes(".")) add(ofDefined(full, d, 1));
     }
-  }
-  for (const [full, d] of all) {
-    if (!full.includes(".")) add(ofDefined(full, d, 1));
   }
   for (const [name, b] of builtins) {
     if (!name.includes(".")) add(ofBuiltin(name, b));
@@ -269,39 +304,25 @@ function members(
   written: string,
   namespace: string,
 ): Completion[] {
-  const all = globals(index, file);
   // As q reads it: a name without a leading dot is in the file's namespace
   const absolute =
     written.startsWith(".") || !namespace ? written : `${namespace}.${written}`;
-  const global = all.get(absolute);
-  const module =
-    global?.kind === "module"
-      ? global.detail?.match(/^use\s*`([^`]*)$/)?.[1]
-      : undefined;
+  // A module bound in this file, as Go to Definition follows only those
+  const module = index
+    .get(file)
+    ?.defined.findLast((d) => d.full === absolute && d.kind === "module")
+    ?.detail?.match(/^use\s*`([^`]*)$/)?.[1];
   if (module !== undefined) return exportsOf(index, file, written, module);
 
   const out = new Map<string, Completion>();
-  const child = (full: string) => {
-    const rest = full.slice(absolute.length + 1);
-    const dot = rest.indexOf(".");
-    return {
-      label: `${written}.${dot < 0 ? rest : rest.slice(0, dot)}`,
-      leaf: dot < 0,
-    };
-  };
-  for (const [full, d] of all) {
-    if (!full.startsWith(`${absolute}.`)) continue;
-    const { label, leaf } = child(full);
-    if (leaf) out.set(label, ofDefined(label, d, 1));
-    else if (!out.has(label)) {
-      out.set(label, { label, kind: "namespace", group: 1 });
-    }
+  for (const c of children(globals(index, file), absolute, `${written}.`)) {
+    out.set(c.label, c);
   }
   for (const [name, b] of builtins) {
-    if (!name.startsWith(`${absolute}.`)) continue;
-    const { label, leaf } = child(name);
-    if (!leaf) continue;
+    const rest = name.slice(absolute.length + 1);
+    if (!name.startsWith(`${absolute}.`) || rest.includes(".")) continue;
     // Your own definition of it, as .z.pg, beside q's entry
+    const label = `${written}.${rest}`;
     const had = out.get(label);
     out.set(label, {
       ...ofBuiltin(label, b),
@@ -311,8 +332,29 @@ function members(
   return [...out.values()];
 }
 
+// The globals directly in a namespace, and the namespaces in it, each
+// labelled by its name in it after the written prefix
+function children(
+  all: Map<string, Listed>,
+  namespace: string,
+  written: string,
+): Completion[] {
+  const out = new Map<string, Completion>();
+  for (const [full, d] of all) {
+    if (!full.startsWith(`${namespace}.`)) continue;
+    const rest = full.slice(namespace.length + 1);
+    const dot = rest.indexOf(".");
+    const label = written + (dot < 0 ? rest : rest.slice(0, dot));
+    if (dot < 0) out.set(label, ofDefined(label, d, 1));
+    else if (!out.has(label)) {
+      out.set(label, { label, kind: "namespace", group: 1 });
+    }
+  }
+  return [...out.values()];
+}
+
 // A module's exports, from each file use`mod may be, by their keys in its
-// export, as the hover has them
+// export, as the hover has them, of a module bound in the file
 function exportsOf(
   index: Index,
   file: string,
@@ -325,25 +367,10 @@ function exportsOf(
     for (const k of e?.export?.keys ?? []) {
       const label = `${written}.${k.key}`;
       if (out.has(label)) continue;
-      const value = k.values[0];
-      const d = e?.defined.find((d) => d.nameSpan.start === value?.start);
-      const defined: Listed = d
-        ? { ...d, full: k.key, file: m }
-        : {
-            full: k.key,
-            ...(k.signature
-              ? {
-                  kind: "function",
-                  detail: `[${k.signature.join(";")}]`,
-                  signature: k.signature,
-                }
-              : { kind: "variable" }),
-            span: { start: k.start, end: k.end },
-            nameSpan: { start: k.start, end: k.end },
-            inLambda: false,
-            file: m,
-          };
-      out.set(label, ofDefined(label, defined, 1));
+      out.set(
+        label,
+        ofDefined(label, exported(index, m, k.values[0], k.key), 1),
+      );
     }
   }
   return [...out.values()];

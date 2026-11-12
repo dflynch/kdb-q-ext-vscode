@@ -519,6 +519,17 @@ function linked(
   }
 }
 
+// A completion, with what its documentation is made from when it's shown
+class Suggested extends vscode.CompletionItem {
+  constructor(
+    readonly completion: Completion,
+    readonly from: vscode.Uri,
+    readonly index: Index,
+  ) {
+    super(completion.label);
+  }
+}
+
 export function registerLanguage(): vscode.Disposable {
   const selector: vscode.DocumentSelector = { language: "q" };
   const range = (d: vscode.TextDocument, { start, end }: Span) =>
@@ -693,32 +704,31 @@ export function registerLanguage(): vscode.Disposable {
             d.offsetAt(at),
           );
           if (!found) return undefined;
-          const replaced = range(d, found.range);
+          const inserting = range(d, found.inserting);
+          const replacing = range(d, found.replacing);
           return found.items.map((c) => {
-            const item = new vscode.CompletionItem(
-              c.label,
-              completionKinds[c.kind],
-            );
-            item.range = replaced;
+            const item = new Suggested(c, d.uri, index);
+            item.kind = completionKinds[c.kind];
+            item.range = { inserting, replacing };
             item.sortText = `${c.group}${c.label}`;
-            // As the hover has it: q's syntax, KX's line and link, then
-            // your own definition, its comment and file
-            const doc = new vscode.MarkdownString();
-            if (c.builtin) {
-              item.detail = c.builtin.summary;
-              codeblock(doc, c.builtin.syntax);
-              doc.appendMarkdown(`\n\n[code.kx.com](<${c.builtin.url}>)`);
-            }
-            if (c.builtin && c.defined) doc.appendMarkdown("\n\n---\n");
-            if (c.defined) {
-              if (!c.builtin && c.defined.detail) {
-                item.detail = c.defined.detail;
-              }
-              described(doc, c.defined, d.uri, index);
-            }
-            if (doc.value) item.documentation = doc;
+            item.detail = c.builtin?.summary ?? c.defined?.detail;
             return item;
           });
+        },
+        // As the hover has it: q's syntax, KX's line and link, then your
+        // own definition, its comment and file; only for the item shown
+        resolveCompletionItem: (item) => {
+          if (!(item instanceof Suggested)) return item;
+          const { completion: c, from, index } = item;
+          const doc = new vscode.MarkdownString();
+          if (c.builtin) {
+            codeblock(doc, c.builtin.syntax);
+            doc.appendMarkdown(`\n\n[code.kx.com](<${c.builtin.url}>)`);
+          }
+          if (c.builtin && c.defined) doc.appendMarkdown("\n\n---\n");
+          if (c.defined) described(doc, c.defined, from, index);
+          if (doc.value) item.documentation = doc;
+          return item;
         },
       },
       ".",
