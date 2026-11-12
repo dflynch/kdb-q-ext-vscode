@@ -19,6 +19,7 @@ suite("statements.flatten", () => {
       ["a:1", "b:2", "a+b", "f:{[a;b] a+b }", "f[10;30]"],
     ],
     ["CRLF line endings", "f:{\r\n  x}\r\nb:2", ["f:{ x}", "b:2"]],
+    ["a lone CR in a string, as an escape", 's:"a\rb"', ['s:"a\\rb"']],
     ["whitespace in strings", 's:"a  b\tc"', ['s:"a  b\tc"']],
 
     // Comments

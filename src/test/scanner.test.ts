@@ -126,6 +126,10 @@ suite("scanner layout", () => {
     ["shebang", "#!/usr/bin/env q\na:1", ["a:1"]],
     ["end of script", "a:1\n\\\nb:2", ["a:1"]],
     ["CRLF", "f:{\r\n  x}\r\nb", ["f:{\r\n  x}", "b"]],
+    // q reads a lone \r as whitespace, not a line break (q 5.0)
+    ["lone CR", "a:(1;\r2)\rb:3", ["a:(1;\r2)\rb:3"]],
+    ["lone CR, then a comment", "a:1\r/ (\rb", ["a:1\r/ (\rb"]],
+    ["lone CR at a line's start, not indentation", "f:{\n\r}", ["f:{", "}"]],
   ];
   for (const [name, text, expected] of cases) {
     test(name, () => {

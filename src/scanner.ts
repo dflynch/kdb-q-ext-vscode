@@ -50,9 +50,10 @@ const blockEnd = /^\\\s*$/;
 
 type Line = { start: number; text: string };
 
+// q breaks lines at \n, and \r\n; a lone \r is whitespace within a line
 function lines(text: string): Line[] {
   const out: Line[] = [];
-  const breaks = /\r\n|\n|\r/g;
+  const breaks = /\r?\n/g;
   let start = 0;
   for (let m = breaks.exec(text); m; m = breaks.exec(text)) {
     out.push({ start, text: text.slice(start, m.index) });
@@ -62,7 +63,9 @@ function lines(text: string): Line[] {
   return out;
 }
 
-const isSpace = (c: string | undefined) => c === " " || c === "\t";
+// A lone \r is whitespace, as before a "/" comment, but not indentation
+const isIndent = (c: string | undefined) => c === " " || c === "\t";
+const isSpace = (c: string | undefined) => isIndent(c) || c === "\r";
 const isDigit = (c: string | undefined) =>
   c !== undefined && c >= "0" && c <= "9";
 const isLetter = (c: string | undefined) =>
@@ -290,7 +293,7 @@ export function scan(text: string): Script {
       continue;
     }
 
-    const indented = isSpace(t[0]);
+    const indented = isIndent(t[0]);
 
     // A line inside a string continues it, unless it starts at column 0. An
     // empty line is in the string too

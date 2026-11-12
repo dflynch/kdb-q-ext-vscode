@@ -180,7 +180,8 @@ suite("documentation", () => {
     Object.fromEntries(
       globals(text, annotate(text)).map((d) => [d.full, d.doc]),
     );
-  const endings = { LF: "\n", CRLF: "\r\n", CR: "\r" };
+  // q's line breaks; a lone \r isn't one (see the scanner's tests)
+  const endings = { LF: "\n", CRLF: "\r\n" };
 
   // Every way to define a global, each with every placement of a comment,
   // at every line ending: the global's name, its line, and whether it's in
@@ -449,7 +450,8 @@ suite("references", () => {
 });
 
 suite("calls at the cursor", () => {
-  const endings = { LF: "\n", CRLF: "\r\n", CR: "\r" };
+  // q's line breaks; a lone \r isn't one (see the scanner's tests)
+  const endings = { LF: "\n", CRLF: "\r\n" };
   // Each call the cursor, |, is in, innermost first, as "name parameter"
   const found = (source: string) => {
     const offset = source.indexOf("|");

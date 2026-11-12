@@ -1,7 +1,8 @@
 import * as assert from "node:assert";
 import { syntaxErrors } from "../syntax";
 
-// Line and column from 1, as the editor shows them, whatever the line ending
+// Line and column from 1, as the editor shows them, whatever the line ending:
+// the editor breaks lines at a lone \r too, though q doesn't
 function at(text: string, offset: number): string {
   const before = text.slice(0, offset).split(/\r\n|\n|\r/);
   return `${before.length}:${before[before.length - 1].length + 1}`;
@@ -18,10 +19,10 @@ function shown(text: string): string[] {
   });
 }
 
+// q's line breaks; a lone \r is whitespace to q, below
 const endings: [string, string][] = [
   ["LF", "\n"],
   ["CRLF", "\r\n"],
-  ["CR", "\r"],
 ];
 
 // [script, what q signals loading it (q 5.0, by hand), what we show]
@@ -84,7 +85,29 @@ const cases: [string, string, string[]][] = [
   ["", "none", []],
 ];
 
+// A lone \r, which q reads as whitespace within a line, not a line break
+const lone: [string, string, string[]][] = [
+  ["a:(1;\r2)", "none: one line", []],
+  ["f:{x+1\r}", "none: one line", []],
+  ['s:"ab\rc"', "none: one line", []],
+  ["a:1 / (\rb:(2", "none: all a comment", []],
+  ["a:1\r/ (", "none: a comment after it", []],
+  ["a:(1;2)\r]", "'] at the ]", ["unmatched ] 2:1"]],
+  // At a line's start, it isn't indentation
+  [
+    "f:{x\n\r}",
+    "'{ at the end of line 1",
+    ["} expected 1:4 (unclosed { 1:3)", "unmatched } 3:1"],
+  ],
+];
+
 suite("syntax errors", () => {
+  for (const [script, q, expected] of lone) {
+    test(`${JSON.stringify(script)} (q: ${q})`, () => {
+      assert.deepStrictEqual(shown(script), expected);
+    });
+  }
+
   for (const [name, eol] of endings) {
     for (const [script, q, expected] of cases) {
       const text = script.replaceAll("\n", eol);

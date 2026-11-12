@@ -97,9 +97,9 @@ read.
   points, or at the close that ended it, as in `{(x+1}`), linked to where
   it opened, and a close with nothing to close, as `unmatched ]`. A line at
   column 0 starts a new statement, as in q, so a lambda's closing `}` there
-  is unmatched, and its `{` left open. Only open files are checked; set
-  `kdb-q-ext-vscode.diagnosticMode` to `workspace` to check every `.q` file
-  in the workspace too, as saved
+  is unmatched, and its `{` left open. Only files open in the editor's tabs
+  are checked; set `kdb-q-ext-vscode.diagnosticMode` to `workspace` to check
+  every `.q` file in the workspace too, as saved
 
 ### Servers
 
@@ -213,7 +213,6 @@ Closed Connection** to forget it.
 
 The status bar shows the active connection, and opens a menu of the server
 commands when clicked:
-
 - A plug, joined when connected and pulled apart when not, spinning while
   it connects or runs a query, and a warning color while the connection is
   closed, until it's dismissed or connected again
@@ -299,7 +298,6 @@ There's more of it than q's console shows: 1000 lines of 1000 characters by
 default, set by `consoleSize` as `\c` takes them, with `..` where it's cut,
 as q has. Nulls are left blank as q leaves them. Where the text differs from
 q's:
-
 - A cell in a table, a matrix or a dictionary is cut at 256 characters, so
   that one long value doesn't widen every line of its column
 - A table or matrix wider than the console ends in `..`, where q drops the
@@ -314,7 +312,6 @@ q's:
 current line, to the active terminal, such as a q session. The q REPL only
 accepts single-line input, so the selected text is sent one statement at a
 time, following the same rules as a q script:
-
 - A line starting at column 0 begins a new statement, and an indented line
   continues the previous one
 - Comments are removed, including block comments and everything after a lone

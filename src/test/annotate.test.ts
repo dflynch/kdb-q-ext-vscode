@@ -428,7 +428,6 @@ suite("annotate parameter lists", () => {
   for (const [ending, eol] of [
     ["LF", "\n"],
     ["CRLF", "\r\n"],
-    ["CR", "\r"],
   ]) {
     test(`across lines, ${ending}`, () => {
       for (const [list, params, signature] of forms) {
@@ -469,7 +468,6 @@ suite("annotate parameter lists", () => {
   for (const [ending, eol] of [
     ["LF", "\n"],
     ["CRLF", "\r\n"],
-    ["CR", "\r"],
   ]) {
     test(`a parameter across lines, ${ending}`, () => {
       const text = `f:{[a / a note${eol}  :\`j;b:f[1;${eol}  2];(c; / c${eol} d)] a}`;
