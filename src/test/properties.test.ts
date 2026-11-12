@@ -162,7 +162,7 @@ suite("properties", () => {
     }
   });
 
-  test("signatures are the innermost call's with any, as its hover has them", () => {
+  test("signatures are the innermost call's with any in the lambda, as its hover has them", () => {
     const random = randomly(3);
     for (let n = 0; n < 3000; n++) {
       const files: Record<string, string> = {
@@ -205,11 +205,22 @@ suite("properties", () => {
       for (let offset = -1; offset <= text.length + 1; offset++) {
         const context = JSON.stringify({ files, offset });
         const found = signatures(index, "/w/a.q", a, offset);
-        // The innermost call around the offset with any
+        // The innermost lambda around the offset, whose code is its own
+        const lambda = a.lambdas
+          .filter(
+            (l) =>
+              l.open.end <= offset &&
+              offset <= (l.close?.start ?? Number.POSITIVE_INFINITY),
+          )
+          .at(-1);
+        // The innermost call around the offset with any, inside that lambda
         let n = a.calls.length - 1;
         for (; n >= 0; n--) {
           const c = a.calls[n];
-          const inside = c.open.end <= offset && offset <= c.end;
+          const inside =
+            c.open.end <= offset &&
+            offset <= c.end &&
+            (!lambda || c.open.start > lambda.open.start);
           if (inside && labels[n].length) break;
         }
         if (n < 0) {

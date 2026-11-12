@@ -80,7 +80,8 @@ read.
   own widget: each of q's forms for the name, then each definition's,
   nearest file first and, in a file that defines it again, the latest
   first, ↑ and ↓ to move between them. Inside an argument that indexes,
-  as ``t[`c]``, the call's own stays. Ctrl+Shift+Space (Cmd+Shift+Space on
+  as ``t[`c]``, the call's own stays; inside a lambda, as in
+  `f[1;{x+y}]`, only the lambda's own calls show one. Ctrl+Shift+Space (Cmd+Shift+Space on
   macOS) shows it again, and `editor.parameterHints.enabled` turns it off.
   q's functions KX writes only in prefix notation, as `.Q.s1 x`, show in
   bracket notation, `.Q.s1[x]`; a call written in prefix or infix notation,

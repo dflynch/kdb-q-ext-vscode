@@ -460,8 +460,9 @@ suite("calls at the cursor", () => {
     ["a keyword", "ssr[A;B]", "ssr"],
     ["a name in .Q", ".Q.s1[A;B]", ".Q.s1"],
   ];
-  // Where the cursor is, as A and B, and the parameter it's at
-  const positions: [string, string, string, number][] = [
+  // Where the cursor is, as A and B, and the parameter it's at, if it's in
+  // the call's own code
+  const positions: [string, string, string, number | undefined][] = [
     ["just after the bracket", "|", "", 0],
     ["before a separator", "1|", "2", 0],
     ["after a separator", "1", "|2", 1],
@@ -469,7 +470,11 @@ suite("calls at the cursor", () => {
     ["in a string holding a separator", '"a;|b"', "2", 0],
     ["in a comment holding a separator", "1 / a;|b\n ", "2", 0],
     ["in a list's brackets", "(1;|2)", "3", 0],
-    ["in a lambda's", "{x;|y}", "3", 0],
+    ["in a lambda's", "{x;|y}", "3", undefined],
+    ["in a lambda's over lines", "{[a]\n  b:a;|\n  b}", "3", undefined],
+    ["in a lambda's parameters", "{[a;|b] a}", "3", undefined],
+    ["in a lambda not closed", "{x;|", "", undefined],
+    ["after a lambda", "{x;y}|", "3", 0],
     ["after a call in it", "g[1;2]|", "3", 0],
   ];
   for (const [form, written, name] of forms) {
@@ -477,7 +482,11 @@ suite("calls at the cursor", () => {
       test(`${form}: ${position}`, () => {
         const source = written.replace("A", a).replace("B", b);
         const all = found(source);
-        assert.strictEqual(all[0], `${name} ${active}`, source);
+        if (active === undefined) {
+          assert.ok(!all.some((c) => c.startsWith(`${name} `)), source);
+        } else {
+          assert.strictEqual(all[0], `${name} ${active}`, source);
+        }
         everywhere(source, all);
       });
     }
@@ -487,6 +496,8 @@ suite("calls at the cursor", () => {
     ["each call it's in", "f[a; t[`c|]]", ["t 0", "f 1"]],
     ["an index after it", "f[a; x[1]|]", ["f 1"]],
     ["calls in a call not closed", "f[1; g[2;|", ["g 1", "f 1"]],
+    ["a call in a lambda in a call", "f[1; {g[x;|y]}]", ["g 1"]],
+    ["a call around a lambda in a call", "h[f[1; {x;|y}]]", []],
     ["the end of a call's last line", "f[1; |  ", ["f 1"]],
     ["past the last parameter", "f[1;2;|3]", ["f 2"]],
     ["empty brackets", "f[|]", ["f 0"]],

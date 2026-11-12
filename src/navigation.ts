@@ -444,13 +444,21 @@ export function occurrences(a: Annotated, offset: number): Occurrence[] {
 // The calls whose brackets the offset is in, innermost first, each with the
 // parameter it's at: how many of the call's own separators are before it.
 // In is after the open, up to the close, or the end of the statement's last
-// line if there's none yet
+// line if there's none yet. A lambda in a call's arguments is code of its
+// own, so only calls inside the lambda count there
 export function callsAt(
   a: Annotated,
   offset: number,
 ): { call: Call; active: number }[] {
+  const inLambda = (c: Call) =>
+    a.lambdas.some(
+      (l) =>
+        c.open.end <= l.open.start &&
+        l.open.end <= offset &&
+        offset <= (l.close?.start ?? Number.POSITIVE_INFINITY),
+    );
   return a.calls
-    .filter((c) => c.open.end <= offset && offset <= c.end)
+    .filter((c) => c.open.end <= offset && offset <= c.end && !inLambda(c))
     .reverse()
     .map((call) => ({
       call,
