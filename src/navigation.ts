@@ -304,8 +304,8 @@ export type Target = {
   // A column's variable, if the table has no such column
   maybe?: string;
   defines: boolean;
-  // Can create it, as an amend of an existing value can't
-  creates: boolean;
+  // Sets its whole value, so is where it's defined, as an amend isn't
+  sets: boolean;
   // In a lambda, rather than run as the file loads
   inLambda: boolean;
   // A global named by a symbol, as `t in `t insert x
@@ -350,7 +350,7 @@ function targetsOf(a: Annotated): Target[] {
       ? { maybe: scoped(n.variable.role, n.variable.full, n.lambda) }
       : {}),
     defines: n.defines === true,
-    creates: n.defines === true && !n.amends,
+    sets: n.defines === true && !n.amends,
     inLambda: n.lambda !== undefined,
     passed: false,
   }));
@@ -363,7 +363,7 @@ function targetsOf(a: Annotated): Target[] {
           ? `global ${h.full}`
           : `export ${h.module} ${h.full}`,
       defines: h.defines === true,
-      creates: h.defines === true && !h.amends,
+      sets: h.defines === true && !h.amends,
       inLambda: h.lambda !== undefined,
       passed: h.module === undefined,
     });
@@ -403,7 +403,7 @@ export function defining(
 ): Target[] {
   if (!identity?.startsWith("variable ") && !identity?.startsWith("global "))
     return [];
-  const defs = all.filter((t) => t.identity === identity && t.creates);
+  const defs = all.filter((t) => t.identity === identity && t.sets);
   const top = defs.filter((t) => !t.inLambda);
   return (top.length ? top : defs).reverse();
 }
