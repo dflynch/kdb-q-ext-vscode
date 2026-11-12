@@ -112,6 +112,21 @@ read.
   is unmatched, and its `{` left open. Only files open in the editor's tabs
   are checked; set `kdb-q-ext-vscode.diagnosticMode` to `workspace` to check
   every `.q` file in the workspace too, as saved
+- Completion, in VS Code's own suggestions as you type: the innermost
+  lambda's parameters and locals first (q has no closures, so an outer
+  lambda's aren't in scope), then the workspace's globals, then q's
+  keywords. After `\d .ns`, `.ns`'s globals are offered by their names in
+  it too. After a dot, a namespace's members and the namespaces in it:
+  `.` gives the namespaces, `.Q.` q's own, with KX's line, and `.ns.` your
+  own, with each function's signature and comment, as the hover shows them;
+  ``s.`` a module's exports, for a global bound by ``s:use`mod``. A symbol
+  naming a namespace, as `` `.ns. ``, offers its members for passing by
+  reference; any other symbol is data, so offers nothing. Nothing is
+  offered in strings, comments, numbers, system commands or another
+  language's lines. Picking one inserts its name; typing `[` then shows
+  its parameter hints. VS Code's word-based suggestions, every word in the
+  open files, comments included, are off for q, as
+  `editor.wordBasedSuggestions` in the `[q]` settings
 
 ### Servers
 

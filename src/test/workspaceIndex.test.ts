@@ -167,6 +167,14 @@ suite("definitions across files", () => {
       ["/w/mod/foo.q 1:1 impl"],
     ],
     [
+      "an export named alone, as ([f;g]) is ([f:f;g:g]), where it's defined",
+      {
+        "/w/mod/foo.q": "f:{x+1}\ng:2\nexport:([f;g])",
+        "/w/main.q": "m:use`foo\nm.|g",
+      },
+      ["/w/mod/foo.q 2:1 g"],
+    ],
+    [
       "an export of a lambda, at its key",
       {
         "/w/mod/foo.q": "impl:{x+1}\nexport:([f:impl;g:{x}])",

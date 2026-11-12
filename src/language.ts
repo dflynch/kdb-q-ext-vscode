@@ -1,11 +1,12 @@
 // q language features in the editor, from the annotation pass: the outline
 // (and breadcrumbs) and occurrence highlighting within a file, and
-// definition, references, hover, parameter hints and symbol search across
-// the workspace's q files, the files a \l may load, references in the
+// definition, references, hover, parameter hints, completion and symbol
+// search across the workspace's q files, the files a \l may load, references in the
 // References view grouped by how they're passed
 
 import * as vscode from "vscode";
 import { type Annotated, annotate } from "./annotate";
+import { type Completion, completions } from "./completion";
 import { lineOf, lineStarts } from "./lines";
 import {
   type Occurrence,
@@ -445,6 +446,16 @@ const kinds: Record<Outlined["kind"], vscode.SymbolKind> = {
   module: vscode.SymbolKind.Module,
 };
 
+const completionKinds: Record<Completion["kind"], vscode.CompletionItemKind> = {
+  param: vscode.CompletionItemKind.Variable,
+  local: vscode.CompletionItemKind.Variable,
+  function: vscode.CompletionItemKind.Function,
+  variable: vscode.CompletionItemKind.Variable,
+  module: vscode.CompletionItemKind.Module,
+  namespace: vscode.CompletionItemKind.Module,
+  keyword: vscode.CompletionItemKind.Keyword,
+};
+
 const highlights: Record<Occurrence["kind"], vscode.DocumentHighlightKind> = {
   read: vscode.DocumentHighlightKind.Read,
   write: vscode.DocumentHighlightKind.Write,
@@ -668,6 +679,49 @@ export function registerLanguage(): vscode.Disposable {
         },
       },
       { triggerCharacters: ["[", ";"], retriggerCharacters: [] },
+    ),
+    vscode.languages.registerCompletionItemProvider(
+      selector,
+      {
+        provideCompletionItems: async (d, at) => {
+          const index = await workspace.index(d);
+          const found = completions(
+            index,
+            d.uri.toString(),
+            d.getText(),
+            annotations(d),
+            d.offsetAt(at),
+          );
+          if (!found) return undefined;
+          const replaced = range(d, found.range);
+          return found.items.map((c) => {
+            const item = new vscode.CompletionItem(
+              c.label,
+              completionKinds[c.kind],
+            );
+            item.range = replaced;
+            item.sortText = `${c.group}${c.label}`;
+            // As the hover has it: q's syntax, KX's line and link, then
+            // your own definition, its comment and file
+            const doc = new vscode.MarkdownString();
+            if (c.builtin) {
+              item.detail = c.builtin.summary;
+              codeblock(doc, c.builtin.syntax);
+              doc.appendMarkdown(`\n\n[code.kx.com](<${c.builtin.url}>)`);
+            }
+            if (c.builtin && c.defined) doc.appendMarkdown("\n\n---\n");
+            if (c.defined) {
+              if (!c.builtin && c.defined.detail) {
+                item.detail = c.defined.detail;
+              }
+              described(doc, c.defined, d.uri, index);
+            }
+            if (doc.value) item.documentation = doc;
+            return item;
+          });
+        },
+      },
+      ".",
     ),
     vscode.commands.registerCommand(
       peekDefinitions,
