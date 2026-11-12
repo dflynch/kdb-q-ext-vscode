@@ -89,7 +89,7 @@ suite("properties", () => {
       const all = targets(a);
       // Every definition in each file, as written
       const every = Object.entries(files).flatMap(([file, t]) =>
-        globals(t, annotate(t), true).map((d) => ({ ...d, file })),
+        globals(t, annotate(t)).map((d) => ({ ...d, file })),
       );
       for (let offset = -1; offset <= text.length + 1; offset++) {
         const context = JSON.stringify({ files, offset });

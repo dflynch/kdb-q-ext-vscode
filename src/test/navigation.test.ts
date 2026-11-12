@@ -78,13 +78,9 @@ suite("outline", () => {
       ["variable a: a:1", "variable b: b:2", "variable d: d:3"],
     ],
     [
-      "set and upsert by reference",
+      "set by reference, not upsert, which changes a value",
       "`t set ([] a:1 2)\n`.u.q upsert x",
-      [
-        "variable t: `t set ([] a:1 2)",
-        "namespace .u",
-        "  variable q: `.u.q upsert x @.u.q",
-      ],
+      ["variable t: `t set ([] a:1 2)"],
     ],
     [
       "a lambda set by handle is a function",
@@ -107,9 +103,9 @@ suite("outline", () => {
     ],
     ["a lambda left open", "f:{x", ["variable f: f:{x"]],
     [
-      "not an amend, as q can't create a global by one",
-      "d[`a]:1\n@[`t;0;:;1]\nd[]:2",
-      ["variable d: d[]:2"],
+      "not an amend, which changes a value",
+      "d[`a]:1\n@[`t;0;:;1]\nd[]:2\ne,:1\n`f insert x",
+      [],
     ],
     [
       "a lambda assigned to several",
@@ -379,9 +375,9 @@ suite("definition in a file", () => {
     ],
     ["a global set by reference", "`t set 1\n|t", "1:2 t"],
     [
-      "a global from a handle, as upsert can create it too",
+      "a global from a handle, where it's assigned, not an upsert",
       "t:1\n`|t upsert 2",
-      "2:2 t, 1:1 t",
+      "1:1 t",
     ],
     ["a parameter, where it's declared", "f:{[a;b] |a}", "1:5 a"],
     [
@@ -417,11 +413,13 @@ suite("definition in a file", () => {
     ],
     ["the definition itself", "|n:0", "1:1 n"],
     [
-      "not an amend, as q can't create a global by one",
+      "not an amend, which changes a value",
       ".h.tx[`a]:1\n@[`t;0;:;1]\nupdate a:1 from `u\nf:{|.h.tx,t,u}",
       "none",
     ],
     ["an assignment, not a later amend", "f:{d[`a]:1}\nd:()!()\n|d", "2:1 d"],
+    ["an assignment, not an append", "t:1\nt,:2\n`t insert 3\n|t", "1:1 t"],
+    ["a local, not where it's added to", "f:{[n] s:0; s+:n; |s}", "1:8 s"],
     ["a replacement in full", "d[]:1\n@[`t;();:;1]\n|t,d", "2:4 t"],
     ["in the root, by key", "@[`.;`t;:;1]\n|t", "1:7 t"],
     ["an implicit parameter", "f:{|x}", "none"],

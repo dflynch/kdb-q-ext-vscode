@@ -13,7 +13,7 @@ import {
   at,
   callsAt,
   type Defined,
-  defining as definedInFile,
+  defining,
   firsts,
   globals,
   references as inFile,
@@ -46,7 +46,7 @@ export function entry(text: string, a: Annotated): Entry {
   const all = targets(a);
   const out: Entry = {
     lines,
-    defined: globals(text, a, true),
+    defined: globals(text, a),
     globals: [],
     exports: [],
   };
@@ -75,9 +75,10 @@ export function entry(text: string, a: Annotated): Entry {
         const target = k.target;
         const defs =
           target && "full" in target
-            ? definedInFile(all, `global ${target.full}`).map(
-                ({ start, end }) => ({ start, end }),
-              )
+            ? defining(all, `global ${target.full}`).map(({ start, end }) => ({
+                start,
+                end,
+              }))
             : [];
         return {
           key: k.key,
@@ -200,12 +201,13 @@ export function definitions(
   if (!here) return [];
   const local = (id: string | undefined) =>
     id?.startsWith("variable ")
-      ? definedInFile(all, id).map((d) => ({ file, ...span(d) }))
+      ? defining(all, id).map((d) => ({ file, ...span(d) }))
       : [];
   const found = local(here.identity);
   if (found.length) return found;
   const wanted = across(index, file, a, offset);
-  if (wanted && "global" in wanted) return defining(index, file, wanted.global);
+  if (wanted && "global" in wanted)
+    return definitionsOf(index, file, wanted.global);
   if (wanted) {
     const out: Location[] = [];
     for (const m of wanted.modules) {
@@ -221,21 +223,21 @@ export function definitions(
   const maybe = local(here.maybe);
   if (maybe.length) return maybe;
   return here.maybe?.startsWith("global ")
-    ? defining(index, file, here.maybe.slice(7))
+    ? definitionsOf(index, file, here.maybe.slice(7))
     : [];
 }
 
 // Where each file assigns a global at top level, or, if none does, in a
 // lambda, the file itself first, then the nearest, each file's the latest
 // first
-function defining(index: Index, file: string, global: string): Location[] {
+function definitionsOf(index: Index, file: string, global: string): Location[] {
   return defined(index, file, global).map((d) => ({
     file: d.file,
     ...d.nameSpan,
   }));
 }
 
-// Each file's definitions of a global, as defining() orders them
+// Each file's definitions of a global, as definitionsOf() orders them
 function defined(index: Index, file: string, global: string): Listed[] {
   const atTop: Listed[] = [];
   const inLambda: Listed[] = [];

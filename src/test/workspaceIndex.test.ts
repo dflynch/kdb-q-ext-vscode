@@ -217,6 +217,10 @@ suite("every definition", () => {
     ["twice, a comment above the latest", [1, "/ again", 2], [3, 1], [3, 1]],
     ["a variable assigned between", [1, "f:1", 2], [3, 2, 1], [2]],
     ["an amend between", [1, "f[`k]:1", 2], [3, 1], [3, 1]],
+    ["an append between", [1, "f,:1", 2], [3, 1], [3, 1]],
+    ["an upsert between", [1, "`f upsert 1", 2], [3, 1], [3, 1]],
+    ["an insert between", [1, "insert[`f;1]", 2], [3, 1], [3, 1]],
+    ["an amend at the path ()", [1, "@[`f;();,;1]", 2], [3, 1], [3, 1]],
   ];
   // Where the definitions are written, the file, and the use at the cursor
   const places: [string, string, (defs: string) => Files][] = [

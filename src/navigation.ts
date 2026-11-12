@@ -104,10 +104,9 @@ export type Defined = {
   doc?: string;
 };
 
-// Each global's first definition at top level and its first in a lambda,
-// or, if every, each of its definitions, not where an existing value is
-// amended, in the order they're written
-export function globals(text: string, a: Annotated, every = false): Defined[] {
+// Each global's definitions, not where an existing value is amended, in the
+// order they're written; firsts() keeps each one's first
+export function globals(text: string, a: Annotated): Defined[] {
   const script = scan(text);
   const at = placed(script);
   const lambdas = new Map<number, Lambda>(
@@ -200,7 +199,7 @@ export function globals(text: string, a: Annotated, every = false): Defined[] {
     const item = described(d.full, d.nameSpan, d.inLambda);
     if (item) out.push(item);
   }
-  return every ? out : firsts(out);
+  return out;
 }
 
 // Each global's first definition at top level and its first in a lambda
@@ -262,7 +261,7 @@ function docs(
 // only its own
 export function outline(text: string, a: Annotated): Outlined[] {
   const top: Outlined[] = [];
-  for (const d of globals(text, a)) {
+  for (const d of firsts(globals(text, a))) {
     if (d.inLambda) continue;
     const item: Outlined = {
       name: d.full,

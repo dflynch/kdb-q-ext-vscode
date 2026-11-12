@@ -53,7 +53,10 @@ read.
   uses that pass a global by reference, naming it by a symbol as in
   ``@[value;`.timer.enabled;0b]`` or `` `t insert x ``, under **Passed by
   reference**, after the rest; the peek (Shift+F12) lists them with the
-  rest, as it has no groups. What it can't know:
+  rest, as it has no groups. A definition sets the whole value, as `t:`,
+  `t::`, `` `t set x `` or ``@[`t;();:;x]`` do; an amend changes it, as
+  `t,:x`, `t[i]:x`, `` `t upsert x `` or ``update … from `t`` do, so is a
+  reference. What it can't know:
   - Each file is read as if loaded in the root namespace: `\l` runs a file
     in its loader's namespace, which the file doesn't say
   - A global defined more than once, in a file or in several, such as a
