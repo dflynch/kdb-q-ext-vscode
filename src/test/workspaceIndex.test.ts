@@ -8,6 +8,7 @@ import {
   position,
   references,
   resolve,
+  signatures,
   symbols,
 } from "../workspaceIndex";
 
@@ -56,6 +57,19 @@ function opened(files: Files) {
           ),
         ]
       );
+    },
+    // Each signature, its active parameter in «», then where it's from
+    signed: () => {
+      const found = signatures(index, cursor.file, a, cursor.offset);
+      return found?.signatures.map((s) => {
+        const p = s.params[found.active];
+        const label = p
+          ? `${s.label.slice(0, p[0])}«${s.label.slice(...p)}»${s.label.slice(p[1])}`
+          : s.label;
+        return "builtin" in s
+          ? label
+          : `${label} ${shown({ file: s.defined.file, ...s.defined.nameSpan })} ${s.defined.doc ?? "-"}`;
+      });
     },
     // Each with whether it's passed by reference
     referencedAll: (withDefinition = true) =>
@@ -405,6 +419,195 @@ suite("hover", () => {
   ];
   for (const [name, files, expected] of cases) {
     test(name, () => assert.deepStrictEqual(opened(files).hovered(), expected));
+  }
+});
+
+suite("signatures", () => {
+  const cases: [string, Files, string[] | undefined][] = [
+    [
+      "a global's, the nearest first",
+      {
+        "/w/a.q": "/ adds\nf:{[a;b] a+b}",
+        "/w/b/c.q": "f:{x}",
+        "/w/b/d.q": "f[1;|]",
+      },
+      ["f[x] /w/b/c.q 1:1 f -", "f[a;«b»] /w/a.q 2:1 f / adds"],
+    ],
+    [
+      "a global defined again in its file: each, the latest first",
+      { "/w/a.q": "f:{[a;b] a+b}\n\nf:{[c;d] c-d}\n\nf[|]" },
+      ["f[«c»;d] /w/a.q 3:1 f -", "f[«a»;b] /w/a.q 1:1 f -"],
+    ],
+    [
+      "defined again, as a variable between",
+      { "/w/a.q": "/ one\nf:{[a] a}\nf:1\nf:{[b] b}\nf[|]" },
+      ["f[«b»] /w/a.q 4:1 f -", "f[«a»] /w/a.q 2:1 f / one"],
+    ],
+    [
+      "defined again in several files, the nearest file first",
+      {
+        "/w/a.q": "f:{[a] a}\nf:{[b] b}",
+        "/w/c/d.q": "f:{[c] c}\nf:{[d] d}",
+        "/w/c/e.q": "f[|]",
+      },
+      [
+        "f[«d»] /w/c/d.q 2:1 f -",
+        "f[«c»] /w/c/d.q 1:1 f -",
+        "f[«b»] /w/a.q 2:1 f -",
+        "f[«a»] /w/a.q 1:1 f -",
+      ],
+    ],
+    [
+      "defined at top level: not as well in a lambda",
+      { "/w/a.q": "f:{[a] a}\ng:{f::{[b] b}}\nf[|]" },
+      ["f[«a»] /w/a.q 1:1 f -"],
+    ],
+    [
+      "defined only in lambdas: each",
+      { "/w/a.q": "g:{f::{[a] a}}\nh:{f::{[b] b}}\nf[|]" },
+      ["f[«b»] /w/a.q 2:4 f -", "f[«a»] /w/a.q 1:4 f -"],
+    ],
+    [
+      "parameters as written",
+      { "/w/a.q": ".foo.f:{[a:`j;(b;c)] a}\n.foo.f[1;|]" },
+      [".foo.f[a:`j;«(b;c)»] /w/a.q 1:1 .foo.f -"],
+    ],
+    [
+      "a parameter written twice",
+      { "/w/a.q": "f:{[a;a] a}\nf[1;|]" },
+      ["f[a;«a»] /w/a.q 1:1 f -"],
+    ],
+    [
+      "an empty parameter",
+      { "/w/a.q": "f:{[;b] b}\nf[|]" },
+      ["f[«»;b] /w/a.q 1:1 f -"],
+    ],
+    [
+      "past the last parameter",
+      { "/w/a.q": "f:{[a;b] a}\nf[1;2;|]" },
+      ["f[a;b] /w/a.q 1:1 f -"],
+    ],
+    [
+      "a global in a namespace by \\d",
+      { "/w/a.q": "\\d .u\nupd:{[t;x] t}\n\\d .\n.u.upd[|]" },
+      [".u.upd[«t»;x] /w/a.q 2:1 upd -"],
+    ],
+    [
+      "an export",
+      {
+        "/w/m.q": "/ middle\nmid:{[a;b] a}\nexport:([mid:mid])",
+        "/w/a.q": "s:use`m\ns.mid[1;|]",
+      },
+      ["mid[a;«b»] /w/m.q 2:1 mid / middle"],
+    ],
+    [
+      "an export written out, beside a global of its name",
+      {
+        "/w/m.q": "mid:{[z] z}\nexport:([mid:{[a;b] a}])",
+        "/w/a.q": "s:use`m\ns.mid[|]",
+      },
+      ["mid[«a»;b] /w/m.q 2:10 mid -"],
+    ],
+    [
+      "an export written out in its module's export",
+      {
+        "/w/m.q": "export:([mid:{[a;b] a}])",
+        "/w/a.q": "s:use`m\ns.mid[|]",
+      },
+      ["mid[«a»;b] /w/m.q 1:10 mid -"],
+    ],
+    ["a keyword", { "/w/a.q": "ssr[s;|]" }, ["ssr[x;«y»;z]"]],
+    [
+      "a keyword with a space",
+      { "/w/a.q": "aj [`s;|]" },
+      ["aj  [c; «t1»; t2]"],
+    ],
+    [
+      "a keyword's forms",
+      { "/w/a.q": "set[|" },
+      [
+        "set[«nam»;y]",
+        "set[«file»;y]",
+        "set[«dir»;t]",
+        "set[«(file;lbs;alg;lvl)»;y]",
+        "set[«(dir;lbs;alg;lvl)»;t]",
+        "set[«(dir;dic)»;t]",
+      ],
+    ],
+    [
+      "a form KX writes in prefix notation",
+      { "/w/a.q": ".Q.s1[|]" },
+      [".Q.s1[«x»]"],
+    ],
+    [
+      "forms in prefix notation",
+      { "/w/a.q": "hopen[|]" },
+      [
+        "hopen[«filehandle»]",
+        "hopen[«processhandle»]",
+        "hopen[«(communicationhandle;timeout)»]",
+        "hopen[«port»]",
+      ],
+    ],
+    [
+      "a callback q has, and the file's definition",
+      { "/w/a.q": "/ logs\n.z.pg:{[q] value q}\n.z.pg[|]" },
+      [".z.pg[«q»] /w/a.q 2:1 .z.pg / logs"],
+    ],
+    [
+      "a name in .Q the file defines too",
+      { "/w/a.q": ".Q.s1:{[a;b] a}\n.Q.s1[|]" },
+      [".Q.s1[«x»]", ".Q.s1[«a»;b] /w/a.q 1:1 .Q.s1 -"],
+    ],
+    [
+      "a function in a query",
+      { "/w/a.q": "f:{[a] 2*a}\nupdate c:f[|a] from t" },
+      ["f[«a»] /w/a.q 1:1 f -"],
+    ],
+    [
+      "an index in a call's arguments: the call's",
+      { "/w/a.q": "f:{[a;b] a}\nf[a; t[`c|]]" },
+      ["f[a;«b»] /w/a.q 1:1 f -"],
+    ],
+    [
+      "a variable indexed: the call's",
+      { "/w/a.q": "f:{[a;b] a}\nd:1 2\nf[a; d[|]]" },
+      ["f[a;«b»] /w/a.q 1:1 f -"],
+    ],
+    [
+      "a local: the call's",
+      { "/w/a.q": "f:{[a;b] a}\ng:{loc:{x};f[a; loc[|]]}" },
+      ["f[a;«b»] /w/a.q 1:1 f -"],
+    ],
+    [
+      "a function in a call's arguments: its own",
+      { "/w/a.q": "f:{[a;b] a}\ng:{[c] c}\nf[a; g[|]]" },
+      ["g[«c»] /w/a.q 2:1 g -"],
+    ],
+    [
+      "a keyword in a call's arguments",
+      { "/w/a.q": "f:{[a;b] a}\nf[a; count[|]]" },
+      ["count[«x»]"],
+    ],
+    ["a variable alone", { "/w/a.q": "d:1 2\nd[|]" }, undefined],
+    ["a global defined nowhere", { "/w/a.q": "g[|]" }, undefined],
+    ["a value q has", { "/w/a.q": ".z.p[|]" }, undefined],
+    ["a glyph applied", { "/w/a.q": "f:{x}\n$[f;|]" }, undefined],
+    ["qSQL", { "/w/a.q": "select[|2] from t" }, undefined],
+    ["infix", { "/w/a.q": "x bin |" }, undefined],
+    ["prefix", { "/w/a.q": "f:{x}\nf |" }, undefined],
+    ["outside the brackets", { "/w/a.q": "f:{x}\nf[1]|" }, undefined],
+  ];
+  const endings = { LF: "\n", CRLF: "\r\n", CR: "\r" };
+  for (const [name, files, expected] of cases) {
+    test(name, () => {
+      for (const [ending, eol] of Object.entries(endings)) {
+        const at = Object.fromEntries(
+          Object.entries(files).map(([f, t]) => [f, t.replaceAll("\n", eol)]),
+        );
+        assert.deepStrictEqual(opened(at).signed(), expected, ending);
+      }
+    });
   }
 });
 

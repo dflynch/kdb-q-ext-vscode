@@ -1,7 +1,8 @@
 // Writes src/builtins.ts, the hover's entries for q's keywords and the .Q,
 // .z, .h and .j namespaces, from KX's reference at a pinned commit of
 // https://github.com/KxSystems/docs (CC BY 4.0): each name's syntax, a line
-// saying what it is, and its page on code.kx.com. Run by hand when the
+// saying what it is, its page on code.kx.com, and its forms in bracket
+// notation, for parameter hints. Run by hand when the
 // reference changes, after moving the commit:
 //   npm run builtins
 // It fails, rather than writing an entry without syntax or a line, or with
@@ -250,6 +251,45 @@ if (missing.length) {
   process.exit(1);
 }
 
+// The forms in bracket notation the syntax gives a function: each written
+// in bracket notation, as written, as aj  [c; t1; t2]; then each written in
+// prefix notation, as .Q.s1 x, as its name with the argument in brackets,
+// .Q.s1[x]. Each once. Lines split into forms at runs of two or more
+// spaces, without a trailing / comment. None for qSQL, whose brackets in
+// KX's templates mark what's optional, as q reads select[2] as a row limit
+function forms(name, syntax) {
+  if (["select", "exec", "update", "delete"].includes(name)) return [];
+  const escaped = name.replace(/\./g, "\\.");
+  const out = [];
+  // What's left once bracket forms are taken out, each leaving a line break
+  let rest = "";
+  let from = 0;
+  const head = new RegExp(`(?<![\\w.])${escaped}\\s*\\[`, "g");
+  for (let m = head.exec(syntax); m; m = head.exec(syntax)) {
+    let depth = 0;
+    let i = m.index + m[0].length - 1;
+    for (; i < syntax.length; i++) {
+      if (syntax[i] === "[") depth++;
+      else if (syntax[i] === "]" && --depth === 0) break;
+    }
+    if (i === syntax.length) break;
+    out.push(syntax.slice(m.index, i + 1));
+    rest += `${syntax.slice(from, m.index)}\n`;
+    from = i + 1;
+    head.lastIndex = from;
+  }
+  rest += syntax.slice(from);
+  const prefix = new RegExp(`^${escaped} (\\S.*)$`);
+  for (const line of rest.split("\n")) {
+    for (const form of line.replace(/(^|\s)\/.*$/, "").split(/\s{2,}/)) {
+      const m = prefix.exec(form.trim());
+      if (m) out.push(`${name}[${m[1]}]`);
+    }
+  }
+  return [...new Set(out)];
+}
+for (const [name, e] of entries) e.forms = forms(name, e.syntax);
+
 const sorted = [...entries].sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0));
 writeFileSync(
   new URL("../src/builtins.ts", import.meta.url),
@@ -257,7 +297,14 @@ writeFileSync(
 // ${commit}, under CC BY 4.0, excerpted: don't edit
 // by hand. See NOTICE.
 
-export type Builtin = { syntax: string; summary: string; url: string };
+// forms: the forms in bracket notation, as aj  [c; t1; t2], or .Q.s1[x]
+// for one KX writes as .Q.s1 x
+export type Builtin = {
+  syntax: string;
+  summary: string;
+  url: string;
+  forms: string[];
+};
 
 export const builtins: ReadonlyMap<string, Builtin> = new Map([
 ${sorted.map(([name, e]) => `  [${JSON.stringify(name)}, ${JSON.stringify(e)}],`).join("\n")}

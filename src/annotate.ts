@@ -1,6 +1,7 @@
 // Annotates q source for navigation: the lambdas, what each name is (a
 // parameter, a local, a global, a column, a key or a q keyword), the globals
-// passed by reference as symbols (handles), and q 5 modules' use and export.
+// passed by reference as symbols (handles), q 5 modules' use and export, and
+// the names applied with brackets (calls).
 // Globals resolve to the namespace q reads them in. Like the scanner it's pure
 // and total: no VS Code or Node imports, and it never throws.
 
@@ -79,11 +80,27 @@ export type Export = {
   target?: { full: string } | { lambda: Lambda };
 };
 
+// A name applied in bracket notation, as f[x;y], or f [x;y], which q reads
+// the same: a call, or an index, as the name's value decides. Not qSQL's
+// words, as q reads select[2] as a row limit
+export type Call = {
+  name: Token;
+  open: Token;
+  close?: Token;
+  // Where the brackets' inside ends: at the close, or, if there's none yet,
+  // at the end of the statement's last line
+  end: number;
+  // The separators directly in the brackets, not in a group in them
+  separators: Token[];
+};
+
 export type Annotated = {
   names: Name[];
   handles: Handle[];
   lambdas: Lambda[];
   uses: Use[];
+  // In the order they open, so a call comes before those in its brackets
+  calls: Call[];
   // A module's export: keys when it's a dictionary literal, else only where
   // it's assigned, as it's built when the module loads
   export?: { at: Token; keys?: Export[] };
@@ -171,6 +188,32 @@ function tree(text: string, tokens: Token[]): Item[] {
   return top;
 }
 
+// The calls in the items, and in their groups, in the order they open
+function called(text: string, items: Item[], end: number, out: Call[]): void {
+  items.forEach((item, i) => {
+    if (!isGroup(item)) return;
+    const prev = items[i - 1];
+    if (
+      text[item.open.start] === "[" &&
+      prev !== undefined &&
+      !isGroup(prev) &&
+      prev.kind === "name" &&
+      !queries.has(text.slice(prev.start, prev.end))
+    ) {
+      out.push({
+        name: prev,
+        open: item.open,
+        ...(item.close ? { close: item.close } : {}),
+        end: item.close ? item.close.start : end,
+        separators: item.items.filter(
+          (t): t is Token => !isGroup(t) && t.kind === "separator",
+        ),
+      });
+    }
+    called(text, item.items, end, out);
+  });
+}
+
 // Items split at their separators
 function segments(items: Item[]): Item[][] {
   const out: Item[][] = [[]];
@@ -217,7 +260,13 @@ export function annotate(
   text: string,
   options: { namespace?: string } = {},
 ): Annotated {
-  const out: Annotated = { names: [], handles: [], lambdas: [], uses: [] };
+  const out: Annotated = {
+    names: [],
+    handles: [],
+    lambdas: [],
+    uses: [],
+    calls: [],
+  };
   const entries: Entry[] = [];
   const byToken = new Map<Token, Entry>();
   const lambdaAt = new Map<Token, Lambda>();
@@ -684,6 +733,10 @@ export function annotate(
     const items = tree(text, statement.tokens);
     const context: Context = { namespace, column: false };
     walk(items, context);
+    // The end of the statement's last line, past spaces after it
+    let end = statement.end;
+    while (text[end] === " " || text[end] === "\t") end++;
+    called(text, items, end, out.calls);
     // system "d .foo"
     const call = segments(items)[0];
     const [command, s] = call;

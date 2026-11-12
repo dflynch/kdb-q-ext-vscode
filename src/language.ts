@@ -1,7 +1,8 @@
 // q language features in the editor, from the annotation pass: the outline
 // (and breadcrumbs) and occurrence highlighting within a file, and
-// definition, references, hover and symbol search across the workspace's q
-// files, references in the References view grouped by how they're passed
+// definition, references, hover, parameter hints and symbol search across
+// the workspace's q files, references in the References view grouped by how
+// they're passed
 
 import * as vscode from "vscode";
 import { type Annotated, annotate } from "./annotate";
@@ -23,6 +24,7 @@ import {
   type Location,
   position,
   references,
+  signatures,
   symbols,
 } from "./workspaceIndex";
 
@@ -206,9 +208,9 @@ function codeblock(out: vscode.MarkdownString, code: string): void {
   out.appendMarkdown(`\n${fence}q\n${code}\n${fence}\n`);
 }
 
-// How a definition reads in a hover, in one q block: the comment above it as
-// written, then its signature, or its name; then the file it's in, if it's
-// another, its path as text
+// How a definition reads in a hover, as the hint has it: its signature, or
+// its name, then the comment above it as written, each in a q block; then
+// the file it's in, if it's another, its path as text
 function described(
   out: vscode.MarkdownString,
   d: Listed,
@@ -221,7 +223,19 @@ function described(
       : d.kind === "module"
         ? `${d.full}:${d.detail}`
         : d.full;
-  codeblock(out, d.doc === undefined ? signature : `${d.doc}\n${signature}`);
+  codeblock(out, signature);
+  if (d.doc !== undefined) codeblock(out, d.doc);
+  linked(out, d, from, index);
+}
+
+// The file a definition is in, if it's another, its path as text linking
+// to the definition
+function linked(
+  out: vscode.MarkdownString,
+  d: Listed,
+  from: vscode.Uri,
+  index: Index,
+): void {
   if (d.file !== from.toString()) {
     const uri = vscode.Uri.parse(d.file);
     const { line, character } = position(
@@ -337,6 +351,53 @@ export function registerLanguage(): vscode.Disposable {
         return new vscode.Hover(out, range(d, name));
       },
     }),
+    vscode.languages.registerSignatureHelpProvider(
+      selector,
+      {
+        provideSignatureHelp: async (d, at, _token, context) => {
+          const index = await workspace.index(d);
+          const found = signatures(
+            index,
+            d.uri.toString(),
+            annotations(d),
+            d.offsetAt(at),
+          );
+          if (!found) return undefined;
+          const help = new vscode.SignatureHelp();
+          help.signatures = found.signatures.map((s) => {
+            // As the hover has them: KX's line and link, or the comment
+            // above the definition, as written, and its file if another
+            const doc = new vscode.MarkdownString();
+            if ("builtin" in s) {
+              doc.appendText(s.builtin.summary);
+              doc.appendMarkdown(`\n\n[code.kx.com](<${s.builtin.url}>)`);
+            } else {
+              if (s.defined.doc !== undefined) codeblock(doc, s.defined.doc);
+              linked(doc, s.defined, d.uri, index);
+            }
+            const info = new vscode.SignatureInformation(
+              s.label,
+              doc.value ? doc : undefined,
+            );
+            info.parameters = s.params.map(
+              (p) => new vscode.ParameterInformation(p),
+            );
+            return info;
+          });
+          help.activeParameter = found.active;
+          // The form the user moved to, if it's still there
+          const before = context.activeSignatureHelp;
+          const kept = before?.activeSignature ?? 0;
+          help.activeSignature =
+            context.isRetrigger &&
+            before?.signatures[kept]?.label === help.signatures[kept]?.label
+              ? kept
+              : 0;
+          return help;
+        },
+      },
+      { triggerCharacters: ["[", ";"], retriggerCharacters: [] },
+    ),
     vscode.commands.registerCommand(
       peekDefinitions,
       async (uri: string, line: number, character: number) => {

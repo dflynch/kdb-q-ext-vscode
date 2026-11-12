@@ -1,18 +1,20 @@
 // Navigation across the workspace's q files: what each file defines and
-// uses, kept as an entry per file, and the definitions, references and
-// symbols they give together. Each file is read as if loaded in the root,
-// as \l runs a file in its loader's namespace, which the file can't show.
-// Modules resolve by file name, as use`foo finds foo.q or foo/init.q in a
-// directory of QPATH, which the workspace doesn't say. Pure and total, as
-// the annotation pass is: no VS Code imports, never throws.
+// uses, kept as an entry per file, and the definitions, references,
+// symbols and signatures they give together. Each file is read as if loaded
+// in the root, as \l runs a file in its loader's namespace, which the file
+// can't show. Modules resolve by file name, as use`foo finds foo.q or
+// foo/init.q in a directory of QPATH, which the workspace doesn't say. Pure
+// and total, as the annotation pass is: no VS Code imports, never throws.
 
-import type { Annotated } from "./annotate";
+import { type Annotated, annotate } from "./annotate";
 import { type Builtin, builtins } from "./builtins";
 import { lineOf, lineStarts } from "./lines";
 import {
   at,
+  callsAt,
   type Defined,
   first,
+  firsts,
   globals,
   references as inFile,
   type Span,
@@ -23,6 +25,8 @@ export type Entry = {
   // Where each line starts, to turn offsets into positions
   lines: number[];
   defined: Defined[];
+  // Each definition that's a function, as a global may be defined again
+  functions: Defined[];
   // Each global named, by its absolute name, assigned or read, and each
   // column that may be one; passed if named by a symbol
   globals: (Span & { full: string; passed: boolean })[];
@@ -41,9 +45,11 @@ export type Entry = {
 export function entry(text: string, a: Annotated): Entry {
   const lines = lineStarts(text);
   const all = targets(a);
+  const every = globals(text, a, true);
   const out: Entry = {
     lines,
-    defined: globals(text, a),
+    defined: firsts(every),
+    functions: every.filter((d) => d.kind === "function"),
     globals: [],
     exports: [],
   };
@@ -294,7 +300,7 @@ export function hover(
     return {
       full: wanted.key,
       ...(signature
-        ? { kind: "function", detail: `[${signature.join(";")}]` }
+        ? { kind: "function", detail: `[${signature.join(";")}]`, signature }
         : { kind: "variable" }),
       span: span(l),
       nameSpan: span(l),
@@ -306,6 +312,86 @@ export function hover(
 }
 
 const span = ({ start, end }: Span): Span => ({ start, end });
+
+// A form a call can take: its label, as .foo.f[a;b] or count[x], each
+// parameter's place in it, start to end, and what it's the form of
+export type Signature = {
+  label: string;
+  params: [number, number][];
+} & ({ builtin: Builtin } | { defined: Listed });
+
+// The signatures for the innermost call the offset is in that has any, and
+// the parameter it's at: a call's are the hover's for its name, q's forms
+// first, then, for each global the hover lists, every definition in its
+// file that's a function, the latest first, as it's what the global holds
+// once the file has loaded. A call with none, as an index, a local or a
+// variable, gives way to the next call out
+export function signatures(
+  index: Index,
+  file: string,
+  a: Annotated,
+  offset: number,
+): { signatures: Signature[]; active: number } | undefined {
+  for (const { call, active } of callsAt(a, offset)) {
+    const shown = hover(index, file, a, call.name.start);
+    if (!shown) continue;
+    const out: Signature[] = [];
+    const { builtin, defined } = shown;
+    if (builtin) {
+      for (const form of builtin.forms) out.push({ ...parsed(form), builtin });
+    }
+    // Each file's definitions of a global; an export written in its
+    // module's export as itself
+    const functions = defined.flatMap((d) => {
+      const e = index.get(d.file);
+      const global = e?.defined.some(
+        (g) => g.nameSpan.start === d.nameSpan.start,
+      );
+      if (!global) return [d];
+      return (e?.functions ?? [])
+        .filter((f) => f.full === d.full && f.inLambda === d.inLambda)
+        .reverse()
+        .map((f) => ({ ...f, file: d.file }));
+    });
+    for (const d of functions) {
+      if (d.kind !== "function" || !d.signature) continue;
+      let label = `${d.full}[`;
+      const params: [number, number][] = [];
+      d.signature.forEach((p, n) => {
+        if (n > 0) label += ";";
+        params.push([label.length, label.length + p.length]);
+        label += p;
+      });
+      out.push({ label: `${label}]`, params, defined: d });
+    }
+    if (out.length) return { signatures: out, active };
+  }
+  return undefined;
+}
+
+// A form of q's own read as a call: its parameters between its brackets'
+// separators, without the spaces around them, as in aj  [c; t1; t2]
+const forms = new Map<string, { label: string; params: [number, number][] }>();
+function parsed(form: string) {
+  let found = forms.get(form);
+  if (found) return found;
+  const call = annotate(form).calls[0];
+  const params: [number, number][] = [];
+  if (call) {
+    const starts = [call.open, ...call.separators].map((t) => t.end);
+    const ends = [...call.separators.map((t) => t.start), call.end];
+    for (let n = 0; n < starts.length; n++) {
+      let start = starts[n];
+      let end = ends[n];
+      while (start < end && /\s/.test(form[start])) start++;
+      while (end > start && /\s/.test(form[end - 1])) end--;
+      params.push([start, end]);
+    }
+  }
+  found = { label: form, params };
+  forms.set(form, found);
+  return found;
+}
 
 // Where the name at the offset occurs, meaning the same thing: a global or
 // an export in every file, anything else as in the file. Without its

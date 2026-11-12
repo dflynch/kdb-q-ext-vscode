@@ -61,9 +61,10 @@ suite("hover", () => {
     );
   });
 
-  test("the comment above, as written, in the file itself", async () => {
+  test("the signature, then the comment above, as written", async () => {
     assert.deepStrictEqual(await hovered("config/wdb.q", 2, 3), [
-      "\n```q\n// Defaults, as a process's settings set them\n.merge.limit\n```\n\n\n" +
+      "\n```q\n.merge.limit\n```\n" +
+        "\n```q\n// Defaults, as a process's settings set them\n```\n\n\n" +
         "[1 more definition](command:kdb-q-ext-vscode.peekDefinitions?" +
         encodeURIComponent(
           JSON.stringify([file("config/wdb.q").toString(), 1, 2]),
@@ -74,8 +75,8 @@ suite("hover", () => {
 
   test("a comment holding a fence, in a longer one", async () => {
     assert.deepStrictEqual(await hovered("code/doc.q", 7, 1), [
-      "\n````q\n/\n Doubles a number:\n  ```\n  twice 2\n  ```\n\\\n" +
-        "twice[x]\n````\n",
+      "\n```q\ntwice[x]\n```\n" +
+        "\n````q\n/\n Doubles a number:\n  ```\n  twice 2\n  ```\n\\\n````\n",
     ]);
   });
 
