@@ -141,8 +141,9 @@ export function resolve(index: Index, from: string, module: string): string[] {
 }
 
 // The files a \l line may load, if the offset is on the path it names: each
-// whose path ends with the path's segments, but . and .., as the directory
-// q runs in, which the path is from, isn't known. The path is the word after
+// whose path ends with the path's segments, without . or a .. and the
+// segment before it, and with no .. at its start, as the directory q runs
+// in, which the path is from, isn't known. The path is the word after
 // \l, as q reads it, which loads nothing if more than a comment follows it
 export function loaded(index: Index, text: string, offset: number): Location[] {
   const command = scan(text)
@@ -155,9 +156,12 @@ export function loaded(index: Index, text: string, offset: number): Location[] {
   if (!m) return [];
   const start = command.start + m[1].length;
   if (offset < start || offset > start + m[2].length) return [];
-  const segments = m[2]
-    .split("/")
-    .filter((s) => s !== "" && s !== "." && s !== "..");
+  // Each .. takes back the segment before it, if any
+  const segments: string[] = [];
+  for (const s of m[2].split("/")) {
+    if (s === "..") segments.pop();
+    else if (s !== "" && s !== ".") segments.push(s);
+  }
   if (!segments.length) return [];
   const tail = `/${segments.join("/")}`;
   return [...index.keys()]

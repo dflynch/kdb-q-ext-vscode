@@ -863,13 +863,18 @@ suite("files a \\l may load", () => {
         ["\\l lib/util|.q", ["/w/lib/util.q"]],
         ["\\l lib/log.q|", ["/w/lib/log.q"]],
         ["\\l notcommon/log|.q", []],
-        // ./ and ../ dropped, wherever they are, and empty segments
+        // ./ and leading ../ dropped, and empty segments
         ["\\l ./util|.q", all],
         ["\\l ../lib/util|.q", ["/w/lib/util.q"]],
         ["\\l ./../../lib/util|.q", ["/w/lib/util.q"]],
         ["\\l lib/./util|.q", ["/w/lib/util.q"]],
         ["\\l lib//util|.q", ["/w/lib/util.q"]],
-        ["\\l lib/../util|.q", ["/w/lib/util.q"]],
+        // .. takes back the segment before it, and none at the start
+        ["\\l lib/../util|.q", all],
+        ["\\l a/b/../../util|.q", all],
+        ["\\l a/../../util|.q", all],
+        ["\\l code/x/../common/util|.q", ["/w/code/common/util.q"]],
+        ["\\l ../code/../lib/util|.q", ["/w/lib/util.q"]],
         ["\\l /w/lib/util|.q", ["/w/lib/util.q"]],
         ["\\l ..|", []],
         ["\\l .|", []],

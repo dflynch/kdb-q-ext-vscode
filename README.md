@@ -68,8 +68,9 @@ read.
     workspace, as `QPATH` isn't read
   - `\l path/util.q` goes to each `.q` file whose path ends with
     `path/util.q`, with the cursor on the path, as `\l` loads from the
-    directory q runs in, which isn't known; `./` and `../` are ignored.
-    A directory, as a database, isn't followed
+    directory q runs in, which isn't known; `./` and a leading `../` are
+    ignored, and `x/..` cancels out. A directory, as a database, isn't
+    followed
   - Names q defines (`.z`, `.Q`), and globals defined outside the workspace
 - Hover: on a q keyword or a name in `.Q`, `.z`, `.h` or `.j`, its syntax
   and what it does, from [KX's reference](https://code.kx.com/q/ref/),
