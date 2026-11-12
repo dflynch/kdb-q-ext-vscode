@@ -84,6 +84,25 @@ suite("workspace index", () => {
     assert.deepStrictEqual(shown(found), ["mods/stats/init.q 1:1"]);
   });
 
+  test("the files a \\l may load", async () => {
+    const d = await vscode.workspace.openTextDocument(file("code/load.q"));
+    const at = (line: number, character: number) =>
+      vscode.commands
+        .executeCommand<vscode.Location[]>(
+          "vscode.executeDefinitionProvider",
+          d.uri,
+          new vscode.Position(line, character),
+        )
+        .then(shown);
+    assert.deepStrictEqual(await at(1, 12), ["config/wdb.q 1:1"]);
+    // In VS Code's order, by file
+    assert.deepStrictEqual(await at(2, 5), [
+      "code/wdb.q 1:1",
+      "config/wdb.q 1:1",
+    ]);
+    assert.deepStrictEqual(await at(2, 1), []);
+  });
+
   test("references in every file", async () => {
     const d = await vscode.workspace.openTextDocument(file("code/main.q"));
     const found = await vscode.commands.executeCommand<vscode.Location[]>(

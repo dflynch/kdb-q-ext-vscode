@@ -75,6 +75,10 @@ All notable changes to the extension are documented in this file.
   Definition has every definition of a global, where its whole value is
   set, which VS Code lists by file and line; the hover shows the nearest
   file's latest. An amend, as `t,:x` or `` `t upsert x ``, is a reference
+- Go to Definition on the path a `\l` line names: the workspace's `.q`
+  files whose paths end with it, as `\l common/util.q` has
+  `code/common/util.q`, ignoring `./` and `../`, as the directory q runs in
+  isn't known. VS Code jumps to one, or lists several in a peek
 - Hover for q: a keyword's, or a `.Q`, `.z`, `.h` or `.j` name's, syntax and
   description from KX's reference, linked; a global's, or a module
   export's, signature, then the comment above its definition, as written,

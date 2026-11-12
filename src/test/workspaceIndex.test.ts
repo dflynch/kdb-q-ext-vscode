@@ -5,6 +5,7 @@ import {
   entry,
   hover,
   type Index,
+  loaded,
   position,
   references,
   resolve,
@@ -805,5 +806,130 @@ suite("positions", () => {
         { line: 3, character: 1 },
       ],
     );
+  });
+});
+
+suite("files a \\l may load", () => {
+  // The workspace's files, each a q file; what they hold doesn't matter
+  const workspace = [
+    "/w/util.q",
+    "/w/code/util.q",
+    "/w/code/common/util.q",
+    "/w/code/notcommon/util.q",
+    "/w/lib/util.q",
+    "/w/lib/log.q",
+    "/w/main.q",
+  ];
+  const index: Index = new Map(
+    workspace.map((f) => [f, entry("", annotate(""))]),
+  );
+  // The files for the cursor, at |, in the lines after a first line, joined
+  // by the line ending
+  const found = (source: string, eol: string, keys: Index = index) => {
+    const text = `a:1${eol}${source.replace(/\n/g, eol)}`;
+    const offset = text.indexOf("|");
+    const plain = text.slice(0, offset) + text.slice(offset + 1);
+    return loaded(keys, plain, offset).map((l) => {
+      assert.deepStrictEqual([l.start, l.end], [0, 0]);
+      return l.file;
+    });
+  };
+  const all = [
+    "/w/code/common/util.q",
+    "/w/code/notcommon/util.q",
+    "/w/code/util.q",
+    "/w/lib/util.q",
+    "/w/util.q",
+  ];
+
+  for (const [ending, eol] of [
+    ["LF", "\n"],
+    ["CRLF", "\r\n"],
+  ]) {
+    suite(ending, () => {
+      // Input forms by how many files they match
+      const grid: [string, string[]][] = [
+        // A bare name: every file of that name, the loader too
+        ["\\l util|.q", all],
+        ["\\l log|.q", ["/w/lib/log.q"]],
+        ["\\l nothere|.q", []],
+        ["\\l main|.q", ["/w/main.q"]],
+        // A nested path: whole segments only
+        ["\\l common/util|.q", ["/w/code/common/util.q"]],
+        ["\\l code/util|.q", ["/w/code/util.q"]],
+        ["\\l mon/util|.q", []],
+        ["\\l til|.q", []],
+        ["\\l w/code/common/util|.q", ["/w/code/common/util.q"]],
+        ["\\l lib/util|.q", ["/w/lib/util.q"]],
+        ["\\l lib/log.q|", ["/w/lib/log.q"]],
+        ["\\l notcommon/log|.q", []],
+        // ./ and ../ dropped, wherever they are, and empty segments
+        ["\\l ./util|.q", all],
+        ["\\l ../lib/util|.q", ["/w/lib/util.q"]],
+        ["\\l ./../../lib/util|.q", ["/w/lib/util.q"]],
+        ["\\l lib/./util|.q", ["/w/lib/util.q"]],
+        ["\\l lib//util|.q", ["/w/lib/util.q"]],
+        ["\\l lib/../util|.q", ["/w/lib/util.q"]],
+        ["\\l /w/lib/util|.q", ["/w/lib/util.q"]],
+        ["\\l ..|", []],
+        ["\\l .|", []],
+        // Backslashes, quotes: q reads them as part of the name
+        ["\\l ..\\lib\\util|.q", []],
+        ['\\l "lib/util|.q"', []],
+        // Spaces, tabs and comments after it, and more than one space or a
+        // tab before it
+        ["\\l lib/util|.q   ", ["/w/lib/util.q"]],
+        ["\\l lib/util|.q\t", ["/w/lib/util.q"]],
+        ["\\l lib/util|.q / the logger", ["/w/lib/util.q"]],
+        ["\\l lib/util|.q\t/x", ["/w/lib/util.q"]],
+        ["\\l   lib/util|.q", ["/w/lib/util.q"]],
+        ["\\l\tlib/util|.q", ["/w/lib/util.q"]],
+        ["\\l lib/util|.q\nb:2", ["/w/lib/util.q"]],
+        // q loads nothing for more than a comment after it, as a space in it
+        ["\\l lib/util|.q x", []],
+        ["\\l lib/sub dir/util|.q", []],
+        ["\\l util|.q;b:2", []],
+        // Not a \l line
+        ["\\lutil|.q", []],
+        ["\\L util|.q", []],
+        [" \\l util|.q", []],
+        ['b:"\n\\l util|.q"', []],
+        ["/\n\\l util|.q\n\\", []],
+        ["\\d util|.q", []],
+      ];
+      for (const [source, files] of grid) {
+        test(JSON.stringify(source), () => {
+          assert.deepStrictEqual(found(source, eol), files);
+        });
+      }
+
+      // Each place on the line, from where the path starts to where it ends
+      test("only on the path", () => {
+        const line = "\\l lib/util.q / x";
+        const at = (n: number) =>
+          found(`${line.slice(0, n)}|${line.slice(n)}`, eol);
+        const on = [...line].map((_, n) => at(n).length > 0);
+        on.push(at(line.length).length > 0);
+        assert.deepStrictEqual(
+          on.map((x) => (x ? "y" : "-")).join(""),
+          "---yyyyyyyyyyy----",
+        );
+      });
+    });
+  }
+
+  test("a URI's escapes, as the path is written", () => {
+    const keys: Index = new Map(
+      ["file:///w/a%2Bb.q", "file:///w/c%23/d.q"].map((f) => [
+        f,
+        entry("", annotate("")),
+      ]),
+    );
+    assert.deepStrictEqual(found("\\l a+|b.q", "\n", keys), [
+      "file:///w/a%2Bb.q",
+    ]);
+    assert.deepStrictEqual(found("\\l c#/|d.q", "\n", keys), [
+      "file:///w/c%23/d.q",
+    ]);
   });
 });

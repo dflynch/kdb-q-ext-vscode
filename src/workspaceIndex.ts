@@ -20,6 +20,7 @@ import {
   type Span,
   targets,
 } from "./navigation";
+import { scan } from "./scanner";
 
 export type Entry = {
   // Where each line starts, to turn offsets into positions
@@ -137,6 +138,41 @@ export function resolve(index: Index, from: string, module: string): string[] {
     }
   }
   return out.sort();
+}
+
+// The files a \l line may load, if the offset is on the path it names: each
+// whose path ends with the path's segments, but . and .., as the directory
+// q runs in, which the path is from, isn't known. The path is the word after
+// \l, as q reads it, which loads nothing if more than a comment follows it
+export function loaded(index: Index, text: string, offset: number): Location[] {
+  const command = scan(text)
+    .statements.flatMap((s) => s.tokens)
+    .find((t) => t.kind === "command" && t.start <= offset && offset <= t.end);
+  if (!command) return [];
+  const m = /^(\\l[ \t\r]+)([^ \t\r]+)(?:[ \t\r]+\/.*)?$/.exec(
+    text.slice(command.start, command.end),
+  );
+  if (!m) return [];
+  const start = command.start + m[1].length;
+  if (offset < start || offset > start + m[2].length) return [];
+  const segments = m[2]
+    .split("/")
+    .filter((s) => s !== "" && s !== "." && s !== "..");
+  if (!segments.length) return [];
+  const tail = `/${segments.join("/")}`;
+  return [...index.keys()]
+    .filter((k) => decoded(k).endsWith(tail))
+    .sort()
+    .map((file) => ({ file, start: 0, end: 0 }));
+}
+
+// A URI as a path, as it's written, to compare with one in q
+function decoded(uri: string): string {
+  try {
+    return decodeURIComponent(uri);
+  } catch {
+    return uri;
+  }
 }
 
 // Nearest the file first: itself, then its directory, then by how many
