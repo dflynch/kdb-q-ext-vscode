@@ -73,6 +73,18 @@ suite("hover", () => {
     ]);
   });
 
+  test("a global defined again in its file: the latest", async () => {
+    assert.deepStrictEqual(await hovered("code/again.q", 6, 1), [
+      "\n```q\nop[c;d]\n```\n" +
+        "\n```q\n/ Subtract d from c\n```\n\n\n" +
+        "[1 more definition](command:kdb-q-ext-vscode.peekDefinitions?" +
+        encodeURIComponent(
+          JSON.stringify([file("code/again.q").toString(), 5, 0]),
+        ) +
+        ")",
+    ]);
+  });
+
   test("a comment holding a fence, in a longer one", async () => {
     assert.deepStrictEqual(await hovered("code/doc.q", 7, 1), [
       "\n```q\ntwice[x]\n```\n" +
@@ -102,6 +114,22 @@ suite("hover", () => {
           `${vscode.workspace.asRelativePath(l.uri)} ${l.range.start.line}`,
       ),
       ["index/code/wdb.q 0", "index/config/wdb.q 1"],
+    );
+  });
+
+  test("the link's command peeks at each in a file, the latest first", async () => {
+    const d = await vscode.workspace.openTextDocument(file("code/again.q"));
+    await vscode.window.showTextDocument(d);
+    const peeked = await vscode.commands.executeCommand<vscode.Location[]>(
+      "kdb-q-ext-vscode.peekDefinitions",
+      d.uri.toString(),
+      5,
+      0,
+    );
+    await vscode.commands.executeCommand("closeReferenceSearch");
+    assert.deepStrictEqual(
+      peeked.map((l) => l.range.start.line),
+      [3, 0],
     );
   });
 

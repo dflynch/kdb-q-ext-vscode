@@ -78,13 +78,9 @@ suite("outline", () => {
       ["variable a: a:1", "variable b: b:2", "variable d: d:3"],
     ],
     [
-      "set and upsert by reference",
+      "set by reference, not upsert, which changes a value",
       "`t set ([] a:1 2)\n`.u.q upsert x",
-      [
-        "variable t: `t set ([] a:1 2)",
-        "namespace .u",
-        "  variable q: `.u.q upsert x @.u.q",
-      ],
+      ["variable t: `t set ([] a:1 2)"],
     ],
     [
       "a lambda set by handle is a function",
@@ -107,9 +103,9 @@ suite("outline", () => {
     ],
     ["a lambda left open", "f:{x", ["variable f: f:{x"]],
     [
-      "not an amend, as q can't create a global by one",
-      "d[`a]:1\n@[`t;0;:;1]\nd[]:2",
-      ["variable d: d[]:2"],
+      "not an amend, which changes a value",
+      "d[`a]:1\n@[`t;0;:;1]\nd[]:2\ne,:1\n`f insert x",
+      [],
     ],
     [
       "a lambda assigned to several",
@@ -350,26 +346,51 @@ function defined(source: string): string {
     a,
     offset,
   );
-  assert.ok(found.length <= 1);
-  const [d] = found;
-  if (!d) return "none";
-  const before = text.slice(0, d.start).split("\n");
-  return `${before.length}:${before[before.length - 1].length + 1} ${text.slice(d.start, d.end)}`;
+  if (!found.length) return "none";
+  return found
+    .map((d) => {
+      const before = text.slice(0, d.start).split("\n");
+      return `${before.length}:${before[before.length - 1].length + 1} ${text.slice(d.start, d.end)}`;
+    })
+    .join(", ");
 }
 
 suite("definition in a file", () => {
   const cases: [string, string, string][] = [
-    ["a global, where it's first assigned", "n:0\nn:1\nf:{|n}", "1:1 n"],
+    [
+      "a global, each assignment, the latest first",
+      "n:0\nn:1\nf:{|n}",
+      "2:1 n, 1:1 n",
+    ],
     [
       "a global assigned as the file loads, not first in a lambda",
       "f:{n::1}\nn:0\n|n",
       "2:1 n",
     ],
     ["a global only a lambda assigns", "f:{n::1}\n|n", "1:4 n"],
+    [
+      "a global only lambdas assign, each, the latest first",
+      "f:{n::1}\ng:{`n set 2}\n|n",
+      "2:5 n, 1:4 n",
+    ],
     ["a global set by reference", "`t set 1\n|t", "1:2 t"],
-    ["a global from a handle", "t:1\n`|t upsert 2", "1:1 t"],
-    ["a parameter, where it's declared", "f:{[a;b] a:1; |a}", "1:5 a"],
+    [
+      "a global from a handle, where it's assigned, not an upsert",
+      "t:1\n`|t upsert 2",
+      "1:1 t",
+    ],
+    ["a parameter, where it's declared", "f:{[a;b] |a}", "1:5 a"],
+    [
+      "a parameter assigned, then where it's declared",
+      "f:{[a;b] a:1; |a}",
+      "1:10 a, 1:5 a",
+    ],
     ["a local, not a global of its name", "a:0\nf:{a:1; |a}", "2:4 a"],
+    [
+      "a local assigned again, the latest first, not an amend",
+      "f:{a:1; a[0]:2; a:a,3; |a}",
+      "1:17 a, 1:4 a",
+    ],
     [
       "a global under \\d, by its absolute name",
       "\\d .u\nf:1\n\\d .\n.u.|f",
@@ -392,11 +413,13 @@ suite("definition in a file", () => {
     ],
     ["the definition itself", "|n:0", "1:1 n"],
     [
-      "not an amend, as q can't create a global by one",
+      "not an amend, which changes a value",
       ".h.tx[`a]:1\n@[`t;0;:;1]\nupdate a:1 from `u\nf:{|.h.tx,t,u}",
       "none",
     ],
     ["an assignment, not a later amend", "f:{d[`a]:1}\nd:()!()\n|d", "2:1 d"],
+    ["an assignment, not an append", "t:1\nt,:2\n`t insert 3\n|t", "1:1 t"],
+    ["a local, not where it's added to", "f:{[n] s:0; s+:n; |s}", "1:8 s"],
     ["a replacement in full", "d[]:1\n@[`t;();:;1]\n|t,d", "2:4 t"],
     ["in the root, by key", "@[`.;`t;:;1]\n|t", "1:7 t"],
     ["an implicit parameter", "f:{|x}", "none"],
@@ -417,11 +440,11 @@ suite("references", () => {
   const at = text.indexOf("n+1");
   const shown = (withDefinition: boolean) =>
     references(annotate(text), at, withDefinition).map((r) => r.start);
-  test("with the definition", () => {
+  test("with the definitions", () => {
     assert.deepStrictEqual(shown(true), [0, 7, 13]);
   });
-  test("without it", () => {
-    assert.deepStrictEqual(shown(false), [7, 13]);
+  test("without any", () => {
+    assert.deepStrictEqual(shown(false), [7]);
   });
 });
 

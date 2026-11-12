@@ -144,12 +144,12 @@ suite("annotate names", () => {
     [
       "amending a local",
       "{a:1; a+:1; a::2}",
-      ["local a :", "local a :", "local a :"],
+      ["local a :", "local a : amends", "local a :"],
     ],
     [
       "amending a global",
       "{a+:1; b[0]:2; c[]:3}",
-      ["global a :", "global b : amends", "global c :"],
+      ["global a : amends", "global b : amends", "global c : amends"],
     ],
     ["a dotted name is global", "{e.f:1}", ["global e.f :"]],
     ["no closures", "{a:1; {a}}", ["local a :", "global a"]],
@@ -444,7 +444,7 @@ suite("annotate parameter lists", () => {
   const uses: [string, (bound: string) => string][] = [
     ["read", (r) => `${r} a`],
     ["assigned", (r) => `${r} a :`],
-    ["amended", (r) => `${r} a :`],
+    ["amended", (r) => `${r} a : amends`],
     ["in a where clause", (r) => `column a ?${r} a`],
   ];
   const bodies: Record<string, string> = {
@@ -516,11 +516,16 @@ suite("annotate handles", () => {
       "@[`.;`upd;:;f]; @[`t;0;:;1]; .[`u;();:;1]",
       ["upd=upd :", "t=t : amends", "u=u :"],
     ],
+    [
+      "amend by another function, even at the path ()",
+      "@[`.;`a;,;1]; @[`b;();,;1]; .[`c;();+;1]",
+      ["a=a : amends", "b=b : amends", "c=c : amends"],
+    ],
     ["index", "@[`t;0]; `t 0; `t[1]; `t i", ["t=t", "t=t", "t=t", "t=t"]],
     [
       "set, upsert, insert",
       "`a set 1; `t upsert x; `u insert y",
-      ["a=a :", "t=t :", "u=u :"],
+      ["a=a :", "t=t : amends", "u=u : amends"],
     ],
     [
       "from, in place for update and delete",
@@ -530,7 +535,7 @@ suite("annotate handles", () => {
     [
       "bracket forms",
       "value[`a]; set[`b;1]; insert[`c;x]; upsert[`d]",
-      ["a=a", "b=b :", "c=c :", "d=d :"],
+      ["a=a", "b=b :", "c=c : amends", "d=d : amends"],
     ],
     ["set on a list assigns nothing", "`a`b set (1;2); `.`t set 9", []],
     [

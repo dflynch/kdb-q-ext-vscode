@@ -102,6 +102,15 @@ suite("definitions across files", () => {
       ],
     ],
     [
+      "each file's every definition, the latest first",
+      {
+        "/w/a.q": "f:1\nf:2",
+        "/w/c/d.q": "f:3\n`f set 4",
+        "/w/c/e.q": "|f",
+      },
+      ["/w/c/d.q 2:2 f", "/w/c/d.q 1:1 f", "/w/a.q 2:1 f", "/w/a.q 1:1 f"],
+    ],
+    [
       "its own directory before one only named like it, or a subdirectory",
       {
         "/w/code-old/f.q": "f:1",
@@ -185,6 +194,94 @@ suite("definitions across files", () => {
     test(name, () => {
       assert.deepStrictEqual(opened(files).defined(), expected);
     });
+  }
+});
+
+suite("every definition", () => {
+  // Each way to define f as a value, the column its name is at, and
+  // whether it's in a lambda
+  const forms: [string, (v: string) => string, number, boolean][] = [
+    ["a name", (v) => `f:${v}`, 1, false],
+    ["a handle", (v) => `\`f set ${v}`, 2, false],
+    ["set[`f;…]", (v) => `set[\`f;${v}]`, 6, false],
+    ["f:g:", (v) => `f:g:${v}`, 1, false],
+    ["in a lambda", (v) => `h:{f::${v}}`, 4, true],
+    ["by a handle in a lambda", (v) => `h:{\`f set ${v}}`, 5, true],
+  ];
+  // Each case's lines, n for the form's nth definition, else as written,
+  // then the lines defining f, the latest first, for a form at top level
+  // and for one in a lambda, as an assignment at top level comes before
+  // any in one
+  const cases: [string, (number | string)[], number[], number[]][] = [
+    ["once", [1], [1], [1]],
+    ["twice, a comment above the latest", [1, "/ again", 2], [3, 1], [3, 1]],
+    ["a variable assigned between", [1, "f:1", 2], [3, 2, 1], [2]],
+    ["an amend between", [1, "f[`k]:1", 2], [3, 1], [3, 1]],
+    ["an append between", [1, "f,:1", 2], [3, 1], [3, 1]],
+    ["an upsert between", [1, "`f upsert 1", 2], [3, 1], [3, 1]],
+    ["an insert between", [1, "insert[`f;1]", 2], [3, 1], [3, 1]],
+    ["an amend at the path ()", [1, "@[`f;();,;1]", 2], [3, 1], [3, 1]],
+  ];
+  // Where the definitions are written, the file, and the use at the cursor
+  const places: [string, string, (defs: string) => Files][] = [
+    ["in the file", "/w/a.q", (d) => ({ "/w/a.q": `${d}\n|f[]` })],
+    ["in another file", "/w/a.q", (d) => ({ "/w/a.q": d, "/w/b.q": "|f[]" })],
+    [
+      "an export",
+      "/w/m.q",
+      (d) => ({
+        "/w/m.q": `${d}\nexport:([f:f])`,
+        "/w/b.q": "s:use`m\ns.|f[]",
+      }),
+    ],
+  ];
+  const endings = { LF: "\n", CRLF: "\r\n", CR: "\r" };
+  for (const [place, at, written] of places) {
+    for (const [form, define, column, inLambda] of forms) {
+      for (const [name, lines, top, inner] of cases) {
+        test(`${place}, ${form}, ${name}`, () => {
+          const text = lines
+            .map((l) => (typeof l === "number" ? define(`{[a${l}] a${l}}`) : l))
+            .join("\n");
+          const latest = inLambda ? inner : top;
+          const where = (n: number) =>
+            `${at} ${n}:${typeof lines[n - 1] === "number" ? column : 1} f`;
+          // The hover's: each one's signature, and the comment above it if
+          // it starts its line
+          const hovered = latest.map((n) => {
+            const l = lines[n - 1];
+            const above = lines[n - 2];
+            const doc =
+              typeof l === "number" &&
+              !inLambda &&
+              typeof above === "string" &&
+              above.startsWith("/")
+                ? above
+                : "-";
+            return `${where(n)}${typeof l === "number" ? `[a${l}]` : ""} ${doc}`;
+          });
+          for (const [ending, eol] of Object.entries(endings)) {
+            const files = Object.fromEntries(
+              Object.entries(written(text)).map(([f, t]) => [
+                f,
+                t.replaceAll("\n", eol),
+              ]),
+            );
+            const o = opened(files);
+            assert.deepStrictEqual(o.defined(), latest.map(where), ending);
+            assert.deepStrictEqual(o.hovered(), hovered, ending);
+            if (place === "an export") continue;
+            // Find All References, without any of them unless asked
+            const without = o.referenced(false);
+            const all = o.referenced();
+            for (const n of latest) {
+              assert.ok(!without.includes(where(n)), ending);
+              assert.ok(all.includes(where(n)), ending);
+            }
+          }
+        });
+      }
+    }
   }
 });
 
@@ -316,6 +413,13 @@ suite("hover", () => {
         "/w/b/d.q": "g:|f 2",
       },
       ["/w/b/c.q 1:1 f[a] -", "/w/a.q 2:1 f[x] / adds one"],
+    ],
+    [
+      "a global defined again in its file: each, the latest first",
+      {
+        "/w/a.q": "f:{[a;b] a+b}\n\n/ Subtract d from c\nf:{[c;d] c-d}\n\n|f[]",
+      },
+      ["/w/a.q 4:1 f[c;d] / Subtract d from c", "/w/a.q 1:1 f[a;b] -"],
     ],
     [
       "a callback q has, and the file's definition",

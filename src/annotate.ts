@@ -40,8 +40,8 @@ export type Name = {
   full: string;
   // Assigns or amends it, or declares a parameter
   defines?: true;
-  // Defines it only by amending a value that must exist already, as d[k]:1,
-  // so isn't where it's defined: q raises 'type on an undefined name
+  // Writes it only by changing its value, as d[k]:1, x+:1 or x,:y, so isn't
+  // where it's defined: that's where the whole value is set, as x:1
   amends?: true;
   // The innermost lambda it's in
   lambda?: Lambda;
@@ -63,8 +63,8 @@ export type Handle = {
   // Absolute, as for a name, or an export's key with module
   full: string;
   defines?: true;
-  // As for a name: @[`t;i;:;1] and update from `t amend; set, upsert,
-  // insert and @[`t;();:;1] assign
+  // As for a name: set and @[`t;();:;1] assign; upsert, insert,
+  // @[`t;i;:;1], @[`t;();,;1] and update from `t amend
   amends?: true;
   lambda?: Lambda;
   module?: string;
@@ -234,8 +234,8 @@ const join = (namespace: string, name: string) =>
     ? bare(name)
     : `${namespace}.${bare(name)}`;
 
-// An amend, as x+: or x,:, can create the name; an indexed one, as x[i]:,
-// needs it to exist
+// An amend changes the value, as x+:, x,: or x[i]:, where x: and x:: set
+// the whole of it
 type Assign = ":" | "::" | "amend" | "indexed";
 // How a handle is written: assigned, as by set, or amended in place
 type Write = "assigns" | "amends";
@@ -495,15 +495,17 @@ export function annotate(
     const args = segments(group.items);
     const first = single(args[0]);
     const second = single(args[1]);
-    // At the path (), it replaces the whole value, as set does, and in the
-    // root, as @[`.;`t;:;1], it adds the key if it's new
+    // Assigning, :, at the path (), it replaces the whole value, as set
+    // does, and in the root, as @[`.;`t;:;1], it sets the key's; any other
+    // function changes the value
+    const assigns = word(single(args[2])) === ":";
     const whole = isGroup(second) && second.items.length === 0;
     const write: Write | undefined =
-      args.length < 3 ? undefined : whole ? "assigns" : "amends";
+      args.length < 3 ? undefined : whole && assigns ? "assigns" : "amends";
     if (isSymbol(first)) {
       if (isRoot(first) && isSymbol(second)) {
         done.add(first);
-        inRoot(second, context, write && "assigns");
+        inRoot(second, context, write && (assigns ? "assigns" : "amends"));
       } else {
         dereference(first, context, write);
       }
@@ -546,7 +548,9 @@ export function annotate(
       dereference(token, context, inPlace ? "amends" : undefined);
     } else if (isName(next, "set", "upsert", "insert")) {
       // Only an atom: on a list they assign nothing
-      if (elements(token).length === 1) dereference(token, context, "assigns");
+      if (elements(token).length === 1) {
+        dereference(token, context, isName(next, "set") ? "assigns" : "amends");
+      }
     } else if (
       (opens(next, "[") && next.open.start === token.end) ||
       (isName(next) && !keywords.has(word(next))) ||
@@ -672,7 +676,8 @@ export function annotate(
         const s = single(segments(next.items)[0]);
         const sets = ["set", "upsert", "insert"].includes(w);
         if (isSymbol(s) && (!sets || elements(s).length === 1)) {
-          dereference(s, here, sets ? "assigns" : undefined);
+          const write = w === "set" ? "assigns" : "amends";
+          dereference(s, here, sets ? write : undefined);
         }
       }
       const entry = enter(item, here, query ? { query: true } : {});
@@ -887,7 +892,9 @@ export function annotate(
     };
     const defines = {
       ...(e.assign || e.declares ? { defines: true as const } : {}),
-      ...(e.assign === "indexed" ? { amends: true as const } : {}),
+      ...(e.assign === "indexed" || e.assign === "amend"
+        ? { amends: true as const }
+        : {}),
     };
     const local = scoped(e, w);
     const exported = w.includes(".") ? exportOf(e) : undefined;

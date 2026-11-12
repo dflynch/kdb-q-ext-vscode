@@ -53,12 +53,16 @@ read.
   uses that pass a global by reference, naming it by a symbol as in
   ``@[value;`.timer.enabled;0b]`` or `` `t insert x ``, under **Passed by
   reference**, after the rest; the peek (Shift+F12) lists them with the
-  rest, as it has no groups. What it can't know:
+  rest, as it has no groups. A definition sets the whole value, as `t:`,
+  `t::`, `` `t set x `` or ``@[`t;();:;x]`` do; an amend changes it, as
+  `t,:x`, `t[i]:x`, `` `t upsert x `` or ``update … from `t`` do, so is a
+  reference. What it can't know:
   - Each file is read as if loaded in the root namespace: `\l` runs a file
     in its loader's namespace, which the file doesn't say
-  - A global several files define, such as a setting with its defaults
-    and overrides, has each file's definition, which VS Code lists in a
-    peek opened at the nearest: the file's own, if it has one. Set
+  - A global defined more than once, in a file or in several, such as a
+    setting with its defaults and overrides, has every definition, which
+    VS Code lists by file and line in a peek opened at the one nearest the
+    cursor: in the file's own, if it has one. Set
     `editor.gotoLocation.multipleDefinitions` to `goto` to jump there
   - ``use`foo`` goes to `foo.q` or `foo/init.q` anywhere in the
     workspace, as `QPATH` isn't read
@@ -70,11 +74,11 @@ read.
   above it, exactly as written, as parameter hints show them, and, if
   it's another, the file it's in. A comment indented, as in a lambda, is
   about the code it's in, and one trailing a line could be about either
-  line, so neither is shown. A
-  global several files define shows the nearest definition, with a link
-  that peeks at all of them, as Go to Definition does. A name in a query
-  may be a column or a global, so, as Go to Definition does, it shows the
-  global of that name, if there is one.
+  line, so neither is shown. A global defined more than once shows the
+  nearest file's latest definition, what the global holds once that file
+  has loaded, with a link that peeks at all of them, as Go to Definition
+  does. A name in a query may be a column or a global, so, as Go to
+  Definition does, it shows the global of that name, if there is one.
 - Parameter hints: typing a call's arguments in brackets, as `f[a;b]`,
   shows its signature with the current parameter highlighted, in VS Code's
   own widget: each of q's forms for the name, then each definition's,

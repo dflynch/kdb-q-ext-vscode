@@ -71,7 +71,10 @@ All notable changes to the extension are documented in this file.
   it occurs, Go to Definition, Find All References and Go to Symbol in
   Workspace, across the workspace's `.q` files, following namespaces,
   lambdas' locals and q 5 modules. Find All References lists the uses that
-  pass a global by reference under a group of their own
+  pass a global by reference under a group of their own. Go to
+  Definition has every definition of a global, where its whole value is
+  set, which VS Code lists by file and line; the hover shows the nearest
+  file's latest. An amend, as `t,:x` or `` `t upsert x ``, is a reference
 - Hover for q: a keyword's, or a `.Q`, `.z`, `.h` or `.j` name's, syntax and
   description from KX's reference, linked; a global's, or a module
   export's, signature, then the comment above its definition, as written,

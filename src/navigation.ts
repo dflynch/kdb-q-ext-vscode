@@ -83,8 +83,8 @@ function closing({ tokens, index }: Placed): number | undefined {
 
 export type Span = { start: number; end: number };
 
-// A global's definition: where it's first assigned at top level, or first
-// in a lambda. A function is a global assigned a lambda, as in f:{x},
+// A global's definition: where it's assigned, not where an existing value is
+// amended. A function is a global assigned a lambda, as in f:{x},
 // f:g:{x}, `f set {x} or set[`f;{x}]; a module, one assigned use`mod
 export type Defined = {
   full: string;
@@ -104,10 +104,9 @@ export type Defined = {
   doc?: string;
 };
 
-// Each global's first definition at top level and its first in a lambda,
-// or, if every, each of its definitions, not where an existing value is
-// amended, in the order they're written
-export function globals(text: string, a: Annotated, every = false): Defined[] {
+// Each global's definitions, not where an existing value is amended, in the
+// order they're written; firsts() keeps each one's first
+export function globals(text: string, a: Annotated): Defined[] {
   const script = scan(text);
   const at = placed(script);
   const lambdas = new Map<number, Lambda>(
@@ -200,7 +199,7 @@ export function globals(text: string, a: Annotated, every = false): Defined[] {
     const item = described(d.full, d.nameSpan, d.inLambda);
     if (item) out.push(item);
   }
-  return every ? out : firsts(out);
+  return out;
 }
 
 // Each global's first definition at top level and its first in a lambda
@@ -262,7 +261,7 @@ function docs(
 // only its own
 export function outline(text: string, a: Annotated): Outlined[] {
   const top: Outlined[] = [];
-  for (const d of globals(text, a)) {
+  for (const d of firsts(globals(text, a))) {
     if (d.inLambda) continue;
     const item: Outlined = {
       name: d.full,
@@ -305,8 +304,8 @@ export type Target = {
   // A column's variable, if the table has no such column
   maybe?: string;
   defines: boolean;
-  // Can create it, as an amend of an existing value can't
-  creates: boolean;
+  // Sets its whole value, so is where it's defined, as an amend isn't
+  sets: boolean;
   // In a lambda, rather than run as the file loads
   inLambda: boolean;
   // A global named by a symbol, as `t in `t insert x
@@ -351,7 +350,7 @@ function targetsOf(a: Annotated): Target[] {
       ? { maybe: scoped(n.variable.role, n.variable.full, n.lambda) }
       : {}),
     defines: n.defines === true,
-    creates: n.defines === true && !n.amends,
+    sets: n.defines === true && !n.amends,
     inLambda: n.lambda !== undefined,
     passed: false,
   }));
@@ -364,7 +363,7 @@ function targetsOf(a: Annotated): Target[] {
           ? `global ${h.full}`
           : `export ${h.module} ${h.full}`,
       defines: h.defines === true,
-      creates: h.defines === true && !h.amends,
+      sets: h.defines === true && !h.amends,
       inLambda: h.lambda !== undefined,
       passed: h.module === undefined,
     });
@@ -381,44 +380,45 @@ export function at(all: readonly Target[], offset: number): Target | undefined {
   );
 }
 
-// Where the name at the offset is defined in the file: a parameter where
-// it's declared, a local or global where it's first assigned, not where an
-// existing value is amended, as d[k]:1. For a global, an assignment at top
-// level comes before any in a lambda, as the outline has it, wherever the
-// lambda is. A column read is the variable it may be. Nothing for a keyword,
-// an export, an implicit parameter never assigned, or a name defined in
-// another file
-function definition(
-  a: Annotated,
-  offset: number,
-): { start: number; end: number } | undefined {
+// Where the name at the offset is defined in the file, as defining() has
+// it. A column read is the variable it may be. Nothing for a keyword, an
+// export, an implicit parameter never assigned, or a name defined in another
+// file
+function definitions(a: Annotated, offset: number): Target[] {
   const all = targets(a);
   const here = at(all, offset);
-  if (!here) return undefined;
-  const d = first(all, here.identity) ?? first(all, here.maybe);
-  return d && { start: d.start, end: d.end };
+  if (!here) return [];
+  const found = defining(all, here.identity);
+  return found.length ? found : defining(all, here.maybe);
 }
 
-// Where a variable or global is first defined in the file, at top level
-// before any lambda
-export function first(
+// Where a variable or global is defined in the file, the latest first: a
+// parameter where it's declared, each assignment, not where an existing
+// value is amended, as d[k]:1. For a global, its assignments at top level,
+// or, if there's none, its assignments in lambdas, as the outline has it,
+// wherever the lambda is
+export function defining(
   all: readonly Target[],
   identity: string | undefined,
-): Target | undefined {
+): Target[] {
   if (!identity?.startsWith("variable ") && !identity?.startsWith("global "))
-    return undefined;
-  const defs = all.filter((t) => t.identity === identity && t.creates);
-  return defs.find((t) => !t.inLambda) ?? defs[0];
+    return [];
+  const defs = all.filter((t) => t.identity === identity && t.sets);
+  const top = defs.filter((t) => !t.inLambda);
+  return (top.length ? top : defs).reverse();
 }
 
-// The occurrences, for find references, without the definition unless asked
+// The occurrences, for find references, without the definitions unless
+// asked
 export function references(
   a: Annotated,
   offset: number,
   withDefinition: boolean,
 ): { start: number; end: number }[] {
-  const d = withDefinition ? undefined : definition(a, offset);
-  return occurrences(a, offset).filter((o) => o.start !== d?.start);
+  const skip = withDefinition ? [] : definitions(a, offset);
+  return occurrences(a, offset).filter(
+    (o) => !skip.some((d) => d.start === o.start),
+  );
 }
 
 // Where the name at the offset occurs in the file, meaning the same thing
