@@ -73,9 +73,11 @@ read.
     are dropped, and `x/..` cancels out, so an absolute path matches as a
     suffix: `\l /opt/app/lib/util.q` finds any file ending in
     `opt/app/lib/util.q`. Paths are split at `/` only, with no `\` or drive
-    letters, as the q process's platform isn't known. Only a `\l` that's a
-    statement of its own, with no indented line after it, as q then loads
-    nothing; and a directory, as a database, isn't followed
+    letters, as the q process's platform isn't known. A `\l` with an
+    indented line after it goes nowhere, as q joins the line on and loads
+    nothing, unless the `\l` line ends in a comment, as q reads a command
+    only up to its first comment. A directory, as a database, isn't
+    followed
   - Names q defines (`.z`, `.Q`), and globals defined outside the workspace
 - Hover: on a q keyword or a name in `.Q`, `.z`, `.h` or `.j`, its syntax
   and what it does, from [KX's reference](https://code.kx.com/q/ref/),

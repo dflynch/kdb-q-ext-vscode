@@ -911,6 +911,19 @@ suite("files a \\l may load", () => {
         // A line of only spaces, or a comment at column 0, isn't joined on
         ["\\l lib/util|.q\n  \nb:2", ["/w/lib/util.q"]],
         ["\\l lib/util|.q\n/ c\nb:2", ["/w/lib/util.q"]],
+        // q reads the command up to its first comment, so one on the \l line
+        // drops the lines joined on (q 5.0)
+        ["\\l lib/util|.q /x\n  show 1", ["/w/lib/util.q"]],
+        ["\\l lib/util|.q /x\n\t/ c", ["/w/lib/util.q"]],
+        ["\\l lib/util|.q\t/x\n  / c", ["/w/lib/util.q"]],
+        ["\\l lib/util|.q /x\n\n  / c", ["/w/lib/util.q"]],
+        ["\\l lib/util|.q /x\n  show 1\n  show 2", ["/w/lib/util.q"]],
+        ["\\l lib/util|.q\n  show 1 /x", []],
+        ["\\l lib/util|.q\n\t/ c", []],
+        ["\\l lib/util|.q  \n  / c", []],
+        ["\\l lib/util|.q x /y\n  show 1", []],
+        ["\\l /w/lib/util|.q /x\n  show 1", ["/w/lib/util.q"]],
+        ["\\l /w/lib/util|.q\n  show 1", []],
       ];
       for (const [source, files] of grid) {
         test(JSON.stringify(source), () => {
