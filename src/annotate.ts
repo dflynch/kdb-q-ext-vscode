@@ -734,7 +734,7 @@ export function annotate(
       if (m) setNamespace(m[1]);
       continue;
     }
-    if (first.kind === "k") continue;
+    if (first.kind === "k" || first.kind === "other") continue;
     const items = tree(text, statement.tokens);
     const context: Context = { namespace, column: false };
     walk(items, context);

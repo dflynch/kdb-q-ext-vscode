@@ -6,6 +6,7 @@
 
 import * as vscode from "vscode";
 import { type Annotated, annotate } from "./annotate";
+import { lineOf, lineStarts } from "./lines";
 import {
   type Occurrence,
   type Outlined,
@@ -14,6 +15,7 @@ import {
   type Span,
 } from "./navigation";
 import { type Found, ReferencesView } from "./referencesView";
+import { syntaxErrors } from "./syntax";
 import {
   definitions,
   type Entry,
@@ -55,6 +57,190 @@ function entryOf(document: vscode.TextDocument): Entry {
   return e;
 }
 
+const diagnosticMode = "kdb-q-ext-vscode.diagnosticMode";
+
+const workspaceWide = () =>
+  vscode.workspace.getConfiguration().get(diagnosticMode) === "workspace";
+
+// Files and untitled documents, not a diff's original, as git: has it
+const checked = new Set(["file", "untitled"]);
+
+// The documents in the editor's tabs, by URI; a diff's, the side edited
+function tabbed(): Map<string, vscode.Uri> {
+  const out = new Map<string, vscode.Uri>();
+  for (const group of vscode.window.tabGroups.all) {
+    for (const { input } of group.tabs) {
+      const uri =
+        input instanceof vscode.TabInputText
+          ? input.uri
+          : input instanceof vscode.TabInputTextDiff
+            ? input.modified
+            : undefined;
+      if (uri) out.set(uri.toString(), uri);
+    }
+  }
+  return out;
+}
+
+// Positions in a file's saved text, by VS Code's lines
+function positions(text: string): (offset: number) => vscode.Position {
+  const starts = lineStarts(text);
+  return (offset) => {
+    const line = lineOf(starts, offset);
+    return new vscode.Position(line, offset - starts[line]);
+  };
+}
+
+// Syntax errors in VS Code's Problems: each q document open in a tab as it's
+// typed, and, in workspace mode, each workspace file's as the index reads it.
+// A document opened without a tab, as for a preview of references, is the
+// index's, not open to the user. A tab VS Code hasn't loaded yet, as those
+// behind the active one as VS Code starts, shows its q file as saved
+class Problems implements vscode.Disposable {
+  private readonly collection =
+    vscode.languages.createDiagnosticCollection("q");
+  // q documents open in tabs, by URI, which show their own text as typed
+  private readonly open = new Map<string, vscode.TextDocument>();
+  // Tabs of q files not loaded yet, by URI
+  private readonly unloaded = new Set<string>();
+  // Checks waiting for typing to pause, by URI
+  private readonly waiting = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly disposables: vscode.Disposable[];
+  // A document no longer open in a tab, for the index to show as it has it
+  left: (uri: vscode.Uri) => void = () => undefined;
+
+  constructor() {
+    const refresh = () => this.refresh();
+    this.disposables = [
+      this.collection,
+      vscode.window.tabGroups.onDidChangeTabs(refresh),
+      vscode.workspace.onDidOpenTextDocument(refresh),
+      vscode.workspace.onDidCloseTextDocument(refresh),
+      vscode.workspace.onDidChangeTextDocument(({ document: d }) => {
+        const key = d.uri.toString();
+        if (!this.open.has(key)) return;
+        clearTimeout(this.waiting.get(key));
+        this.waiting.set(
+          key,
+          setTimeout(() => {
+            this.waiting.delete(key);
+            this.check(d);
+          }, 250),
+        );
+      }),
+    ];
+    this.refresh();
+  }
+
+  // Checks each q document newly in a tab, and lets go of each that left
+  private refresh() {
+    const tabs = tabbed();
+    const now = new Map<string, vscode.TextDocument>();
+    const loaded = new Set<string>();
+    for (const d of vscode.workspace.textDocuments) {
+      const key = d.uri.toString();
+      if (d.isClosed || !tabs.has(key)) continue;
+      loaded.add(key);
+      if (d.languageId === "q" && checked.has(d.uri.scheme)) now.set(key, d);
+    }
+    for (const [key, d] of this.open) {
+      if (now.get(key) === d) continue;
+      this.open.delete(key);
+      clearTimeout(this.waiting.get(key));
+      this.waiting.delete(key);
+      // A document closed, the index reads again itself
+      this.release(d.uri, !d.isClosed);
+    }
+    for (const key of [...this.unloaded]) {
+      if (tabs.has(key) && !loaded.has(key)) continue;
+      this.unloaded.delete(key);
+      if (!now.has(key)) this.release(vscode.Uri.parse(key), true);
+    }
+    for (const [key, d] of now) {
+      if (this.open.has(key)) continue;
+      this.open.set(key, d);
+      this.check(d);
+    }
+    for (const [key, uri] of tabs) {
+      if (loaded.has(key) || this.unloaded.has(key)) continue;
+      if (uri.scheme !== "file" || !uri.path.endsWith(".q")) continue;
+      this.unloaded.add(key);
+      vscode.workspace.fs.readFile(uri).then(
+        (bytes) => this.file(uri, new TextDecoder().decode(bytes)),
+        () => undefined,
+      );
+    }
+  }
+
+  // A tab let go of: its problems go, and the index may show its file's
+  private release(uri: vscode.Uri, reread: boolean) {
+    this.collection.delete(uri);
+    if (reread) this.left(uri);
+  }
+
+  private check(d: vscode.TextDocument) {
+    if (d.isClosed) return;
+    this.show(d.uri, d.getText(), (offset) => d.positionAt(offset));
+  }
+
+  private show(
+    uri: vscode.Uri,
+    text: string,
+    at: (offset: number) => vscode.Position,
+  ) {
+    const range = (s: { start: number; end: number }) =>
+      new vscode.Range(at(s.start), at(s.end));
+    this.collection.set(
+      uri,
+      syntaxErrors(text).map((p) => {
+        const d = new vscode.Diagnostic(
+          range(p),
+          p.message,
+          vscode.DiagnosticSeverity.Error,
+        );
+        d.source = "q";
+        if (p.related) {
+          d.relatedInformation = [
+            new vscode.DiagnosticRelatedInformation(
+              new vscode.Location(uri, range(p.related)),
+              p.related.message,
+            ),
+          ];
+        }
+        return d;
+      }),
+    );
+  }
+
+  // A file as saved, or as a document not in a tab has it, or without its
+  // text when it's gone. A document in a tab shows its own; a tab not
+  // loaded yet, its file's, in either mode
+  file(uri: vscode.Uri, text?: string) {
+    const key = uri.toString();
+    if (this.open.has(key)) return;
+    if (text === undefined || !(workspaceWide() || this.unloaded.has(key))) {
+      this.collection.delete(uri);
+      return;
+    }
+    this.show(uri, text, positions(text));
+  }
+
+  // Back to open files only
+  narrow() {
+    const shut: vscode.Uri[] = [];
+    this.collection.forEach((uri) => {
+      const key = uri.toString();
+      if (!this.open.has(key) && !this.unloaded.has(key)) shut.push(uri);
+    });
+    for (const uri of shut) this.collection.delete(uri);
+  }
+
+  dispose() {
+    for (const t of this.waiting.values()) clearTimeout(t);
+    for (const d of this.disposables) d.dispose();
+  }
+}
+
 // Whether findFiles finds the file, as it applies files.exclude
 async function included(uri: vscode.Uri): Promise<boolean> {
   const folder = vscode.workspace.getWorkspaceFolder(uri);
@@ -74,15 +260,23 @@ async function included(uri: vscode.Uri): Promise<boolean> {
 // The workspace's q files, each as its open document has it, else as it's
 // saved; files.exclude leaves some out, as Explorer does. Built in the
 // background, as is each change on disk, in turn; each request waits for
-// them, and reads an open document's latest text when it's asked
+// them, and reads an open document's latest text when it's asked. Each file
+// it reads, and each it drops, goes to the problems, for workspace mode
 class Workspace implements vscode.Disposable {
   private readonly files = new Map<string, Entry>();
   private readonly edited = new Set<vscode.TextDocument>();
   private done: Promise<void> = Promise.resolve();
   private readonly disposables: vscode.Disposable[];
 
-  constructor() {
+  constructor(private readonly problems: Problems) {
     const watcher = vscode.workspace.createFileSystemWatcher("**/*.q");
+    // Folders too, as a folder deleted or moved may be reported without
+    // the files in it
+    const anything = vscode.workspace.createFileSystemWatcher(
+      "**",
+      false,
+      true,
+    );
     // A file new to the index only if findFiles would find it, as
     // files.exclude may leave it out
     const read = (uri: vscode.Uri) =>
@@ -95,11 +289,28 @@ class Workspace implements vscode.Disposable {
       watcher,
       watcher.onDidCreate(read),
       watcher.onDidChange(read),
-      watcher.onDidDelete((uri) =>
+      anything,
+      // A folder moved here may come without its q files: once creating
+      // pauses, if any was a folder, every q file the index hasn't got, as
+      // a checkout or a build may create many
+      anything.onDidCreate((uri) => {
+        if (uri.path.endsWith(".q")) return;
+        this.created.push(uri);
+        clearTimeout(this.creating);
+        this.creating = setTimeout(() => this.folders(), 250);
+      }),
+      // The file, or every file in the folder, after the reads before it
+      anything.onDidDelete((uri) => {
+        const key = uri.toString();
         this.queue(async () => {
-          this.files.delete(uri.toString());
-        }),
-      ),
+          for (const file of [...this.files.keys()]) {
+            if (file === key || file.startsWith(`${key}/`)) {
+              this.files.delete(file);
+              this.problems.file(vscode.Uri.parse(file));
+            }
+          }
+        });
+      }),
       // Its text, rather than the file's, as it may differ, as when a
       // document left unsaved is opened as VS Code starts
       vscode.workspace.onDidOpenTextDocument((document) => {
@@ -123,8 +334,47 @@ class Workspace implements vscode.Disposable {
       vscode.workspace.onDidChangeWorkspaceFolders(() =>
         this.queue(() => this.build()),
       ),
+      // Files excluded or included, or every file's problems wanted
+      vscode.workspace.onDidChangeConfiguration((e) => {
+        if (
+          e.affectsConfiguration("files.exclude") ||
+          (e.affectsConfiguration(diagnosticMode) && workspaceWide())
+        ) {
+          this.queue(() => this.build());
+        } else if (e.affectsConfiguration(diagnosticMode)) {
+          this.problems.narrow();
+        }
+      }),
     ];
+    // A document out of its tab, as the index now has it
+    problems.left = (uri) => {
+      if (this.files.has(uri.toString())) this.queue(() => this.read(uri));
+    };
     this.queue(() => this.build());
+  }
+
+  // Paths created since creating last paused, and the timer for the pause
+  private created: vscode.Uri[] = [];
+  private creating: ReturnType<typeof setTimeout> | undefined;
+
+  private async folders() {
+    const created = this.created;
+    this.created = [];
+    const types = await Promise.all(
+      created.map((uri) =>
+        vscode.workspace.fs.stat(uri).then(
+          (s) => s.type,
+          () => vscode.FileType.Unknown,
+        ),
+      ),
+    );
+    if (!types.some((t) => t & vscode.FileType.Directory)) return;
+    this.queue(async () => {
+      const uris = await vscode.workspace.findFiles("**/*.q");
+      for (const u of uris) {
+        if (!this.files.has(u.toString())) await this.read(u);
+      }
+    });
   }
 
   private queue(f: () => Promise<void>) {
@@ -132,11 +382,15 @@ class Workspace implements vscode.Disposable {
   }
 
   private async build() {
+    const before = [...this.files.keys()];
     this.files.clear();
     const uris = await vscode.workspace.findFiles("**/*.q");
     // A few at a time, so a large workspace doesn't open every file at once
     for (let i = 0; i < uris.length; i += 64) {
       await Promise.all(uris.slice(i, i + 64).map((u) => this.read(u)));
+    }
+    for (const key of before) {
+      if (!this.files.has(key)) this.problems.file(vscode.Uri.parse(key));
     }
   }
 
@@ -147,6 +401,7 @@ class Workspace implements vscode.Disposable {
       vscode.workspace.textDocuments.find((d) => d.uri.toString() === key);
     if (document) {
       this.files.set(key, entryOf(document));
+      this.problems.file(uri, document.getText());
       return;
     }
     try {
@@ -154,8 +409,10 @@ class Workspace implements vscode.Disposable {
         await vscode.workspace.fs.readFile(uri),
       );
       this.files.set(key, entry(text, annotate(text)));
+      this.problems.file(uri, text);
     } catch {
       this.files.delete(key);
+      this.problems.file(uri);
     }
   }
 
@@ -175,6 +432,7 @@ class Workspace implements vscode.Disposable {
   }
 
   dispose() {
+    clearTimeout(this.creating);
     for (const d of this.disposables) d.dispose();
   }
 }
@@ -264,7 +522,8 @@ export function registerLanguage(): vscode.Disposable {
     s.children = (o.children ?? []).map((c) => symbol(d, c));
     return s;
   };
-  const workspace = new Workspace();
+  const problems = new Problems();
+  const workspace = new Workspace(problems);
   const location = (index: Index, l: Location) => {
     const e = index.get(l.file) as Entry;
     const { line, character } = position(e, l.start);
@@ -291,6 +550,7 @@ export function registerLanguage(): vscode.Disposable {
   // As VS Code's Find All References asks, with each definition
   const view = new ReferencesView((d, at) => found(d, at, true));
   return vscode.Disposable.from(
+    problems,
     workspace,
     vscode.languages.registerDocumentSymbolProvider(selector, {
       provideDocumentSymbols: (d) =>

@@ -235,7 +235,8 @@ suite("every definition", () => {
       }),
     ],
   ];
-  const endings = { LF: "\n", CRLF: "\r\n", CR: "\r" };
+  // q's line breaks; a lone \r isn't one (see the scanner's tests)
+  const endings = { LF: "\n", CRLF: "\r\n" };
   for (const [place, at, written] of places) {
     for (const [form, define, column, inLambda] of forms) {
       for (const [name, lines, top, inner] of cases) {
@@ -702,7 +703,8 @@ suite("signatures", () => {
     ["prefix", { "/w/a.q": "f:{x}\nf |" }, undefined],
     ["outside the brackets", { "/w/a.q": "f:{x}\nf[1]|" }, undefined],
   ];
-  const endings = { LF: "\n", CRLF: "\r\n", CR: "\r" };
+  // q's line breaks; a lone \r isn't one (see the scanner's tests)
+  const endings = { LF: "\n", CRLF: "\r\n" };
   for (const [name, files, expected] of cases) {
     test(name, () => {
       for (const [ending, eol] of Object.entries(endings)) {

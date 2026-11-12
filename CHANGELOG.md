@@ -83,6 +83,10 @@ All notable changes to the extension are documented in this file.
 - Parameter hints for q: a call's signatures while typing its arguments in
   brackets, the current parameter highlighted: q's forms of a keyword, with
   KX's line and link, then each definition's, with its comment and file
+- Syntax errors for q as you type: a bracket or string left open, marked
+  where its close was expected, linked to where it opened, and a close with
+  nothing to close. Open files only, or every `.q` file in the workspace
+  with `kdb-q-ext-vscode.diagnosticMode`
 
 ### Changed
 
