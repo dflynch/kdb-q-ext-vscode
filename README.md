@@ -91,6 +91,15 @@ read.
   bracket notation, `.Q.s1[x]`; a call written in prefix or infix notation,
   as `count x` or `x bin y`, has none, nor has `select[2]`, a qSQL query's
   row limit; a call in a query has its own
+- Syntax errors as you type, in the Problems panel, for the brackets and
+  strings q would refuse a script for: one left open, as `) expected` where
+  its close was expected (at the end of the statement, as q's own error
+  points, or at the close that ended it, as in `{(x+1}`), linked to where
+  it opened, and a close with nothing to close, as `unmatched ]`. A line at
+  column 0 starts a new statement, as in q, so a lambda's closing `}` there
+  is unmatched, and its `{` left open. Only open files are checked; set
+  `kdb-q-ext-vscode.diagnosticMode` to `workspace` to check every `.q` file
+  in the workspace too, as saved
 
 ### Servers
 
@@ -204,6 +213,7 @@ Closed Connection** to forget it.
 
 The status bar shows the active connection, and opens a menu of the server
 commands when clicked:
+
 - A plug, joined when connected and pulled apart when not, spinning while
   it connects or runs a query, and a warning color while the connection is
   closed, until it's dismissed or connected again
@@ -289,6 +299,7 @@ There's more of it than q's console shows: 1000 lines of 1000 characters by
 default, set by `consoleSize` as `\c` takes them, with `..` where it's cut,
 as q has. Nulls are left blank as q leaves them. Where the text differs from
 q's:
+
 - A cell in a table, a matrix or a dictionary is cut at 256 characters, so
   that one long value doesn't widen every line of its column
 - A table or matrix wider than the console ends in `..`, where q drops the
@@ -303,6 +314,7 @@ q's:
 current line, to the active terminal, such as a q session. The q REPL only
 accepts single-line input, so the selected text is sent one statement at a
 time, following the same rules as a q script:
+
 - A line starting at column 0 begins a new statement, and an indented line
   continues the previous one
 - Comments are removed, including block comments and everything after a lone
@@ -382,17 +394,18 @@ Open Keyboard Shortcuts**.
 
 ## Settings
 
-| Setting                          | Default        | What it does                                                 |
-| -------------------------------- | -------------- | ------------------------------------------------------------ |
-| `kdb-q-ext-vscode.servers`       | `{}`           | The servers to connect to, by name (see [Servers](#servers)) |
-| `kdb-q-ext-vscode.authExtension` | `""`           | The extension that gives credentials, as `publisher.name`    |
-| `kdb-q-ext-vscode.tlsCaFile`     | `""`           | A CA certificate to trust for TLS, as `SSL_CA_CERT_FILE`     |
-| `kdb-q-ext-vscode.tlsCertFile`   | `""`           | A client certificate for TLS, as `SSL_CERT_FILE`             |
-| `kdb-q-ext-vscode.tlsKeyFile`    | `""`           | The client certificate's key, as `SSL_KEY_FILE`              |
-| `kdb-q-ext-vscode.consoleSize`   | `[1000, 1000]` | How much of a result to show, as lines then width            |
-| `kdb-q-ext-vscode.precision`     | `7`            | Significant digits of floats and reals, as `\P`; 0 for all   |
-| `kdb-q-ext-vscode.sizeLimit`     | `100`          | The largest result to take, in MB, uncompressed              |
-| `kdb-q-ext-vscode.rowLimit`      | `5000000`      | The most rows a result, or a cell drilled into, can have     |
+| Setting                           | Default           | What it does                                                 |
+| --------------------------------- | ----------------- | ------------------------------------------------------------ |
+| `kdb-q-ext-vscode.servers`        | `{}`              | The servers to connect to, by name (see [Servers](#servers)) |
+| `kdb-q-ext-vscode.authExtension`  | `""`              | The extension that gives credentials, as `publisher.name`    |
+| `kdb-q-ext-vscode.tlsCaFile`      | `""`              | A CA certificate to trust for TLS, as `SSL_CA_CERT_FILE`     |
+| `kdb-q-ext-vscode.tlsCertFile`    | `""`              | A client certificate for TLS, as `SSL_CERT_FILE`             |
+| `kdb-q-ext-vscode.tlsKeyFile`     | `""`              | The client certificate's key, as `SSL_KEY_FILE`              |
+| `kdb-q-ext-vscode.consoleSize`    | `[1000, 1000]`    | How much of a result to show, as lines then width            |
+| `kdb-q-ext-vscode.precision`      | `7`               | Significant digits of floats and reals, as `\P`; 0 for all   |
+| `kdb-q-ext-vscode.sizeLimit`      | `100`             | The largest result to take, in MB, uncompressed              |
+| `kdb-q-ext-vscode.rowLimit`       | `5000000`         | The most rows a result, or a cell drilled into, can have     |
+| `kdb-q-ext-vscode.diagnosticMode` | `"openFilesOnly"` | Syntax errors in open files only, or the `"workspace"` too   |
 
 `precision` works as q's `\P`: from 1 to 17 significant digits, or 0 for as
 many as each type holds, 17 for a float and 8 for a real. It applies wherever
