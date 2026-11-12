@@ -139,6 +139,39 @@ export function resolve(index: Index, from: string, module: string): string[] {
   return out.sort();
 }
 
+// The files a \l line may load, if the offset is on the path it names, and
+// the path: each file whose path ends with the path's segments, as the
+// directory q runs in, which the path is from, isn't known. Without . or
+// empty segments, each .. taking back the segment before it, and any .. at
+// the start dropped
+export function loaded(
+  index: Index,
+  a: Annotated,
+  offset: number,
+): { path: Span; files: string[] } | undefined {
+  const load = a.loads.find((l) => l.start <= offset && offset <= l.end);
+  if (!load) return undefined;
+  const segments: string[] = [];
+  for (const s of load.path.split("/")) {
+    if (s === "..") segments.pop();
+    else if (s !== "" && s !== ".") segments.push(s);
+  }
+  const tail = `/${segments.join("/")}`;
+  const files = segments.length
+    ? [...index.keys()].filter((k) => decoded(k).endsWith(tail)).sort()
+    : [];
+  return { path: span(load), files };
+}
+
+// A URI as a path, as it's written, to compare with one in q
+function decoded(uri: string): string {
+  try {
+    return decodeURIComponent(uri);
+  } catch {
+    return uri;
+  }
+}
+
 // Nearest the file first: itself, then its directory, then by how many
 // directories they share, then by path
 function nearest(file: string): (x: string, y: string) => number {

@@ -72,6 +72,10 @@ export type Handle = {
 };
 export type Use = { token: Token; module: string };
 
+// The path a \l line names, as written, and where: the word after \l, as q
+// reads it, with nothing after it but a comment, else q loads nothing (q 5.0)
+export type Load = { start: number; end: number; path: string };
+
 export type Export = {
   key: string;
   start: number;
@@ -99,6 +103,7 @@ export type Annotated = {
   handles: Handle[];
   lambdas: Lambda[];
   uses: Use[];
+  loads: Load[];
   // In the order they open, so a call comes before those in its brackets
   calls: Call[];
   // A module's export: keys when it's a dictionary literal, else only where
@@ -265,6 +270,7 @@ export function annotate(
     handles: [],
     lambdas: [],
     uses: [],
+    loads: [],
     calls: [],
   };
   const entries: Entry[] = [];
@@ -721,6 +727,21 @@ export function annotate(
     }
   };
 
+  // A \l's path: q reads the command after \l and the spaces after it, with
+  // any lines joined on, up to its first comment, so one on the \l line
+  // drops them, and else they put a line break in the path (q 5.0)
+  const loads = (command: string, at: number, joined: boolean) => {
+    const start = at + (/^\\l[ \t\r]+/.exec(command)?.[0].length ?? 0);
+    if (start === at) return;
+    const rest = command.slice(start - at);
+    const comment = rest.search(/[ \t\r]\//);
+    if (comment < 0 && joined) return;
+    const path = (comment < 0 ? rest : rest.slice(0, comment)).trimEnd();
+    if (path && !/[ \t\r]/.test(path)) {
+      out.loads.push({ start, end: start + path.length, path });
+    }
+  };
+
   const script = scan(text);
   let namespace = options.namespace ?? "";
   const setNamespace = (arg: string) => {
@@ -730,15 +751,18 @@ export function annotate(
   for (const statement of script.statements) {
     const first = statement.tokens[0];
     if (first.kind === "command") {
-      const m = /^\\d\s+(\S+)/.exec(text.slice(first.start, first.end));
+      const command = text.slice(first.start, first.end);
+      const m = /^\\d\s+(\S+)/.exec(command);
       if (m) setNamespace(m[1]);
+      loads(command, first.start, statement.tokens.length > 1);
       continue;
     }
     if (first.kind === "k" || first.kind === "other") continue;
     const items = tree(text, statement.tokens);
     const context: Context = { namespace, column: false };
     walk(items, context);
-    // The end of the statement's last line, past spaces after it
+    // The end of the statement's last line, or of an indented comment line
+    // after it, past spaces after it
     let end = statement.end;
     while (text[end] === " " || text[end] === "\t") end++;
     called(text, items, end, out.calls);

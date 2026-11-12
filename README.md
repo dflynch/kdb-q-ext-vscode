@@ -66,6 +66,18 @@ read.
     `editor.gotoLocation.multipleDefinitions` to `goto` to jump there
   - ``use`foo`` goes to `foo.q` or `foo/init.q` anywhere in the
     workspace, as `QPATH` isn't read
+  - `\l path/util.q` goes to each `.q` file whose path ends with
+    `path/util.q`, with the cursor on the path, as `\l` loads from the
+    directory q runs in, which isn't known. `.` anywhere, any number of
+    leading `..`, and empty segments, as in `lib//util.q` or a leading `/`,
+    are dropped, and `x/..` cancels out, so an absolute path matches as a
+    suffix: `\l /opt/app/lib/util.q` finds any file ending in
+    `opt/app/lib/util.q`. Paths are split at `/` only, with no `\` or drive
+    letters, as the q process's platform isn't known. A `\l` with an
+    indented line after it goes nowhere, as q joins the line on and loads
+    nothing, unless the `\l` line ends in a comment, as q reads a command
+    only up to its first comment. A directory, as a database, isn't
+    followed
   - Names q defines (`.z`, `.Q`), and globals defined outside the workspace
 - Hover: on a q keyword or a name in `.Q`, `.z`, `.h` or `.j`, its syntax
   and what it does, from [KX's reference](https://code.kx.com/q/ref/),

@@ -1,8 +1,8 @@
 // q language features in the editor, from the annotation pass: the outline
 // (and breadcrumbs) and occurrence highlighting within a file, and
 // definition, references, hover, parameter hints and symbol search across
-// the workspace's q files, references in the References view grouped by how
-// they're passed
+// the workspace's q files, the files a \l may load, references in the
+// References view grouped by how they're passed
 
 import * as vscode from "vscode";
 import { type Annotated, annotate } from "./annotate";
@@ -24,6 +24,7 @@ import {
   type Index,
   type Listed,
   type Location,
+  loaded,
   position,
   references,
   signatures,
@@ -565,12 +566,22 @@ export function registerLanguage(): vscode.Disposable {
     vscode.languages.registerDefinitionProvider(selector, {
       provideDefinition: async (d, position) => {
         const index = await workspace.index(d);
-        return definitions(
-          index,
-          d.uri.toString(),
-          annotations(d),
-          d.offsetAt(position),
-        ).map((l) => location(index, l));
+        const offset = d.offsetAt(position);
+        const a = annotations(d);
+        // A \l's files, as links from its whole path, as Cmd+hover underlines
+        const load = loaded(index, a, offset);
+        if (load) {
+          return load.files.map(
+            (f): vscode.LocationLink => ({
+              originSelectionRange: range(d, load.path),
+              targetUri: vscode.Uri.parse(f),
+              targetRange: new vscode.Range(0, 0, 0, 0),
+            }),
+          );
+        }
+        return definitions(index, d.uri.toString(), a, offset).map((l) =>
+          location(index, l),
+        );
       },
     }),
     view,

@@ -53,6 +53,11 @@ const cases: [string, string, string[]][] = [
     ['" expected 1:7 (unclosed " 1:4)', ") expected 1:7 (unclosed ( 1:3)"],
   ],
   [
+    "f:{x+1\n  / c\ng:2",
+    "'{ at the end of the comment line joined on; marked at the code's",
+    ["} expected 1:6 (unclosed { 1:3)"],
+  ],
+  [
     "a:(1;[2",
     "'[ at the end",
     ["] expected 1:7 (unclosed [ 1:6)", ") expected 1:7 (unclosed ( 1:3)"],
