@@ -27,11 +27,11 @@ function join(text: string, statement: Statement): string {
   return out;
 }
 
-// A string over several lines keeps its line breaks as \n escapes, and a lone
-// \r, which q reads as a character, as an \r escape. As in a q script,
-// trailing whitespace is dropped and a tab at column 0 reads as a space.
+// A string over several lines keeps its line breaks as \n escapes. As in a q
+// script, trailing whitespace is dropped and a tab at column 0 reads as a
+// space.
 function oneLine(written: string): string {
-  const lines = written.replace(/\r(?!\n)/g, "\\r").split(/\r?\n/);
+  const lines = written.split(/\r\n|\n|\r/);
   return lines
     .map((line, i) => {
       const read = i > 0 ? line.replace(/^\t/, " ") : line;

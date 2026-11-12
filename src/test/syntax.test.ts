@@ -81,6 +81,9 @@ const cases: [string, string, string[]][] = [
   ["/\n(\n\\\nv:1", "none: a block comment", []],
   ["v:1\n\\\n(", "none: after a lone \\", []],
   ["k)a:(1", "'( (a k line, not read)", []],
+  ["q)a:(1;2", "'( at the end", [") expected 1:8 (unclosed ( 1:5)"]],
+  ["p)def f(x:\n   return (x / y", "none: Python's, to .p.e", []],
+  ["s)select (", "none: SQL's, to .s.e", []],
   ["\\d .x(", "none: a command", []],
   ["", "none", []],
 ];

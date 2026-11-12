@@ -17,6 +17,7 @@ export type Kind =
   | "comment" // a trailing comment, a comment line or a block comment
   | "command" // a system command line, such as \d .ns, verbatim
   | "k" // a k) line, not read further
+  | "other" // a line q hands another language by its prefix, as p) or s)
   | "unknown"; // anything else
 
 export type Token = {
@@ -245,8 +246,9 @@ export function scan(text: string): Script {
   const script: Script = { statements: [], comments: [], blocks: [] };
   const all = lines(text);
   let current: Statement | undefined;
-  // Whether the current statement is k, whose continuation lines are k too
-  let k = false;
+  // The language of the current statement, if it's k's or another's, by its
+  // prefix: its continuation lines are that language's too
+  let language: string | undefined;
   // A string token left open at the end of the last line
   let open: Token | undefined;
   // Comment lines after the current statement, which belong to it only if a
@@ -265,7 +267,7 @@ export function scan(text: string): Script {
     pending = [];
     current = undefined;
     open = undefined;
-    k = false;
+    language = undefined;
   };
   const begin = (start: number) => {
     finish();
@@ -347,8 +349,22 @@ export function scan(text: string): Script {
         start: line.start,
         end: line.start + trimmedEnd(t),
       });
-    } else if ((!indented && t.startsWith("k)")) || (k && indented)) {
-      k = true;
+    } else if (!indented && t.startsWith("q)")) {
+      // q's own prefix: the rest is q
+      open = lexLine(line, 2, statement.tokens, undefined);
+    } else if (
+      (!indented && /^[A-Za-z]\)/.test(t) && t[0] !== "k") ||
+      (language && language !== "k" && indented)
+    ) {
+      // Any other letter hands the line to .X.e, as written, comments and all
+      language ??= t[0];
+      statement.tokens.push({
+        kind: "other",
+        start: line.start + first,
+        end: line.start + trimmedEnd(t),
+      });
+    } else if ((!indented && t.startsWith("k)")) || (language && indented)) {
+      language = "k";
       const end = kCodeEnd(t);
       if (end > first) {
         statement.tokens.push({

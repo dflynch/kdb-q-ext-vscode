@@ -52,6 +52,8 @@ suite("scanner against q's lexer", () => {
 
 suite("scanner kinds", () => {
   const cases: [string, string[]][] = [
+    ["p)x = 7 // 2", ["other p)x = 7 // 2"]],
+    ["q)a:1", ["name a", "operator :", "number 1"]],
     ["a -1", ["name a", "number -1"]],
     ["a-1", ["name a", "operator -", "number 1"]],
     [
@@ -127,6 +129,13 @@ suite("scanner layout", () => {
     ["end of script", "a:1\n\\\nb:2", ["a:1"]],
     ["CRLF", "f:{\r\n  x}\r\nb", ["f:{\r\n  x}", "b"]],
     // q reads a lone \r as whitespace, not a line break (q 5.0)
+    // Another language's prefix: its lines to .X.e as written (q 5.0)
+    [
+      "other language",
+      "p)def f(x:\n   return (x / y\nb",
+      ["p)def f(x:\n   return (x / y", "b"],
+    ],
+    ["q's own prefix", "q)a:(1;\n  2)\nb", ["q)a:(1;\n  2)", "b"]],
     ["lone CR", "a:(1;\r2)\rb:3", ["a:(1;\r2)\rb:3"]],
     ["lone CR, then a comment", "a:1\r/ (\rb", ["a:1\r/ (\rb"]],
     ["lone CR at a line's start, not indentation", "f:{\n\r}", ["f:{", "}"]],

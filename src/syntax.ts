@@ -19,8 +19,9 @@ const closes: Record<string, string> = { "(": ")", "[": "]", "{": "}" };
 export function syntaxErrors(text: string): Problem[] {
   const out: Problem[] = [];
   for (const { tokens } of scan(text).statements) {
-    // k lines and system commands aren't q's to read
-    if (tokens[0]?.kind === "command" || tokens[0]?.kind === "k") continue;
+    // k's lines, other languages' and system commands aren't q's to read
+    const kind = tokens[0]?.kind;
+    if (kind === "command" || kind === "k" || kind === "other") continue;
     const code = tokens.filter((t) => t.kind !== "comment");
     const last = code[code.length - 1];
     if (!last) continue;

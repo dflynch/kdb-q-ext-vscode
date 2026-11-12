@@ -259,31 +259,28 @@ class Workspace implements vscode.Disposable {
       watcher.onDidCreate(read),
       watcher.onDidChange(read),
       anything,
-      // A folder's q files, as a folder moved here may come without them
+      // A folder moved here may come without its q files: once creating
+      // pauses, if any was a folder, every q file the index hasn't got, as
+      // a checkout or a build may create many
       anything.onDidCreate((uri) => {
         if (uri.path.endsWith(".q")) return;
+        this.created.push(uri);
+        clearTimeout(this.creating);
+        this.creating = setTimeout(() => this.folders(), 250);
+      }),
+      // The file, or every file in the folder, if the index has any
+      anything.onDidDelete((uri) => {
+        const key = uri.toString();
+        const under = (file: string) =>
+          file === key || file.startsWith(`${key}/`);
+        if (![...this.files.keys()].some(under)) return;
         this.queue(async () => {
-          const { type } = await vscode.workspace.fs.stat(uri);
-          if (!(type & vscode.FileType.Directory)) return;
-          const uris = await vscode.workspace.findFiles(
-            new vscode.RelativePattern(uri, "**/*.q"),
-          );
-          // Each as files.exclude has it, from the workspace folder
-          for (const u of uris) if (await included(u)) await this.read(u);
+          for (const file of [...this.files.keys()].filter(under)) {
+            this.files.delete(file);
+            this.problems.file(vscode.Uri.parse(file));
+          }
         });
       }),
-      // The file, or every file in the folder
-      anything.onDidDelete((uri) =>
-        this.queue(async () => {
-          const key = uri.toString();
-          for (const file of [...this.files.keys()]) {
-            if (file === key || file.startsWith(`${key}/`)) {
-              this.files.delete(file);
-              this.problems.file(vscode.Uri.parse(file));
-            }
-          }
-        }),
-      ),
       // Its text, rather than the file's, as it may differ, as when a
       // document left unsaved is opened as VS Code starts
       vscode.workspace.onDidOpenTextDocument((document) => {
@@ -324,6 +321,30 @@ class Workspace implements vscode.Disposable {
       if (this.files.has(uri.toString())) this.queue(() => this.read(uri));
     };
     this.queue(() => this.build());
+  }
+
+  // Paths created since creating last paused, and the timer for the pause
+  private created: vscode.Uri[] = [];
+  private creating: ReturnType<typeof setTimeout> | undefined;
+
+  private async folders() {
+    const created = this.created;
+    this.created = [];
+    const types = await Promise.all(
+      created.map((uri) =>
+        vscode.workspace.fs.stat(uri).then(
+          (s) => s.type,
+          () => vscode.FileType.Unknown,
+        ),
+      ),
+    );
+    if (!types.some((t) => t & vscode.FileType.Directory)) return;
+    this.queue(async () => {
+      const uris = await vscode.workspace.findFiles("**/*.q");
+      for (const u of uris) {
+        if (!this.files.has(u.toString())) await this.read(u);
+      }
+    });
   }
 
   private queue(f: () => Promise<void>) {
@@ -383,6 +404,7 @@ class Workspace implements vscode.Disposable {
   }
 
   dispose() {
+    clearTimeout(this.creating);
     for (const d of this.disposables) d.dispose();
   }
 }
