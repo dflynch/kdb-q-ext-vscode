@@ -116,8 +116,8 @@ suite("scanner layout", () => {
     ["blank lines inside", "f:{\n\n  x}", ["f:{\n\n  x}"]],
     ["comment line inside", "a:1\n/ c\n  +2", ["a:1\n/ c\n  +2"]],
     ["comment line after", "a:1\n/ c\nb", ["a:1", "b"]],
-    // q joins an indented comment line on, as \l a.q then "  / c" loads
-    // "a.q\n  " (q 5.0)
+    // q joins an indented comment line on, as \l a.q then "  / c" tries
+    // to load a.q with a line break after it (q 5.0)
     ["indented comment line after", "a:1\n  / c\nb", ["a:1\n  / c", "b"]],
     ["indented, after blank lines", "\\l a.q\n\n  / c", ["\\l a.q\n\n  / c"]],
     [
@@ -126,6 +126,13 @@ suite("scanner layout", () => {
       ["a:1\n/ c\n  / d", "b"],
     ],
     ["indented comment line first", "  / c\na:1", ["a:1"]],
+    ["indented by a tab", "a:1\n\t/ c\nb", ["a:1\n\t/ c", "b"]],
+    ["indented, CRLF", "a:1\r\n  / c\r\nb", ["a:1\r\n  / c", "b"]],
+    [
+      "indented, CRLF, after one at column 0",
+      "a:1\r\n/ c\r\n\t/ d\r\nb",
+      ["a:1\r\n/ c\r\n\t/ d", "b"],
+    ],
     ["block inside", "f:{\n/\nnote\n\\\n  x}", ["f:{\n/\nnote\n\\\n  x}"]],
     ["string over lines", 'a:"x\n  y"\nb', ['a:"x\n  y"', "b"]],
     ["string ended at column 0", 'a:"x\nb', ['a:"x', "b"]],

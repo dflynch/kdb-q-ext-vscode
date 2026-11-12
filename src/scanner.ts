@@ -29,6 +29,8 @@ export type Token = {
   unterminated?: true;
 };
 
+// From its first token's start to its last's end, which may be an indented
+// comment line's after its code
 export type Statement = { start: number; end: number; tokens: Token[] };
 
 // An outermost block comment from its "/" line to its "\" line, or to the end
@@ -37,8 +39,9 @@ export type BlockComment = { open: number; close?: number };
 
 export type Script = {
   statements: Statement[];
-  // Comment lines and block comments between statements. Those inside a
-  // statement, between its lines, are among its tokens
+  // Comment lines and block comments between statements. Those in a
+  // statement, between its lines or indented after them, are among its
+  // tokens
   comments: Token[];
   // By line number
   blocks: BlockComment[];
@@ -323,32 +326,25 @@ export function scan(text: string): Script {
     const first = t.search(/\S/);
     if (first < 0) continue;
 
-    // A comment line at column 0 belongs to the statement only if a
-    // continuation line follows it. One indented is a continuation line, as
-    // q joins it on: \l a.q then "  / c" loads "a.q\n  "
+    // An indented line continues the statement, a comment line too, as q
+    // joins it on (\l a.q then "  / c" tries to load a.q with a line break
+    // after it): comment lines at column 0 since the last line are inside
+    // it. Those not followed by one are between statements
+    const continued = indented ? current : undefined;
+    if (continued) {
+      for (const t of pending) continued.tokens.push(t);
+      pending = [];
+    }
     if (t[first] === "/") {
-      const comment: Token = {
+      (continued ? continued.tokens : pending).push({
         kind: "comment",
         start: line.start + first,
         end: line.start + trimmedEnd(t),
-      };
-      if (indented && current) {
-        for (const t of pending) current.tokens.push(t);
-        pending = [];
-        current.tokens.push(comment);
-      } else {
-        pending.push(comment);
-      }
+      });
       continue;
     }
 
-    if (!indented || !current) {
-      begin(line.start + first);
-    } else {
-      // A continuation line: comment lines since the last line are inside
-      for (const t of pending) current.tokens.push(t);
-      pending = [];
-    }
+    if (!continued) begin(line.start + first);
     const statement = current as Statement;
 
     if (!indented && t[0] === "\\") {
