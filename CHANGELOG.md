@@ -72,8 +72,8 @@ All notable changes to the extension are documented in this file.
   Workspace, across the workspace's `.q` files, following namespaces,
   lambdas' locals and q 5 modules. Find All References lists the uses that
   pass a global by reference under a group of their own. Go to
-  Definition and the hover have every definition of a global, the nearest
-  file first, and each file's latest first
+  Definition has every definition of a global, which VS Code lists by file
+  and line; the hover shows the nearest file's latest
 - Hover for q: a keyword's, or a `.Q`, `.z`, `.h` or `.j` name's, syntax and
   description from KX's reference, linked; a global's, or a module
   export's, signature, then the comment above its definition, as written,
