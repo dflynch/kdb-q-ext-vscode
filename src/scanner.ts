@@ -323,14 +323,22 @@ export function scan(text: string): Script {
     const first = t.search(/\S/);
     if (first < 0) continue;
 
-    // A comment line, at column 0 or indented, belongs to the statement only
-    // if a continuation line follows it
+    // A comment line at column 0 belongs to the statement only if a
+    // continuation line follows it. One indented is a continuation line, as
+    // q joins it on: \l a.q then "  / c" loads "a.q\n  "
     if (t[first] === "/") {
-      pending.push({
+      const comment: Token = {
         kind: "comment",
         start: line.start + first,
         end: line.start + trimmedEnd(t),
-      });
+      };
+      if (indented && current) {
+        for (const t of pending) current.tokens.push(t);
+        pending = [];
+        current.tokens.push(comment);
+      } else {
+        pending.push(comment);
+      }
       continue;
     }
 

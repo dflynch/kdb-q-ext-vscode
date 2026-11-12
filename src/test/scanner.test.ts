@@ -116,6 +116,16 @@ suite("scanner layout", () => {
     ["blank lines inside", "f:{\n\n  x}", ["f:{\n\n  x}"]],
     ["comment line inside", "a:1\n/ c\n  +2", ["a:1\n/ c\n  +2"]],
     ["comment line after", "a:1\n/ c\nb", ["a:1", "b"]],
+    // q joins an indented comment line on, as \l a.q then "  / c" loads
+    // "a.q\n  " (q 5.0)
+    ["indented comment line after", "a:1\n  / c\nb", ["a:1\n  / c", "b"]],
+    ["indented, after blank lines", "\\l a.q\n\n  / c", ["\\l a.q\n\n  / c"]],
+    [
+      "indented, after one at column 0",
+      "a:1\n/ c\n  / d\nb",
+      ["a:1\n/ c\n  / d", "b"],
+    ],
+    ["indented comment line first", "  / c\na:1", ["a:1"]],
     ["block inside", "f:{\n/\nnote\n\\\n  x}", ["f:{\n/\nnote\n\\\n  x}"]],
     ["string over lines", 'a:"x\n  y"\nb', ['a:"x\n  y"', "b"]],
     ["string ended at column 0", 'a:"x\nb', ['a:"x', "b"]],
