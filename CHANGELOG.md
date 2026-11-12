@@ -74,7 +74,7 @@ All notable changes to the extension are documented in this file.
   pass a global by reference under a group of their own
 - Hover for q: a keyword's, or a `.Q`, `.z`, `.h` or `.j` name's, syntax and
   description from KX's reference, linked; a global's, or a module
-  export's, comment above its definition, as written, and its signature,
+  export's, signature, then the comment above its definition, as written,
   with a link to its other definitions. A signature shows each parameter as
   written, typed (``[a:`j;b]``) or as a pattern (`[(src;dst);speed]`)
 - Parameter hints for q: a call's signatures while typing its arguments in

@@ -66,9 +66,9 @@ read.
 - Hover: on a q keyword or a name in `.Q`, `.z`, `.h` or `.j`, its syntax
   and what it does, from [KX's reference](https://code.kx.com/q/ref/),
   linked. On a global, or a name a module exports, defined at the start
-  of a line, the comment lines directly above it, exactly as written,
-  then its signature, or its name, and, if it's another, the file it's
-  in. A comment indented, as in a lambda, is about the code it's in, and
+  of a line, its signature, or its name, then the comment lines directly
+  above it, exactly as written, as parameter hints show them, and, if
+  it's another, the file it's in. A comment indented, as in a lambda, is about the code it's in, and
   one trailing a line could be about either line, so neither is shown. A
   global several files define shows the nearest definition, with a link
   that peeks at all of them, as Go to Definition does. A name in a query

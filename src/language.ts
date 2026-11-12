@@ -208,9 +208,9 @@ function codeblock(out: vscode.MarkdownString, code: string): void {
   out.appendMarkdown(`\n${fence}q\n${code}\n${fence}\n`);
 }
 
-// How a definition reads in a hover, in one q block: the comment above it as
-// written, then its signature, or its name; then the file it's in, if it's
-// another, its path as text
+// How a definition reads in a hover, as the hint has it: its signature, or
+// its name, then the comment above it as written, each in a q block; then
+// the file it's in, if it's another, its path as text
 function described(
   out: vscode.MarkdownString,
   d: Listed,
@@ -223,7 +223,8 @@ function described(
       : d.kind === "module"
         ? `${d.full}:${d.detail}`
         : d.full;
-  codeblock(out, d.doc === undefined ? signature : `${d.doc}\n${signature}`);
+  codeblock(out, signature);
+  if (d.doc !== undefined) codeblock(out, d.doc);
   linked(out, d, from, index);
 }
 
