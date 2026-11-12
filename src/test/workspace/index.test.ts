@@ -86,15 +86,19 @@ suite("workspace index", () => {
 
   test("the files a \\l may load", async () => {
     const d = await vscode.workspace.openTextDocument(file("code/load.q"));
+    const links = (line: number, character: number) =>
+      vscode.commands.executeCommand<vscode.LocationLink[]>(
+        "vscode.executeDefinitionProvider",
+        d.uri,
+        new vscode.Position(line, character),
+      );
     const at = (line: number, character: number) =>
-      vscode.commands
-        .executeCommand<vscode.Location[]>(
-          "vscode.executeDefinitionProvider",
-          d.uri,
-          new vscode.Position(line, character),
-        )
-        .then(shown);
+      links(line, character).then(shown);
     assert.deepStrictEqual(await at(1, 12), ["config/wdb.q 1:1"]);
+    // Linked from the whole path, as Cmd+hover underlines it
+    const [link] = await links(1, 4);
+    assert.ok(link.originSelectionRange);
+    assert.strictEqual(d.getText(link.originSelectionRange), "../config/wdb.q");
     // In VS Code's order, by file
     assert.deepStrictEqual(await at(2, 5), [
       "code/wdb.q 1:1",

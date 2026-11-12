@@ -77,9 +77,11 @@ All notable changes to the extension are documented in this file.
   file's latest. An amend, as `t,:x` or `` `t upsert x ``, is a reference
 - Go to Definition on the path a `\l` line names: the workspace's `.q`
   files whose paths end with it, as `\l common/util.q` has
-  `code/common/util.q`, ignoring `./` and a leading `../`, with `x/..`
-  cancelled, as the directory q runs in isn't known. VS Code jumps to one,
-  or lists several in a peek
+  `code/common/util.q`, as the directory q runs in isn't known. `.`
+  anywhere, any number of leading `..`, and empty segments, as in
+  `lib//util.q` or a leading `/`, are dropped, and `x/..` cancels out, so
+  an absolute path matches as a suffix. VS Code jumps to one, or lists
+  several in a peek
 - Hover for q: a keyword's, or a `.Q`, `.z`, `.h` or `.j` name's, syntax and
   description from KX's reference, linked; a global's, or a module
   export's, signature, then the comment above its definition, as written,

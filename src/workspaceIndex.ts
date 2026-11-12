@@ -20,7 +20,6 @@ import {
   type Span,
   targets,
 } from "./navigation";
-import { scan } from "./scanner";
 
 export type Entry = {
   // Where each line starts, to turn offsets into positions
@@ -140,34 +139,28 @@ export function resolve(index: Index, from: string, module: string): string[] {
   return out.sort();
 }
 
-// The files a \l line may load, if the offset is on the path it names: each
-// whose path ends with the path's segments, without . or a .. and the
-// segment before it, and with no .. at its start, as the directory q runs
-// in, which the path is from, isn't known. The path is the word after
-// \l, as q reads it, which loads nothing if more than a comment follows it
-export function loaded(index: Index, text: string, offset: number): Location[] {
-  const command = scan(text)
-    .statements.flatMap((s) => s.tokens)
-    .find((t) => t.kind === "command" && t.start <= offset && offset <= t.end);
-  if (!command) return [];
-  const m = /^(\\l[ \t\r]+)([^ \t\r]+)(?:[ \t\r]+\/.*)?$/.exec(
-    text.slice(command.start, command.end),
-  );
-  if (!m) return [];
-  const start = command.start + m[1].length;
-  if (offset < start || offset > start + m[2].length) return [];
-  // Each .. takes back the segment before it, if any
+// The files a \l line may load, if the offset is on the path it names, and
+// the path: each file whose path ends with the path's segments, as the
+// directory q runs in, which the path is from, isn't known. Without . or
+// empty segments, each .. taking back the segment before it, and any .. at
+// the start dropped
+export function loaded(
+  index: Index,
+  a: Annotated,
+  offset: number,
+): { path: Span; files: string[] } | undefined {
+  const load = a.loads.find((l) => l.start <= offset && offset <= l.end);
+  if (!load) return undefined;
   const segments: string[] = [];
-  for (const s of m[2].split("/")) {
+  for (const s of load.path.split("/")) {
     if (s === "..") segments.pop();
     else if (s !== "" && s !== ".") segments.push(s);
   }
-  if (!segments.length) return [];
   const tail = `/${segments.join("/")}`;
-  return [...index.keys()]
-    .filter((k) => decoded(k).endsWith(tail))
-    .sort()
-    .map((file) => ({ file, start: 0, end: 0 }));
+  const files = segments.length
+    ? [...index.keys()].filter((k) => decoded(k).endsWith(tail)).sort()
+    : [];
+  return { path: span(load), files };
 }
 
 // A URI as a path, as it's written, to compare with one in q

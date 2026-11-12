@@ -72,6 +72,11 @@ export type Handle = {
 };
 export type Use = { token: Token; module: string };
 
+// The path a \l line names, as written, and where: the word after \l, as q
+// reads it, on a line that's a statement of its own, with nothing after it
+// but a comment, else q loads nothing (q 5.0)
+export type Load = { start: number; end: number; path: string };
+
 export type Export = {
   key: string;
   start: number;
@@ -99,6 +104,7 @@ export type Annotated = {
   handles: Handle[];
   lambdas: Lambda[];
   uses: Use[];
+  loads: Load[];
   // In the order they open, so a call comes before those in its brackets
   calls: Call[];
   // A module's export: keys when it's a dictionary literal, else only where
@@ -265,6 +271,7 @@ export function annotate(
     handles: [],
     lambdas: [],
     uses: [],
+    loads: [],
     calls: [],
   };
   const entries: Entry[] = [];
@@ -730,8 +737,14 @@ export function annotate(
   for (const statement of script.statements) {
     const first = statement.tokens[0];
     if (first.kind === "command") {
-      const m = /^\\d\s+(\S+)/.exec(text.slice(first.start, first.end));
+      const command = text.slice(first.start, first.end);
+      const m = /^\\d\s+(\S+)/.exec(command);
       if (m) setNamespace(m[1]);
+      const l = /^(\\l[ \t\r]+)([^ \t\r]+)(?:[ \t\r]+\/.*)?$/.exec(command);
+      if (l && statement.tokens.length === 1) {
+        const start = first.start + l[1].length;
+        out.loads.push({ start, end: start + l[2].length, path: l[2] });
+      }
       continue;
     }
     if (first.kind === "k" || first.kind === "other") continue;

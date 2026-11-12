@@ -823,17 +823,17 @@ suite("files a \\l may load", () => {
   const index: Index = new Map(
     workspace.map((f) => [f, entry("", annotate(""))]),
   );
-  // The files for the cursor, at |, in the lines after a first line, joined
-  // by the line ending
-  const found = (source: string, eol: string, keys: Index = index) => {
+  // The path and files for the cursor, at |, in the lines after a first
+  // line, joined by the line ending
+  const load = (source: string, eol: string, keys: Index = index) => {
     const text = `a:1${eol}${source.replace(/\n/g, eol)}`;
     const offset = text.indexOf("|");
     const plain = text.slice(0, offset) + text.slice(offset + 1);
-    return loaded(keys, plain, offset).map((l) => {
-      assert.deepStrictEqual([l.start, l.end], [0, 0]);
-      return l.file;
-    });
+    const l = loaded(keys, annotate(plain), offset);
+    return l && { path: plain.slice(l.path.start, l.path.end), files: l.files };
   };
+  const found = (source: string, eol: string, keys: Index = index) =>
+    load(source, eol, keys)?.files ?? [];
   const all = [
     "/w/code/common/util.q",
     "/w/code/notcommon/util.q",
@@ -901,6 +901,16 @@ suite("files a \\l may load", () => {
         ['b:"\n\\l util|.q"', []],
         ["/\n\\l util|.q\n\\", []],
         ["\\d util|.q", []],
+        // q joins an indented line on, after blank lines too, and then
+        // loads nothing (q 5.0)
+        ["\\l lib/util|.q\n  show 1", []],
+        ["\\l lib/util|.q\n  / c", []],
+        ["\\l lib/util|.q\n\n  show 1", []],
+        ["\\l lib/util|.q\n\n  / c", []],
+        ["\\l lib/util|.q\n/ c\n  show 1", []],
+        // A line of only spaces, or a comment at column 0, isn't joined on
+        ["\\l lib/util|.q\n  \nb:2", ["/w/lib/util.q"]],
+        ["\\l lib/util|.q\n/ c\nb:2", ["/w/lib/util.q"]],
       ];
       for (const [source, files] of grid) {
         test(JSON.stringify(source), () => {
@@ -910,15 +920,32 @@ suite("files a \\l may load", () => {
 
       // Each place on the line, from where the path starts to where it ends
       test("only on the path", () => {
-        const line = "\\l lib/util.q / x";
+        const line = "\\l ../lib/util.q / x";
         const at = (n: number) =>
           found(`${line.slice(0, n)}|${line.slice(n)}`, eol);
         const on = [...line].map((_, n) => at(n).length > 0);
         on.push(at(line.length).length > 0);
         assert.deepStrictEqual(
           on.map((x) => (x ? "y" : "-")).join(""),
-          "---yyyyyyyyyyy----",
+          "---yyyyyyyyyyyyyy----",
         );
+      });
+
+      test("the whole path, wherever the cursor is on it", () => {
+        for (const source of [
+          "\\l |../lib/util.q",
+          "\\l ../lib|/util.q / x",
+          "\\l ../lib/util.q|",
+        ]) {
+          assert.deepStrictEqual(load(source, eol), {
+            path: "../lib/util.q",
+            files: ["/w/lib/util.q"],
+          });
+        }
+        assert.deepStrictEqual(load("\\l nothere|.q", eol), {
+          path: "nothere.q",
+          files: [],
+        });
       });
     });
   }

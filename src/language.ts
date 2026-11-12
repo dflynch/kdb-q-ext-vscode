@@ -567,11 +567,21 @@ export function registerLanguage(): vscode.Disposable {
       provideDefinition: async (d, position) => {
         const index = await workspace.index(d);
         const offset = d.offsetAt(position);
-        const files = loaded(index, d.getText(), offset);
-        const found = files.length
-          ? files
-          : definitions(index, d.uri.toString(), annotations(d), offset);
-        return found.map((l) => location(index, l));
+        const a = annotations(d);
+        // A \l's files, as links from its whole path, as Cmd+hover underlines
+        const load = loaded(index, a, offset);
+        if (load) {
+          return load.files.map(
+            (f): vscode.LocationLink => ({
+              originSelectionRange: range(d, load.path),
+              targetUri: vscode.Uri.parse(f),
+              targetRange: new vscode.Range(0, 0, 0, 0),
+            }),
+          );
+        }
+        return definitions(index, d.uri.toString(), a, offset).map((l) =>
+          location(index, l),
+        );
       },
     }),
     view,

@@ -68,9 +68,14 @@ read.
     workspace, as `QPATH` isn't read
   - `\l path/util.q` goes to each `.q` file whose path ends with
     `path/util.q`, with the cursor on the path, as `\l` loads from the
-    directory q runs in, which isn't known; `./` and a leading `../` are
-    ignored, and `x/..` cancels out. A directory, as a database, isn't
-    followed
+    directory q runs in, which isn't known. `.` anywhere, any number of
+    leading `..`, and empty segments, as in `lib//util.q` or a leading `/`,
+    are dropped, and `x/..` cancels out, so an absolute path matches as a
+    suffix: `\l /opt/app/lib/util.q` finds any file ending in
+    `opt/app/lib/util.q`. Paths are split at `/` only, with no `\` or drive
+    letters, as the q process's platform isn't known. Only a `\l` that's a
+    statement of its own, with no indented line after it, as q then loads
+    nothing; and a directory, as a database, isn't followed
   - Names q defines (`.z`, `.Q`), and globals defined outside the workspace
 - Hover: on a q keyword or a name in `.Q`, `.z`, `.h` or `.j`, its syntax
   and what it does, from [KX's reference](https://code.kx.com/q/ref/),
