@@ -37,7 +37,11 @@ const mode = (value: string | undefined) =>
 const write = (uri: vscode.Uri, text: string) =>
   vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(text));
 
-suite("syntax errors", () => {
+// Each test waits on the file watcher, or for typing to pause, which a slow
+// machine can take longer than mocha's 2 s for
+suite("syntax errors", function () {
+  this.timeout(10000);
+
   suiteSetup(async () => {
     await vscode.extensions
       .getExtension("dflynch3.kdb-q-ext-vscode")
