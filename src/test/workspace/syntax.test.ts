@@ -1,5 +1,5 @@
-// Syntax errors in the Problems: open documents' as they're typed, and in
-// workspace mode, every workspace file's as saved
+// Syntax errors in the Problems: documents open in tabs as they're typed, and
+// in workspace mode, every workspace file's as saved
 import * as assert from "node:assert";
 import * as vscode from "vscode";
 

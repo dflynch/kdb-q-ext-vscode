@@ -62,7 +62,7 @@ const diagnosticMode = "kdb-q-ext-vscode.diagnosticMode";
 const workspaceWide = () =>
   vscode.workspace.getConfiguration().get(diagnosticMode) === "workspace";
 
-// Files and untitled documents, not the other side of a diff
+// Files and untitled documents, not a diff's original, as git: has it
 const checked = new Set(["file", "untitled"]);
 
 // The documents in the editor's tabs, by URI; a diff's, the side edited
@@ -149,12 +149,12 @@ class Problems implements vscode.Disposable {
       clearTimeout(this.waiting.get(key));
       this.waiting.delete(key);
       // A document closed, the index reads again itself
-      this.let(d.uri, !d.isClosed);
+      this.release(d.uri, !d.isClosed);
     }
     for (const key of [...this.unloaded]) {
       if (tabs.has(key) && !loaded.has(key)) continue;
       this.unloaded.delete(key);
-      if (!now.has(key)) this.let(vscode.Uri.parse(key), true);
+      if (!now.has(key)) this.release(vscode.Uri.parse(key), true);
     }
     for (const [key, d] of now) {
       if (this.open.has(key)) continue;
@@ -173,7 +173,7 @@ class Problems implements vscode.Disposable {
   }
 
   // A tab let go of: its problems go, and the index may show its file's
-  private let(uri: vscode.Uri, reread: boolean) {
+  private release(uri: vscode.Uri, reread: boolean) {
     this.collection.delete(uri);
     if (reread) this.left(uri);
   }
@@ -261,7 +261,7 @@ async function included(uri: vscode.Uri): Promise<boolean> {
 // saved; files.exclude leaves some out, as Explorer does. Built in the
 // background, as is each change on disk, in turn; each request waits for
 // them, and reads an open document's latest text when it's asked. Each file
-// read saved is shown to the problems, in case they're workspace wide
+// it reads, and each it drops, goes to the problems, for workspace mode
 class Workspace implements vscode.Disposable {
   private readonly files = new Map<string, Entry>();
   private readonly edited = new Set<vscode.TextDocument>();
@@ -400,8 +400,7 @@ class Workspace implements vscode.Disposable {
       open &&
       vscode.workspace.textDocuments.find((d) => d.uri.toString() === key);
     if (document) {
-      const e = entryOf(document);
-      this.files.set(key, e);
+      this.files.set(key, entryOf(document));
       this.problems.file(uri, document.getText());
       return;
     }
@@ -409,8 +408,7 @@ class Workspace implements vscode.Disposable {
       const text = new TextDecoder().decode(
         await vscode.workspace.fs.readFile(uri),
       );
-      const e = entry(text, annotate(text));
-      this.files.set(key, e);
+      this.files.set(key, entry(text, annotate(text)));
       this.problems.file(uri, text);
     } catch {
       this.files.delete(key);

@@ -363,7 +363,10 @@ export function scan(text: string): Script {
         start: line.start + first,
         end: line.start + trimmedEnd(t),
       });
-    } else if ((!indented && t.startsWith("k)")) || (language && indented)) {
+    } else if (
+      (!indented && t.startsWith("k)")) ||
+      (language === "k" && indented)
+    ) {
       language = "k";
       const end = kCodeEnd(t);
       if (end > first) {
