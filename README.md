@@ -114,18 +114,19 @@ read.
   every `.q` file in the workspace too, as saved
 - Completion, in VS Code's own suggestions as you type: the innermost
   lambda's parameters and locals first (q has no closures, so an outer
-  lambda's aren't in scope), then the workspace's globals, then q's
-  keywords. After `\d .ns`, `.ns`'s globals and namespaces are offered by
-  their names in it instead of the root's, as q reads names there. After a
+  lambda's aren't in scope), then the workspace's globals in the root,
+  then q's keywords. After `\d .ns`, `.ns`'s globals, q's own if it's
+  `.Q` or `.z`, and its namespaces are offered by their names in it instead
+  of the root's, as q reads names there. After a
   dot, a namespace's members and the namespaces in it:
   `.` gives the namespaces, `.Q.` q's own, with KX's line, and `.ns.` your
-  own, with each function's signature and comment, as the hover shows them;
+  own, with each function's signature, and its comment as the hover shows it;
   `s.` a module's exports, for a global bound by ``s:use`mod`` in the same
   file, as Go to Definition follows. A symbol
-  naming a namespace, as `` `.ns. ``, offers its members for passing by
+  starting with a dot, as `` `.ns. ``, offers its members for passing by
   reference; any other symbol is data, so offers nothing. Nothing is
   offered in strings, comments, numbers, system commands or another
-  language's lines. Picking one inserts its name, or replaces the whole
+  language's lines, nor in a lambda's parameter list. Picking one inserts its name, or replaces the whole
   name with `editor.suggest.insertMode` set to `replace`; typing `[` then shows
   its parameter hints. VS Code's word-based suggestions, every word in the
   open files, comments included, are off for q, as

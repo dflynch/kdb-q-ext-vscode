@@ -1,16 +1,18 @@
 // What to offer as the user types a name: the innermost lambda's parameters
-// and locals, as q has no closures; the workspace's globals, by absolute
-// name; q's keywords; and, after a dot, a namespace's members, q's own in
-// .Q, .z, .h and .j among them, or a module's exports, as s. for s:use`mod.
-// A symbol naming a namespace, as `.ns., offers its members too; any other
-// symbol is data. Nothing in a string, a comment, a number, a system command,
-// a line for another language, or after the line that ends the script. Pure
-// and total, as the index is: no VS Code imports, never throws.
+// and locals, as q has no closures; the workspace's globals in the root, or,
+// after \d, the namespace's, by their names in it; q's keywords; and, after
+// a dot, a namespace's members, q's own in .Q, .z, .h and .j among them, or
+// a module's exports, as s. for s:use`mod bound in the file. A symbol
+// starting with a dot, as `.ns., offers the same; any other symbol is data.
+// Nothing in a string, a comment, a number, a system command, a line for
+// another language, a lambda's parameter list, or after the line that ends
+// the script. Pure and total, as the index is: no VS Code imports, never
+// throws.
 
 import type { Annotated, Lambda } from "./annotate";
 import { type Builtin, builtins } from "./builtins";
 import type { Span } from "./navigation";
-import type { Token } from "./scanner";
+import type { Statement, Token } from "./scanner";
 import {
   exported,
   type Index,
@@ -49,17 +51,15 @@ export function completions(
 ): { inserting: Span; replacing: Span; items: Completion[] } | undefined {
   const typed = typing(text, a, offset);
   if (typed === undefined) return undefined;
-  const { prefix, symbol, end } = typed;
+  const { prefix, end } = typed;
   const start = offset - prefix.length;
   const namespace = namespaceAt(a, offset);
   const dot = prefix.lastIndexOf(".");
   let items: Completion[];
   if (dot > 0) {
-    items = members(index, file, prefix.slice(0, dot), namespace);
+    items = members(index, file, a, prefix.slice(0, dot), namespace);
   } else if (dot === 0) {
     items = namespaces(index, file);
-  } else if (symbol) {
-    items = [];
   } else {
     items = bare(index, file, namespace, lambdaAt(text, a, offset));
   }
@@ -71,11 +71,7 @@ export function completions(
 }
 
 // Nothing typed yet, where a name could start
-const nothing = (offset: number) => ({
-  prefix: "",
-  symbol: false,
-  end: offset,
-});
+const nothing = (offset: number) => ({ prefix: "", end: offset });
 
 // The name being typed up to the offset, and where the whole of it ends;
 // an empty one where a name could start; or undefined where nothing's
@@ -84,43 +80,54 @@ function typing(
   text: string,
   a: Annotated,
   offset: number,
-): { prefix: string; symbol: boolean; end: number } | undefined {
-  if (ended(text, a, offset)) return undefined;
-  const t = tokenAt(a, offset);
+): { prefix: string; end: number } | undefined {
+  if (ended(text, a, offset) || shebang(text, offset)) return undefined;
+  if (a.script.comments.some((c) => within(c, offset))) return undefined;
+  if (inParams(text, a, offset)) return undefined;
+  const s = statementAt(text, a, offset);
+  // A command, another language's line, or k, and the lines q joins on
+  if (s && !q(s.tokens[0])) return undefined;
+  const t = s?.tokens.find((t) => within(t, offset));
   if (!t) {
-    // Past spaces after a comment, a command, another language's line or a
-    // string left open, which run to the end of the line, still in it
-    let at = offset;
-    while (text[at - 1] === " " || text[at - 1] === "\t") at--;
-    const before = at < offset ? tokenAt(a, at) : undefined;
-    return before && !open(before) ? undefined : nothing(offset);
+    const before = s?.tokens.findLast((t) => t.end < offset);
+    return before && !follows(text, before, offset)
+      ? undefined
+      : nothing(offset);
   }
   switch (t.kind) {
     case "name":
-      return { prefix: text.slice(t.start, offset), symbol: false, end: t.end };
+      return { prefix: text.slice(t.start, offset), end: t.end };
     case "symbol": {
-      // The symbol from its last backtick before the offset, if it names a
-      // namespace: anything else is data, as `a or `:file
+      // The symbol from its last backtick before the offset, if it starts
+      // with a dot: anything else is data, as `a or `:file
       const from = text.lastIndexOf("`", offset - 1) + 1;
       const prefix = text.slice(from, offset);
       const next = text.indexOf("`", offset);
       const end = next < 0 || next > t.end ? t.end : next;
-      return prefix.startsWith(".") ? { prefix, symbol: true, end } : undefined;
+      return prefix.startsWith(".") ? { prefix, end } : undefined;
     }
     case "operator":
       // A dot alone, as a namespace starts: q's . otherwise, which is rare
       // before a name
       return text.slice(t.start, offset) === "."
-        ? { prefix: ".", symbol: false, end: offset }
+        ? { prefix: ".", end: offset }
         : nothing(offset);
     default:
-      return open(t) && offset === t.end ? nothing(offset) : undefined;
+      // Right after a bracket, a separator or a string; not in a number,
+      // a comment or a string
+      return opens(t) && offset === t.end ? nothing(offset) : undefined;
   }
 }
 
-// Whether a name can follow the token: not in a comment, a number, a
-// command, k, another language's line or a string left open
-function open(t: Token): boolean {
+const within = (t: { start: number; end: number }, offset: number) =>
+  t.start < offset && offset <= t.end;
+
+// Whether the statement's q: not a command, another language's or k
+const q = (t: Token) =>
+  t.kind !== "command" && t.kind !== "other" && t.kind !== "k";
+
+// Whether a name typed right after the token would start a new one
+function opens(t: Token): boolean {
   switch (t.kind) {
     case "string":
       return !t.unterminated;
@@ -129,25 +136,59 @@ function open(t: Token): boolean {
     case "separator":
     case "iterator":
     case "operator":
-    case "name":
-    case "symbol":
       return true;
     default:
       return false;
   }
 }
 
-// The token the offset is in or just after, as when typing it
-function tokenAt(a: Annotated, offset: number): Token | undefined {
-  const within = (t: { start: number; end: number }) =>
-    t.start < offset && offset <= t.end;
-  for (const s of a.script.statements) {
-    if (s.start >= offset) break;
-    if (!within(s)) continue;
-    const t = s.tokens.find(within);
-    if (t) return t;
-  }
-  return a.script.comments.find(within);
+// Whether a name can start at the offset, after the token and whitespace:
+// not on a comment's line, nor in a string left open, which runs on
+function follows(text: string, t: Token, offset: number): boolean {
+  if (t.kind === "comment") return text.slice(t.end, offset).includes("\n");
+  return !(t.kind === "string" && t.unterminated);
+}
+
+// On the first line, after #!, which q skips
+const shebang = (text: string, offset: number) =>
+  text.startsWith("#!") && !text.slice(0, offset).includes("\n");
+
+// The statement the offset is in, or after on its last line, or on an
+// indented line after with only whitespace between, as q joins it on
+function statementAt(
+  text: string,
+  a: Annotated,
+  offset: number,
+): Statement | undefined {
+  const s = a.script.statements.findLast((s) => s.start < offset);
+  return s && holds(text, s, offset) ? s : undefined;
+}
+
+function holds(text: string, s: Statement, offset: number): boolean {
+  if (offset <= s.end) return true;
+  const between = text.slice(s.end, offset);
+  if (!/^\s*$/.test(between)) return false;
+  // Lines break at \n, as q's do: a lone \r is a space
+  const line = between.slice(between.lastIndexOf("\n") + 1);
+  return !between.includes("\n") || line.length > 0;
+}
+
+const statementOf = (a: Annotated, at: number) =>
+  a.script.statements.find((s) => s.start <= at && at < s.end);
+
+// In a lambda's parameter list, as {[a|], where a name is declared, not used
+function inParams(text: string, a: Annotated, offset: number): boolean {
+  return a.lambdas.some((l) => {
+    if (l.open.end > offset) return false;
+    const s = statementOf(a, l.open.start);
+    const tokens = s?.tokens.filter((t) => t.start >= l.open.end) ?? [];
+    const open = tokens[0];
+    if (open?.start !== l.open.end || text[open.start] !== "[") return false;
+    const close = tokens.find(
+      (t) => t.kind === "close" && text[t.start] === "]",
+    );
+    return open.start < offset && (!close || offset <= close.start);
+  });
 }
 
 // After the lone \ that ends the script, which q doesn't read
@@ -175,8 +216,7 @@ function namespaceAt(a: Annotated, offset: number): string {
 }
 
 // The innermost lambda the offset is in: after its open, up to its close,
-// or, if there's none yet, its statement, with the indented lines after it
-// that q would join on, blank so far
+// or, if there's none yet, anywhere its statement holds
 function lambdaAt(
   text: string,
   a: Annotated,
@@ -187,27 +227,10 @@ function lambdaAt(
     if (l.open.end > offset) continue;
     const inside = l.close
       ? offset <= l.close.start
-      : continues(text, a, l.open.start, offset);
+      : statementOf(a, l.open.start) === statementAt(text, a, offset);
     if (inside && (!found || l.open.start > found.open.start)) found = l;
   }
   return found;
-}
-
-// Whether the offset is in the statement at, or after it on its last line,
-// or on an indented line after it with only spaces between
-function continues(
-  text: string,
-  a: Annotated,
-  at: number,
-  offset: number,
-): boolean {
-  const s = a.script.statements.find((s) => s.start <= at && at < s.end);
-  if (!s || offset <= s.end) return true;
-  const between = text.slice(s.end, offset);
-  if (!/^\s*$/.test(between)) return false;
-  // Lines break at \n, as q's do: a lone \r is a space
-  const line = between.slice(between.lastIndexOf("\n") + 1);
-  return !between.includes("\n") || line.length > 0;
 }
 
 // Each global's definition the hover would show first
@@ -230,9 +253,14 @@ const ofDefined = (
   group: 0 | 1 | 2,
 ): Completion => ({ label, kind: defined.kind, group, defined });
 
-const ofBuiltin = (label: string, builtin: Builtin): Completion => ({
+// Of q's, by its name, as .Q.s1 shown as s1 after \d .Q
+const ofBuiltin = (
+  name: string,
+  label: string,
+  builtin: Builtin,
+): Completion => ({
   label,
-  kind: label.includes(".")
+  kind: name.includes(".")
     ? builtin.forms.length
       ? "function"
       : "variable"
@@ -242,8 +270,9 @@ const ofBuiltin = (label: string, builtin: Builtin): Completion => ({
 });
 
 // A bare name: the lambda's parameters and locals; the globals in the root,
-// or, after \d, the namespace's, by their names in it, and its namespaces,
-// as q reads names there and nowhere else; and q's keywords
+// or, after \d, the namespace's, q's own in it among them, by their names in
+// it, and its namespaces, as q reads names there and nowhere else; and q's
+// keywords
 function bare(
   index: Index,
   file: string,
@@ -261,14 +290,14 @@ function bare(
     for (const l of lambda.locals) add({ label: l, kind: "local", group: 0 });
   }
   if (namespace) {
-    for (const c of children(globals(index, file), namespace, "")) add(c);
+    for (const c of inNamespace(index, file, namespace, "")) add(c);
   } else {
     for (const [full, d] of globals(index, file)) {
       if (!full.includes(".")) add(ofDefined(full, d, 1));
     }
   }
   for (const [name, b] of builtins) {
-    if (!name.includes(".")) add(ofBuiltin(name, b));
+    if (!name.includes(".")) add(ofBuiltin(name, name, b));
   }
   return [...out.values()];
 }
@@ -296,36 +325,44 @@ function namespaces(index: Index, file: string): Completion[] {
 }
 
 // After a dot: the members of the namespace written before it, each as
-// written up to its own name, and its namespaces; or a module's exports,
-// for a global bound to one, as q never reads a dotted name through a local
+// written up to its own name, and its namespaces; or a module's exports, for
+// a global bound to one in the file, as Go to Definition follows
 function members(
   index: Index,
   file: string,
+  a: Annotated,
   written: string,
   namespace: string,
 ): Completion[] {
   // As q reads it: a name without a leading dot is in the file's namespace
   const absolute =
     written.startsWith(".") || !namespace ? written : `${namespace}.${written}`;
-  // A module bound in this file, as Go to Definition follows only those
-  const module = index
-    .get(file)
-    ?.defined.findLast((d) => d.full === absolute && d.kind === "module")
-    ?.detail?.match(/^use\s*`([^`]*)$/)?.[1];
-  if (module !== undefined) return exportsOf(index, file, written, module);
+  const module = a.modules.get(absolute);
+  return module === undefined
+    ? inNamespace(index, file, absolute, `${written}.`)
+    : exportsOf(index, file, written, module);
+}
 
+// The globals and q's own directly in a namespace, and the namespaces in it,
+// each labelled by its name in it after the written prefix; your own
+// definition of one of q's, as .z.pg, beside q's entry
+function inNamespace(
+  index: Index,
+  file: string,
+  namespace: string,
+  written: string,
+): Completion[] {
   const out = new Map<string, Completion>();
-  for (const c of children(globals(index, file), absolute, `${written}.`)) {
+  for (const c of children(globals(index, file), namespace, written)) {
     out.set(c.label, c);
   }
   for (const [name, b] of builtins) {
-    const rest = name.slice(absolute.length + 1);
-    if (!name.startsWith(`${absolute}.`) || rest.includes(".")) continue;
-    // Your own definition of it, as .z.pg, beside q's entry
-    const label = `${written}.${rest}`;
+    const rest = name.slice(namespace.length + 1);
+    if (!name.startsWith(`${namespace}.`) || rest.includes(".")) continue;
+    const label = written + rest;
     const had = out.get(label);
     out.set(label, {
-      ...ofBuiltin(label, b),
+      ...ofBuiltin(name, label, b),
       ...(had?.defined ? { defined: had.defined } : {}),
     });
   }

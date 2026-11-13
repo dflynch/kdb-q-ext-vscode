@@ -104,6 +104,9 @@ export type Annotated = {
   // Where \d, or system "d …", changes the namespace, and to what: from the
   // end of its statement on
   namespaces: { at: number; namespace: string }[];
+  // The module each global bound by m:use`mod is, by its full name, as
+  // m.f resolves
+  modules: Map<string, string>;
   names: Name[];
   handles: Handle[];
   lambdas: Lambda[];
@@ -274,6 +277,7 @@ export function annotate(
   const out: Annotated = {
     script,
     namespaces: [],
+    modules: new Map(),
     names: [],
     handles: [],
     lambdas: [],
@@ -885,7 +889,7 @@ export function annotate(
     return undefined;
   };
   // Modules bound to globals, by full name, and to locals, by lambda
-  const globalModules = new Map<string, string>();
+  const globalModules = out.modules;
   const localModules = new Map<Lambda, Map<string, string>>();
   for (const { entry, module } of bindings) {
     if (scoped(entry, entry.text) && entry.lambda) {

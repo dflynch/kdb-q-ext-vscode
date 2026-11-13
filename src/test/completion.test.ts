@@ -4,7 +4,8 @@ import { type Completion, completions } from "../completion";
 import { entry } from "../workspaceIndex";
 
 // Files by path, written with \n, one with a | at the cursor, taken out:
-// what's offered there, by label, and the text it replaces
+// what's offered there, by label; the text typed up to the cursor, which
+// inserting replaces; and the whole name, which replacing does
 function complete(files: Record<string, string>, newline: string) {
   const index = new Map<string, ReturnType<typeof entry>>();
   let cursor: { file: string; text: string; offset: number } | undefined;
@@ -26,8 +27,8 @@ function complete(files: Record<string, string>, newline: string) {
   );
   if (!found) return undefined;
   return {
-    replaced: cursor.text.slice(found.inserting.start, found.inserting.end),
-    whole: cursor.text.slice(found.replacing.start, found.replacing.end),
+    inserting: cursor.text.slice(found.inserting.start, found.inserting.end),
+    replacing: cursor.text.slice(found.replacing.start, found.replacing.end),
     items: new Map(found.items.map((c) => [c.label, c])),
   };
 }
@@ -71,7 +72,7 @@ for (const [ending, newline] of [
           ".ns.h": "-",
         },
       );
-      assert.strictEqual(found?.replaced, "p");
+      assert.strictEqual(found?.inserting, "p");
     });
 
     test("only the innermost lambda's, as q has no closures", () => {
@@ -90,7 +91,7 @@ for (const [ending, newline] of [
       );
     });
 
-    test("a lambda left open, to its statement's end", () => {
+    test("a lambda left open, till a line at column 0", () => {
       assert.deepStrictEqual(offered(at({ "/w/a.q": "f:{[a] |" }), ["a"]), {
         a: "param 0",
       });
@@ -142,7 +143,7 @@ for (const [ending, newline] of [
 
     test("after a glyph, with nothing typed", () => {
       const found = at({ "/w/a.q": "g:1\nx:|" });
-      assert.strictEqual(found?.replaced, "");
+      assert.strictEqual(found?.inserting, "");
       assert.deepStrictEqual(offered(found, ["g"]), { g: "variable 1" });
     });
 
@@ -178,18 +179,56 @@ for (const [ending, newline] of [
 
     test("inside a name, replacing the whole of it", () => {
       const found = at({ "/w/a.q": "f:{[abc] a|b}" });
-      assert.strictEqual(found?.replaced, "a");
-      assert.strictEqual(found?.whole, "ab");
+      assert.strictEqual(found?.inserting, "a");
+      assert.strictEqual(found?.replacing, "ab");
       const dotted = at({ "/w/a.q": ".ns.f:1\nx:.n|s.f" });
-      assert.strictEqual(dotted?.replaced, ".n");
-      assert.strictEqual(dotted?.whole, ".ns.f");
+      assert.strictEqual(dotted?.inserting, ".n");
+      assert.strictEqual(dotted?.replacing, ".ns.f");
       const symbol = at({ "/w/a.q": ".ns.f:1\nx:`.n|s.f`b" });
-      assert.strictEqual(symbol?.whole, ".ns.f");
+      assert.strictEqual(symbol?.replacing, ".ns.f");
     });
 
     test("just after a string's close", () => {
       assert.deepStrictEqual(offered(at({ "/w/a.q": 'g:1\nx:"a"|' }), ["g"]), {
         g: "variable 1",
+      });
+    });
+
+    test("after a number and a space", () => {
+      assert.deepStrictEqual(offered(at({ "/w/a.q": "g:1\nx:1 |" }), ["g"]), {
+        g: "variable 1",
+      });
+    });
+
+    test("on a line joined on after a trailing comment", () => {
+      assert.deepStrictEqual(
+        offered(at({ "/w/a.q": "f:{[a] 1 / c\n  |" }), ["a"]),
+        { a: "param 0" },
+      );
+    });
+
+    test("after \\d .Q, q's own by their names in it", () => {
+      assert.deepStrictEqual(
+        offered(at({ "/w/a.q": "\\d .Q\nx:|" }), ["s1", "a", "count"]),
+        { s1: "function 2", a: "variable 2", count: "keyword 2" },
+      );
+    });
+
+    test("after \\d, in a lambda: its own first, then the namespace's", () => {
+      const files = {
+        "/w/a.q": "\\d .ns\nf:{[a;g] b:1; |}",
+        "/w/b.q": ".ns.g:1\n.ns.h:1",
+      };
+      assert.deepStrictEqual(offered(at(files), ["a", "b", "g", "h"]), {
+        a: "param 0",
+        b: "local 0",
+        g: "param 0",
+        h: "variable 1",
+      });
+      const open = { ...files, "/w/a.q": "\\d .ns\nf:{[a]\n  |" };
+      assert.deepStrictEqual(offered(at(open), ["a", "h"]), {
+        a: "param 0",
+        h: "variable 1",
       });
     });
   });
@@ -210,7 +249,7 @@ for (const [ending, newline] of [
           ".ns.f": "-",
         },
       );
-      assert.strictEqual(found?.replaced, ".");
+      assert.strictEqual(found?.inserting, ".");
     });
 
     test("q's own members, with KX's line", () => {
@@ -224,7 +263,7 @@ for (const [ending, newline] of [
         found?.items.get(".Q.a")?.builtin?.summary,
         "lower-case alphabet",
       );
-      assert.strictEqual(found?.replaced, ".Q.");
+      assert.strictEqual(found?.inserting, ".Q.");
     });
 
     test("your namespace's members and namespaces, not deeper", () => {
@@ -244,9 +283,9 @@ for (const [ending, newline] of [
       assert.strictEqual(found?.items.get(".ns.f")?.defined?.detail, "[a;b]");
     });
 
-    test("the name typed so far is replaced, dots and all", () => {
+    test("the name typed so far, dots and all", () => {
       const found = at({ "/w/a.q": ".ns.sub.g:1\nx:.ns.su|" });
-      assert.strictEqual(found?.replaced, ".ns.su");
+      assert.strictEqual(found?.inserting, ".ns.su");
       assert.deepStrictEqual(offered(found, [".ns.sub"]), {
         ".ns.sub": "namespace 1",
       });
@@ -298,6 +337,45 @@ for (const [ending, newline] of [
       });
     });
 
+    test("inside lambdas, open or nested, and a broken file", () => {
+      for (const source of [
+        ".ns.f:1\ng:{[a] .ns.|",
+        ".ns.f:1\ng:{[a] {[b] .ns.|}}",
+        "x:(1;2\n.ns.f:1]\ng:{.ns.|}",
+      ]) {
+        assert.deepStrictEqual(offered(at({ "/w/a.q": source }), [".ns.f"]), {
+          ".ns.f": "variable 1",
+        });
+      }
+    });
+
+    test("a module's exports: partly typed, under \\d, or bound as Go to Definition binds", () => {
+      const mod = { "/w/mod.q": "f:{x}\nfa:1\nexport:([f;fa])" };
+      const found = at({ ...mod, "/w/a.q": "s:use`mod\nx:s.f|" });
+      assert.strictEqual(found?.inserting, "s.f");
+      assert.deepStrictEqual(offered(found, ["s.f", "s.fa"]), {
+        "s.f": "function 1",
+        "s.fa": "variable 1",
+      });
+      assert.deepStrictEqual(
+        offered(at({ ...mod, "/w/a.q": "\\d .ns\ns:use`mod\nx:s.|" }), ["s.f"]),
+        { "s.f": "function 1" },
+      );
+      // :: at top level is a view; a local is never read through a dot
+      for (const source of ["s::use`mod\nx:s.|", "f:{s:use`mod; s.|}"]) {
+        assert.deepStrictEqual(
+          offered(at({ ...mod, "/w/a.q": source }), ["s.f"]),
+          {
+            "s.f": "-",
+          },
+        );
+      }
+    });
+
+    test("a module that isn't found, nothing", () => {
+      assert.strictEqual(at({ "/w/a.q": "s:use`nope\nx:s.|" })?.items.size, 0);
+    });
+
     test("a namespace with nothing in it, nothing", () => {
       assert.strictEqual(at({ "/w/a.q": "x:.nope.|" })?.items.size, 0);
     });
@@ -306,7 +384,7 @@ for (const [ending, newline] of [
   suite(`completion: a symbol (${ending})`, () => {
     test("naming a namespace, its members", () => {
       const found = at({ "/w/a.q": ".ns.f:1\nx:`.ns.|" });
-      assert.strictEqual(found?.replaced, ".ns.");
+      assert.strictEqual(found?.inserting, ".ns.");
       assert.deepStrictEqual(offered(found, [".ns.f"]), {
         ".ns.f": "variable 1",
       });
@@ -318,6 +396,17 @@ for (const [ending, newline] of [
         offered(at({ "/w/a.q": ".ns.f:1\nx:`.|" }), [".ns"]),
         { ".ns": "namespace 1" },
       );
+    });
+
+    test("under \\d, and in a broken file", () => {
+      for (const source of [
+        "\\d .other\n.ns.f:1\nx:`.ns.|",
+        "x:(1;2\n.ns.f:1]\nx:`.ns.|",
+      ]) {
+        assert.deepStrictEqual(offered(at({ "/w/a.q": source }), [".ns.f"]), {
+          ".ns.f": "variable 1",
+        });
+      }
     });
 
     test("any other, nothing: it's data", () => {
@@ -343,6 +432,12 @@ for (const [ending, newline] of [
       ["after spaces in a trailing comment", "g:1\nx:1 / note |"],
       ["after spaces in another language's line", "g:1\np)x = |"],
       ["after spaces in a system command", "g:1\n\\l |"],
+      ["on a system command's line joined on", "g:1\n\\l a.q\n  g|"],
+      ["on another language's line joined on", "g:1\np)x = 1\n  |"],
+      ["on a blank line in a string left open", 'g:1\nx:"abc\n  |'],
+      ["after #!", "#!/usr/bin/q|\ng:1"],
+      ["in a lambda's parameters", "g:1\nf:{[a|] a}"],
+      ["in a lambda's parameters, left open", "g:1\nf:{[a;|"],
     ]) {
       test(what, () => {
         assert.strictEqual(at({ "/w/a.q": source }), undefined);

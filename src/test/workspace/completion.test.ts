@@ -1,5 +1,5 @@
 // Completion over the q files copied into the test folder, as VS Code asks
-// for it: what's offered, as which kind, replacing what, with what detail
+// for it: what's offered, as which kind, over what typed, with what detail
 // and documentation; and VS Code's word-based suggestions off for q
 import * as assert from "node:assert";
 import * as vscode from "vscode";
@@ -25,7 +25,7 @@ async function offered(d: vscode.TextDocument, trigger?: string) {
   );
 }
 
-const replaced = (d: vscode.TextDocument, i: vscode.CompletionItem) => {
+const inserted = (d: vscode.TextDocument, i: vscode.CompletionItem) => {
   const r = i.range;
   assert.ok(r && !(r instanceof vscode.Range));
   return d.getText(r.inserting);
@@ -50,12 +50,12 @@ suite("completion", () => {
     assert.strictEqual(editor.get("wordBasedSuggestions"), "off");
   });
 
-  test("parameters, then globals from other files, then keywords", async () => {
+  test("parameters before keywords, and globals from other files", async () => {
     const d = await untitled("f:{[price;qty] pr");
     const items = await offered(d);
     const price = items.get("price");
     assert.strictEqual(price?.kind, vscode.CompletionItemKind.Variable);
-    assert.strictEqual(price && replaced(d, price), "pr");
+    assert.strictEqual(price && inserted(d, price), "pr");
     assert.strictEqual(
       items.get("run")?.kind,
       vscode.CompletionItemKind.Function,
@@ -75,7 +75,7 @@ suite("completion", () => {
     const upd = (await offered(d, ".")).get(".u.upd");
     assert.strictEqual(upd?.kind, vscode.CompletionItemKind.Function);
     assert.strictEqual(upd?.detail, "[t;x]");
-    assert.strictEqual(upd && replaced(d, upd), ".u.");
+    assert.strictEqual(upd && inserted(d, upd), ".u.");
     assert.match(documented(upd), /index\/code\/wdb\.q/);
   });
 

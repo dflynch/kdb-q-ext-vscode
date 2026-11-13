@@ -174,7 +174,7 @@ function decoded(uri: string): string {
 
 // Nearest the file first: itself, then its directory, then by how many
 // directories they share, then by path
-export function nearest(file: string): (x: string, y: string) => number {
+function nearest(file: string): (x: string, y: string) => number {
   const directories = (f: string) => f.split("/").slice(0, -1);
   const mine = directories(file);
   const shared = (other: string) => {
