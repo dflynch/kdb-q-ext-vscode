@@ -87,6 +87,16 @@ suite("completion", () => {
     assert.match(documented(s1), /code\.kx\.com/);
   });
 
+  test(".z's as events, as q's hooks", async () => {
+    const items = await offered(await untitled("x:.z."), ".");
+    for (const name of [".z.pg", ".z.p"]) {
+      assert.strictEqual(
+        items.get(name)?.kind,
+        vscode.CompletionItemKind.Event,
+      );
+    }
+  });
+
   test("a module's exports", async () => {
     const d = await untitled("s:use`stats\nx:s.");
     const mean = (await offered(d, ".")).get("s.mean");
