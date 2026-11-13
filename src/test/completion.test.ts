@@ -194,6 +194,14 @@ for (const [ending, newline] of [
       });
     });
 
+    test("after q)", () => {
+      for (const source of ["g:1\nq)|", "g:1\nq)x:|"]) {
+        assert.deepStrictEqual(offered(at({ "/w/a.q": source }), ["g"]), {
+          g: "variable 1",
+        });
+      }
+    });
+
     test("after a number and a space", () => {
       assert.deepStrictEqual(offered(at({ "/w/a.q": "g:1\nx:1 |" }), ["g"]), {
         g: "variable 1",
