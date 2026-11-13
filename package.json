@@ -41,6 +41,16 @@
         "path": "./syntaxes/q.tmGrammar.json"
       }
     ],
+    "semanticTokenScopes": [
+      {
+        "language": "q",
+        "scopes": {
+          "variable": [
+            "variable.parameter.local.q"
+          ]
+        }
+      }
+    ],
     "viewsContainers": {
       "panel": [
         {

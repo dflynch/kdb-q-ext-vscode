@@ -316,6 +316,11 @@ suite("occurrences", () => {
       ["n write", "n text"],
     ],
     [
+      "a parameter, not the column delete names, as q reads that as a name",
+      "f:{[t;|p] delete p from t where c>p}",
+      ["p write", "p text"],
+    ],
+    [
       "a module's export by a dot, apart from by a key, as q reads a dictionary",
       "m:use`foo\nk:use`foo\nm.|f 1\nm`f\nk`f",
       ["m.f read"],

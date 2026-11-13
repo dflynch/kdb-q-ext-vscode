@@ -46,8 +46,8 @@ export type Name = {
   lambda?: Lambda;
   // A column read as a variable, if the table has no such column: q reads
   // a column first, then a local or parameter, then a global. Never for one
-  // assigned, or for i, the virtual column, which q reads even over a column
-  // named i
+  // assigned, for i, the virtual column, which q reads even over a column
+  // named i, or for one delete names, as delete p from t
   variable?: { role: "param" | "local" | "global"; full: string };
 };
 
@@ -270,6 +270,8 @@ type Entry = {
   declares?: true;
   // In a qSQL query, where from and by are keywords
   query?: true;
+  // A column delete names, which q reads as a name, never a variable
+  named?: true;
 };
 
 type Element = { start: number; end: number; text: string };
@@ -620,6 +622,8 @@ export function annotate(
     let query = false;
     // update and delete, which amend a table named by a symbol in place
     let inPlace = false;
+    // Between delete and from, where q reads each name as a column's name
+    let deleting = false;
     let column = context.column;
     // Whether the query is itself in a clause, so all of it is
     let outer = column;
@@ -678,6 +682,7 @@ export function annotate(
       }
       if (item.kind === "separator") {
         query = false;
+        deleting = false;
         column = context.column;
         continue;
       }
@@ -691,6 +696,7 @@ export function annotate(
         outer = column;
         query = true;
         inPlace = w === "update" || w === "delete";
+        deleting = w === "delete";
         column = true;
       }
       // value[`a], set[`a;1], insert[`t;x]
@@ -706,10 +712,15 @@ export function annotate(
           dereference(s, here, sets ? write : undefined);
         }
       }
-      const entry = enter(item, here, query ? { query: true } : {});
+      const entry = enter(
+        item,
+        here,
+        query ? { query: true, ...(deleting ? { named: true } : {}) } : {},
+      );
       const assign = assignment(items, i);
       if (assign) entry.assign = assign;
       if (query && w === "from") {
+        deleting = false;
         column = outer;
       } else if (query && w === "where") {
         column = true;
@@ -939,7 +950,7 @@ export function annotate(
         ...base,
         role: "column",
         full: w,
-        ...(w === "i" || e.assign
+        ...(w === "i" || e.assign || e.named
           ? {}
           : {
               variable: local

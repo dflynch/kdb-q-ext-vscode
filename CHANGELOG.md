@@ -105,6 +105,9 @@ All notable changes to the extension are documented in this file.
   for ``s:use`mod`` in the file or, if it doesn't define `s`, another;
   and a symbol starting with a dot, as `` `.ns. ``. VS
   Code's word-based suggestions are off for q
+- A lambda's parameters and locals in the parameter colour wherever they're
+  used, so its own names stand apart from globals, as a misspelt local
+  does; a local is still a variable to themes that colour them apart
 
 ### Changed
 
