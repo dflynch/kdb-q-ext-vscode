@@ -84,6 +84,41 @@ suite("workspace index", () => {
     assert.deepStrictEqual(shown(found), ["mods/stats/init.q 1:1"]);
   });
 
+  test("an export, through a module bound in another file", async () => {
+    const d = await vscode.workspace.openTextDocument(file("code/report.q"));
+    const found = await vscode.commands.executeCommand<vscode.Location[]>(
+      "vscode.executeDefinitionProvider",
+      d.uri,
+      new vscode.Position(1, 5),
+    );
+    assert.deepStrictEqual(shown(found), ["mods/stats/init.q 1:1"]);
+    // And as s`mean
+    const keyed = await vscode.commands.executeCommand<vscode.Location[]>(
+      "vscode.executeDefinitionProvider",
+      d.uri,
+      new vscode.Position(3, 4),
+    );
+    assert.deepStrictEqual(shown(keyed), ["mods/stats/init.q 1:1"]);
+  });
+
+  test("a module's own global, only in the module", async () => {
+    const d = await vscode.workspace.openTextDocument(file("code/report.q"));
+    const found = await vscode.commands.executeCommand<vscode.Location[]>(
+      "vscode.executeDefinitionProvider",
+      d.uri,
+      new vscode.Position(2, 3),
+    );
+    assert.deepStrictEqual(shown(found), []);
+    // Symbol search still finds it, as written in the module
+    const listed = await vscode.commands.executeCommand<
+      vscode.SymbolInformation[]
+    >("vscode.executeWorkspaceSymbolProvider", "spread");
+    assert.deepStrictEqual(
+      listed.map((s) => shown([s.location])[0]),
+      ["mods/stats/init.q 4:1"],
+    );
+  });
+
   test("the files a \\l may load", async () => {
     const d = await vscode.workspace.openTextDocument(file("code/load.q"));
     const links = (line: number, character: number) =>

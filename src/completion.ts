@@ -2,7 +2,9 @@
 // and locals, as q has no closures; the workspace's globals in the root, or,
 // after \d, the namespace's, by their names in it; q's keywords; and, after
 // a dot, a namespace's members, q's own in .Q, .z, .h and .j among them, or
-// a module's exports, as s. for s:use`mod bound in the file. A symbol
+// a module's exports, as s. for s:use`mod, bound as Go to Definition binds
+// it. In a module's own namespace, its own globals, not the root's; and
+// outside the module, none of them. A symbol
 // starting with a dot, as `.ns., offers the same; any other symbol is data.
 // Nothing in a string, a comment, a number, a system command, a line for
 // another language, a lambda's parameter list, or after the line that ends
@@ -17,8 +19,10 @@ import {
   exported,
   type Index,
   type Listed,
+  moduleAt,
+  moduleFiles,
+  named,
   preferred,
-  resolve,
 } from "./workspaceIndex";
 
 export type Completion = {
@@ -57,14 +61,15 @@ export function completions(
   const { prefix, end } = typed;
   const start = offset - prefix.length;
   const namespace = namespaceAt(a, offset);
+  const own = moduleAt(index, file, start);
   const dot = prefix.lastIndexOf(".");
   let items: Completion[];
   if (dot > 0) {
-    items = members(index, file, a, prefix.slice(0, dot), namespace);
+    items = members(index, file, prefix.slice(0, dot), namespace, start);
   } else if (dot === 0) {
     items = namespaces(index, file);
   } else {
-    items = bare(index, file, namespace, lambdaAt(text, a, offset));
+    items = bare(index, file, namespace, lambdaAt(text, a, offset), own);
   }
   return {
     inserting: { start, end: offset },
@@ -244,12 +249,18 @@ function lambdaAt(
   return found;
 }
 
-// Each global's definition the hover would show first
-function globals(index: Index, file: string): Map<string, Listed> {
+// Each global's definition the hover would show first: a module's own,
+// for the module's own namespace, else the rest
+function globals(
+  index: Index,
+  file: string,
+  own?: string,
+): Map<string, Listed> {
   const better = preferred(file);
   const out = new Map<string, Listed>();
   for (const [f, e] of index) {
     for (const d of e.defined) {
+      if (named(index, f, d.nameSpan.start, d.full).own !== own) continue;
       const had = out.get(d.full);
       const listed = { ...d, file: f };
       if (!had || better(listed, had) < 0) out.set(d.full, listed);
@@ -297,6 +308,7 @@ function bare(
   file: string,
   namespace: string,
   lambda: Lambda | undefined,
+  own: string | undefined,
 ): Completion[] {
   const out = new Map<string, Completion>();
   const add = (c: Completion) => {
@@ -310,10 +322,10 @@ function bare(
   }
   if (namespace) {
     // .z's own are q's values, not names in it: under \d .z, K isn't .z.K
-    const own = namespace !== ".z";
-    for (const c of inNamespace(index, file, namespace, "", own)) add(c);
+    const qs = namespace !== ".z";
+    for (const c of inNamespace(index, file, namespace, "", qs)) add(c);
   } else {
-    for (const [full, d] of globals(index, file)) {
+    for (const [full, d] of globals(index, file, own)) {
       if (!full.includes(".")) add(ofDefined(full, d, 1));
     }
   }
@@ -347,21 +359,22 @@ function namespaces(index: Index, file: string): Completion[] {
 
 // After a dot: the members of the namespace written before it, each as
 // written up to its own name, and its namespaces; or a module's exports, for
-// a global bound to one in the file, as Go to Definition follows
+// a global bound to one, as Go to Definition follows
 function members(
   index: Index,
   file: string,
-  a: Annotated,
   written: string,
   namespace: string,
+  start: number,
 ): Completion[] {
   // As q reads it: a name without a leading dot is in the file's namespace
   const absolute =
     written.startsWith(".") || !namespace ? written : `${namespace}.${written}`;
-  const module = a.modules.get(absolute);
-  return module === undefined
-    ? inNamespace(index, file, absolute, `${written}.`)
-    : exportsOf(index, file, written, module);
+  const global = named(index, file, start, absolute);
+  const found = moduleFiles(index, file, global, false);
+  return found.length
+    ? exportsOf(index, written, found)
+    : inNamespace(index, file, absolute, `${written}.`, true, global.own);
 }
 
 // The globals and q's own directly in a namespace, and the namespaces in it,
@@ -373,9 +386,10 @@ function inNamespace(
   namespace: string,
   written: string,
   qs = true,
+  own?: string,
 ): Completion[] {
   const out = new Map<string, Completion>();
-  for (const c of children(globals(index, file), namespace, written)) {
+  for (const c of children(globals(index, file, own), namespace, written)) {
     out.set(c.label, c);
   }
   for (const [name, b] of qs ? builtins : []) {
@@ -412,16 +426,15 @@ function children(
   return [...out.values()];
 }
 
-// A module's exports, from each file use`mod may be, by their keys in its
-// export, as the hover has them, of a module bound in the file
+// A module's exports, from each of its files, by their keys in its export,
+// as the hover has them
 function exportsOf(
   index: Index,
-  file: string,
   written: string,
-  module: string,
+  files: string[],
 ): Completion[] {
   const out = new Map<string, Completion>();
-  for (const m of resolve(index, file, module)) {
+  for (const m of files) {
     const e = index.get(m);
     for (const k of e?.export?.keys ?? []) {
       const label = `${written}.${k.key}`;

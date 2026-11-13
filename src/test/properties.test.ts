@@ -87,9 +87,23 @@ suite("properties", () => {
       const text = files["/w/a.q"];
       const a = annotate(text);
       const all = targets(a);
-      // Every definition in each file, as written
+      // Every definition in each file, as written, and whether it's a
+      // module's own: in a file that assigns export before any \d, before
+      // it, without a leading dot
+      const own = (file: string, at: number, full: string) => {
+        const t = files[file];
+        const end = annotate(t).namespaces[0]?.at ?? t.length + 1;
+        const module = globals(t, annotate(t)).some(
+          (d) => d.full === "export" && d.nameSpan.start < end,
+        );
+        return module && at < end && !full.startsWith(".");
+      };
       const every = Object.entries(files).flatMap(([file, t]) =>
-        globals(t, annotate(t)).map((d) => ({ ...d, file })),
+        globals(t, annotate(t)).map((d) => ({
+          ...d,
+          file,
+          own: own(file, d.nameSpan.start, d.full),
+        })),
       );
       for (let offset = -1; offset <= text.length + 1; offset++) {
         const context = JSON.stringify({ files, offset });
@@ -134,14 +148,23 @@ suite("properties", () => {
         // A global, or a column that may be one: every definition of it in
         // each file it lists, at top level, or, if no file has one, in a
         // lambda, each file's together, the latest first, and every file
-        // that has one
+        // that has one; a module's own only in the module. Not one that
+        // may be read through a module, as m.f
         const global = inside?.identity.startsWith("global ")
           ? inside.identity
           : inside?.identity.startsWith("column ")
             ? inside.maybe
             : undefined;
-        if (global?.startsWith("global ")) {
-          const of = every.filter((d) => d.full === global.slice(7));
+        const full = global?.slice(7) ?? "";
+        const through = every.some(
+          (d) => d.kind === "module" && full.startsWith(`${d.full}.`),
+        );
+        if (inside && global?.startsWith("global ") && !through) {
+          const mine = own("/w/a.q", inside.start, full);
+          const of = every.filter(
+            (d) =>
+              d.full === full && (mine ? d.own && d.file === "/w/a.q" : !d.own),
+          );
           const top = of.filter((d) => !d.inLambda);
           const chosen = top.length ? top : of;
           const listed = found?.defined ?? [];

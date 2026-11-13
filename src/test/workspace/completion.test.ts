@@ -103,6 +103,17 @@ suite("completion", () => {
     assert.strictEqual(mean?.kind, vscode.CompletionItemKind.Function);
   });
 
+  test("a module's exports, bound in another file", async () => {
+    const d = await untitled("x:s.");
+    const mean = (await offered(d, ".")).get("s.mean");
+    assert.strictEqual(mean?.kind, vscode.CompletionItemKind.Function);
+  });
+
+  test("not a module's own globals", async () => {
+    const d = await untitled("x:spr");
+    assert.strictEqual((await offered(d)).get("spread"), undefined);
+  });
+
   test("nothing in a string", async () => {
     const d = await untitled('x:"pr');
     assert.strictEqual((await offered(d)).size, 0);

@@ -378,14 +378,6 @@ for (const [ending, newline] of [
         "s.v": "variable 1",
       });
       assert.strictEqual(found?.items.get("s.f")?.defined?.detail, "[a;b]");
-      // Bound in another file, none, as Go to Definition follows only a
-      // module bound in the file
-      const elsewhere = {
-        ...files,
-        "/w/b.q": "t:use`mod",
-        "/w/a.q": "x:t.|",
-      };
-      assert.deepStrictEqual(offered(at(elsewhere), ["t.f"]), { "t.f": "-" });
     });
 
     test("a module's export of a dotted name alone, by its last part", () => {
@@ -440,6 +432,170 @@ for (const [ending, newline] of [
 
     test("a namespace with nothing in it, nothing", () => {
       assert.strictEqual(at({ "/w/a.q": "x:.nope.|" })?.items.size, 0);
+    });
+  });
+
+  suite(`completion: a module bound in another file (${ending})`, () => {
+    const mod = { "/w/lib/mod.q": "impl:{x}\nexport:([f:impl])" };
+    const other = { "/w/lib/other.q": "g:{y}\nexport:([h:g])" };
+    // Each way to bind s, and the namespace a read of it is in
+    const forms: [string, (m: string) => string, string][] = [
+      ["at top level", (m) => `s:use\`${m}`, ""],
+      ["in a lambda", (m) => `init:{s::use\`${m}}`, ""],
+      ["under \\d", (m) => `\\d .ns\ns:use\`${m}`, "\\d .ns\n"],
+    ];
+    // Each case's files, given the form, and how s.f and s.h are offered
+    const cases: [
+      string,
+      (bind: (m: string) => string, ns: string) => Record<string, string>,
+      string,
+      string,
+    ][] = [
+      [
+        "bound only in another file",
+        (bind, ns) => ({ "/w/a.q": bind("mod"), "/w/b.q": `${ns}x:s.|` }),
+        "function 1",
+        "-",
+      ],
+      [
+        "bound in the file too, the file's",
+        (bind) => ({
+          "/w/a.q": bind("mod"),
+          "/w/b.q": `${bind("other")}\nx:s.|`,
+        }),
+        "-",
+        "function 1",
+      ],
+      [
+        "defined in the file as something else, none",
+        (bind, ns) => ({ "/w/a.q": bind("mod"), "/w/b.q": `${ns}s:1\nx:s.|` }),
+        "-",
+        "-",
+      ],
+      [
+        "bound in two other files, both",
+        (bind, ns) => ({
+          "/w/a.q": bind("mod"),
+          "/w/x/c.q": bind("other"),
+          "/w/b.q": `${ns}x:s.|`,
+        }),
+        "function 1",
+        "function 1",
+      ],
+    ];
+    for (const [form, bind, ns] of forms) {
+      for (const [name, files, f, h] of cases) {
+        test(`${form}, ${name}`, () => {
+          const found = at({ ...mod, ...other, ...files(bind, ns) });
+          assert.deepStrictEqual(offered(found, ["s.f", "s.h"]), {
+            "s.f": f,
+            "s.h": h,
+          });
+        });
+      }
+    }
+
+    test("bound in a module's own namespace, or read in one, none", () => {
+      const own = "export:([z:1])\n";
+      for (const files of [
+        { "/w/a.q": `${own}s:use\`mod`, "/w/b.q": "x:s.|" },
+        { "/w/a.q": "s:use`mod", "/w/b.q": `${own}x:s.|` },
+      ]) {
+        assert.deepStrictEqual(offered(at({ ...mod, ...files }), ["s.f"]), {
+          "s.f": "-",
+        });
+      }
+      // After a \d, the root's, as any global
+      for (const files of [
+        { "/w/a.q": `${own}\\d .\ns:use\`mod`, "/w/b.q": "x:s.|" },
+        { "/w/a.q": "s:use`mod", "/w/b.q": `${own}\\d .\nx:s.|` },
+      ]) {
+        assert.deepStrictEqual(offered(at({ ...mod, ...files }), ["s.f"]), {
+          "s.f": "function 1",
+        });
+      }
+    });
+
+    test("a view at top level, none, as q 5.0 reads no s.f through it", () => {
+      const found = at({ ...mod, "/w/a.q": "s::use`mod", "/w/b.q": "x:s.|" });
+      assert.deepStrictEqual(offered(found, ["s.f"]), { "s.f": "-" });
+      // In the file, it's the file's s, so none from another file's binding
+      const here = at({
+        ...mod,
+        ...other,
+        "/w/a.q": "s:use`mod",
+        "/w/b.q": "s::use`other\nx:s.|",
+      });
+      assert.deepStrictEqual(offered(here, ["s.f", "s.h"]), {
+        "s.f": "-",
+        "s.h": "-",
+      });
+    });
+
+    test("after \\d . in a module binding its own s, the root's", () => {
+      const found = at({
+        ...mod,
+        ...other,
+        "/w/a.q": "s:use`mod",
+        "/w/b.q": "s:use`other\nexport:([z:1])\n\\d .\nx:s.|",
+      });
+      assert.deepStrictEqual(offered(found, ["s.f", "s.h"]), {
+        "s.f": "function 1",
+        "s.h": "-",
+      });
+    });
+  });
+
+  suite(`completion: a module's own globals (${ending})`, () => {
+    // Each way the file ends, and whether it's a module, as q finds an
+    // export only in the module's own namespace
+    const forms: [string, string, boolean][] = [
+      ["an export", "export:([mean])", true],
+      [
+        "an export assigned in a lambda",
+        "init:{export::([mean])}\ninit[]",
+        true,
+      ],
+      ["no export", "", false],
+      ["an export after \\d", "\\d .x\nexport:([mean])", false],
+    ];
+    const stats = (tail: string) =>
+      `helper:{x}\nmean:{helper x}\n.abs.g:1\n${tail}`;
+    for (const [form, tail, module] of forms) {
+      test(`${form}: in another file, ${module ? "none" : "as globals"}`, () => {
+        const found = at({ "/w/stats.q": stats(tail), "/w/a.q": "x:|" });
+        assert.deepStrictEqual(offered(found, ["helper", "mean"]), {
+          helper: module ? "-" : "function 1",
+          mean: module ? "-" : "function 1",
+        });
+        const dotted = at({ "/w/stats.q": stats(tail), "/w/a.q": "x:.abs.|" });
+        assert.deepStrictEqual(offered(dotted, [".abs.g"]), {
+          ".abs.g": "variable 1",
+        });
+      });
+
+      test(`${form}: in the file, ${module ? "its own only" : "every file's"}`, () => {
+        const found = at({
+          "/w/stats.q": `x:|\n${stats(tail)}`,
+          "/w/b.q": "root:1",
+        });
+        assert.deepStrictEqual(offered(found, ["helper", "mean", "root"]), {
+          helper: "function 1",
+          mean: "function 1",
+          root: module ? "-" : "variable 1",
+        });
+      });
+    }
+
+    test("after \\d . in a module, the root's", () => {
+      const found = at({
+        "/w/stats.q": "helper:{x}\nexport:([helper])\n\\d .\nx:|",
+        "/w/b.q": "root:1",
+      });
+      assert.deepStrictEqual(offered(found, ["helper", "root"]), {
+        helper: "-",
+        root: "variable 1",
+      });
     });
   });
 

@@ -70,11 +70,16 @@ All notable changes to the extension are documented in this file.
 - Navigation for q: the outline and breadcrumbs, highlighting a name where
   it occurs, Go to Definition, Find All References and Go to Symbol in
   Workspace, across the workspace's `.q` files, following namespaces,
-  lambdas' locals and q 5 modules. Find All References lists the uses that
-  pass a global by reference under a group of their own. Go to
-  Definition has every definition of a global, where its whole value is
-  set, which VS Code lists by file and line; the hover shows the nearest
-  file's latest. An amend, as `t,:x` or `` `t upsert x ``, is a reference
+  lambdas' locals and q 5 modules. `s.f`, ``s`f`` and ``s[`f]`` follow
+  ``s:use`mod`` in the file, or, if the file doesn't define `s`, in any
+  other file. ``s`f`` and ``s[`f]`` also follow a top-level view
+  ``s::use`mod``, as q 5.0 does. A module's own globals are followed only
+  in the module. ``s`f`` and ``s[`f]`` highlight together, apart from
+  `s.f`, which q reads alike only through a module. Find All
+  References lists the uses that pass a global by reference under a group
+  of their own. Go to Definition has every definition of a global, where
+  its whole value is set, which VS Code lists by file and line; the hover
+  shows the nearest file's latest. An amend, as `t,:x` or `` `t upsert x ``, is a reference
 - Go to Definition on the path a `\l` line names: the workspace's `.q`
   files whose paths end with it, as `\l common/util.q` has
   `code/common/util.q`, as the directory q runs in isn't known. `.`
@@ -97,7 +102,8 @@ All notable changes to the extension are documented in this file.
 - Completion for q: the lambda's parameters and locals, the workspace's
   globals in the root, or after `\d .ns` the namespace's, and q's keywords; after a dot, a namespace's members, q's own in
   `.Q`, `.z`, `.h` and `.j` with KX's line, or a module's exports, as `s.`
-  for ``s:use`mod`` in the file; and a symbol starting with a dot, as `` `.ns. ``. VS
+  for ``s:use`mod`` in the file or, if it doesn't define `s`, another;
+  and a symbol starting with a dot, as `` `.ns. ``. VS
   Code's word-based suggestions are off for q
 
 ### Changed

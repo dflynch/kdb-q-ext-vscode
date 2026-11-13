@@ -294,8 +294,10 @@ export function outline(text: string, a: Annotated): Outlined[] {
 }
 
 // What a name or handle refers to, so occurrences can be matched: a local or
-// parameter by its lambda, a global by its absolute name, an export by its
-// module and key, and a column, key or keyword by name
+// parameter by its lambda, a global by its absolute name, a global's key
+// read, as m`f or m[`f], by the global and key, which q reads as m.f only
+// through a module, an export of a local's module by the module and key,
+// and a column, key or keyword by name
 export type Target = {
   start: number;
   end: number;
@@ -335,8 +337,6 @@ function targetsOf(a: Annotated): Target[] {
       case "local":
       case "global":
         return scoped(n.role, n.full, n.lambda);
-      case "export":
-        return `export ${n.module} ${n.full}`;
       default:
         return `${n.role} ${n.full}`;
     }
@@ -365,6 +365,17 @@ function targetsOf(a: Annotated): Target[] {
       sets: h.defines === true && !h.amends,
       inLambda: h.lambda !== undefined,
       passed: h.module === undefined,
+    });
+  }
+  for (const k of a.keyReads) {
+    out.push({
+      start: k.start,
+      end: k.end,
+      identity: `keyread ${k.via} ${k.key}`,
+      defines: false,
+      sets: false,
+      inLambda: false,
+      passed: false,
     });
   }
   return out.sort((x, y) => x.start - y.start);
