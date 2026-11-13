@@ -46,6 +46,21 @@ suite("where, the function or a query's clause", () => {
       ["clause", "function"],
     ],
     [
+      "a query as the table, in brackets, each with its own",
+      "select from (select from t where date=x) where time=y",
+      ["clause", "clause"],
+    ],
+    [
+      "a query as the table, the function in its clause",
+      "select from (select from t where d=x, s in where b) where e=y",
+      ["clause", "function", "clause"],
+    ],
+    [
+      "a query as the table, in a lambda, over lines",
+      "f:{[d;t0] select from\n  (select from trade where date=d)\n  where time>t0}",
+      ["clause", "clause"],
+    ],
+    [
       "a query in the column list, with its own, ended by the outer from",
       "select c:exec x from s where y from t where z",
       ["clause", "clause"],
