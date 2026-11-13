@@ -29,8 +29,8 @@ export type Token = {
   unterminated?: true;
 };
 
-// From its first token's start to its last's end, which may be an indented
-// comment line's after its code
+// From its first line's text past any indent, a q) prefix and all, to its
+// last token's end, which may be an indented comment line's after its code
 export type Statement = { start: number; end: number; tokens: Token[] };
 
 // An outermost block comment from its "/" line to its "\" line, or to the end

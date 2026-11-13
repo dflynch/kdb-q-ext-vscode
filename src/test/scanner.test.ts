@@ -211,7 +211,12 @@ suite("scanner layout", () => {
     ["a comment, ending a statement", "a+\nq)/ c\nb", ["a+", "b"], ["/ c"]],
     ["a comment, a line joined on", "q)/ c\n  x:1", ["q)/ c\n  x:1"], []],
     ["a slash alone, not a block", "q)/\nb\n\\\nc", ["b"], ["/"], 2],
+    ["a comment, prefixed twice", "q)q)/ c\nb", ["b"], ["/ c"]],
+    ["a comment after a tab", "q)\t/ c\nb", ["b"], ["/ c"]],
+    ["a backslash and spaces", "q)\\  \nb", ["q)\\", "b"], []],
+    ["a string over lines", 'q)a:"x\n  y"\nb', ['q)a:"x\n  y"', "b"], []],
     ["a k line", "q)k)+/1\n  +1\nb", ["q)k)+/1\n  +1", "b"], []],
+    ["a k line, prefixed twice", "q)q)k)+/1\nb", ["q)q)k)+/1", "b"], []],
     ["another language", "q)p)f(\n  1)\nb", ["q)p)f(\n  1)", "b"], []],
   ];
   for (const [ending, eol] of [
