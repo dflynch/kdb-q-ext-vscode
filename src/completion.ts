@@ -261,7 +261,8 @@ const ofDefined = (
   group: 0 | 1 | 2,
 ): Completion => ({ label, kind: defined.kind, group, defined });
 
-// Of q's, by its name, as .Q.s1 shown as s1 after \d .Q
+// Of q's, by its name, as .Q.s1 shown as s1 after \d .Q: a function if
+// it's called, or if KX writes it as one you assign, as .z.pg:f
 const ofBuiltin = (
   name: string,
   label: string,
@@ -269,7 +270,7 @@ const ofBuiltin = (
 ): Completion => ({
   label,
   kind: name.includes(".")
-    ? builtin.forms.length
+    ? builtin.forms.length || builtin.syntax === `${name}:f`
       ? "function"
       : "variable"
     : "keyword",

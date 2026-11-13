@@ -323,6 +323,25 @@ for (const [ending, newline] of [
       });
     });
 
+    test(".z's callbacks as functions, its values as variables", () => {
+      assert.deepStrictEqual(
+        offered(at({ "/w/a.q": "x:.z.|" }), [
+          ".z.pg",
+          ".z.ts",
+          ".z.exit",
+          ".z.K",
+          ".z.p",
+        ]),
+        {
+          ".z.pg": "function 2",
+          ".z.ts": "function 2",
+          ".z.exit": "function 2",
+          ".z.K": "variable 2",
+          ".z.p": "variable 2",
+        },
+      );
+    });
+
     test("your own .z.pg beside q's entry", () => {
       const found = at({ "/w/a.q": ".z.pg:{[q] value q}\nx:.z.|" });
       const pg = found?.items.get(".z.pg");
