@@ -49,6 +49,9 @@ export type Name = {
   // assigned, for i, the virtual column, which q reads even over a column
   // named i, or for one delete names, as delete p from t
   variable?: { role: "param" | "local" | "global"; full: string };
+  // The where that opens a query's where clause, rather than the function,
+  // as where 1 0 1b
+  clause?: true;
 };
 
 // A global passed by reference: a symbol, or part of a symbol list, naming it
@@ -272,6 +275,8 @@ type Entry = {
   query?: true;
   // A column delete names, which q reads as a name, never a variable
   named?: true;
+  // The where that opens a query's where clause
+  clause?: true;
 };
 
 type Element = { start: number; end: number; text: string };
@@ -624,6 +629,12 @@ export function annotate(
     let inPlace = false;
     // Between delete and from, where q reads each name as a column's name
     let deleting = false;
+    // Past the query's from, and past its where clause's where: the clause
+    // opens at the first where after from, at the query's own depth, and
+    // any other where is the function, as in select c:where b from t or
+    // select from t where a in where b
+    let from = false;
+    let clause = false;
     let column = context.column;
     // Whether the query is itself in a clause, so all of it is
     let outer = column;
@@ -683,6 +694,8 @@ export function annotate(
       if (item.kind === "separator") {
         query = false;
         deleting = false;
+        from = false;
+        clause = false;
         column = context.column;
         continue;
       }
@@ -697,6 +710,8 @@ export function annotate(
         query = true;
         inPlace = w === "update" || w === "delete";
         deleting = w === "delete";
+        from = false;
+        clause = false;
         column = true;
       }
       // value[`a], set[`a;1], insert[`t;x]
@@ -712,17 +727,26 @@ export function annotate(
           dereference(s, here, sets ? write : undefined);
         }
       }
+      const starts = query && from && !clause && w === "where";
       const entry = enter(
         item,
         here,
-        query ? { query: true, ...(deleting ? { named: true } : {}) } : {},
+        query
+          ? {
+              query: true,
+              ...(deleting ? { named: true } : {}),
+              ...(starts ? { clause: true } : {}),
+            }
+          : {},
       );
       const assign = assignment(items, i);
       if (assign) entry.assign = assign;
       if (query && w === "from") {
         deleting = false;
+        from = true;
         column = outer;
-      } else if (query && w === "where") {
+      } else if (starts) {
+        clause = true;
         column = true;
       }
       // m:use`mod
@@ -942,7 +966,12 @@ export function annotate(
     if (e.declares) {
       name = { ...base, role: "param", full: w, ...defines };
     } else if (keywords.has(w) && (e.query || !queryWords.has(w))) {
-      name = { ...base, role: "builtin", full: w };
+      name = {
+        ...base,
+        role: "builtin",
+        full: w,
+        ...(e.clause ? { clause: true as const } : {}),
+      };
     } else if (e.key) {
       name = { ...base, role: e.key, full: w, ...defines };
     } else if (e.column) {
