@@ -387,7 +387,7 @@ such as `constant.numeric.date.q`, and `source.q` keeps a rule to q files.
 | `` `s# ``, `` `u# ``, `` `p# ``, `` `g# `` (attributes) | `storage.modifier.attribute.q`       |
 | `.Q.dd`, `.z.p`, `.h.ht`, `.j.j`                        | `source.q support.class.namespace`   |
 | `` `sym `` and `` `:data/trades.csv `` (handles)        | `source.q constant.language.symbol`  |
-| Handles only, as `` `:data/trades.csv ``               | `constant.language.symbol.handle.q`  |
+| Handles only, as `` `:data/trades.csv ``                | `constant.language.symbol.handle.q`  |
 | `0N`, `0w`, dates, times, numbers                       | `source.q constant.numeric`          |
 | `x`, `y`, `z` and `{[a;b]` parameters                   | `source.q variable.parameter`        |
 | `/ \ ' ': /: \:` (iterators)                            | `keyword.operator.iterator.q`        |
