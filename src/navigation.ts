@@ -296,7 +296,8 @@ export function outline(text: string, a: Annotated): Outlined[] {
 
 // What a name or handle refers to, so occurrences can be matched: a local or
 // parameter by its lambda, a global by its absolute name, an export by its
-// module and key, and a column, key or keyword by name
+// module and key, a key of a global no module is bound to in the file by
+// both, and a column, key or keyword by name
 export type Target = {
   start: number;
   end: number;
@@ -366,6 +367,18 @@ function targetsOf(a: Annotated): Target[] {
       sets: h.defines === true && !h.amends,
       inLambda: h.lambda !== undefined,
       passed: h.module === undefined,
+    });
+  }
+  // m`f, for an m bound in another file, if any
+  for (const k of a.keyed) {
+    out.push({
+      start: k.start,
+      end: k.end,
+      identity: `keyed ${k.via} ${k.key}`,
+      defines: false,
+      sets: false,
+      inLambda: false,
+      passed: false,
     });
   }
   return out.sort((x, y) => x.start - y.start);

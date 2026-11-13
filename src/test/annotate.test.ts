@@ -620,6 +620,31 @@ suite("annotate modules", () => {
   test("export used, not assigned", () => {
     assert.strictEqual(annotate("export[1]").export, undefined);
   });
+
+  // A key of a global no module is bound to in the file, for another
+  // file's binding: each form, each line ending
+  for (const [ending, eol] of [
+    ["LF", "\n"],
+    ["CRLF", "\r\n"],
+  ]) {
+    const keyed = (text: string) =>
+      annotate(text.replaceAll("\n", eol)).keyed.map(
+        (k) => `${k.via} ${k.key}`,
+      );
+    for (const [what, text, expected] of [
+      ["m`f", "x:1\nm`f", ["m f"]],
+      ["m[`f]", "x:1\nm[`f]", ["m f"]],
+      ["under \\d", "\\d .ns\nm`f", [".ns.m f"]],
+      ["in a lambda, a global", "g:{m`f}", ["m f"]],
+      ["bound in the file, a handle instead", "m:use`foo\nm`f", []],
+      ["a local, never", "g:{m:1; m`f}", []],
+      ["a keyword's, never", "value`a", []],
+    ] as const) {
+      test(`keyed, ${what} (${ending})`, () => {
+        assert.deepStrictEqual(keyed(text), expected);
+      });
+    }
+  }
 });
 
 suite("annotate over the corpus", () => {

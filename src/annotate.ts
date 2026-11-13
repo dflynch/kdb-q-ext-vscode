@@ -112,6 +112,10 @@ export type Annotated = {
   lambdas: Lambda[];
   uses: Use[];
   loads: Load[];
+  // A symbol keying a global no module is bound to in the file, as m`f or
+  // m[`f]: an export, if another file binds m. The global's full name and
+  // the key
+  keyed: { start: number; end: number; via: string; key: string }[];
   // In the order they open, so a call comes before those in its brackets
   calls: Call[];
   // A module's export: keys when it's a dictionary literal, else only where
@@ -283,6 +287,7 @@ export function annotate(
     lambdas: [],
     uses: [],
     loads: [],
+    keyed: [],
     calls: [],
   };
   const entries: Entry[] = [];
@@ -983,7 +988,17 @@ export function annotate(
 
   for (const { entry, element } of reached) {
     const bound = boundTo(entry);
-    if (!bound) continue;
+    if (!bound) {
+      if (!scoped(entry, entry.text) && !keywords.has(entry.text)) {
+        out.keyed.push({
+          start: element.start,
+          end: element.end,
+          via: join(entry.namespace, entry.text),
+          key: element.text,
+        });
+      }
+      continue;
+    }
     out.handles.push({
       start: element.start,
       end: element.end,

@@ -65,8 +65,8 @@ read.
     cursor: in the file's own, if it has one. Set
     `editor.gotoLocation.multipleDefinitions` to `goto` to jump there
   - ``use`foo`` goes to `foo.q` or `foo/init.q` anywhere in the
-    workspace, as `QPATH` isn't read. `s.f` follows the module bound to
-    `s`, as any global: by ``s:use`foo`` in the file, if it defines `s`,
+    workspace, as `QPATH` isn't read. `s.f`, `` s`f `` and ``s[`f]`` follow
+    the module bound to `s`, as any global: by ``s:use`foo`` in the file, if it defines `s`,
     else in every file that binds it, nearest first. A module, a file that
     assigns `export`, runs in `.m.foo` up to its first `\d`, so its own
     globals there, but those with a leading dot, as `.ns.f`, are followed

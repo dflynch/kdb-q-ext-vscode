@@ -789,8 +789,14 @@ suite("a module bound in another file", () => {
     ["in a lambda", (m) => `init:{s::use\`${m}}`, ""],
     ["under \\d", (m) => `\\d .ns\ns:use\`${m}`, "\\d .ns\n"],
   ];
-  // Each case's files, given the form, with b.q's last line s.|f 1, and
-  // where s.f is defined
+  // Each way to read s's export f, with the cursor, and what's at it
+  const reads: [string, string, string][] = [
+    ["s.f", "s.|f 1", "1 s.f"],
+    ["s`f", "s`|f", "3 f"],
+    ["s[`f]", "s[`|f]", "4 f"],
+  ];
+  // Each case's files, given the form, with b.q's last line the read, and
+  // where f is defined
   const own = "export:([z:1])\n";
   const cases: [
     string,
@@ -799,20 +805,20 @@ suite("a module bound in another file", () => {
   ][] = [
     [
       "bound only in another file",
-      (bind, ns) => ({ "/w/a.q": bind("mod"), "/w/b.q": `${ns}s.|f 1` }),
+      (bind, ns) => ({ "/w/a.q": bind("mod"), "/w/b.q": `${ns}READ` }),
       () => [impl],
     ],
     [
       "bound in the file too, the file's",
       (bind) => ({
         "/w/a.q": bind("mod"),
-        "/w/b.q": `${bind("other")}\ns.|f 1`,
+        "/w/b.q": `${bind("other")}\nREAD`,
       }),
       () => [g],
     ],
     [
       "defined in the file as something else, none",
-      (bind, ns) => ({ "/w/a.q": bind("mod"), "/w/b.q": `${ns}s:1\ns.|f 1` }),
+      (bind, ns) => ({ "/w/a.q": bind("mod"), "/w/b.q": `${ns}s:1\nREAD` }),
       () => [],
     ],
     [
@@ -820,54 +826,60 @@ suite("a module bound in another file", () => {
       (bind, ns) => ({
         "/w/x/c.q": bind("other"),
         "/w/a.q": bind("mod"),
-        "/w/b.q": `${ns}s.|f 1`,
+        "/w/b.q": `${ns}READ`,
       }),
       () => [impl, g],
     ],
     [
       "bound in a module's own namespace, none; after \\d, as any global",
-      (bind, ns) => ({ "/w/a.q": own + bind("mod"), "/w/b.q": `${ns}s.|f 1` }),
+      (bind, ns) => ({ "/w/a.q": own + bind("mod"), "/w/b.q": `${ns}READ` }),
       (form) => (form === "under \\d" ? [impl] : []),
     ],
     [
       "read in a module's own namespace, none; after \\d, as any global",
-      (bind, ns) => ({ "/w/a.q": bind("mod"), "/w/b.q": `${own}${ns}s.|f 1` }),
+      (bind, ns) => ({ "/w/a.q": bind("mod"), "/w/b.q": `${own}${ns}READ` }),
       (form) => (form === "under \\d" ? [impl] : []),
     ],
   ];
-  for (const [form, bind, ns] of forms) {
-    for (const [name, files, expected] of cases) {
-      test(`${form}, ${name}`, () => {
-        const written: Files = { ...mod, ...other, ...files(bind, ns) };
-        const read = written["/w/b.q"].split("\n").length;
-        for (const [ending, eol] of Object.entries(endings)) {
-          const o = opened(ended(written, eol));
-          const found = expected(form);
-          assert.deepStrictEqual(o.defined(), found, ending);
-          assert.deepStrictEqual(
-            where(o.hovered()),
-            found.length ? found : undefined,
-            ending,
-          );
-          // Find All References: from the read, mod's key, and from mod's
-          // key, the read, as the read reaches mod
-          const at = `/w/b.q ${read}:1 s.f`;
-          const reaches = found.includes(impl);
-          const key = "/w/lib/mod.q 2:10 f";
-          assert.strictEqual(o.referenced().includes(key), reaches, ending);
-          const fromKey = opened(
-            ended(
-              {
-                ...written,
-                "/w/b.q": written["/w/b.q"].replace("|", ""),
-                "/w/lib/mod.q": "impl:{x}\nexport:([|f:impl])",
-              },
-              eol,
+  for (const [reading, cursor, shown] of reads) {
+    for (const [form, bind, ns] of forms) {
+      for (const [name, files, expected] of cases) {
+        test(`${reading}, ${form}, ${name}`, () => {
+          const written: Files = Object.fromEntries(
+            Object.entries({ ...mod, ...other, ...files(bind, ns) }).map(
+              ([f, t]) => [f, t.replace("READ", cursor)],
             ),
-          ).referenced();
-          assert.strictEqual(fromKey.includes(at), reaches, ending);
-        }
-      });
+          );
+          const read = written["/w/b.q"].split("\n").length;
+          for (const [ending, eol] of Object.entries(endings)) {
+            const o = opened(ended(written, eol));
+            const found = expected(form);
+            assert.deepStrictEqual(o.defined(), found, ending);
+            assert.deepStrictEqual(
+              where(o.hovered()),
+              found.length ? found : undefined,
+              ending,
+            );
+            // Find All References: from the read, mod's key, and from mod's
+            // key, the read, as the read reaches mod
+            const at = `/w/b.q ${read}:${shown}`;
+            const reaches = found.includes(impl);
+            const key = "/w/lib/mod.q 2:10 f";
+            assert.strictEqual(o.referenced().includes(key), reaches, ending);
+            const fromKey = opened(
+              ended(
+                {
+                  ...written,
+                  "/w/b.q": written["/w/b.q"].replace("|", ""),
+                  "/w/lib/mod.q": "impl:{x}\nexport:([|f:impl])",
+                },
+                eol,
+              ),
+            ).referenced();
+            assert.strictEqual(fromKey.includes(at), reaches, ending);
+          }
+        });
+      }
     }
   }
 

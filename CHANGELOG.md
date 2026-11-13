@@ -70,7 +70,7 @@ All notable changes to the extension are documented in this file.
 - Navigation for q: the outline and breadcrumbs, highlighting a name where
   it occurs, Go to Definition, Find All References and Go to Symbol in
   Workspace, across the workspace's `.q` files, following namespaces,
-  lambdas' locals and q 5 modules: `s.f` through ``s:use`mod`` in the file
+  lambdas' locals and q 5 modules: `s.f` and `` s`f `` through ``s:use`mod`` in the file
   or, if it doesn't define `s`, any other, and a module's own globals only
   in the module. Find All References lists the uses that
   pass a global by reference under a group of their own. Go to

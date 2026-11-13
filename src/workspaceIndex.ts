@@ -33,6 +33,9 @@ export type Entry = {
   globals: (Span & { full: string; passed: boolean })[];
   // Each export of a module named, as m.f where m:use`foo in the file
   exports: (Span & { module: string; key: string })[];
+  // Each key of a global no module is bound to in the file, as m`f or
+  // m[`f]: an export, if another file binds m
+  keyed: (Span & { via: string; key: string })[];
   // A module's, a file assigning export in its own namespace: where that
   // ends, at the first \d, as use runs the file in .m.foo until one, and a
   // \d is absolute, \d . the root (q 5.0). Its globals before, but those
@@ -56,13 +59,14 @@ export function entry(text: string, a: Annotated): Entry {
     defined: globals(text, a),
     globals: [],
     exports: [],
+    keyed: a.keyed,
   };
   const end = a.namespaces[0]?.at ?? Number.POSITIVE_INFINITY;
   if (out.defined.some((d) => d.full === "export" && d.nameSpan.start < end))
     out.own = end;
   for (const d of out.defined) {
-    if (d.kind === "module" && a.modules.has(d.full) && d.detail)
-      d.module = d.detail.split("`")[1];
+    const module = d.kind === "module" ? a.modules.get(d.full) : undefined;
+    if (module) d.module = module;
   }
   for (const t of all) {
     const global = [t.identity, t.maybe].find((id) =>
@@ -287,10 +291,21 @@ function through(
   return undefined;
 }
 
+// The export a key of a global may be, as m`f or m[`f], through a module
+// bound to m, as modules() has it
+function keyedThrough(
+  index: Index,
+  file: string,
+  k: Span & { via: string; key: string },
+): { modules: string[]; key: string } | undefined {
+  const found = modules(index, file, named(index, file, k.start, k.via));
+  return found.length ? { modules: found, key: k.key } : undefined;
+}
+
 // What the name at the offset is, across files: a global; an export, by the
-// modules it can be and its key, from a use of it, a global's name through
-// a module bound in another file, or the key in the module's own export; or
-// nothing, when it's only the file's
+// modules it can be and its key, from a use of it, a global's name or key
+// through a module bound in another file, or the key in the module's own
+// export; or nothing, when it's only the file's
 type Across =
   | { global: Global }
   | { modules: string[]; key: string }
@@ -311,6 +326,10 @@ function across(
   if (id?.startsWith("export ")) {
     const [, module, key] = id.split(" ");
     return { modules: resolve(index, file, module), key };
+  }
+  if (here && id?.startsWith("keyed ")) {
+    const [, via, key] = id.split(" ");
+    return keyedThrough(index, file, { ...span(here), via, key });
   }
   // The key the offset is in, else one it's just after, as at() has it
   const keys = index.get(file)?.export?.keys ?? [];
@@ -603,6 +622,13 @@ export function references(
         reached.set(known, hit);
       }
       if (hit) out.push({ file: f, ...span(g), passed: false });
+    }
+    // A key through a module bound in another file, as m`f
+    for (const k of e.keyed) {
+      if (k.key !== wanted.key) continue;
+      const x = keyedThrough(index, f, k);
+      if (x?.modules.some((m) => wanted.modules.includes(m)))
+        out.push({ file: f, ...span(k), passed: false });
     }
   }
   const skip = withDefinition

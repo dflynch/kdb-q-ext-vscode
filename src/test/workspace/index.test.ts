@@ -92,6 +92,13 @@ suite("workspace index", () => {
       new vscode.Position(1, 5),
     );
     assert.deepStrictEqual(shown(found), ["mods/stats/init.q 1:1"]);
+    // And as s`mean
+    const keyed = await vscode.commands.executeCommand<vscode.Location[]>(
+      "vscode.executeDefinitionProvider",
+      d.uri,
+      new vscode.Position(3, 4),
+    );
+    assert.deepStrictEqual(shown(keyed), ["mods/stats/init.q 1:1"]);
   });
 
   test("a module's own global, only in the module", async () => {
