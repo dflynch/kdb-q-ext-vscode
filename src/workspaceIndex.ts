@@ -280,10 +280,45 @@ function defined(index: Index, file: string, global: string): Listed[] {
         (d.inLambda ? inLambda : atTop).push({ ...d, file: f });
     }
   }
+  return (atTop.length ? atTop : inLambda).sort(preferred(file));
+}
+
+// The order definitions of a global are listed in: at top level before in a
+// lambda, then the file itself, then the nearest, each file's the latest
+// first
+export function preferred(file: string): (x: Listed, y: Listed) => number {
   const order = nearest(file);
-  return (atTop.length ? atTop : inLambda).sort(
-    (x, y) => order(x.file, y.file) || y.nameSpan.start - x.nameSpan.start,
-  );
+  return (x, y) =>
+    Number(x.inLambda) - Number(y.inLambda) ||
+    order(x.file, y.file) ||
+    y.nameSpan.start - x.nameSpan.start;
+}
+
+// What's defined where a module's export gives the key's value: the global
+// defined there, else the key itself, a function if a lambda is written in
+// it, as ([f:{[a;b] a}])
+export function exported(
+  index: Index,
+  file: string,
+  at: Span,
+  key: string,
+): Listed {
+  const e = index.get(file);
+  const d = e?.defined.find((d) => d.nameSpan.start === at.start);
+  if (d) return { ...d, file };
+  const signature = e?.export?.keys?.find(
+    (k) => k.start === at.start,
+  )?.signature;
+  return {
+    full: key,
+    ...(signature
+      ? { kind: "function", detail: `[${signature.join(";")}]`, signature }
+      : { kind: "variable" }),
+    span: span(at),
+    nameSpan: span(at),
+    inLambda: false,
+    file,
+  };
 }
 
 // What a hover over the offset says, and the name it's over: q's own entry
@@ -326,25 +361,9 @@ export function hover(
       : undefined;
   }
   if ("global" in wanted) return ofGlobal(wanted.global);
-  const found = definitions(index, file, a, offset).map((l): Listed => {
-    const d = index
-      .get(l.file)
-      ?.defined.find((d) => d.nameSpan.start === l.start);
-    if (d) return { ...d, file: l.file };
-    const signature = index
-      .get(l.file)
-      ?.export?.keys?.find((k) => k.start === l.start)?.signature;
-    return {
-      full: wanted.key,
-      ...(signature
-        ? { kind: "function", detail: `[${signature.join(";")}]`, signature }
-        : { kind: "variable" }),
-      span: span(l),
-      nameSpan: span(l),
-      inLambda: false,
-      file: l.file,
-    };
-  });
+  const found = definitions(index, file, a, offset).map((l) =>
+    exported(index, l.file, l, wanted.key),
+  );
   return found.length ? { name, defined: found } : undefined;
 }
 

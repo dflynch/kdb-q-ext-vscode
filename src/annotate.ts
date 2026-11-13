@@ -5,7 +5,7 @@
 // Globals resolve to the namespace q reads them in. Like the scanner it's pure
 // and total: no VS Code or Node imports, and it never throws.
 
-import { scan, type Token } from "./scanner";
+import { type Script, scan, type Token } from "./scanner";
 
 export type Role =
   | "param"
@@ -99,6 +99,14 @@ export type Call = {
 };
 
 export type Annotated = {
+  // The text as scanned
+  script: Script;
+  // Where \d, or system "d …", changes the namespace, and to what: from the
+  // end of its statement on
+  namespaces: { at: number; namespace: string }[];
+  // The module each global bound by m:use`mod is, by its full name, as
+  // m.f resolves
+  modules: Map<string, string>;
   names: Name[];
   handles: Handle[];
   lambdas: Lambda[];
@@ -265,7 +273,11 @@ export function annotate(
   text: string,
   options: { namespace?: string } = {},
 ): Annotated {
+  const script = scan(text);
   const out: Annotated = {
+    script,
+    namespaces: [],
+    modules: new Map(),
     names: [],
     handles: [],
     lambdas: [],
@@ -742,18 +754,19 @@ export function annotate(
     }
   };
 
-  const script = scan(text);
   let namespace = options.namespace ?? "";
-  const setNamespace = (arg: string) => {
+  const setNamespace = (arg: string, at: number) => {
     if (arg === ".") namespace = "";
     else if (arg.startsWith(".")) namespace = arg;
+    else return;
+    out.namespaces.push({ at, namespace });
   };
   for (const statement of script.statements) {
     const first = statement.tokens[0];
     if (first.kind === "command") {
       const command = text.slice(first.start, first.end);
       const m = /^\\d\s+(\S+)/.exec(command);
-      if (m) setNamespace(m[1]);
+      if (m) setNamespace(m[1], statement.end);
       loads(command, first.start, statement.tokens.length > 1);
       continue;
     }
@@ -772,7 +785,7 @@ export function annotate(
     if (isName(command, "system") && call.length === 2) {
       if (!isGroup(s) && s.kind === "string") {
         const m = /^"d\s+(\S+)"$/.exec(text.slice(s.start, s.end));
-        if (m) setNamespace(m[1]);
+        if (m) setNamespace(m[1], statement.end);
       }
     }
     if (isName(items[0], "export")) exported(items, namespace);
@@ -804,10 +817,14 @@ export function annotate(
       for (const s of segments(value.items[0].items)) {
         const [k, op] = s;
         const name = nameOf(k);
-        if (!name || word(op) !== ":") continue;
-        const t = target(s.slice(2));
+        // A name alone is its own value, keyed by its last part, as
+        // ([f;.ns.g]) is ([f:f;g:.ns.g])
+        const alone = name && s.length === 1;
+        if (!name || (!alone && word(op) !== ":")) continue;
+        const t = target(alone ? s : s.slice(2));
+        const key = word(name);
         keys.push({
-          key: word(name),
+          key: alone ? key.slice(key.lastIndexOf(".") + 1) : key,
           start: name.start,
           end: name.end,
           ...(t ? { target: t } : {}),
@@ -872,7 +889,7 @@ export function annotate(
     return undefined;
   };
   // Modules bound to globals, by full name, and to locals, by lambda
-  const globalModules = new Map<string, string>();
+  const globalModules = out.modules;
   const localModules = new Map<Lambda, Map<string, string>>();
   for (const { entry, module } of bindings) {
     if (scoped(entry, entry.text) && entry.lambda) {

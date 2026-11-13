@@ -694,6 +694,11 @@
           "markdownDescription": "Which q files show their syntax errors, such as a bracket or string left open, as q would refuse the script for: the open files, as you type, or the workspace's `.q` files too, as saved, leaving out those `#files.exclude#` hides."
         }
       }
+    },
+    "configurationDefaults": {
+      "[q]": {
+        "editor.wordBasedSuggestions": "off"
+      }
     }
   },
   "scripts": {

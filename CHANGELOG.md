@@ -94,6 +94,11 @@ All notable changes to the extension are documented in this file.
   where its close was expected, linked to where it opened, and a close with
   nothing to close. Open files only, or every `.q` file in the workspace
   with `kdb-q-ext-vscode.diagnosticMode`
+- Completion for q: the lambda's parameters and locals, the workspace's
+  globals in the root, or after `\d .ns` the namespace's, and q's keywords; after a dot, a namespace's members, q's own in
+  `.Q`, `.z`, `.h` and `.j` with KX's line, or a module's exports, as `s.`
+  for ``s:use`mod`` in the file; and a symbol starting with a dot, as `` `.ns. ``. VS
+  Code's word-based suggestions are off for q
 
 ### Changed
 
