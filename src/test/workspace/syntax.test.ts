@@ -89,7 +89,25 @@ suite("syntax errors", function () {
 
     const moved = () => vscode.Uri.joinPath(folder(), "moved", "a.q");
 
-    setup(() => write(broken(), "a:(1;2\n"));
+    // Till the file watcher has told of the file: a delete soon after its
+    // creation, while the watcher still holds that, is folded into it, and
+    // no delete is told. The index may read it first, from disk, as the
+    // mode changes, so a test can't tell from the problems
+    setup(async () => {
+      const watcher = vscode.workspace.createFileSystemWatcher(
+        new vscode.RelativePattern(folder(), "broken/a.q"),
+      );
+      try {
+        const told = new Promise<void>((resolve) => {
+          watcher.onDidCreate(() => resolve());
+          watcher.onDidChange(() => resolve());
+        });
+        await write(broken(), "a:(1;2\n");
+        await told;
+      } finally {
+        watcher.dispose();
+      }
+    });
     teardown(async () => {
       await mode(undefined);
       for (const name of ["broken", "moved"]) {
