@@ -7,7 +7,7 @@
 // module's own globals are in .m.foo, which only it sees. Pure and total,
 // as the annotation pass is: no VS Code imports, never throws.
 
-import { type Annotated, annotate } from "./annotate";
+import { type Annotated, annotate, type KeyRead } from "./annotate";
 import { type Builtin, builtins } from "./builtins";
 import { lineOf, lineStarts } from "./lines";
 import {
@@ -30,9 +30,11 @@ export type Entry = {
   // level
   defined: (Defined & { module?: string; view?: true })[];
   // Each global named, by its absolute name, assigned or read, and each
-  // column that may be one; passed if named by a symbol, by a key if read
-  // as m`f or m[`f]
-  globals: (Span & { full: string; passed: boolean; byKey?: true })[];
+  // column that may be one; passed if named by a symbol
+  globals: (Span & { full: string; passed: boolean })[];
+  // Each key read of a global, as m`f or m[`f]: an export, if m is bound
+  // to a module
+  keyReads: KeyRead[];
   // Each export of a local's module named, as n`f where n:use`foo in a
   // lambda, or of (use`foo)`f
   exports: (Span & { module: string; key: string })[];
@@ -59,6 +61,7 @@ export function entry(text: string, a: Annotated): Entry {
     defined: globals(text, a),
     globals: [],
     exports: [],
+    keyReads: a.keyReads,
   };
   const end = a.namespaces[0]?.at ?? Number.POSITIVE_INFINITY;
   if (out.defined.some((d) => d.full === "export" && d.nameSpan.start < end))
@@ -80,7 +83,6 @@ export function entry(text: string, a: Annotated): Entry {
         end: t.end,
         full: global.slice(7),
         passed: t.passed,
-        ...(t.byKey && global === t.identity ? { byKey: t.byKey } : {}),
       });
     } else if (t.identity.startsWith("export ")) {
       const [, module, key] = t.identity.split(" ");
@@ -345,31 +347,25 @@ export function moduleFiles(
 }
 
 // The ways q may read a dotted global through a module, as m.f, the longest
-// m first, each with its key; by a key, as m`f, only the longest
-function* reads(
-  g: Global,
-  byKey: boolean,
-): Generator<{ via: Global; key: string; byKey: boolean }> {
+// m first, each with its key
+function* reads(g: Global): Generator<{ via: Global; key: string }> {
   for (let dot = g.full.lastIndexOf("."); dot > 0; ) {
     const key = g.full.slice(dot + 1).split(".")[0];
-    yield { via: { ...g, full: g.full.slice(0, dot) }, key, byKey };
-    byKey = false;
+    yield { via: { ...g, full: g.full.slice(0, dot) }, key };
     dot = g.full.lastIndexOf(".", dot - 1);
   }
 }
 
-// The export a dotted global may be, as m.f, m`f or m[`f], where m is
-// bound to a module, as moduleFiles() has it, and its key: the first of
-// reads() bound to one
+// The export a dotted global may be, as m.f, where m is bound to a module,
+// as moduleFiles() has it, and its key: the first of reads() bound to one
 function through(
   index: Index,
   file: string,
   g: Global,
-  byKey: boolean,
   all: Bindings,
 ): { modules: string[]; key: string } | undefined {
-  for (const r of reads(g, byKey)) {
-    const found = moduleFiles(index, file, r.via, r.byKey, all);
+  for (const r of reads(g)) {
+    const found = moduleFiles(index, file, r.via, false, all);
     if (found.length) return { modules: found, key: r.key };
   }
   return undefined;
@@ -405,11 +401,17 @@ function across(
   const id = here?.identity;
   if (here && id?.startsWith("global ")) {
     const global = named(index, file, here.start, id.slice(7));
-    const byKey = here.byKey === true;
     return (
-      (global.full.includes(".") &&
-        through(index, file, global, byKey, all)) || { global }
+      (global.full.includes(".") && through(index, file, global, all)) || {
+        global,
+      }
     );
+  }
+  if (here && id?.startsWith("keyread ")) {
+    const [, via, key] = id.split(" ");
+    const m = named(index, file, here.start, via);
+    const found = moduleFiles(index, file, m, true, all);
+    return found.length ? { modules: found, key } : undefined;
   }
   if (id?.startsWith("export ")) {
     const [, module, key] = id.split(" ");
@@ -693,13 +695,19 @@ export function references(
     for (const g of e.globals) {
       if (!afterDot(g.full, exported.key)) continue;
       const read = named(index, f, g.start, g.full);
-      for (const r of reads(read, g.byKey === true)) {
-        const found = reach(f, r.via, r.byKey);
+      for (const r of reads(read)) {
+        const found = reach(f, r.via, false);
         if (found === "none") continue;
         if (found === "hit" && r.key === exported.key)
           out.push({ file: f, ...span(g), passed: false });
         break;
       }
+    }
+    // A key read through a module, as m`f, through a view too
+    for (const k of e.keyReads) {
+      if (k.key !== exported.key) continue;
+      if (reach(f, named(index, f, k.start, k.via), true) === "hit")
+        out.push({ file: f, ...span(k), passed: false });
     }
   }
   const skip = withDefinition

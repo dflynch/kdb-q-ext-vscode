@@ -294,9 +294,10 @@ export function outline(text: string, a: Annotated): Outlined[] {
 }
 
 // What a name or handle refers to, so occurrences can be matched: a local or
-// parameter by its lambda, a global by its absolute name, as m.f, m`f or
-// m[`f], which q reads alike, an export of a local's module by the module
-// and key, and a column, key or keyword by name
+// parameter by its lambda, a global by its absolute name, a global's key
+// read, as m`f or m[`f], by the global and key, which q reads as m.f only
+// through a module, an export of a local's module by the module and key,
+// and a column, key or keyword by name
 export type Target = {
   start: number;
   end: number;
@@ -310,9 +311,6 @@ export type Target = {
   inLambda: boolean;
   // A global named by a symbol, as `t in `t insert x
   passed: boolean;
-  // A global read by a key, as m`f or m[`f], which q 5.0 reads through a
-  // view, m::use`mod, as it doesn't m.f
-  byKey?: true;
 };
 
 // Each annotation's, once: every request reads them, several times over
@@ -373,12 +371,11 @@ function targetsOf(a: Annotated): Target[] {
     out.push({
       start: k.start,
       end: k.end,
-      identity: `global ${k.via}.${k.key}`,
+      identity: `keyread ${k.via} ${k.key}`,
       defines: false,
       sets: false,
       inLambda: false,
       passed: false,
-      byKey: true,
     });
   }
   return out.sort((x, y) => x.start - y.start);

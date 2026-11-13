@@ -113,9 +113,9 @@ export type Annotated = {
   lambdas: Lambda[];
   uses: Use[];
   loads: Load[];
-  // Each key read of a global by a symbol, as m`f or m[`f], as q reads m.f
-  // too: an export, if m is bound to a module, or viewed one, in any file.
-  // The global's full name and the key
+  // Each key read of a global by a symbol, as m`f or m[`f]: an export, if m
+  // is bound to a module, or viewed one, in any file, as m.f is only if
+  // bound (q 5.0). The global's full name and the key
   keyReads: KeyRead[];
   // In the order they open, so a call comes before those in its brackets
   calls: Call[];

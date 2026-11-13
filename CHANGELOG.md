@@ -74,8 +74,8 @@ All notable changes to the extension are documented in this file.
   ``s:use`mod`` in the file, or, if the file doesn't define `s`, in any
   other file. ``s`f`` and ``s[`f]`` also follow a top-level view
   ``s::use`mod``, as q 5.0 does. A module's own globals are followed only
-  in the module. ``d`a`` and ``d[`a]`` read `d.a`, as q reads them, for
-  any global `d`, so they're highlighted and found with it. Find All
+  in the module. ``s`f`` and ``s[`f]`` highlight together, apart from
+  `s.f`, which q reads alike only through a module. Find All
   References lists the uses that pass a global by reference under a group
   of their own. Go to Definition has every definition of a global, where
   its whole value is set, which VS Code lists by file and line; the hover

@@ -779,12 +779,18 @@ const endings = { LF: "\n", CRLF: "\r\n" };
 const where = (hovered: string[] | undefined) =>
   hovered?.map((h) => h.split(/\[| /).slice(0, 3).join(" "));
 
-suite("highlights of a module's export read", () => {
-  // s.f, s`f and s[`f] read the same, as q reads them, whether s is bound
-  // in the file, viewed in it, or bound only in another: each form at the
-  // cursor, each binding, each line ending
+suite("highlights of a global's reads by a dot and by a key", () => {
+  // s`f and s[`f] together, s.f apart, as q reads them alike only through
+  // a module, not a dictionary or a view (q 5.0), however s is bound: each
+  // form at the cursor, each binding, each line ending
   const reads = ["s.f 1", "s`f", "s[`f]"];
-  const bindings = ["s:use`m\n", "s::use`m\n", "init:{s::use`m}\n", ""];
+  const bindings = [
+    "s:use`m\n",
+    "s::use`m\n",
+    "init:{s::use`m}\n",
+    "s:`f!1\n",
+    "",
+  ];
   for (const bound of bindings) {
     for (let n = 0; n < reads.length; n++) {
       for (const [ending, eol] of Object.entries(endings)) {
@@ -796,12 +802,13 @@ suite("highlights of a module's export read", () => {
           const found = occurrences(annotate(text), at).map((o) =>
             text.slice(o.start, o.end),
           );
-          assert.deepStrictEqual(found, ["s.f", "f", "f"], ending);
+          assert.deepStrictEqual(found, n ? ["f", "f"] : ["s.f"], ending);
         });
       }
     }
   }
 });
+
 suite("a module bound in another file", () => {
   const mod = { "/w/lib/mod.q": "impl:{x}\nexport:([f:impl])" };
   const other = { "/w/lib/other.q": "g:{y}\nexport:([f:g])" };

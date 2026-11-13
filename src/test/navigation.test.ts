@@ -316,9 +316,14 @@ suite("occurrences", () => {
       ["n write", "n text"],
     ],
     [
-      "an export, by a dot or a key, as q reads them alike",
+      "a module's export by a dot, apart from by a key, as q reads a dictionary",
       "m:use`foo\nk:use`foo\nm.|f 1\nm`f\nk`f",
-      ["m.f read", "f read"],
+      ["m.f read"],
+    ],
+    [
+      "a key read, as m`f and m[`f], by its global and key",
+      "m:use`foo\nm`|f\nm[`f]\nm.f 1\nk`f",
+      ["f read", "f read"],
     ],
     [
       "a dictionary by its name with a dot",
