@@ -621,6 +621,21 @@ suite("annotate modules", () => {
     assert.strictEqual(annotate("export[1]").export, undefined);
   });
 
+  // q 5.0: m::use`foo at top level is a view, which m`f and m[`f] read
+  // through, but not m.f
+  test("a view at top level", () => {
+    for (const eol of ["\n", "\r\n"]) {
+      const a = annotate(`m::use\`foo${eol}m\`f${eol}m[\`g]${eol}m.h`);
+      assert.deepStrictEqual([...a.views], [["m", "foo"]]);
+      assert.deepStrictEqual([...a.modules], []);
+      assert.deepStrictEqual(
+        a.handles.map((h) => `${h.module} ${h.full}`),
+        ["foo f", "foo g"],
+      );
+      assert.ok(a.names.every((n) => n.role !== "export"));
+    }
+  });
+
   // A key of a global no module is bound to in the file, for another
   // file's binding: each form, each line ending
   for (const [ending, eol] of [
@@ -637,6 +652,7 @@ suite("annotate modules", () => {
       ["under \\d", "\\d .ns\nm`f", [".ns.m f"]],
       ["in a lambda, a global", "g:{m`f}", ["m f"]],
       ["bound in the file, a handle instead", "m:use`foo\nm`f", []],
+      ["a view at top level, a handle instead", "m::use`foo\nm`f", []],
       ["a local, never", "g:{m:1; m`f}", []],
       ["a keyword's, never", "value`a", []],
     ] as const) {

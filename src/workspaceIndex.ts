@@ -26,8 +26,9 @@ export type Entry = {
   // Where each line starts, to turn offsets into positions
   lines: number[];
   // Each definition of a global, in the order they're written, and the
-  // module one binds, as m:use`mod
-  defined: (Defined & { module?: string })[];
+  // module one binds, as m:use`mod, or is a view of, as m::use`mod at top
+  // level
+  defined: (Defined & { module?: string; view?: true })[];
   // Each global named, by its absolute name, assigned or read, and each
   // column that may be one; passed if named by a symbol
   globals: (Span & { full: string; passed: boolean })[];
@@ -65,8 +66,11 @@ export function entry(text: string, a: Annotated): Entry {
   if (out.defined.some((d) => d.full === "export" && d.nameSpan.start < end))
     out.own = end;
   for (const d of out.defined) {
-    const module = d.kind === "module" ? a.modules.get(d.full) : undefined;
+    if (d.kind !== "module") continue;
+    const module = a.modules.get(d.full);
+    const view = a.views.get(d.full);
     if (module) d.module = module;
+    else if (view) Object.assign(d, { module: view, view: true });
   }
   for (const t of all) {
     const global = [t.identity, t.maybe].find((id) =>
@@ -246,43 +250,88 @@ function names(
   return ownAt(e, offset, full) ? g.own === file : g.own === undefined;
 }
 
-// The files of the modules a global may be bound to, as m in m.f, where
-// m:use`mod: the file's own bindings, if it defines m, else each file's
-// that does, the nearest first, as a global defined in several files is
-export function modules(index: Index, file: string, g: Global): string[] {
-  const bindings = (f: string, e: Entry) =>
-    e.defined.filter((d) => names(g, f, e, d.nameSpan.start, d.full));
-  const mine = index.get(file);
-  const own = mine ? bindings(file, mine) : [];
-  const found: [string, Entry["defined"]][] = [];
-  if (own.length) {
-    found.push([file, own]);
-  } else {
-    for (const [f, e] of index) {
-      const ds = bindings(f, e);
-      if (ds.length) found.push([f, ds]);
+// Each global bound to a module in a file, by its name, but a module's own,
+// which no other file sees: the file, the module's files, and whether it's
+// a view, m::use`mod at top level, which q 5.0 reads m`f through, not m.f
+type Binding = { file: string; files: string[]; view: boolean };
+export type Bindings = Map<string, Binding[]>;
+
+export function bindings(index: Index): Bindings {
+  const out: Bindings = new Map();
+  // use`foo resolves alike from any file; a relative use`.bar doesn't
+  const resolved = new Map<string, string[]>();
+  for (const [file, e] of index) {
+    for (const d of e.defined) {
+      if (!d.module || ownAt(e, d.nameSpan.start, d.full)) continue;
+      let files = d.module.startsWith(".")
+        ? resolve(index, file, d.module)
+        : resolved.get(d.module);
+      if (!files) {
+        files = resolve(index, file, d.module);
+        resolved.set(d.module, files);
+      }
+      const all = out.get(d.full) ?? [];
+      all.push({ file, files, view: d.view === true });
+      out.set(d.full, all);
     }
-    found.sort(([x], [y]) => nearest(file)(x, y));
   }
+  return out;
+}
+
+// How a global is bound in the file, if the file defines it, which wins
+// over every other file's: a definition that isn't a binding binds nothing
+function boundHere(
+  index: Index,
+  file: string,
+  g: Global,
+): Binding[] | undefined {
+  const e = index.get(file);
+  const own = e?.defined.filter((d) =>
+    names(g, file, e, d.nameSpan.start, d.full),
+  );
+  if (!own?.length) return undefined;
+  return own.flatMap((d) =>
+    d.module
+      ? [{ file, files: resolve(index, file, d.module), view: d.view === true }]
+      : [],
+  );
+}
+
+// The files of the modules a global may be bound to, as m in m.f, where
+// m:use`mod, or, for a key, as m`f, m::use`mod too: the file's own
+// bindings, if it defines m, else each file's that does, the nearest first,
+// as a global defined in several files is; none for a module's own
+export function modules(
+  index: Index,
+  file: string,
+  g: Global,
+  keyed: boolean,
+  all: Bindings = bindings(index),
+): string[] {
+  const found =
+    boundHere(index, file, g) ??
+    (g.own ? [] : [...(all.get(g.full) ?? [])]).sort((x, y) =>
+      nearest(file)(x.file, y.file),
+    );
   const out = new Set<string>();
-  for (const [f, ds] of found) {
-    for (const d of ds) {
-      for (const m of d.module ? resolve(index, f, d.module) : []) out.add(m);
-    }
+  for (const b of found) {
+    if (keyed || !b.view) for (const m of b.files) out.add(m);
   }
   return [...out];
 }
 
 // The export a global's name may be, as m.f where m is bound to a module,
 // as modules() has it, and its key: the longest such m, as q reads a dotted
-// name
+// name. Only an m some file binds, as the file's own were annotated
 function through(
   index: Index,
   file: string,
   g: Global,
+  all: Bindings,
 ): { modules: string[]; key: string } | undefined {
   for (let dot = g.full.lastIndexOf("."); dot > 0; ) {
-    const found = modules(index, file, { ...g, full: g.full.slice(0, dot) });
+    const m = { ...g, full: g.full.slice(0, dot) };
+    const found = all.has(m.full) ? modules(index, file, m, false, all) : [];
     if (found.length) {
       return { modules: found, key: g.full.slice(dot + 1).split(".")[0] };
     }
@@ -297,9 +346,21 @@ function keyedThrough(
   index: Index,
   file: string,
   k: Span & { via: string; key: string },
+  all: Bindings,
 ): { modules: string[]; key: string } | undefined {
-  const found = modules(index, file, named(index, file, k.start, k.via));
+  const m = named(index, file, k.start, k.via);
+  const found = all.has(m.full) ? modules(index, file, m, true, all) : [];
   return found.length ? { modules: found, key: k.key } : undefined;
+}
+
+// The key of the file's export the offset is in, else one it's just after,
+// as at() has it
+function keyAt(index: Index, file: string, offset: number) {
+  const keys = index.get(file)?.export?.keys ?? [];
+  return (
+    keys.find((k) => k.start <= offset && offset < k.end) ??
+    keys.find((k) => k.end === offset)
+  );
 }
 
 // What the name at the offset is, across files: a global; an export, by the
@@ -316,12 +377,13 @@ function across(
   file: string,
   a: Annotated,
   offset: number,
+  all: Bindings = bindings(index),
 ): Across {
   const here = at(targets(a), offset);
   const id = here?.identity;
   if (here && id?.startsWith("global ")) {
     const global = named(index, file, here.start, id.slice(7));
-    return through(index, file, global) ?? { global };
+    return through(index, file, global, all) ?? { global };
   }
   if (id?.startsWith("export ")) {
     const [, module, key] = id.split(" ");
@@ -329,13 +391,9 @@ function across(
   }
   if (here && id?.startsWith("keyed ")) {
     const [, via, key] = id.split(" ");
-    return keyedThrough(index, file, { ...span(here), via, key });
+    return keyedThrough(index, file, { ...span(here), via, key }, all);
   }
-  // The key the offset is in, else one it's just after, as at() has it
-  const keys = index.get(file)?.export?.keys ?? [];
-  const key =
-    keys.find((k) => k.start <= offset && offset < k.end) ??
-    keys.find((k) => k.end === offset);
+  const key = keyAt(index, file, offset);
   if (key) return { modules: [file], key: key.key };
   return undefined;
 }
@@ -563,7 +621,9 @@ function parsed(form: string) {
 
 // Where the name at the offset occurs, meaning the same thing: a global or
 // an export in every file, a module's own global in the module, anything
-// else as in the file. Without its definitions unless asked
+// else as in the file; at a key written alone in the module's export, as
+// ([f]), both the global and the export. Without its definitions unless
+// asked
 export function references(
   index: Index,
   file: string,
@@ -571,7 +631,8 @@ export function references(
   offset: number,
   withDefinition: boolean,
 ): Reference[] {
-  const wanted = across(index, file, a, offset);
+  const all = bindings(index);
+  const wanted = across(index, file, a, offset, all);
   if (!wanted) {
     return inFile(a, offset, withDefinition).map((r) => ({
       file,
@@ -579,55 +640,60 @@ export function references(
       passed: false,
     }));
   }
+  const key = "global" in wanted ? keyAt(index, file, offset) : undefined;
+  const global = "global" in wanted ? wanted.global : undefined;
+  const exported =
+    "global" in wanted ? key && { modules: [file], key: key.key } : wanted;
   const out: Reference[] = [];
+  const reach = exported ? reaching(index, all, exported.modules) : undefined;
   for (const [f, e] of index) {
-    if ("global" in wanted) {
+    if (global) {
       for (const g of e.globals) {
-        if (names(wanted.global, f, e, g.start, g.full)) {
+        if (names(global, f, e, g.start, g.full)) {
           out.push({ file: f, ...span(g), passed: g.passed });
         }
       }
-      continue;
     }
+    if (!exported || !reach) continue;
     // The key, as the export's declaration
-    if (withDefinition && wanted.modules.includes(f)) {
-      const k = e.export?.keys?.find((k) => k.key === wanted.key);
+    if (withDefinition && !global && exported.modules.includes(f)) {
+      const k = e.export?.keys?.find((k) => k.key === exported.key);
       if (k) out.push({ file: f, ...span(k), passed: false });
     }
     const resolved = new Map<string, boolean>();
     for (const x of e.exports) {
-      if (x.key !== wanted.key) continue;
+      if (x.key !== exported.key) continue;
       let hit = resolved.get(x.module);
       if (hit === undefined) {
         hit = resolve(index, f, x.module).some((m) =>
-          wanted.modules.includes(m),
+          exported.modules.includes(m),
         );
         resolved.set(x.module, hit);
       }
       if (hit) out.push({ file: f, ...span(x), passed: false });
     }
-    // A global's name through a module bound in another file, as m.f: one
-    // with the key after a dot
-    const reached = new Map<string, boolean>();
+    // A global's name through a module bound in another file, as m.f, as
+    // through() reads it: one with the key after a dot
     for (const g of e.globals) {
-      if (!g.full.split(".").slice(1).includes(wanted.key)) continue;
-      const global = named(index, f, g.start, g.full);
-      const known = `${global.own ?? ""} ${g.full}`;
-      let hit = reached.get(known);
-      if (hit === undefined) {
-        const x = through(index, f, global);
-        hit =
-          x?.key === wanted.key &&
-          x.modules.some((m) => wanted.modules.includes(m));
-        reached.set(known, hit);
+      const parts = g.full.split(".");
+      if (!parts.slice(1).includes(exported.key)) continue;
+      const read = named(index, f, g.start, g.full);
+      for (let dot = g.full.lastIndexOf("."); dot > 0; ) {
+        const m = { ...read, full: g.full.slice(0, dot) };
+        const found = all.has(m.full) ? reach(f, m, false) : "none";
+        if (found !== "none") {
+          const k = g.full.slice(dot + 1).split(".")[0];
+          if (found === "hit" && k === exported.key)
+            out.push({ file: f, ...span(g), passed: false });
+          break;
+        }
+        dot = g.full.lastIndexOf(".", dot - 1);
       }
-      if (hit) out.push({ file: f, ...span(g), passed: false });
     }
     // A key through a module bound in another file, as m`f
     for (const k of e.keyed) {
-      if (k.key !== wanted.key) continue;
-      const x = keyedThrough(index, f, k);
-      if (x?.modules.some((m) => wanted.modules.includes(m)))
+      if (k.key !== exported.key || !all.has(k.via)) continue;
+      if (reach(f, named(index, f, k.start, k.via), true) === "hit")
         out.push({ file: f, ...span(k), passed: false });
     }
   }
@@ -638,6 +704,38 @@ export function references(
   return out
     .filter((o) => !skip.includes(`${o.file} ${o.start}`))
     .sort((x, y) => order(x.file, y.file) || x.start - y.start);
+}
+
+// Whether a global, named in a file, is bound to a module, as modules() has
+// it, and to one of the files: none, another, or a hit. Each name's other
+// files' bindings checked once, for the many names Find All References reads
+function reaching(
+  index: Index,
+  all: Bindings,
+  files: string[],
+): (file: string, g: Global, keyed: boolean) => "none" | "other" | "hit" {
+  const of = (found: Binding[], keyed: boolean) => {
+    let out: "none" | "other" | "hit" = "none";
+    for (const b of found) {
+      if ((!keyed && b.view) || !b.files.length) continue;
+      if (b.files.some((m) => files.includes(m))) return "hit";
+      out = "other";
+    }
+    return out;
+  };
+  const others = new Map<string, "none" | "other" | "hit">();
+  return (file, g, keyed) => {
+    const here = boundHere(index, file, g);
+    if (here) return of(here, keyed);
+    if (g.own) return "none";
+    const known = `${keyed} ${g.full}`;
+    let found = others.get(known);
+    if (found === undefined) {
+      found = of(all.get(g.full) ?? [], keyed);
+      others.set(known, found);
+    }
+    return found;
+  };
 }
 
 export type Listed = Defined & { file: string };

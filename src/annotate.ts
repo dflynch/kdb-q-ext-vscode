@@ -107,6 +107,10 @@ export type Annotated = {
   // The module each global bound by m:use`mod is, by its full name, as
   // m.f resolves
   modules: Map<string, string>;
+  // The module each global defined as a view of it, m::use`mod at top
+  // level, is, by its full name: q 5.0 reads m`f and m[`f] through it, but
+  // not m.f
+  views: Map<string, string>;
   names: Name[];
   handles: Handle[];
   lambdas: Lambda[];
@@ -282,6 +286,7 @@ export function annotate(
     script,
     namespaces: [],
     modules: new Map(),
+    views: new Map(),
     names: [],
     handles: [],
     lambdas: [],
@@ -297,6 +302,7 @@ export function annotate(
   const done = new Set<Token>();
   // m:use`mod, to resolve m.f, m`f and m[`f] once roles are known
   const bindings: { entry: Entry; module: string }[] = [];
+  const views: { entry: Entry; module: string }[] = [];
   const reached: { entry: Entry; element: Element }[] = [];
 
   const word = (item: Item | undefined) =>
@@ -720,14 +726,15 @@ export function annotate(
           const target = items[i - 2];
           const after = items[i + 2];
           // At top level, :: defines a view, not a binding
+          const view = word(prev) === "::" && !here.lambda;
           if (
-            (word(prev) === ":" || (word(prev) === "::" && here.lambda)) &&
+            (word(prev) === ":" || word(prev) === "::") &&
             isName(target) &&
             (after === undefined ||
               (!isGroup(after) && after.kind === "separator"))
           ) {
             const bound = byToken.get(target as Token);
-            if (bound) bindings.push({ entry: bound, module });
+            if (bound) (view ? views : bindings).push({ entry: bound, module });
           }
         }
       }
@@ -905,6 +912,9 @@ export function annotate(
       globalModules.set(join(entry.namespace, entry.text), module);
     }
   }
+  for (const { entry, module } of views) {
+    out.views.set(join(entry.namespace, entry.text), module);
+  }
   // The module bound to the name, local or global, and the global's name
   const boundTo = (e: Entry) => {
     if (scoped(e, e.text)) {
@@ -912,7 +922,7 @@ export function annotate(
       return module ? { module } : undefined;
     }
     const via = join(e.namespace, e.text);
-    const module = globalModules.get(via);
+    const module = globalModules.get(via) ?? out.views.get(via);
     return module ? { module, via } : undefined;
   };
   // A dotted name's export: m.f, where m, a global, is bound. q never reads

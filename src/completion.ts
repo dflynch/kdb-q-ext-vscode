@@ -364,7 +364,7 @@ function members(
     own && !absolute.startsWith(".")
       ? { full: absolute, own }
       : { full: absolute };
-  const found = modules(index, file, global);
+  const found = modules(index, file, global, false);
   return found.length
     ? exportsOf(index, written, found)
     : inNamespace(index, file, absolute, `${written}.`, true, global.own);

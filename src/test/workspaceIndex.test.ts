@@ -801,7 +801,7 @@ suite("a module bound in another file", () => {
   const cases: [
     string,
     (bind: (m: string) => string, ns: string) => Files,
-    (form: string) => string[],
+    (form: string, reading: string) => string[],
   ][] = [
     [
       "bound only in another file",
@@ -840,6 +840,19 @@ suite("a module bound in another file", () => {
       (bind, ns) => ({ "/w/a.q": bind("mod"), "/w/b.q": `${own}${ns}READ` }),
       (form) => (form === "under \\d" ? [impl] : []),
     ],
+    [
+      "a view at top level in another file, a key only, as q 5.0 reads it",
+      (_, ns) => ({ "/w/a.q": `${ns}s::use\`mod`, "/w/b.q": `${ns}READ` }),
+      (_, reading) => (reading === "s.f" ? [] : [impl]),
+    ],
+    [
+      "a view at top level in the file too, the file's, a key only",
+      (bind, ns) => ({
+        "/w/a.q": bind("mod"),
+        "/w/b.q": `${ns}s::use\`other\nREAD`,
+      }),
+      (_, reading) => (reading === "s.f" ? [] : [g]),
+    ],
   ];
   for (const [reading, cursor, shown] of reads) {
     for (const [form, bind, ns] of forms) {
@@ -853,7 +866,7 @@ suite("a module bound in another file", () => {
           const read = written["/w/b.q"].split("\n").length;
           for (const [ending, eol] of Object.entries(endings)) {
             const o = opened(ended(written, eol));
-            const found = expected(form);
+            const found = expected(form, reading);
             assert.deepStrictEqual(o.defined(), found, ending);
             assert.deepStrictEqual(
               where(o.hovered()),
@@ -866,26 +879,48 @@ suite("a module bound in another file", () => {
             const reaches = found.includes(impl);
             const key = "/w/lib/mod.q 2:10 f";
             assert.strictEqual(o.referenced().includes(key), reaches, ending);
-            const fromKey = opened(
-              ended(
-                {
-                  ...written,
-                  "/w/b.q": written["/w/b.q"].replace("|", ""),
-                  "/w/lib/mod.q": "impl:{x}\nexport:([|f:impl])",
-                },
-                eol,
-              ),
-            ).referenced();
-            assert.strictEqual(fromKey.includes(at), reaches, ending);
+            // The key with its value, or alone, as ([f]) is ([f:f])
+            for (const source of [
+              "impl:{x}\nexport:([|f:impl])",
+              "f:{x}\nexport:([|f])",
+            ]) {
+              const fromKey = opened(
+                ended(
+                  {
+                    ...written,
+                    "/w/b.q": written["/w/b.q"].replace("|", ""),
+                    "/w/lib/mod.q": source,
+                  },
+                  eol,
+                ),
+              ).referenced();
+              assert.strictEqual(fromKey.includes(at), reaches, source);
+            }
           }
         });
       }
     }
   }
 
-  test("a view at top level, none", () => {
-    const o = opened({ ...mod, "/w/a.q": "s::use`mod", "/w/b.q": "s.|f 1" });
-    assert.deepStrictEqual(o.defined(), []);
+  test("a key written alone: the global's references and the export's", () => {
+    const files = {
+      "/w/lib/mod.q": "f:{x}\ng:{f x}\nexport:([|f])",
+      "/w/a.q": "s:use`mod\ns.f 1",
+      "/w/b.q": "s.f 2",
+    };
+    for (const [ending, eol] of Object.entries(endings)) {
+      assert.deepStrictEqual(
+        opened(ended(files, eol)).referenced(),
+        [
+          "/w/lib/mod.q 1:1 f",
+          "/w/lib/mod.q 2:4 f",
+          "/w/lib/mod.q 3:10 f",
+          "/w/a.q 2:1 s.f",
+          "/w/b.q 1:1 s.f",
+        ],
+        ending,
+      );
+    }
   });
 
   test("a module not in the workspace, none", () => {
