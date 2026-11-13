@@ -70,8 +70,16 @@ export function completions(
   };
 }
 
-// Nothing typed yet, where a name could start
-const nothing = (offset: number) => ({ prefix: "", end: offset });
+// Nothing typed yet, where a name could start: before a name the cursor
+// touches, that whole name, for replacing
+function nothing(a: Annotated, offset: number) {
+  for (const s of a.script.statements) {
+    if (s.start > offset) break;
+    const t = s.tokens.find((t) => t.start === offset);
+    if (t?.kind === "name") return { prefix: "", end: t.end };
+  }
+  return { prefix: "", end: offset };
+}
 
 // The name being typed up to the offset, and where the whole of it ends;
 // an empty one where a name could start; or undefined where nothing's
@@ -92,7 +100,7 @@ function typing(
     const before = s?.tokens.findLast((t) => t.end < offset);
     return before && !follows(text, before, offset)
       ? undefined
-      : nothing(offset);
+      : nothing(a, offset);
   }
   switch (t.kind) {
     case "name":
@@ -111,11 +119,11 @@ function typing(
       // before a name
       return text.slice(t.start, offset) === "."
         ? { prefix: ".", end: offset }
-        : nothing(offset);
+        : nothing(a, offset);
     default:
       // Right after a bracket, a separator or a string; not in a number,
       // a comment or a string
-      return opens(t) && offset === t.end ? nothing(offset) : undefined;
+      return opens(t) && offset === t.end ? nothing(a, offset) : undefined;
   }
 }
 
@@ -290,7 +298,9 @@ function bare(
     for (const l of lambda.locals) add({ label: l, kind: "local", group: 0 });
   }
   if (namespace) {
-    for (const c of inNamespace(index, file, namespace, "")) add(c);
+    // .z's own are q's values, not names in it: under \d .z, K isn't .z.K
+    const own = namespace !== ".z";
+    for (const c of inNamespace(index, file, namespace, "", own)) add(c);
   } else {
     for (const [full, d] of globals(index, file)) {
       if (!full.includes(".")) add(ofDefined(full, d, 1));
@@ -351,12 +361,13 @@ function inNamespace(
   file: string,
   namespace: string,
   written: string,
+  qs = true,
 ): Completion[] {
   const out = new Map<string, Completion>();
   for (const c of children(globals(index, file), namespace, written)) {
     out.set(c.label, c);
   }
-  for (const [name, b] of builtins) {
+  for (const [name, b] of qs ? builtins : []) {
     const rest = name.slice(namespace.length + 1);
     if (!name.startsWith(`${namespace}.`) || rest.includes(".")) continue;
     const label = written + rest;

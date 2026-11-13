@@ -115,8 +115,8 @@ read.
 - Completion, in VS Code's own suggestions as you type: the innermost
   lambda's parameters and locals first (q has no closures, so an outer
   lambda's aren't in scope), then the workspace's globals in the root,
-  then q's keywords. After `\d .ns`, `.ns`'s globals, q's own if it's
-  `.Q` or `.z`, and its namespaces are offered by their names in it instead
+  then q's keywords. After `\d .ns`, `.ns`'s globals, q's own in `.Q`, `.h` or
+  `.j`, and its namespaces are offered by their names in it instead
   of the root's, as q reads names there. After a
   dot, a namespace's members and the namespaces in it:
   `.` gives the namespaces, `.Q.` q's own, with KX's line, and `.ns.` your

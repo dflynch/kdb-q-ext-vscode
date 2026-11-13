@@ -202,6 +202,25 @@ for (const [ending, newline] of [
       }
     });
 
+    test("with the cursor before a name, replacing all of it", () => {
+      for (const [source, name] of [
+        ["g:1\nx:|abc", "abc"],
+        ["g:1\n|abc:1", "abc"],
+        ["g:1\nx:|.ns.f", ".ns.f"],
+      ]) {
+        const found = at({ "/w/a.q": source });
+        assert.strictEqual(found?.inserting, "");
+        assert.strictEqual(found?.replacing, name);
+      }
+    });
+
+    test("after \\d .z, your own, not q's values", () => {
+      assert.deepStrictEqual(
+        offered(at({ "/w/a.q": "\\d .z\npg:{x}\nx:|" }), ["pg", "K", "P"]),
+        { pg: "function 1", K: "-", P: "-" },
+      );
+    });
+
     test("after a number and a space", () => {
       assert.deepStrictEqual(offered(at({ "/w/a.q": "g:1\nx:1 |" }), ["g"]), {
         g: "variable 1",
