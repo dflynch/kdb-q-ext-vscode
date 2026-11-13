@@ -219,6 +219,11 @@ for (const [ending, newline] of [
         offered(at({ "/w/a.q": "\\d .z\npg:{x}\nx:|" }), ["pg", "K", "P"]),
         { pg: "function 1", K: "-", P: "-" },
       );
+      // Written in full, they are, as everywhere
+      assert.deepStrictEqual(
+        offered(at({ "/w/a.q": "\\d .z\nx:.z.|" }), [".z.K", ".z.P"]),
+        { ".z.K": "variable 2", ".z.P": "variable 2" },
+      );
     });
 
     test("after a number and a space", () => {
