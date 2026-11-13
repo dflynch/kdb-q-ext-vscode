@@ -108,6 +108,16 @@ All notable changes to the extension are documented in this file.
 
 ### Changed
 
+- Handles, such as `` `:data/trades.csv ``, are colored as the symbols
+  they are. System commands, such as `\l` and `\d`, and `k)` are colored
+  as `use`, the color Python's `import` has. qSQL's `select`, `from`, `by`
+  and `where` are colored as `if`, so in Dark and Light Modern they no
+  longer look like symbols. If you customized `support.class.handle.q`,
+  `meta.preprocessor` or `keyword.other.qsql.q`, they're now
+  `constant.language.symbol.handle.q`, `keyword.control.directive` and
+  `keyword.control.qsql.q`; a rule on `keyword.control` now also colors
+  qSQL and system commands, and one on `support.class` no longer colors
+  handles
 - The extension is now named Ink: kdb+/q toolkit, with a new icon: an ink q
   on paper, its tail ending in a drop. q files and the kdb+/q icon in the
   Activity Bar and panel have the same q

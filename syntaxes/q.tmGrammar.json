@@ -72,7 +72,7 @@
           "begin": "^((?:q\\))+)",
           "beginCaptures": {
             "1": {
-              "name": "meta.preprocessor.language.q"
+              "name": "keyword.control.directive.language.q"
             }
           },
           "end": "$",
@@ -97,7 +97,7 @@
               "match": "\\G([A-Za-z]\\)).*",
               "captures": {
                 "1": {
-                  "name": "meta.preprocessor.language.q"
+                  "name": "keyword.control.directive.language.q"
                 }
               }
             },
@@ -125,7 +125,7 @@
           "match": "^([A-Za-z]\\)).*",
           "captures": {
             "1": {
-              "name": "meta.preprocessor.language.q"
+              "name": "keyword.control.directive.language.q"
             }
           }
         }
@@ -137,7 +137,7 @@
           "begin": "\\G(\\\\d)(?=\\s|$)",
           "beginCaptures": {
             "1": {
-              "name": "meta.preprocessor.system.q"
+              "name": "keyword.control.directive.system.q"
             }
           },
           "end": "$",
@@ -151,7 +151,7 @@
           "match": "\\G(\\\\(?:l|cd|[12_]))(?=\\s|$).*",
           "captures": {
             "1": {
-              "name": "meta.preprocessor.system.q"
+              "name": "keyword.control.directive.system.q"
             }
           }
         },
@@ -159,7 +159,7 @@
           "begin": "\\G(\\\\(?:ts|[abBcCefgopPrsStTuvwWxz\\\\])(?::\\d+)?)(?=\\s|$)",
           "beginCaptures": {
             "1": {
-              "name": "meta.preprocessor.system.q"
+              "name": "keyword.control.directive.system.q"
             }
           },
           "end": "$",
@@ -176,7 +176,7 @@
           "match": "\\G(\\\\[A-Za-z_][\\w.-]*)(?=\\s|$).*",
           "captures": {
             "1": {
-              "name": "meta.preprocessor.system.q"
+              "name": "keyword.control.directive.system.q"
             }
           }
         },
@@ -184,7 +184,7 @@
           "match": "\\G(\\\\)\\s*$",
           "captures": {
             "1": {
-              "name": "meta.preprocessor.system.q"
+              "name": "keyword.control.directive.system.q"
             }
           }
         }
@@ -262,7 +262,7 @@
           "match": "':|'|\\\\:|/:|/|\\\\"
         },
         {
-          "name": "keyword.other.qsql.q",
+          "name": "keyword.control.qsql.q",
           "match": "\\b(?:select|exec|update|delete|by|from|where)(?![\\w.])"
         },
         {
@@ -294,7 +294,7 @@
     "literals": {
       "patterns": [
         {
-          "name": "support.class.handle.q",
+          "name": "constant.language.symbol.handle.q",
           "match": "`:[.:/\\w]*"
         },
         {
