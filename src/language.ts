@@ -1,15 +1,14 @@
 // q language features in the editor, from the annotation pass: the outline
 // (and breadcrumbs) and occurrence highlighting within a file, and
 // definition, references, hover, parameter hints, completion and symbol
-// search across the workspace's q files, parameters and locals highlighted
-// and renamed within their lambda, the files a \l may load, references in the
+// search across the workspace's q files, parameters and locals highlighted, the files a \l may load, references in the
 // References view grouped by how they're passed
 
 import * as vscode from "vscode";
 import { type Annotated, annotate } from "./annotate";
 import { type Completion, completions } from "./completion";
 import { lineOf, lineStarts } from "./lines";
-import { locals, rename, renameable } from "./locals";
+import { locals } from "./locals";
 import {
   type Occurrence,
   type Outlined,
@@ -606,25 +605,6 @@ export function registerLanguage(): vscode.Disposable {
       },
       legend,
     ),
-    vscode.languages.registerRenameProvider(selector, {
-      prepareRename: (d, position) => {
-        const found = renameable(annotations(d), d.offsetAt(position));
-        if ("refused" in found) throw new Error(found.refused);
-        return range(d, found);
-      },
-      provideRenameEdits: (d, position, to) => {
-        const found = rename(
-          d.getText(),
-          annotations(d),
-          d.offsetAt(position),
-          to,
-        );
-        if ("refused" in found) throw new Error(found.refused);
-        const edit = new vscode.WorkspaceEdit();
-        for (const e of found.edits) edit.replace(d.uri, range(d, e), e.text);
-        return edit;
-      },
-    }),
     vscode.languages.registerDefinitionProvider(selector, {
       provideDefinition: async (d, position) => {
         const index = await workspace.index(d);

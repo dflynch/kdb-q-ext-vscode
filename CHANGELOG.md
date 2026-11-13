@@ -108,11 +108,6 @@ All notable changes to the extension are documented in this file.
 - A lambda's parameters and locals in the parameter colour wherever they're
   used, so its own names stand apart from globals, as a misspelt local
   does; a local is still a variable to themes that colour them apart
-- Rename (F2) for a lambda's parameters and locals, within that lambda, a
-  query's name that may be the parameter included. Renaming `x` in `{x*y}`
-  writes the parameter list, `{[price;y] price*y}`. A new name q would read
-  differently is refused: dotted, a keyword, a name the lambda already
-  has, or `x`, `y` or `z` in a lambda without a parameter list
 
 ### Changed
 
