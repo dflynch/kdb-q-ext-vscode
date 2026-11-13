@@ -134,6 +134,17 @@ for (const [ending, newline] of [
       });
     });
 
+    test("after q)\\d, only the namespace's", () => {
+      const files = { "/w/b.q": ".ns.g:{x}\nr:1" };
+      for (const source of ["q)\\d .ns\n|", "q)q)\\d .ns\nx:|"]) {
+        const found = at({ ...files, "/w/a.q": source });
+        assert.deepStrictEqual(offered(found, ["g", "r"]), {
+          g: "function 1",
+          r: "-",
+        });
+      }
+    });
+
     test('after system "d .ns" too', () => {
       assert.deepStrictEqual(
         offered(at({ "/w/a.q": 'system "d .ns"\nf:1\n|' }), ["f"]),
@@ -465,6 +476,14 @@ for (const [ending, newline] of [
       ["after spaces in another language's line", "g:1\np)x = |"],
       ["after spaces in a system command", "g:1\n\\l |"],
       ["on a system command's line joined on", "g:1\n\\l a.q\n  g|"],
+      ["in a system command after q)", "g:1\nq)\\l a|"],
+      ["after spaces in a system command after q)", "g:1\nq)\\l |"],
+      ["in \\d after q)", "q)\\d .n|"],
+      ["on a line joined on to q)\\l", "g:1\nq)\\l a.q\n  g|"],
+      ["in a comment after q)", "g:1\nq)/ g|"],
+      ["in a comment after q) and a space", "g:1\nq) / g|"],
+      ["in a k line after q)", "g:1\nq)k)g|"],
+      ["in another language's line after q)", "g:1\nq)p)g|"],
       ["on another language's line joined on", "g:1\np)x = 1\n  |"],
       ["on a blank line in a string left open", 'g:1\nx:"abc\n  |'],
       ["after #!", "#!/usr/bin/q|\ng:1"],

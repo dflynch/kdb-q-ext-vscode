@@ -90,6 +90,10 @@ const cases: [string, string, string[]][] = [
   ["p)def f(x:\n   return (x / y", "none: Python's, to .p.e", []],
   ["s)select (", "none: SQL's, to .s.e", []],
   ["\\d .x(", "none: a command", []],
+  ["q)\\d .x(", "none: a command", []],
+  ["q)/ (", "none: a comment", []],
+  ["q) / (", "none: a comment", []],
+  ["q)k)a:(1", "'( (a k line, not read)", []],
   ["", "none", []],
 ];
 

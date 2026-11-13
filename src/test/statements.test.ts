@@ -94,6 +94,12 @@ suite("statements.flatten", () => {
       "a:1;\n\\l b.q\n\\cd /tmp\nc:2",
       ["a:1;", "\\l b.q", "\\cd /tmp", "c:2"],
     ],
+
+    // After q), the rest as a line at column 0: a command, a comment, k
+    ["q) prefix", "q)a:1\nq)\\d .ns\nb", ["a:1", "\\d .ns", "b"]],
+    ["q) prefix, a comment", "q)/ c\nq) / c\nb", ["b"]],
+    ["q) prefix, CRLF", "q)\\d .ns\r\nq)/ c\r\nb", ["\\d .ns", "b"]],
+    ["q) prefix, k continuation lines", "q)k)a:1+\n  2", ["k)a:1+;2"]],
   ];
 
   for (const [name, input, expected] of cases) {

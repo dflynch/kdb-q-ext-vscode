@@ -54,6 +54,17 @@ suite("scanner kinds", () => {
   const cases: [string, string[]][] = [
     ["p)x = 7 // 2", ["other p)x = 7 // 2"]],
     ["q)a:1", ["name a", "operator :", "number 1"]],
+    // After q), a line as at column 0, but spaces don't indent it (q 5.0)
+    ["q)\\d .ns", ["command \\d .ns"]],
+    ["q)q)\\d .ns", ["command \\d .ns"]],
+    ["q)\\", ["command \\"]],
+    ["q) \\d .ns", ["iterator \\", "name d", "name .ns"]],
+    ["q)/ c", ["comment / c"]],
+    ["q)/", ["comment /"]],
+    ["q)\t/ c", ["comment / c"]],
+    ["q)k)1+1 / c", ["k k)1+1", "comment / c"]],
+    ["q)p)print(1)", ["other p)print(1)"]],
+    ["q) k)1", ["name k", "close )", "number 1"]],
     ["a -1", ["name a", "number -1"]],
     ["a-1", ["name a", "operator -", "number 1"]],
     [
@@ -178,6 +189,51 @@ suite("scanner layout", () => {
     test(name, () => {
       assert.deepStrictEqual(statements(text), expected);
     });
+  }
+
+  // After q), the rest of the line as at column 0: a command, a comment or
+  // another prefix. q)/ and q)\ aren't a block or the script's end, and
+  // the line begins a statement as any at column 0 does (q 5.0). Its
+  // statements, comments between them and the script's end, in each line
+  // ending
+  const prefixed: [string, string, string[], string[], number?][] = [
+    ["a command", "q)\\d .ns\nx:1", ["q)\\d .ns", "x:1"], []],
+    ["a command, prefixed twice", "q)q)\\l a.q\nx", ["q)q)\\l a.q", "x"], []],
+    [
+      "a command, a line joined on",
+      "q)\\l a.q\n  / c\nb",
+      ["q)\\l a.q\n  / c", "b"],
+      [],
+    ],
+    ["a backslash alone, a command", "q)\\\nb", ["q)\\", "b"], []],
+    ["a comment", "q)/ c\nb", ["b"], ["/ c"]],
+    ["a comment after spaces", "q) / c\nb", ["b"], ["/ c"]],
+    ["a comment, ending a statement", "a+\nq)/ c\nb", ["a+", "b"], ["/ c"]],
+    ["a comment, a line joined on", "q)/ c\n  x:1", ["q)/ c\n  x:1"], []],
+    ["a slash alone, not a block", "q)/\nb\n\\\nc", ["b"], ["/"], 2],
+    ["a k line", "q)k)+/1\n  +1\nb", ["q)k)+/1\n  +1", "b"], []],
+    ["another language", "q)p)f(\n  1)\nb", ["q)p)f(\n  1)", "b"], []],
+  ];
+  for (const [ending, eol] of [
+    ["LF", "\n"],
+    ["CRLF", "\r\n"],
+  ]) {
+    for (const [name, lf, expected, comments, end] of prefixed) {
+      test(`q's own prefix, ${name}, ${ending}`, () => {
+        const text = lf.replaceAll("\n", eol);
+        const script = scan(text);
+        assert.deepStrictEqual(
+          statements(text),
+          expected.map((s) => s.replaceAll("\n", eol)),
+        );
+        assert.deepStrictEqual(
+          script.comments.map((t) => text.slice(t.start, t.end)),
+          comments,
+        );
+        assert.deepStrictEqual(script.blocks, []);
+        assert.strictEqual(script.end, end);
+      });
+    }
   }
 
   test("comments between statements", () => {

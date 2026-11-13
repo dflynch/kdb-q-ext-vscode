@@ -121,6 +121,9 @@ All notable changes to the extension are documented in this file.
   `select.y`, are highlighted as one name
 - Negative times, such as `-12:34:56.789`, are highlighted as one literal
 - `'[f;g]` (compose) is no longer highlighted as a signal
+- A line after `q)` is read as q reads it: `q)\d .ns` and `q)\l a.q` as
+  system commands, for completion, Go to Definition and the outline, and
+  `q)/ c` as a comment
 - The `.` in `\d .` is no longer highlighted as an operator
 - Lowercase typed nulls and infinities, such as `0nz` and `-0wz` (how q
   prints a datetime infinity), are highlighted as one literal
