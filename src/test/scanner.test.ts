@@ -152,6 +152,10 @@ suite("scanner layout", () => {
       ["p)def f(x:\n   return (x / y", "b"],
     ],
     ["q's own prefix", "q)a:(1;\n  2)\nb", ["q)a:(1;\n  2)", "b"]],
+    ["q's own prefix alone", "q)\nb", ["b"]],
+    ["q's own prefix alone, then spaces", "q) \r\nb", ["b"]],
+    ["q's own prefix alone, at the end", "a\nq)", ["a"]],
+    ["q's own prefix, then a line joined on", "q)\n  x:1", ["q)\n  x:1"]],
     // q reads a lone \r as whitespace, not a line break (q 5.0)
     ["lone CR", "a:(1;\r2)\rb:3", ["a:(1;\r2)\rb:3"]],
     ["lone CR, then a comment", "a:1\r/ (\rb", ["a:1\r/ (\rb"]],
