@@ -727,7 +727,8 @@
     "format": "biome check --write",
     "builtins": "node scripts/builtins.mjs",
     "fixtures": "cd test/fixtures && q fixtures.q -q && q lex.q -q && QPATH=$PWD/modules q scope.q -q",
-    "fuzz": "npm run compile && node test/fuzz/fuzz.js"
+    "fuzz": "npm run compile && node test/fuzz/fuzz.js",
+    "evaluate": "npm run compile && node test/evaluate/evaluate.js"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.2",
@@ -740,6 +741,7 @@
     "@vscode/vsce": "^4.0.0",
     "ag-grid-community": "36.2.0",
     "esbuild": "^0.28.2",
+    "playwright-core": "^1.65.0",
     "typescript": "^7.0.2",
     "uplot": "^1.6.32",
     "vscode-oniguruma": "^2.0.1",
