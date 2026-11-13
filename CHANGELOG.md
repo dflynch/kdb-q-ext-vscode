@@ -70,16 +70,16 @@ All notable changes to the extension are documented in this file.
 - Navigation for q: the outline and breadcrumbs, highlighting a name where
   it occurs, Go to Definition, Find All References and Go to Symbol in
   Workspace, across the workspace's `.q` files, following namespaces,
-  lambdas' locals and q 5 modules: `s.f`, ``s`f`` and ``s[`f]`` through
-  ``s:use`mod`` in the file or, if it doesn't define `s`, any other, the
-  last two through a view at top level, ``s::use`mod``, too, as q 5.0
-  reads them; and a module's own globals only in the module. The key in
-  ``d`a`` or ``d[`a]``, for any global `d`, is highlighted, and found by
-  Find All References, wherever the file keys `d` by it. Find All
-  References lists the uses that pass a global by reference under a group of their own. Go to
-  Definition has every definition of a global, where its whole value is
-  set, which VS Code lists by file and line; the hover shows the nearest
-  file's latest. An amend, as `t,:x` or `` `t upsert x ``, is a reference
+  lambdas' locals and q 5 modules. `s.f`, ``s`f`` and ``s[`f]`` follow
+  ``s:use`mod`` in the file, or, if the file doesn't define `s`, in any
+  other file. ``s`f`` and ``s[`f]`` also follow a top-level view
+  ``s::use`mod``, as q 5.0 does. A module's own globals are followed only
+  in the module. ``d`a`` and ``d[`a]`` read `d.a`, as q reads them, for
+  any global `d`, so they're highlighted and found with it. Find All
+  References lists the uses that pass a global by reference under a group
+  of their own. Go to Definition has every definition of a global, where
+  its whole value is set, which VS Code lists by file and line; the hover
+  shows the nearest file's latest. An amend, as `t,:x` or `` `t upsert x ``, is a reference
 - Go to Definition on the path a `\l` line names: the workspace's `.q`
   files whose paths end with it, as `\l common/util.q` has
   `code/common/util.q`, as the directory q runs in isn't known. `.`

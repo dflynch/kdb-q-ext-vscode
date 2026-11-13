@@ -101,11 +101,10 @@ function shown(a: Annotated, text: string): string[] {
   return a.names.map((n) => {
     const written = text.slice(n.token.start, n.token.end);
     const full = n.full !== written ? `=${n.full}` : "";
-    const module = n.module !== undefined ? ` from ${n.module}` : "";
     const variable = n.variable
       ? ` ?${n.variable.role} ${n.variable.full}`
       : "";
-    return `${n.role} ${written}${full}${module}${n.defines ? " :" : ""}${n.amends ? " amends" : ""}${variable}`;
+    return `${n.role} ${written}${full}${n.defines ? " :" : ""}${n.amends ? " amends" : ""}${variable}`;
   });
 }
 const names = (text: string, namespace?: string) =>
@@ -247,12 +246,12 @@ suite("annotate names", () => {
     ],
     ["multiple assignment", "{(a;b):1 2}", ["local a :", "local b :"]],
     [
-      "a module's exports, never through a local",
+      "a module's exports by a dot, globals resolved across files; never a local",
       "m:use`foo\nm.f 1\n{n:use`bar; n.g}",
       [
         "global m :",
         "builtin use",
-        "export m.f=f from foo",
+        "global m.f",
         "local n :",
         "builtin use",
         "global n.g",
@@ -273,13 +272,13 @@ suite("annotate names", () => {
   });
 
   test("a module bound to a dotted global", () => {
+    const a = annotate(".a.m:use`foo\n.a.m.f 1");
+    assert.deepStrictEqual([...a.modules], [[".a.m", "foo"]]);
     assert.deepStrictEqual(names(".a.m:use`foo\n.a.m.f 1"), [
       "global .a.m :",
       "builtin use",
-      "export .a.m.f=f from foo",
+      "global .a.m.f",
     ]);
-    const [, , f] = annotate(".a.m:use`foo\n.a.m.f 1").names;
-    assert.strictEqual(f.via, ".a.m");
   });
 
   test("a view isn't a binding", () => {
@@ -579,9 +578,9 @@ suite("annotate handles", () => {
     ["in a lambda, the root", "\\d .foo\n{value `a}", ["a=a"]],
     ["a path is absolute", "\\d .foo\nvalue `.`t", ["t=t"]],
     [
-      "a module's exports",
+      "a local's module's exports, and use's; a global's are key reads",
       "m:use`foo\nm`f; m[`g]; (use`bar)`h; {n:use`baz; n`k}",
-      ["f=f from foo", "g=g from foo", "h=h from bar", "k=k from baz"],
+      ["h=h from bar", "k=k from baz"],
     ],
   ];
   for (const [name, text, expected] of cases) {
@@ -650,22 +649,17 @@ suite("annotate modules", () => {
       const a = annotate(`m::use\`foo${eol}m\`f${eol}m[\`g]${eol}m.h`);
       assert.deepStrictEqual([...a.views], [["m", "foo"]]);
       assert.deepStrictEqual([...a.modules], []);
-      assert.deepStrictEqual(
-        a.handles.map((h) => `${h.module} ${h.full}`),
-        ["foo f", "foo g"],
-      );
-      assert.ok(a.names.every((n) => n.role !== "export"));
     }
   });
 
-  // A key of a global no module is bound to in the file, for another
-  // file's binding: each form, each line ending
+  // Each key read of a global by a symbol, which the index follows through
+  // a module bound, or viewed, in any file: each form, each line ending
   for (const [ending, eol] of [
     ["LF", "\n"],
     ["CRLF", "\r\n"],
   ]) {
-    const keyed = (text: string) =>
-      annotate(text.replaceAll("\n", eol)).keyed.map(
+    const keyReads = (text: string) =>
+      annotate(text.replaceAll("\n", eol)).keyReads.map(
         (k) => `${k.via} ${k.key}`,
       );
     for (const [what, text, expected] of [
@@ -673,13 +667,14 @@ suite("annotate modules", () => {
       ["m[`f]", "x:1\nm[`f]", ["m f"]],
       ["under \\d", "\\d .ns\nm`f", [".ns.m f"]],
       ["in a lambda, a global", "g:{m`f}", ["m f"]],
-      ["bound in the file, a handle instead", "m:use`foo\nm`f", []],
-      ["a view at top level, a handle instead", "m::use`foo\nm`f", []],
+      ["bound in the file", "m:use`foo\nm`f", ["m f"]],
+      ["a view at top level", "m::use`foo\nm`f", ["m f"]],
       ["a local, never", "g:{m:1; m`f}", []],
+      ["a local bound, a handle instead", "g:{m:use`foo; m`f}", []],
       ["a keyword's, never", "value`a", []],
     ] as const) {
-      test(`keyed, ${what} (${ending})`, () => {
-        assert.deepStrictEqual(keyed(text), expected);
+      test(`key reads, ${what} (${ending})`, () => {
+        assert.deepStrictEqual(keyReads(text), expected);
       });
     }
   }

@@ -1,5 +1,6 @@
 import * as assert from "node:assert";
 import { annotate } from "../annotate";
+import { occurrences } from "../navigation";
 import {
   definitions,
   entry,
@@ -778,6 +779,29 @@ const endings = { LF: "\n", CRLF: "\r\n" };
 const where = (hovered: string[] | undefined) =>
   hovered?.map((h) => h.split(/\[| /).slice(0, 3).join(" "));
 
+suite("highlights of a module's export read", () => {
+  // s.f, s`f and s[`f] read the same, as q reads them, whether s is bound
+  // in the file, viewed in it, or bound only in another: each form at the
+  // cursor, each binding, each line ending
+  const reads = ["s.f 1", "s`f", "s[`f]"];
+  const bindings = ["s:use`m\n", "s::use`m\n", "init:{s::use`m}\n", ""];
+  for (const bound of bindings) {
+    for (let n = 0; n < reads.length; n++) {
+      for (const [ending, eol] of Object.entries(endings)) {
+        test(`${reads[n]}, ${bound.trim() || "bound elsewhere"} (${ending})`, () => {
+          const lines = reads.map((r, i) => `x${i}:${r}`);
+          const text = (bound + lines.join("\n")).replaceAll("\n", eol);
+          const line = (i: number) => text.indexOf(`x${i}:`) + 3;
+          const at = line(n) + (n === 0 ? 2 : n === 1 ? 2 : 3);
+          const found = occurrences(annotate(text), at).map((o) =>
+            text.slice(o.start, o.end),
+          );
+          assert.deepStrictEqual(found, ["s.f", "f", "f"], ending);
+        });
+      }
+    }
+  }
+});
 suite("a module bound in another file", () => {
   const mod = { "/w/lib/mod.q": "impl:{x}\nexport:([f:impl])" };
   const other = { "/w/lib/other.q": "g:{y}\nexport:([f:g])" };

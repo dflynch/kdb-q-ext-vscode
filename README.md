@@ -68,12 +68,13 @@ read.
     workspace, as `QPATH` isn't read. `s.f`, ``s`f`` and ``s[`f]`` follow
     the module bound to `s`, as any global: by ``s:use`foo`` in the file,
     if it defines `s`, else in every file that binds it, nearest first.
-    ``s`f`` and ``s[`f]`` follow a view at top level, ``s::use`foo``,
-    too, as q 5.0 reads them; `s.f` doesn't, as q doesn't. A module, a file that
-    assigns `export`, runs in `.m.foo` up to its first `\d`, so its own
-    globals there, but those with a leading dot, as `.ns.f`, are followed
-    only in it, and never from another file; Go to Symbol in Workspace
-    still lists them, as written in the module
+    ``s`f`` and ``s[`f]`` also follow a top-level view ``s::use`foo``, as
+    q 5.0 does; `s.f` doesn't, as q doesn't. A module, a file that assigns
+    `export`, runs in `.m.foo` up to its first `\d`. Its globals there
+    without a leading dot are its own, followed only in the module, never
+    from another file; Go to Symbol in Workspace still lists them, as
+    written in the module. An `export` after a `\d` doesn't make the file
+    a module, as q then finds no export
   - `\l path/util.q` goes to each `.q` file whose path ends with
     `path/util.q`, with the cursor on the path, as `\l` loads from the
     directory q runs in, which isn't known. `.` anywhere, any number of

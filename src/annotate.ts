@@ -13,8 +13,7 @@ export type Role =
   | "global"
   | "column" // a name in a qSQL clause, or a table literal's column
   | "key" // a dictionary literal's key, as f in ([f:1])
-  | "builtin" // a q keyword, such as count or select
-  | "export"; // m.f, where m:use`mod: an export of a module
+  | "builtin"; // a q keyword, such as count or select
 
 export type Lambda = {
   open: Token;
@@ -35,8 +34,8 @@ export type Lambda = {
 export type Name = {
   token: Token;
   role: Role;
-  // A global's absolute name, as .foo.f, or f in the root; an export's key;
-  // otherwise the name as written
+  // A global's absolute name, as .foo.f, or f in the root; otherwise the
+  // name as written
   full: string;
   // Assigns or amends it, or declares a parameter
   defines?: true;
@@ -50,9 +49,6 @@ export type Name = {
   // assigned, or for i, the virtual column, which q reads even over a column
   // named i
   variable?: { role: "param" | "local" | "global"; full: string };
-  // An export's module, as written in use, and the global bound to it
-  module?: string;
-  via?: string;
 };
 
 // A global passed by reference: a symbol, or part of a symbol list, naming it
@@ -60,17 +56,19 @@ export type Name = {
 export type Handle = {
   start: number;
   end: number;
-  // Absolute, as for a name, or an export's key with module
+  // Absolute, as for a name, or an export's key with its module
   full: string;
   defines?: true;
   // As for a name: set and @[`t;();:;1] assign; upsert, insert,
   // @[`t;i;:;1], @[`t;();,;1] and update from `t amend
   amends?: true;
   lambda?: Lambda;
+  // The module, as written in use, of a local bound to it, as n`f where
+  // n:use`mod in the lambda, or of (use`mod)`f
   module?: string;
-  via?: string;
 };
 export type Use = { token: Token; module: string };
+export type KeyRead = { start: number; end: number; via: string; key: string };
 
 // The path a \l line names, as written, and where: the word after \l, as q
 // reads it, with nothing after it but a comment, else q loads nothing (q 5.0)
@@ -104,8 +102,7 @@ export type Annotated = {
   // Where \d, or system "d …", changes the namespace, and to what: from the
   // end of its statement on
   namespaces: { at: number; namespace: string }[];
-  // The module each global bound by m:use`mod is, by its full name, as
-  // m.f resolves
+  // The module each global bound by m:use`mod is, by its full name
   modules: Map<string, string>;
   // The module each global defined as a view of it, m::use`mod at top
   // level, is, by its full name: q 5.0 reads m`f and m[`f] through it, but
@@ -116,10 +113,10 @@ export type Annotated = {
   lambdas: Lambda[];
   uses: Use[];
   loads: Load[];
-  // A symbol keying a global no module is bound to in the file, as m`f or
-  // m[`f]: an export, if another file binds m. The global's full name and
-  // the key
-  keyed: { start: number; end: number; via: string; key: string }[];
+  // Each key read of a global by a symbol, as m`f or m[`f], as q reads m.f
+  // too: an export, if m is bound to a module, or viewed one, in any file.
+  // The global's full name and the key
+  keyReads: KeyRead[];
   // In the order they open, so a call comes before those in its brackets
   calls: Call[];
   // A module's export: keys when it's a dictionary literal, else only where
@@ -292,7 +289,7 @@ export function annotate(
     lambdas: [],
     uses: [],
     loads: [],
-    keyed: [],
+    keyReads: [],
     calls: [],
   };
   const entries: Entry[] = [];
@@ -900,8 +897,9 @@ export function annotate(
     if (l.locals.has(name)) return "local" as const;
     return undefined;
   };
-  // Modules bound to globals, by full name, and to locals, by lambda
-  const globalModules = out.modules;
+  // Modules bound to globals, by full name, and to locals, by lambda. A
+  // global's is resolved across files, as which one the file reads, as
+  // a module's own or the root's, the file can't say; a local's here
   const localModules = new Map<Lambda, Map<string, string>>();
   for (const { entry, module } of bindings) {
     if (scoped(entry, entry.text) && entry.lambda) {
@@ -909,36 +907,12 @@ export function annotate(
       m.set(entry.text, module);
       localModules.set(entry.lambda, m);
     } else {
-      globalModules.set(join(entry.namespace, entry.text), module);
+      out.modules.set(join(entry.namespace, entry.text), module);
     }
   }
   for (const { entry, module } of views) {
     out.views.set(join(entry.namespace, entry.text), module);
   }
-  // The module bound to the name, local or global, and the global's name
-  const boundTo = (e: Entry) => {
-    if (scoped(e, e.text)) {
-      const module = e.lambda && localModules.get(e.lambda)?.get(e.text);
-      return module ? { module } : undefined;
-    }
-    const via = join(e.namespace, e.text);
-    const module = globalModules.get(via) ?? out.views.get(via);
-    return module ? { module, via } : undefined;
-  };
-  // A dotted name's export: m.f, where m, a global, is bound. q never reads
-  // a dotted name through a local
-  const exportOf = (e: Entry) => {
-    const full = join(e.namespace, e.text);
-    for (let dot = full.lastIndexOf("."); dot > 0; ) {
-      const module = globalModules.get(full.slice(0, dot));
-      if (module) {
-        const via = full.slice(0, dot);
-        return { module, via, key: full.slice(dot + 1).split(".")[0] };
-      }
-      dot = full.lastIndexOf(".", dot - 1);
-    }
-    return undefined;
-  };
 
   for (const e of entries) {
     const w = e.text;
@@ -953,7 +927,6 @@ export function annotate(
         : {}),
     };
     const local = scoped(e, w);
-    const exported = w.includes(".") ? exportOf(e) : undefined;
     let name: Name;
     if (e.declares) {
       name = { ...base, role: "param", full: w, ...defines };
@@ -975,14 +948,6 @@ export function annotate(
             }),
         ...defines,
       };
-    } else if (exported) {
-      name = {
-        ...base,
-        role: "export",
-        full: exported.key,
-        module: exported.module,
-        via: exported.via,
-      };
     } else if (local) {
       name = { ...base, role: local, full: w, ...defines };
     } else {
@@ -996,26 +961,29 @@ export function annotate(
     out.names.push(name);
   }
 
+  // m`f and m[`f]: a local's export, if it's bound to a module, else a
+  // global's key read
   for (const { entry, element } of reached) {
-    const bound = boundTo(entry);
-    if (!bound) {
-      if (!scoped(entry, entry.text) && !keywords.has(entry.text)) {
-        out.keyed.push({
+    if (scoped(entry, entry.text)) {
+      const lambda = entry.lambda;
+      const module = lambda && localModules.get(lambda)?.get(entry.text);
+      if (module) {
+        out.handles.push({
           start: element.start,
           end: element.end,
-          via: join(entry.namespace, entry.text),
-          key: element.text,
+          full: element.text,
+          module,
+          ...(lambda ? { lambda } : {}),
         });
       }
-      continue;
+    } else if (!keywords.has(entry.text)) {
+      out.keyReads.push({
+        start: element.start,
+        end: element.end,
+        via: join(entry.namespace, entry.text),
+        key: element.text,
+      });
     }
-    out.handles.push({
-      start: element.start,
-      end: element.end,
-      full: element.text,
-      ...bound,
-      ...(entry.lambda ? { lambda: entry.lambda } : {}),
-    });
   }
   out.handles.sort((a, b) => a.start - b.start);
   return out;

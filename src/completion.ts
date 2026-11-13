@@ -17,11 +17,10 @@ import type { Span } from "./navigation";
 import type { Statement, Token } from "./scanner";
 import {
   exported,
-  type Global,
   type Index,
   type Listed,
   moduleAt,
-  modules,
+  moduleFiles,
   named,
   preferred,
 } from "./workspaceIndex";
@@ -66,7 +65,7 @@ export function completions(
   const dot = prefix.lastIndexOf(".");
   let items: Completion[];
   if (dot > 0) {
-    items = members(index, file, prefix.slice(0, dot), namespace, own);
+    items = members(index, file, prefix.slice(0, dot), namespace, start);
   } else if (dot === 0) {
     items = namespaces(index, file);
   } else {
@@ -366,16 +365,13 @@ function members(
   file: string,
   written: string,
   namespace: string,
-  own: string | undefined,
+  start: number,
 ): Completion[] {
   // As q reads it: a name without a leading dot is in the file's namespace
   const absolute =
     written.startsWith(".") || !namespace ? written : `${namespace}.${written}`;
-  const global: Global =
-    own && !absolute.startsWith(".")
-      ? { full: absolute, own }
-      : { full: absolute };
-  const found = modules(index, file, global, false);
+  const global = named(index, file, start, absolute);
+  const found = moduleFiles(index, file, global, false);
   return found.length
     ? exportsOf(index, written, found)
     : inNamespace(index, file, absolute, `${written}.`, true, global.own);

@@ -294,9 +294,9 @@ export function outline(text: string, a: Annotated): Outlined[] {
 }
 
 // What a name or handle refers to, so occurrences can be matched: a local or
-// parameter by its lambda, a global by its absolute name, an export by its
-// module and key, a key of a global no module is bound to in the file by
-// both, and a column, key or keyword by name
+// parameter by its lambda, a global by its absolute name, as m.f, m`f or
+// m[`f], which q reads alike, an export of a local's module by the module
+// and key, and a column, key or keyword by name
 export type Target = {
   start: number;
   end: number;
@@ -310,10 +310,9 @@ export type Target = {
   inLambda: boolean;
   // A global named by a symbol, as `t in `t insert x
   passed: boolean;
-  // An export's global bound to its module, as m in m.f, and whether it's
-  // read by a key, as m`f, which q 5.0 also reads through a view
-  via?: string;
-  keyed?: boolean;
+  // A global read by a key, as m`f or m[`f], which q 5.0 reads through a
+  // view, m::use`mod, as it doesn't m.f
+  byKey?: true;
 };
 
 // Each annotation's, once: every request reads them, several times over
@@ -340,8 +339,6 @@ function targetsOf(a: Annotated): Target[] {
       case "local":
       case "global":
         return scoped(n.role, n.full, n.lambda);
-      case "export":
-        return `export ${n.module} ${n.full}`;
       default:
         return `${n.role} ${n.full}`;
     }
@@ -357,7 +354,6 @@ function targetsOf(a: Annotated): Target[] {
     sets: n.defines === true && !n.amends,
     inLambda: n.lambda !== undefined,
     passed: false,
-    ...(n.via === undefined ? {} : { via: n.via, keyed: false }),
   }));
   for (const h of a.handles) {
     out.push({
@@ -371,19 +367,18 @@ function targetsOf(a: Annotated): Target[] {
       sets: h.defines === true && !h.amends,
       inLambda: h.lambda !== undefined,
       passed: h.module === undefined,
-      ...(h.via === undefined ? {} : { via: h.via, keyed: true }),
     });
   }
-  // m`f, for an m bound in another file, if any
-  for (const k of a.keyed) {
+  for (const k of a.keyReads) {
     out.push({
       start: k.start,
       end: k.end,
-      identity: `keyed ${k.via} ${k.key}`,
+      identity: `global ${k.via}.${k.key}`,
       defines: false,
       sets: false,
       inLambda: false,
       passed: false,
+      byKey: true,
     });
   }
   return out.sort((x, y) => x.start - y.start);

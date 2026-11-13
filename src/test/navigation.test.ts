@@ -316,8 +316,8 @@ suite("occurrences", () => {
       ["n write", "n text"],
     ],
     [
-      "an export, by any binding",
-      "m:use`foo\nk:use`foo\nm.|f 1\nk`f",
+      "an export, by a dot or a key, as q reads them alike",
+      "m:use`foo\nk:use`foo\nm.|f 1\nm`f\nk`f",
       ["m.f read", "f read"],
     ],
     [
