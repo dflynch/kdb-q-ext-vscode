@@ -47,6 +47,9 @@
         "scopes": {
           "variable": [
             "variable.parameter.local.q"
+          ],
+          "function.defaultLibrary": [
+            "support.function.builtin.q"
           ]
         }
       }

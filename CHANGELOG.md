@@ -136,6 +136,9 @@ All notable changes to the extension are documented in this file.
 
 ### Fixed
 
+- `where` used as the function, as `where 101b` or in a query's column
+  list, is colored as a built-in, as `count` is, and only the `where` that
+  opens a query's where clause as qSQL
 - Dotted names that start with a reserved word, such as `null.x` or
   `select.y`, are highlighted as one name
 - Negative times, such as `-12:34:56.789`, are highlighted as one literal
