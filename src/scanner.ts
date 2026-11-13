@@ -261,9 +261,11 @@ export function scan(text: string): Script {
   let blockOpen = 0;
 
   const finish = () => {
-    if (current) {
+    // A statement with nothing in it, as a q) line alone, isn't one
+    const last = current?.tokens.at(-1);
+    if (current && last) {
       if (open) open.unterminated = true;
-      current.end = current.tokens[current.tokens.length - 1].end;
+      current.end = last.end;
       script.statements.push(current);
     }
     for (const t of pending) script.comments.push(t);
