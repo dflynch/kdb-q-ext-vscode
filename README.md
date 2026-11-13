@@ -363,7 +363,7 @@ time, following the same rules as a q script:
 ### Customizing colors
 
 VS Code's default themes have fewer colors than q has kinds of token, so
-some kinds share a color, such as file handles and symbols. Each kind has
+some kinds share a color, such as casts and `.Q`/`.z`. Each kind has
 its own scope, so you can give it a color of your own in `settings.json`:
 
 ```json
@@ -380,18 +380,21 @@ such as `constant.numeric.date.q`, and `source.q` keeps a rule to q files.
 
 | Tokens                                                  | Scope                                |
 | ------------------------------------------------------- | ------------------------------------ |
-| `if`, `$[`, `do`, `while`, `exit`, `'` (signal)         | `source.q keyword.control`           |
+| `if`, `$[`, `do`, `while`, `exit`, `'` (signal), `use`  | `source.q keyword.control`           |
 | `select`, `from`, `by`, `where`, …                      | `keyword.control.qsql.q`             |
 | `count`, `each`, `0:`, `-11!`, …                        | `source.q support.function.builtin`  |
 | `` `int$ ``, `"j"$`, `` `$ `` (casts)                   | `support.type.cast.q`                |
 | `` `s# ``, `` `u# ``, `` `p# ``, `` `g# `` (attributes) | `storage.modifier.attribute.q`       |
 | `.Q.dd`, `.z.p`, `.h.ht`, `.j.j`                        | `source.q support.class.namespace`   |
-| `` `sym ``                                              | `constant.language.symbol.q`         |
-| `` `:data/trades.csv ``                                 | `constant.language.symbol.handle.q`  |
+| `` `sym `` and `` `:data/trades.csv `` (handles)        | `source.q constant.language.symbol`  |
+| Handles only, as `` `:data/trades.csv ``               | `constant.language.symbol.handle.q`  |
 | `0N`, `0w`, dates, times, numbers                       | `source.q constant.numeric`          |
 | `x`, `y`, `z` and `{[a;b]` parameters                   | `source.q variable.parameter`        |
 | `/ \ ' ': /: \:` (iterators)                            | `keyword.operator.iterator.q`        |
 | `\l`, `\t`, … and `k)`                                  | `source.q keyword.control.directive` |
+
+A rule on `source.q keyword.control` also colors qSQL and system commands,
+as their scopes start with it.
 
 Run **Developer: Inspect Editor Tokens and Scopes** to see the scope of any
 token.
