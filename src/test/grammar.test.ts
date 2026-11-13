@@ -305,6 +305,15 @@ suite("q grammar", () => {
         ["+/1 2", "source.q"],
       ],
     ],
+    // Another letter hands the line to .X.e, as written (q 5.0)
+    [
+      "another language's line",
+      "p)x = 7 // 2",
+      [
+        ["p)", "meta.preprocessor.language.q"],
+        ["x = 7 // 2", "source.q"],
+      ],
+    ],
 
     // Keywords
     [
@@ -1267,6 +1276,146 @@ suite("q grammar", () => {
 
   for (const [name, source, expected] of cases) {
     test(name, () => {
+      assert.deepStrictEqual(tokenize(grammar, source), expected);
+    });
+  }
+
+  // After q), once or more, a line is read as at column 0, as the scanner
+  // reads it (q 5.0): the same tokens, after the prefix. VS Code hands the
+  // grammar lines without their line breaks, so LF and CRLF read alike
+  const lines = [
+    "\\d .ns",
+    "\\d .ns / c",
+    "\\l a.q",
+    "\\ts f /x",
+    "\\t 1000",
+    "\\ls /tmp",
+    "\\\\",
+    "/ c",
+    "/c",
+    "k)+/1 2",
+    "p)x = 7 // 2",
+    "a:1 / c",
+    '"a / b"',
+  ];
+  for (const prefix of ["q)", "q)q)"]) {
+    for (const line of lines) {
+      test(`${prefix}${line}, as at column 0`, () => {
+        assert.deepStrictEqual(tokenize(grammar, `${prefix}${line}`), [
+          [prefix, "meta.preprocessor.language.q"],
+          ...tokenize(grammar, line),
+        ]);
+      });
+    }
+  }
+
+  const prefixed: [string, string, [string, string][]][] = [
+    [
+      "a system command",
+      "q)\\d .ns",
+      [
+        ["q)", "meta.preprocessor.language.q"],
+        ["\\d", "meta.preprocessor.system.q"],
+        [".ns", "source.q"],
+      ],
+    ],
+    [
+      "a slash alone, a comment, not a block",
+      "q)/\na",
+      [
+        ["q)", "meta.preprocessor.language.q"],
+        ["/", "comment.line.slash.q"],
+        ["a", "source.q"],
+      ],
+    ],
+    [
+      "a backslash alone, a command, not the script's end",
+      "q)\\ \na",
+      [
+        ["q)", "meta.preprocessor.language.q"],
+        ["\\", "meta.preprocessor.system.q"],
+        ["a", "source.q"],
+      ],
+    ],
+    [
+      "a space, then q",
+      "q) \\d .ns",
+      [
+        ["q)", "meta.preprocessor.language.q"],
+        ["\\", "keyword.operator.iterator.q"],
+        ["d", "source.q"],
+        [".ns", "source.q"],
+      ],
+    ],
+    [
+      "a space, then a comment",
+      "q) / c\nq)\t/ c",
+      [
+        ["q)", "meta.preprocessor.language.q"],
+        ["/ c", "comment.line.slash.q"],
+        ["q)", "meta.preprocessor.language.q"],
+        ["/ c", "comment.line.slash.q"],
+      ],
+    ],
+    [
+      "a space, then k) is q",
+      "q) k)1",
+      [
+        ["q)", "meta.preprocessor.language.q"],
+        ["k", "source.q"],
+        [")", "source.q"],
+        ["1", "constant.numeric.number.q"],
+      ],
+    ],
+    [
+      "a k line",
+      "q)k)+/1 2",
+      [
+        ["q)", "meta.preprocessor.language.q"],
+        ["k)", "meta.preprocessor.language.q"],
+        ["+/1 2", "source.q"],
+      ],
+    ],
+    [
+      "a string over lines",
+      'q)a:"x\n  y"',
+      [
+        ["q)", "meta.preprocessor.language.q"],
+        ["a", "source.q"],
+        [":", "keyword.operator.assignment.q"],
+        ['"', "string.quoted.double.q"],
+        ["x", "string.quoted.double.q"],
+        ["y", "string.quoted.double.q"],
+        ['"', "string.quoted.double.q"],
+      ],
+    ],
+    // Only q)'s own: after a bracket, still q
+    [
+      "a name in parentheses",
+      "(a)/1",
+      [
+        ["(", "source.q"],
+        ["a", "source.q"],
+        [")", "source.q"],
+        ["/", "keyword.operator.iterator.q"],
+        ["1", "constant.numeric.number.q"],
+      ],
+    ],
+    [
+      "a slash after a brace",
+      "{/[x]}",
+      [
+        ["{", "source.q"],
+        ["/", "keyword.operator.iterator.q"],
+        ["[", "source.q"],
+        ["x", "variable.parameter.implicit.q"],
+        ["]", "source.q"],
+        ["}", "source.q"],
+      ],
+    ],
+  ];
+  for (const [name, source, expected] of prefixed) {
+    test(`after q), ${name}`, () => {
       assert.deepStrictEqual(tokenize(grammar, source), expected);
     });
   }

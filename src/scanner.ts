@@ -29,8 +29,8 @@ export type Token = {
   unterminated?: true;
 };
 
-// From its first token's start to its last's end, which may be an indented
-// comment line's after its code
+// From its first line's text past any indent, a q) prefix and all, to its
+// last token's end, which may be an indented comment line's after its code
 export type Statement = { start: number; end: number; tokens: Token[] };
 
 // An outermost block comment from its "/" line to its "\" line, or to the end
@@ -97,9 +97,10 @@ function stringEnd(text: string, i: number): number {
   return -1;
 }
 
-// The tokens of one line of a statement from column i. When the line starts
-// inside a string, open is that string's token, to extend. Returns the string
-// token still open at the end of the line, if any.
+// The tokens of one line of a statement from column i, where a "/" starts a
+// comment as at column 0. When the line starts inside a string, open is that
+// string's token, to extend. Returns the string token still open at the end
+// of the line, if any.
 function lexLine(
   line: Line,
   i: number,
@@ -107,6 +108,7 @@ function lexLine(
   open: Token | undefined,
 ): Token | undefined {
   const { text, start: base } = line;
+  const column = i;
   const push = (kind: Kind, from: number, to: number) => {
     tokens.push({ kind, start: base + from, end: base + to });
   };
@@ -132,7 +134,7 @@ function lexLine(
     const next = text[i + 1];
     if (isSpace(c)) {
       i++;
-    } else if (c === "/" && (i === 0 || isSpace(text[i - 1]))) {
+    } else if (c === "/" && (i === column || isSpace(text[i - 1]))) {
       push("comment", i, trimmedEnd(text));
       return undefined;
     } else if (c === '"') {
@@ -261,9 +263,12 @@ export function scan(text: string): Script {
   let blockOpen = 0;
 
   const finish = () => {
-    // A statement with nothing in it, as a q) line alone, isn't one
+    // A statement with nothing but comments in it, as a q) line alone or
+    // q)/ c, isn't one: they're between statements
     const last = current?.tokens.at(-1);
-    if (current && last) {
+    if (current?.tokens.every((t) => t.kind === "comment")) {
+      for (const t of current.tokens) script.comments.push(t);
+    } else if (current && last) {
       if (open) open.unterminated = true;
       current.end = last.end;
       script.statements.push(current);
@@ -349,36 +354,38 @@ export function scan(text: string): Script {
     if (!continued) begin(line.start + first);
     const statement = current as Statement;
 
-    if (!indented && t[0] === "\\") {
+    // q's own prefix, once or more: the rest of the line is read as a line
+    // at column 0 is, a command, a comment, another prefix or q. But blocks
+    // and the script's end are the layout's: q)/ is a comment and q)\ a
+    // command. Spaces after it don't indent: q) \d .ns is q (q 5.0)
+    let at = indented ? first : 0;
+    while (!indented && t.startsWith("q)", at)) at += 2;
+    const head = indented ? "" : t.slice(at);
+
+    if (head[0] === "\\") {
       statement.tokens.push({
         kind: "command",
-        start: line.start,
+        start: line.start + at,
         end: line.start + trimmedEnd(t),
       });
-    } else if (!indented && t.startsWith("q)")) {
-      // q's own prefix: the rest is q
-      open = lexLine(line, 2, statement.tokens, undefined);
     } else if (
-      (!indented && /^[A-Za-z]\)/.test(t) && t[0] !== "k") ||
+      (/^[A-Za-z]\)/.test(head) && head[0] !== "k") ||
       (language && language !== "k" && indented)
     ) {
       // Any other letter hands the line to .X.e, as written, comments and all
-      language ??= t[0];
+      language ??= head[0];
       statement.tokens.push({
         kind: "other",
-        start: line.start + first,
+        start: line.start + at,
         end: line.start + trimmedEnd(t),
       });
-    } else if (
-      (!indented && t.startsWith("k)")) ||
-      (language === "k" && indented)
-    ) {
+    } else if (head.startsWith("k)") || (language === "k" && indented)) {
       language = "k";
       const end = kCodeEnd(t);
-      if (end > first) {
+      if (end > at) {
         statement.tokens.push({
           kind: "k",
-          start: line.start + first,
+          start: line.start + at,
           end: line.start + end,
         });
       }
@@ -386,7 +393,7 @@ export function scan(text: string): Script {
         lexLine(line, t.indexOf("/", end), statement.tokens, undefined);
       }
     } else {
-      open = lexLine(line, first, statement.tokens, undefined);
+      open = lexLine(line, at, statement.tokens, undefined);
     }
   }
 

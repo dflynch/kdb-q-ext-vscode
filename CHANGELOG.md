@@ -121,6 +121,10 @@ All notable changes to the extension are documented in this file.
   `select.y`, are highlighted as one name
 - Negative times, such as `-12:34:56.789`, are highlighted as one literal
 - `'[f;g]` (compose) is no longer highlighted as a signal
+- A line after `q)` is read as q reads it, as at column 0: `q)\d .ns` and
+  `q)\l a.q` are system commands, `q)/ c` a comment and `q)k)` a k line, in
+  highlighting, completion, Go to Definition, the outline, syntax errors
+  and Run. A `p)` or other language's line is highlighted as one, not as q
 - The `.` in `\d .` is no longer highlighted as an operator
 - Lowercase typed nulls and infinities, such as `0nz` and `-0wz` (how q
   prints a datetime infinity), are highlighted as one literal
