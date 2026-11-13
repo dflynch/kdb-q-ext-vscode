@@ -1,13 +1,15 @@
 // q language features in the editor, from the annotation pass: the outline
 // (and breadcrumbs) and occurrence highlighting within a file, and
 // definition, references, hover, parameter hints, completion and symbol
-// search across the workspace's q files, the files a \l may load, references in the
+// search across the workspace's q files, parameters and locals highlighted
+// and renamed within their lambda, the files a \l may load, references in the
 // References view grouped by how they're passed
 
 import * as vscode from "vscode";
 import { type Annotated, annotate } from "./annotate";
 import { type Completion, completions } from "./completion";
 import { lineOf, lineStarts } from "./lines";
+import { locals, rename, renameable } from "./locals";
 import {
   type Occurrence,
   type Outlined,
@@ -463,6 +465,11 @@ const highlights: Record<Occurrence["kind"], vscode.DocumentHighlightKind> = {
   text: vscode.DocumentHighlightKind.Text,
 };
 
+// Parameters and locals, each a token of its own type; a local is drawn
+// in the parameter's colour by the scope package.json maps it to, so a
+// lambda's own names stand apart from globals
+const legend = new vscode.SemanticTokensLegend(["parameter", "variable"]);
+
 // Runs from a hover's link: the definitions of the name at the position,
 // in the peek, given back for tests
 const peekDefinitions = "kdb-q-ext-vscode.peekDefinitions";
@@ -585,6 +592,38 @@ export function registerLanguage(): vscode.Disposable {
         occurrences(annotations(d), d.offsetAt(position)).map(
           (o) => new vscode.DocumentHighlight(range(d, o), highlights[o.kind]),
         ),
+    }),
+    vscode.languages.registerDocumentSemanticTokensProvider(
+      selector,
+      {
+        provideDocumentSemanticTokens: (d) => {
+          const tokens = new vscode.SemanticTokensBuilder(legend);
+          for (const o of locals(annotations(d))) {
+            tokens.push(range(d, o), o.param ? "parameter" : "variable");
+          }
+          return tokens.build();
+        },
+      },
+      legend,
+    ),
+    vscode.languages.registerRenameProvider(selector, {
+      prepareRename: (d, position) => {
+        const found = renameable(annotations(d), d.offsetAt(position));
+        if ("refused" in found) throw new Error(found.refused);
+        return range(d, found);
+      },
+      provideRenameEdits: (d, position, to) => {
+        const found = rename(
+          d.getText(),
+          annotations(d),
+          d.offsetAt(position),
+          to,
+        );
+        if ("refused" in found) throw new Error(found.refused);
+        const edit = new vscode.WorkspaceEdit();
+        for (const e of found.edits) edit.replace(d.uri, range(d, e), e.text);
+        return edit;
+      },
     }),
     vscode.languages.registerDefinitionProvider(selector, {
       provideDefinition: async (d, position) => {

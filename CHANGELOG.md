@@ -105,6 +105,14 @@ All notable changes to the extension are documented in this file.
   for ``s:use`mod`` in the file or, if it doesn't define `s`, another;
   and a symbol starting with a dot, as `` `.ns. ``. VS
   Code's word-based suggestions are off for q
+- A lambda's parameters and locals in the parameter colour wherever they're
+  used, so its own names stand apart from globals, as a misspelt local
+  does; a local is still a variable to themes that colour them apart
+- Rename (F2) for a lambda's parameters and locals, within that lambda, a
+  query's name that may be the parameter included. Renaming `x` in `{x*y}`
+  writes the parameter list, `{[price;y] price*y}`. A new name q would read
+  differently is refused: dotted, a keyword, a name the lambda already
+  has, or `x`, `y` or `z` in a lambda without a parameter list
 
 ### Changed
 
