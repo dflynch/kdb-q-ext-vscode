@@ -768,6 +768,235 @@ suite("modules by file name", () => {
   }
 });
 
+// Each file's text with \n as the line ending
+const ended = (files: Files, eol: string): Files =>
+  Object.fromEntries(
+    Object.entries(files).map(([f, t]) => [f, t.replaceAll("\n", eol)]),
+  );
+const endings = { LF: "\n", CRLF: "\r\n" };
+// Where each definition the hover shows is, without its signature or doc
+const where = (hovered: string[] | undefined) =>
+  hovered?.map((h) => h.split(/\[| /).slice(0, 3).join(" "));
+
+suite("a module bound in another file", () => {
+  const mod = { "/w/lib/mod.q": "impl:{x}\nexport:([f:impl])" };
+  const other = { "/w/lib/other.q": "g:{y}\nexport:([f:g])" };
+  const impl = "/w/lib/mod.q 1:1 impl";
+  const g = "/w/lib/other.q 1:1 g";
+  // Each way to bind s, and the namespace a read of it is in
+  const forms: [string, (m: string) => string, string][] = [
+    ["at top level", (m) => `s:use\`${m}`, ""],
+    ["in a lambda", (m) => `init:{s::use\`${m}}`, ""],
+    ["under \\d", (m) => `\\d .ns\ns:use\`${m}`, "\\d .ns\n"],
+  ];
+  // Each case's files, given the form, with b.q's last line s.|f 1, and
+  // where s.f is defined
+  const own = "export:([z:1])\n";
+  const cases: [
+    string,
+    (bind: (m: string) => string, ns: string) => Files,
+    (form: string) => string[],
+  ][] = [
+    [
+      "bound only in another file",
+      (bind, ns) => ({ "/w/a.q": bind("mod"), "/w/b.q": `${ns}s.|f 1` }),
+      () => [impl],
+    ],
+    [
+      "bound in the file too, the file's",
+      (bind) => ({
+        "/w/a.q": bind("mod"),
+        "/w/b.q": `${bind("other")}\ns.|f 1`,
+      }),
+      () => [g],
+    ],
+    [
+      "defined in the file as something else, none",
+      (bind, ns) => ({ "/w/a.q": bind("mod"), "/w/b.q": `${ns}s:1\ns.|f 1` }),
+      () => [],
+    ],
+    [
+      "bound in two other files, the nearest first",
+      (bind, ns) => ({
+        "/w/x/c.q": bind("other"),
+        "/w/a.q": bind("mod"),
+        "/w/b.q": `${ns}s.|f 1`,
+      }),
+      () => [impl, g],
+    ],
+    [
+      "bound in a module's own namespace, none; after \\d, as any global",
+      (bind, ns) => ({ "/w/a.q": own + bind("mod"), "/w/b.q": `${ns}s.|f 1` }),
+      (form) => (form === "under \\d" ? [impl] : []),
+    ],
+    [
+      "read in a module's own namespace, none; after \\d, as any global",
+      (bind, ns) => ({ "/w/a.q": bind("mod"), "/w/b.q": `${own}${ns}s.|f 1` }),
+      (form) => (form === "under \\d" ? [impl] : []),
+    ],
+  ];
+  for (const [form, bind, ns] of forms) {
+    for (const [name, files, expected] of cases) {
+      test(`${form}, ${name}`, () => {
+        const written: Files = { ...mod, ...other, ...files(bind, ns) };
+        const read = written["/w/b.q"].split("\n").length;
+        for (const [ending, eol] of Object.entries(endings)) {
+          const o = opened(ended(written, eol));
+          const found = expected(form);
+          assert.deepStrictEqual(o.defined(), found, ending);
+          assert.deepStrictEqual(
+            where(o.hovered()),
+            found.length ? found : undefined,
+            ending,
+          );
+          // Find All References: from the read, mod's key, and from mod's
+          // key, the read, as the read reaches mod
+          const at = `/w/b.q ${read}:1 s.f`;
+          const reaches = found.includes(impl);
+          const key = "/w/lib/mod.q 2:10 f";
+          assert.strictEqual(o.referenced().includes(key), reaches, ending);
+          const fromKey = opened(
+            ended(
+              {
+                ...written,
+                "/w/b.q": written["/w/b.q"].replace("|", ""),
+                "/w/lib/mod.q": "impl:{x}\nexport:([|f:impl])",
+              },
+              eol,
+            ),
+          ).referenced();
+          assert.strictEqual(fromKey.includes(at), reaches, ending);
+        }
+      });
+    }
+  }
+
+  test("a view at top level, none", () => {
+    const o = opened({ ...mod, "/w/a.q": "s::use`mod", "/w/b.q": "s.|f 1" });
+    assert.deepStrictEqual(o.defined(), []);
+  });
+
+  test("a module not in the workspace, none", () => {
+    const o = opened({ "/w/a.q": "s:use`nope", "/w/b.q": "s.|f 1" });
+    assert.deepStrictEqual(o.defined(), []);
+  });
+});
+
+suite("a module's own globals", () => {
+  // Each way the file ends, and whether it's a module, as q finds an
+  // export only in the module's own namespace, and whether its export
+  // can be followed, as a dictionary written at top level
+  const forms: [string, string, boolean, boolean][] = [
+    ["an export", "export:([mean])", true, true],
+    [
+      "an export assigned in a lambda",
+      "init:{export::([mean])}\ninit[]",
+      true,
+      false,
+    ],
+    ["no export", "", false, false],
+    ["an export after \\d", "\\d .x\nexport:([mean])", false, false],
+  ];
+  const stats = (tail: string) =>
+    `helper:{x}\nmean:{helper x}\n.abs.g:1\n${tail}`;
+  const helper = "/w/stats.q 1:1 helper";
+  const read = "/w/stats.q 2:7 helper";
+  for (const [form, tail, module, followed] of forms) {
+    // Where the cursor is, given the module's text, and, for a module and
+    // for any other file, where the name there is defined, and its
+    // references
+    const places: [string, (m: string) => Files, Expected, Expected][] = [
+      [
+        "a module's own, from another file",
+        (m) => ({ "/w/stats.q": m, "/w/a.q": "|helper 1" }),
+        { defined: [], referenced: ["/w/a.q 1:1 helper"] },
+        {
+          defined: [helper],
+          referenced: ["/w/a.q 1:1 helper", helper, read],
+        },
+      ],
+      [
+        "a module's own, in the module, beside a global of another file's",
+        (m) => ({
+          "/w/stats.q": m.replace("{helper", "{|helper"),
+          "/w/b.q": "helper:2",
+        }),
+        { defined: [helper], referenced: [helper, read] },
+        {
+          defined: [helper, "/w/b.q 1:1 helper"],
+          referenced: [helper, read, "/w/b.q 1:1 helper"],
+        },
+      ],
+      [
+        "an absolute name, from another file",
+        (m) => ({ "/w/stats.q": m, "/w/a.q": "|.abs.g" }),
+        {
+          defined: ["/w/stats.q 3:1 .abs.g"],
+          referenced: ["/w/a.q 1:1 .abs.g", "/w/stats.q 3:1 .abs.g"],
+        },
+        {
+          defined: ["/w/stats.q 3:1 .abs.g"],
+          referenced: ["/w/a.q 1:1 .abs.g", "/w/stats.q 3:1 .abs.g"],
+        },
+      ],
+    ];
+    for (const [place, files, inModule, otherwise] of places) {
+      test(`${form}, ${place}`, () => {
+        const want = module ? inModule : otherwise;
+        for (const [ending, eol] of Object.entries(endings)) {
+          const o = opened(ended(files(stats(tail)), eol));
+          assert.deepStrictEqual(o.defined(), want.defined, ending);
+          assert.deepStrictEqual(
+            where(o.hovered()),
+            want.defined.length ? want.defined : undefined,
+            ending,
+          );
+          assert.deepStrictEqual(o.referenced(), want.referenced, ending);
+        }
+      });
+    }
+
+    test(`${form}, an export, through to the module`, () => {
+      for (const [ending, eol] of Object.entries(endings)) {
+        const o = opened(
+          ended(
+            { "/w/stats.q": stats(tail), "/w/a.q": "s:use`stats\ns.|mean 1" },
+            eol,
+          ),
+        );
+        assert.deepStrictEqual(
+          o.defined(),
+          followed ? ["/w/stats.q 2:1 mean"] : [],
+          ending,
+        );
+      }
+    });
+  }
+
+  test("after \\d . or \\d .other in a module, globals as any file's", () => {
+    const files = {
+      "/w/stats.q":
+        'a:1\nexport:([a])\n\\d .other\nb:2\n\\d .\nc:3\nsystem "d .zz"\nd:4',
+      "/w/x.q": "a+.other.b+c+|.zz.d",
+    };
+    assert.deepStrictEqual(opened(files).defined(), ["/w/stats.q 8:1 d"]);
+    for (const [name, line] of [
+      ["a", undefined],
+      [".other.b", "/w/stats.q 4:1 b"],
+      ["c", "/w/stats.q 6:1 c"],
+    ] as const) {
+      const at = files["/w/x.q"].replace("|", "").replace(name, `|${name}`);
+      assert.deepStrictEqual(
+        opened({ ...files, "/w/x.q": at }).defined(),
+        line ? [line] : [],
+        name,
+      );
+    }
+  });
+});
+
+type Expected = { defined: string[]; referenced: string[] };
+
 suite("symbols", () => {
   const index: Index = new Map(
     Object.entries({
@@ -798,6 +1027,17 @@ suite("symbols", () => {
 
   test("everything for no query", () => {
     assert.strictEqual(listed("").length, 7);
+  });
+
+  test("a module's own globals too, as written in it", () => {
+    const text = "helper:{x}\nexport:([helper])";
+    const modules: Index = new Map([
+      ["/w/stats.q", entry(text, annotate(text))],
+    ]);
+    assert.deepStrictEqual(
+      symbols(modules, "help").map((s) => `${s.file} ${s.full}`),
+      ["/w/stats.q helper"],
+    );
   });
 });
 

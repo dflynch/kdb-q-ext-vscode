@@ -65,7 +65,13 @@ read.
     cursor: in the file's own, if it has one. Set
     `editor.gotoLocation.multipleDefinitions` to `goto` to jump there
   - ``use`foo`` goes to `foo.q` or `foo/init.q` anywhere in the
-    workspace, as `QPATH` isn't read
+    workspace, as `QPATH` isn't read. `s.f` follows the module bound to
+    `s`, as any global: by ``s:use`foo`` in the file, if it defines `s`,
+    else in every file that binds it, nearest first. A module, a file that
+    assigns `export`, runs in `.m.foo` up to its first `\d`, so its own
+    globals there, but those with a leading dot, as `.ns.f`, are followed
+    only in it, and never from another file; Go to Symbol in Workspace
+    still lists them, as written in the module
   - `\l path/util.q` goes to each `.q` file whose path ends with
     `path/util.q`, with the cursor on the path, as `\l` loads from the
     directory q runs in, which isn't known. `.` anywhere, any number of
@@ -121,8 +127,9 @@ read.
   dot, a namespace's members and the namespaces in it:
   `.` gives the namespaces, `.Q.` q's own, with KX's line, and `.ns.` your
   own, with each function's signature, and its comment as the hover shows it;
-  `s.` a module's exports, for a global bound by ``s:use`mod`` in the same
-  file, as Go to Definition follows. A symbol
+  `s.` a module's exports, for `s` bound by ``s:use`mod``, as Go to
+  Definition follows it. A module's own globals are offered only in the
+  module, and there instead of the root's. A symbol
   starting with a dot, as `` `.ns. ``, offers its members for passing by
   reference; any other symbol is data, so offers nothing. Nothing is
   offered in strings, comments, numbers, system commands or another

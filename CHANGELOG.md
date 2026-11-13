@@ -70,7 +70,9 @@ All notable changes to the extension are documented in this file.
 - Navigation for q: the outline and breadcrumbs, highlighting a name where
   it occurs, Go to Definition, Find All References and Go to Symbol in
   Workspace, across the workspace's `.q` files, following namespaces,
-  lambdas' locals and q 5 modules. Find All References lists the uses that
+  lambdas' locals and q 5 modules: `s.f` through ``s:use`mod`` in the file
+  or, if it doesn't define `s`, any other, and a module's own globals only
+  in the module. Find All References lists the uses that
   pass a global by reference under a group of their own. Go to
   Definition has every definition of a global, where its whole value is
   set, which VS Code lists by file and line; the hover shows the nearest
@@ -97,7 +99,8 @@ All notable changes to the extension are documented in this file.
 - Completion for q: the lambda's parameters and locals, the workspace's
   globals in the root, or after `\d .ns` the namespace's, and q's keywords; after a dot, a namespace's members, q's own in
   `.Q`, `.z`, `.h` and `.j` with KX's line, or a module's exports, as `s.`
-  for ``s:use`mod`` in the file; and a symbol starting with a dot, as `` `.ns. ``. VS
+  for ``s:use`mod`` in the file or, if it doesn't define `s`, another;
+  and a symbol starting with a dot, as `` `.ns. ``. VS
   Code's word-based suggestions are off for q
 
 ### Changed

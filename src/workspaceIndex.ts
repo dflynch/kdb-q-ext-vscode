@@ -3,8 +3,9 @@
 // symbols and signatures they give together. Each file is read as if loaded
 // in the root, as \l runs a file in its loader's namespace, which the file
 // can't show. Modules resolve by file name, as use`foo finds foo.q or
-// foo/init.q in a directory of QPATH, which the workspace doesn't say. Pure
-// and total, as the annotation pass is: no VS Code imports, never throws.
+// foo/init.q in a directory of QPATH, which the workspace doesn't say; a
+// module's own globals are in .m.foo, which only it sees. Pure and total,
+// as the annotation pass is: no VS Code imports, never throws.
 
 import { type Annotated, annotate } from "./annotate";
 import { type Builtin, builtins } from "./builtins";
@@ -24,13 +25,19 @@ import {
 export type Entry = {
   // Where each line starts, to turn offsets into positions
   lines: number[];
-  // Each definition of a global, in the order they're written
-  defined: Defined[];
+  // Each definition of a global, in the order they're written, and the
+  // module one binds, as m:use`mod
+  defined: (Defined & { module?: string })[];
   // Each global named, by its absolute name, assigned or read, and each
   // column that may be one; passed if named by a symbol
   globals: (Span & { full: string; passed: boolean })[];
-  // Each export of a module named, as m.f where m:use`foo
+  // Each export of a module named, as m.f where m:use`foo in the file
   exports: (Span & { module: string; key: string })[];
+  // A module's, a file assigning export in its own namespace: where that
+  // ends, at the first \d, as use runs the file in .m.foo until one, and a
+  // \d is absolute, \d . the root (q 5.0). Its globals before, but those
+  // with a leading dot, are the module's own
+  own?: number;
   // The module's own export, if the file assigns one: its keys when it's a
   // dictionary literal, each where its value is defined in the file, as
   // a global's definitions, else the key itself, and, for a lambda written
@@ -50,6 +57,13 @@ export function entry(text: string, a: Annotated): Entry {
     globals: [],
     exports: [],
   };
+  const end = a.namespaces[0]?.at ?? Number.POSITIVE_INFINITY;
+  if (out.defined.some((d) => d.full === "export" && d.nameSpan.start < end))
+    out.own = end;
+  for (const d of out.defined) {
+    if (d.kind === "module" && a.modules.has(d.full) && d.detail)
+      d.module = d.detail.split("`")[1];
+  }
   for (const t of all) {
     const global = [t.identity, t.maybe].find((id) =>
       id?.startsWith("global "),
@@ -66,7 +80,8 @@ export function entry(text: string, a: Annotated): Entry {
       out.exports.push({ start: t.start, end: t.end, module, key });
     }
   }
-  if (a.export) {
+  // q finds no export outside the module's own namespace
+  if (a.export && out.own !== undefined && a.export.at.start < out.own) {
     const { start, end } = a.export.at;
     out.export = { start, end };
     if (a.export.keys) {
@@ -188,11 +203,96 @@ function nearest(file: string): (x: string, y: string) => number {
   return (x, y) => shared(y) - shared(x) || (x < y ? -1 : x > y ? 1 : 0);
 }
 
-// What the name at the offset is, across files: a global, by its absolute
-// name; an export, by the modules it can be and its key, from a use of it or
-// the key in the module's own export; or nothing, when it's only the file's
+// A global as named somewhere: its absolute name, and, if a module's own,
+// the module's file, as no other file sees it
+export type Global = { full: string; own?: string };
+
+// Whether a name at the offset in the file is a module's own global
+const ownAt = (e: Entry | undefined, offset: number, full: string) =>
+  e?.own !== undefined && offset < e.own && !full.startsWith(".");
+
+// The global named at the offset in the file
+export function named(
+  index: Index,
+  file: string,
+  offset: number,
+  full: string,
+): Global {
+  return ownAt(index.get(file), offset, full) ? { full, own: file } : { full };
+}
+
+// The module whose own namespace the offset is in: the file, if so
+export function moduleAt(
+  index: Index,
+  file: string,
+  offset: number,
+): string | undefined {
+  return named(index, file, offset, "").own;
+}
+
+// Whether a name at the offset in a file is the global
+function names(
+  g: Global,
+  file: string,
+  e: Entry,
+  offset: number,
+  full: string,
+): boolean {
+  if (full !== g.full) return false;
+  return ownAt(e, offset, full) ? g.own === file : g.own === undefined;
+}
+
+// The files of the modules a global may be bound to, as m in m.f, where
+// m:use`mod: the file's own bindings, if it defines m, else each file's
+// that does, the nearest first, as a global defined in several files is
+export function modules(index: Index, file: string, g: Global): string[] {
+  const bindings = (f: string, e: Entry) =>
+    e.defined.filter((d) => names(g, f, e, d.nameSpan.start, d.full));
+  const mine = index.get(file);
+  const own = mine ? bindings(file, mine) : [];
+  const found: [string, Entry["defined"]][] = [];
+  if (own.length) {
+    found.push([file, own]);
+  } else {
+    for (const [f, e] of index) {
+      const ds = bindings(f, e);
+      if (ds.length) found.push([f, ds]);
+    }
+    found.sort(([x], [y]) => nearest(file)(x, y));
+  }
+  const out = new Set<string>();
+  for (const [f, ds] of found) {
+    for (const d of ds) {
+      for (const m of d.module ? resolve(index, f, d.module) : []) out.add(m);
+    }
+  }
+  return [...out];
+}
+
+// The export a global's name may be, as m.f where m is bound to a module,
+// as modules() has it, and its key: the longest such m, as q reads a dotted
+// name
+function through(
+  index: Index,
+  file: string,
+  g: Global,
+): { modules: string[]; key: string } | undefined {
+  for (let dot = g.full.lastIndexOf("."); dot > 0; ) {
+    const found = modules(index, file, { ...g, full: g.full.slice(0, dot) });
+    if (found.length) {
+      return { modules: found, key: g.full.slice(dot + 1).split(".")[0] };
+    }
+    dot = g.full.lastIndexOf(".", dot - 1);
+  }
+  return undefined;
+}
+
+// What the name at the offset is, across files: a global; an export, by the
+// modules it can be and its key, from a use of it, a global's name through
+// a module bound in another file, or the key in the module's own export; or
+// nothing, when it's only the file's
 type Across =
-  | { global: string }
+  | { global: Global }
   | { modules: string[]; key: string }
   | undefined;
 
@@ -204,7 +304,10 @@ function across(
 ): Across {
   const here = at(targets(a), offset);
   const id = here?.identity;
-  if (id?.startsWith("global ")) return { global: id.slice(7) };
+  if (here && id?.startsWith("global ")) {
+    const global = named(index, file, here.start, id.slice(7));
+    return through(index, file, global) ?? { global };
+  }
   if (id?.startsWith("export ")) {
     const [, module, key] = id.split(" ");
     return { modules: resolve(index, file, module), key };
@@ -221,8 +324,9 @@ function across(
 // Where the name at the offset is defined. A local or parameter as in the
 // file. A global where each file assigns it at top level, or, if none does,
 // in a lambda, the file itself first, then the nearest, and each file's the
-// latest first. An export where its module's export has the key, or where
-// the export is assigned if it's built as the module loads
+// latest first; a module's own only in the module. An export where its
+// module's export has the key, or where the export is assigned if it's
+// built as the module loads
 export function definitions(
   index: Index,
   file: string,
@@ -256,27 +360,31 @@ export function definitions(
   const maybe = local(here.maybe);
   if (maybe.length) return maybe;
   return here.maybe?.startsWith("global ")
-    ? definitionsOf(index, file, here.maybe.slice(7))
+    ? definitionsOf(
+        index,
+        file,
+        named(index, file, here.start, here.maybe.slice(7)),
+      )
     : [];
 }
 
 // Where each file assigns a global at top level, or, if none does, in a
 // lambda, the file itself first, then the nearest, each file's the latest
 // first
-function definitionsOf(index: Index, file: string, global: string): Location[] {
-  return defined(index, file, global).map((d) => ({
+function definitionsOf(index: Index, file: string, g: Global): Location[] {
+  return defined(index, file, g).map((d) => ({
     file: d.file,
     ...d.nameSpan,
   }));
 }
 
 // Each file's definitions of a global, as definitionsOf() orders them
-function defined(index: Index, file: string, global: string): Listed[] {
+function defined(index: Index, file: string, g: Global): Listed[] {
   const atTop: Listed[] = [];
   const inLambda: Listed[] = [];
   for (const [f, e] of index) {
     for (const d of e.defined) {
-      if (d.full === global)
+      if (names(g, f, e, d.nameSpan.start, d.full))
         (d.inLambda ? inLambda : atTop).push({ ...d, file: f });
     }
   }
@@ -343,11 +451,11 @@ export function hover(
     const builtin = builtins.get(here.identity.slice(8));
     return builtin && { name, builtin, defined: [] };
   }
-  const ofGlobal = (global: string) => {
+  const ofGlobal = (global: Global) => {
     // q's own, only in its namespaces: a keyword is never a global, and
     // from and by are qSQL's only in a query
-    const builtin = /^\.[Qzhj]\./.test(global)
-      ? builtins.get(global)
+    const builtin = /^\.[Qzhj]\./.test(global.full)
+      ? builtins.get(global.full)
       : undefined;
     const found = defined(index, file, global);
     if (!builtin && !found.length) return undefined;
@@ -357,7 +465,7 @@ export function hover(
   // A column read, as the global it may be, as definitions() takes it
   if (!wanted) {
     return here.maybe?.startsWith("global ")
-      ? ofGlobal(here.maybe.slice(7))
+      ? ofGlobal(named(index, file, here.start, here.maybe.slice(7)))
       : undefined;
   }
   if ("global" in wanted) return ofGlobal(wanted.global);
@@ -435,8 +543,8 @@ function parsed(form: string) {
 }
 
 // Where the name at the offset occurs, meaning the same thing: a global or
-// an export in every file, anything else as in the file. Without its
-// definitions unless asked
+// an export in every file, a module's own global in the module, anything
+// else as in the file. Without its definitions unless asked
 export function references(
   index: Index,
   file: string,
@@ -456,7 +564,7 @@ export function references(
   for (const [f, e] of index) {
     if ("global" in wanted) {
       for (const g of e.globals) {
-        if (g.full === wanted.global) {
+        if (names(wanted.global, f, e, g.start, g.full)) {
           out.push({ file: f, ...span(g), passed: g.passed });
         }
       }
@@ -478,6 +586,23 @@ export function references(
         resolved.set(x.module, hit);
       }
       if (hit) out.push({ file: f, ...span(x), passed: false });
+    }
+    // A global's name through a module bound in another file, as m.f: one
+    // with the key after a dot
+    const reached = new Map<string, boolean>();
+    for (const g of e.globals) {
+      if (!g.full.split(".").slice(1).includes(wanted.key)) continue;
+      const global = named(index, f, g.start, g.full);
+      const known = `${global.own ?? ""} ${g.full}`;
+      let hit = reached.get(known);
+      if (hit === undefined) {
+        const x = through(index, f, global);
+        hit =
+          x?.key === wanted.key &&
+          x.modules.some((m) => wanted.modules.includes(m));
+        reached.set(known, hit);
+      }
+      if (hit) out.push({ file: f, ...span(g), passed: false });
     }
   }
   const skip = withDefinition
