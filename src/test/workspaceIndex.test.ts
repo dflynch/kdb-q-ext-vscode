@@ -1196,6 +1196,13 @@ suite("files a \\l may load", () => {
         ['b:"\n\\l util|.q"', []],
         ["/\n\\l util|.q\n\\", []],
         ["\\d util|.q", []],
+        // After q), a command as at column 0; after q) and a space, q, and
+        // a line joined on as at column 0 (q 5.0)
+        ["q)\\l lib/util|.q", ["/w/lib/util.q"]],
+        ["q)q)\\l lib/util|.q", ["/w/lib/util.q"]],
+        ["q)\\l lib/util|.q / c", ["/w/lib/util.q"]],
+        ["q) \\l util|.q", []],
+        ["q)\\l lib/util|.q\n  show 1", []],
         // q joins an indented line on, after blank lines too, and then
         // loads nothing (q 5.0)
         ["\\l lib/util|.q\n  show 1", []],

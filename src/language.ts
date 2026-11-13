@@ -454,6 +454,7 @@ const completionKinds: Record<Completion["kind"], vscode.CompletionItemKind> = {
   module: vscode.CompletionItemKind.Module,
   namespace: vscode.CompletionItemKind.Module,
   keyword: vscode.CompletionItemKind.Keyword,
+  hook: vscode.CompletionItemKind.Event,
 };
 
 const highlights: Record<Occurrence["kind"], vscode.DocumentHighlightKind> = {

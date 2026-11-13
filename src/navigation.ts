@@ -6,7 +6,7 @@
 
 import type { Annotated, Call, Lambda, Name } from "./annotate";
 import { lineOf, lineStarts } from "./lines";
-import { type Script, scan, type Token } from "./scanner";
+import type { Script, Token } from "./scanner";
 
 export type Outlined = {
   name: string;
@@ -107,8 +107,7 @@ export type Defined = {
 // Each global's definitions, not where an existing value is amended, in the
 // order they're written; firsts() keeps each one's first
 export function globals(text: string, a: Annotated): Defined[] {
-  const script = scan(text);
-  const at = placed(script);
+  const at = placed(a.script);
   const lambdas = new Map<number, Lambda>(
     a.lambdas.map((l) => [l.open.start, l]),
   );
@@ -193,7 +192,7 @@ export function globals(text: string, a: Annotated): Defined[] {
     }
   }
   defined.sort((x, y) => x.nameSpan.start - y.nameSpan.start);
-  const documented = docs(text, script);
+  const documented = docs(text, a.script);
   const out: Defined[] = [];
   for (const d of defined) {
     const item = described(d.full, d.nameSpan, d.inLambda);

@@ -69,7 +69,72 @@
     "commands": {
       "patterns": [
         {
-          "begin": "^(\\\\d)(?=\\s|$)",
+          "begin": "^((?:q\\))+)",
+          "beginCaptures": {
+            "1": {
+              "name": "meta.preprocessor.language.q"
+            }
+          },
+          "end": "$",
+          "patterns": [
+            {
+              "begin": "\\G(?=\\\\)",
+              "end": "$",
+              "patterns": [
+                {
+                  "include": "#command"
+                },
+                {
+                  "include": "#expression"
+                }
+              ]
+            },
+            {
+              "name": "comment.line.slash.q",
+              "match": "\\G\\/.*"
+            },
+            {
+              "match": "\\G([A-Za-z]\\)).*",
+              "captures": {
+                "1": {
+                  "name": "meta.preprocessor.language.q"
+                }
+              }
+            },
+            {
+              "include": "#comments"
+            },
+            {
+              "include": "#expression"
+            }
+          ]
+        },
+        {
+          "begin": "^(?=\\\\)",
+          "end": "$",
+          "patterns": [
+            {
+              "include": "#command"
+            },
+            {
+              "include": "#expression"
+            }
+          ]
+        },
+        {
+          "match": "^([A-Za-z]\\)).*",
+          "captures": {
+            "1": {
+              "name": "meta.preprocessor.language.q"
+            }
+          }
+        }
+      ]
+    },
+    "command": {
+      "patterns": [
+        {
+          "begin": "\\G(\\\\d)(?=\\s|$)",
           "beginCaptures": {
             "1": {
               "name": "meta.preprocessor.system.q"
@@ -83,7 +148,7 @@
           ]
         },
         {
-          "match": "^(\\\\(?:l|cd|[12_]))(?=\\s|$).*",
+          "match": "\\G(\\\\(?:l|cd|[12_]))(?=\\s|$).*",
           "captures": {
             "1": {
               "name": "meta.preprocessor.system.q"
@@ -91,7 +156,7 @@
           }
         },
         {
-          "begin": "^(\\\\(?:ts|[abBcCefgopPrsStTuvwWxz\\\\])(?::\\d+)?)(?=\\s|$)",
+          "begin": "\\G(\\\\(?:ts|[abBcCefgopPrsStTuvwWxz\\\\])(?::\\d+)?)(?=\\s|$)",
           "beginCaptures": {
             "1": {
               "name": "meta.preprocessor.system.q"
@@ -108,7 +173,7 @@
           ]
         },
         {
-          "match": "^(\\\\[A-Za-z_][\\w.-]*)(?=\\s|$).*",
+          "match": "\\G(\\\\[A-Za-z_][\\w.-]*)(?=\\s|$).*",
           "captures": {
             "1": {
               "name": "meta.preprocessor.system.q"
@@ -116,10 +181,10 @@
           }
         },
         {
-          "match": "^(k\\)).*",
+          "match": "\\G(\\\\)\\s*$",
           "captures": {
             "1": {
-              "name": "meta.preprocessor.language.q"
+              "name": "meta.preprocessor.system.q"
             }
           }
         }

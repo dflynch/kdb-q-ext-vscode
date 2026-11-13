@@ -290,6 +290,28 @@ suite("annotate names", () => {
     ]);
   });
 
+  // After q), \d is a command as at column 0; after q) and a space it's q
+  // (q 5.0)
+  for (const [ending, eol] of [
+    ["LF", "\n"],
+    ["CRLF", "\r\n"],
+  ]) {
+    test(`\\d after q), ${ending}`, () => {
+      for (const text of [
+        `q)\\d .foo${eol}f:1`,
+        `q)q)\\d .foo${eol}f:1`,
+        `q)\\d .foo${eol}  / c${eol}f:1`,
+      ]) {
+        assert.deepStrictEqual(names(text), ["global f=.foo.f :"], text);
+      }
+      assert.deepStrictEqual(names(`q)\\d .foo${eol}q)\\d .${eol}f:1`), [
+        "global f :",
+      ]);
+      const spaced = `q) \\d .foo${eol}f:1`;
+      assert.deepStrictEqual(names(spaced).at(-1), "global f :");
+    });
+  }
+
   test("system d with a semicolon", () => {
     assert.deepStrictEqual(names('system "d .foo";\nf:1'), [
       "builtin system",
