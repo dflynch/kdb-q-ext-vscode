@@ -217,12 +217,12 @@ for (const [ending, newline] of [
     test("after \\d .z, your own, not q's values", () => {
       assert.deepStrictEqual(
         offered(at({ "/w/a.q": "\\d .z\npg:{x}\nx:|" }), ["pg", "K", "P"]),
-        { pg: "function 1", K: "-", P: "-" },
+        { pg: "hook 1", K: "-", P: "-" },
       );
       // Written in full, they are, as everywhere
       assert.deepStrictEqual(
         offered(at({ "/w/a.q": "\\d .z\nx:.z.|" }), [".z.K", ".z.P"]),
-        { ".z.K": "variable 2", ".z.P": "variable 2" },
+        { ".z.K": "hook 2", ".z.P": "hook 2" },
       );
     });
 
@@ -323,7 +323,7 @@ for (const [ending, newline] of [
       });
     });
 
-    test(".z's callbacks as functions, its values as variables", () => {
+    test("all of .z's as hooks, values and callbacks alike", () => {
       assert.deepStrictEqual(
         offered(at({ "/w/a.q": "x:.z.|" }), [
           ".z.pg",
@@ -333,11 +333,11 @@ for (const [ending, newline] of [
           ".z.p",
         ]),
         {
-          ".z.pg": "function 2",
-          ".z.ts": "function 2",
-          ".z.exit": "function 2",
-          ".z.K": "variable 2",
-          ".z.p": "variable 2",
+          ".z.pg": "hook 2",
+          ".z.ts": "hook 2",
+          ".z.exit": "hook 2",
+          ".z.K": "hook 2",
+          ".z.p": "hook 2",
         },
       );
     });

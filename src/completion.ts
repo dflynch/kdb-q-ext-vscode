@@ -31,7 +31,10 @@ export type Completion = {
     | "variable"
     | "module"
     | "namespace"
-    | "keyword";
+    | "keyword"
+    // In .z: q's hooks, each with a default behaviour or yours to set, as
+    // .z.p reads the clock and .z.pg answers a get
+    | "hook";
   // 0 in scope, 1 the workspace's, 2 q's own, to order a list not yet
   // narrowed by typing
   group: 0 | 1 | 2;
@@ -259,21 +262,28 @@ const ofDefined = (
   label: string,
   defined: Listed,
   group: 0 | 1 | 2,
-): Completion => ({ label, kind: defined.kind, group, defined });
+): Completion => ({
+  label,
+  kind: defined.full.startsWith(".z.") ? "hook" : defined.kind,
+  group,
+  defined,
+});
 
-// Of q's, by its name, as .Q.s1 shown as s1 after \d .Q: a function if
-// it's called, or if KX writes it as one you assign, as .z.pg:f
+// Of q's, by its name, as .Q.s1 shown as s1 after \d .Q: a hook in .z, else
+// a function if it's called
 const ofBuiltin = (
   name: string,
   label: string,
   builtin: Builtin,
 ): Completion => ({
   label,
-  kind: name.includes(".")
-    ? builtin.forms.length || builtin.syntax === `${name}:f`
-      ? "function"
-      : "variable"
-    : "keyword",
+  kind: name.startsWith(".z.")
+    ? "hook"
+    : name.includes(".")
+      ? builtin.forms.length
+        ? "function"
+        : "variable"
+      : "keyword",
   group: 2,
   builtin,
 });
