@@ -136,7 +136,7 @@ All notable changes to the extension are documented in this file.
 
 ### Fixed
 
-- `where` used as the function, as `where 1 0 1b` or in a query's column
+- `where` used as the function, as `where 101b` or in a query's column
   list, is colored as a built-in, as `count` is, and only the `where` that
   opens a query's where clause as qSQL
 - Dotted names that start with a reserved word, such as `null.x` or

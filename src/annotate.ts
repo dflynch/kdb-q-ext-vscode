@@ -50,7 +50,7 @@ export type Name = {
   // named i, or for one delete names, as delete p from t
   variable?: { role: "param" | "local" | "global"; full: string };
   // The where that opens a query's where clause, rather than the function,
-  // as where 1 0 1b
+  // as where 101b
   clause?: true;
 };
 
@@ -629,10 +629,11 @@ export function annotate(
     let inPlace = false;
     // Between delete and from, where q reads each name as a column's name
     let deleting = false;
-    // Past the query's from, and past its where clause's where: the clause
-    // opens at the first where after from, at the query's own depth, and
-    // any other where is the function, as in select c:where b from t or
-    // select from t where a in where b
+    // Past a from, and past the where that opens its clause: a clause opens
+    // at the first where after the latest from, at the query's own depth,
+    // and any other where is the function, as in select c:where b from t
+    // or select from t where a in where b. A from ends a clause, as q
+    // reads select c:exec x from s where y from t where z
     let from = false;
     let clause = false;
     let column = context.column;
@@ -744,6 +745,7 @@ export function annotate(
       if (query && w === "from") {
         deleting = false;
         from = true;
+        clause = false;
         column = outer;
       } else if (starts) {
         clause = true;

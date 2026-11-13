@@ -21,7 +21,7 @@ function wheres(text: string): string[] {
 suite("where, the function or a query's clause", () => {
   // As q reads each, checked on q 5
   const cases: [string, string, string[]][] = [
-    ["outside a query", "a:where 1 0 1b", ["function"]],
+    ["outside a query", "a:where 101b", ["function"]],
     ["a query's clause", "select from t where b", ["clause"]],
     [
       "in its own clause, after the clause's where",
@@ -44,6 +44,21 @@ suite("where, the function or a query's clause", () => {
       "a query in brackets, with its own",
       "f[(select from t where b);where c]",
       ["clause", "function"],
+    ],
+    [
+      "a query in the column list, with its own, ended by the outer from",
+      "select c:exec x from s where y from t where z",
+      ["clause", "clause"],
+    ],
+    [
+      "a query in the by list, with its own",
+      "select by c:exec x from s where y from t where z",
+      ["clause", "clause"],
+    ],
+    [
+      "a query as exec's column, with its own",
+      "exec select from t where b from s where c",
+      ["clause", "clause"],
     ],
     ["update", "update c:1 from t where b", ["clause"]],
     ["delete", "delete from t where b", ["clause"]],
@@ -78,7 +93,7 @@ suite("where in the editor", () => {
       ?.activate();
     const d = await vscode.workspace.openTextDocument({
       language: "q",
-      content: "a:where 1 0 1b\nselect from t where b",
+      content: "a:where 101b\nselect from t where b",
     });
     const legend =
       await vscode.commands.executeCommand<vscode.SemanticTokensLegend>(
