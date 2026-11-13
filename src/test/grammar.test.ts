@@ -205,10 +205,10 @@ suite("q grammar", () => {
       "namespace command",
       "\\d .a.b / note\n\\d .",
       [
-        ["\\d", "meta.preprocessor.system.q"],
+        ["\\d", "keyword.control.directive.system.q"],
         [".a.b", "source.q"],
         ["/ note", "comment.line.slash.q"],
-        ["\\d", "meta.preprocessor.system.q"],
+        ["\\d", "keyword.control.directive.system.q"],
         [".", "source.q"],
       ],
     ],
@@ -216,7 +216,7 @@ suite("q grammar", () => {
       "load command",
       "\\l foo.q",
       [
-        ["\\l", "meta.preprocessor.system.q"],
+        ["\\l", "keyword.control.directive.system.q"],
         ["foo.q", "source.q"],
       ],
     ],
@@ -224,7 +224,7 @@ suite("q grammar", () => {
       "load command with absolute path",
       "\\l /a/b.q",
       [
-        ["\\l", "meta.preprocessor.system.q"],
+        ["\\l", "keyword.control.directive.system.q"],
         ["/a/b.q", "source.q"],
       ],
     ],
@@ -232,9 +232,9 @@ suite("q grammar", () => {
       "path arguments are not comments",
       "\\cd /tmp\n\\1 /tmp/out.txt",
       [
-        ["\\cd", "meta.preprocessor.system.q"],
+        ["\\cd", "keyword.control.directive.system.q"],
         ["/tmp", "source.q"],
-        ["\\1", "meta.preprocessor.system.q"],
+        ["\\1", "keyword.control.directive.system.q"],
         ["/tmp/out.txt", "source.q"],
       ],
     ],
@@ -242,7 +242,7 @@ suite("q grammar", () => {
       "iterator in a timing command",
       "\\ts f/x",
       [
-        ["\\ts", "meta.preprocessor.system.q"],
+        ["\\ts", "keyword.control.directive.system.q"],
         ["f", "source.q"],
         ["/", "keyword.operator.iterator.q"],
         ["x", "source.q"],
@@ -252,7 +252,7 @@ suite("q grammar", () => {
       "trailing comment after a timing command",
       "\\ts f /x",
       [
-        ["\\ts", "meta.preprocessor.system.q"],
+        ["\\ts", "keyword.control.directive.system.q"],
         ["f", "source.q"],
         ["/x", "comment.line.slash.q"],
       ],
@@ -261,7 +261,7 @@ suite("q grammar", () => {
       "timer command",
       "\\t 1000",
       [
-        ["\\t", "meta.preprocessor.system.q"],
+        ["\\t", "keyword.control.directive.system.q"],
         ["1000", "constant.numeric.number.q"],
       ],
     ],
@@ -269,7 +269,7 @@ suite("q grammar", () => {
       "timing command",
       "\\ts f x",
       [
-        ["\\ts", "meta.preprocessor.system.q"],
+        ["\\ts", "keyword.control.directive.system.q"],
         ["f", "source.q"],
         ["x", "source.q"],
       ],
@@ -278,10 +278,10 @@ suite("q grammar", () => {
       "repeat counts",
       "\\t:100 f[]\n\\ts:10 f x / y",
       [
-        ["\\t:100", "meta.preprocessor.system.q"],
+        ["\\t:100", "keyword.control.directive.system.q"],
         ["f", "source.q"],
         ["[]", "source.q"],
-        ["\\ts:10", "meta.preprocessor.system.q"],
+        ["\\ts:10", "keyword.control.directive.system.q"],
         ["f", "source.q"],
         ["x", "source.q"],
         ["/ y", "comment.line.slash.q"],
@@ -291,9 +291,9 @@ suite("q grammar", () => {
       "operating system commands",
       "\\ls /tmp\n\\mkdir -p /tmp/a",
       [
-        ["\\ls", "meta.preprocessor.system.q"],
+        ["\\ls", "keyword.control.directive.system.q"],
         ["/tmp", "source.q"],
-        ["\\mkdir", "meta.preprocessor.system.q"],
+        ["\\mkdir", "keyword.control.directive.system.q"],
         ["-p /tmp/a", "source.q"],
       ],
     ],
@@ -301,7 +301,7 @@ suite("q grammar", () => {
       "k line",
       "k)+/1 2",
       [
-        ["k)", "meta.preprocessor.language.q"],
+        ["k)", "keyword.control.directive.language.q"],
         ["+/1 2", "source.q"],
       ],
     ],
@@ -310,7 +310,7 @@ suite("q grammar", () => {
       "another language's line",
       "p)x = 7 // 2",
       [
-        ["p)", "meta.preprocessor.language.q"],
+        ["p)", "keyword.control.directive.language.q"],
         ["x = 7 // 2", "source.q"],
       ],
     ],
@@ -488,13 +488,13 @@ suite("q grammar", () => {
       "qSQL",
       "select a by b from t where c",
       [
-        ["select", "keyword.other.qsql.q"],
+        ["select", "keyword.control.qsql.q"],
         ["a", "source.q"],
-        ["by", "keyword.other.qsql.q"],
+        ["by", "keyword.control.qsql.q"],
         ["b", "source.q"],
-        ["from", "keyword.other.qsql.q"],
+        ["from", "keyword.control.qsql.q"],
         ["t", "source.q"],
-        ["where", "keyword.other.qsql.q"],
+        ["where", "keyword.control.qsql.q"],
         ["c", "source.q"],
       ],
     ],
@@ -502,9 +502,9 @@ suite("q grammar", () => {
       "qSQL update, exec and delete",
       "update exec delete",
       [
-        ["update", "keyword.other.qsql.q"],
-        ["exec", "keyword.other.qsql.q"],
-        ["delete", "keyword.other.qsql.q"],
+        ["update", "keyword.control.qsql.q"],
+        ["exec", "keyword.control.qsql.q"],
+        ["delete", "keyword.control.qsql.q"],
       ],
     ],
     [
@@ -678,14 +678,14 @@ suite("q grammar", () => {
       "handles",
       "`:db `:localhost:5000",
       [
-        ["`:db", "support.class.handle.q"],
-        ["`:localhost:5000", "support.class.handle.q"],
+        ["`:db", "constant.language.symbol.handle.q"],
+        ["`:localhost:5000", "constant.language.symbol.handle.q"],
       ],
     ],
     [
       "handle with a path",
       "`:data/trades.csv",
-      [["`:data/trades.csv", "support.class.handle.q"]],
+      [["`:data/trades.csv", "constant.language.symbol.handle.q"]],
     ],
     [
       "slash after a symbol is an iterator",
@@ -849,7 +849,7 @@ suite("q grammar", () => {
       "-11!`:f;x-8!y",
       [
         ["-11!", "support.function.builtin.internal.q"],
-        ["`:f", "support.class.handle.q"],
+        ["`:f", "constant.language.symbol.handle.q"],
         [";", "punctuation.separator.q"],
         ["x", "source.q"],
         ["-", "keyword.operator.arithmetic.q"],
@@ -1302,7 +1302,7 @@ suite("q grammar", () => {
     for (const line of lines) {
       test(`${prefix}${line}, as at column 0`, () => {
         assert.deepStrictEqual(tokenize(grammar, `${prefix}${line}`), [
-          [prefix, "meta.preprocessor.language.q"],
+          [prefix, "keyword.control.directive.language.q"],
           ...tokenize(grammar, line),
         ]);
       });
@@ -1314,8 +1314,8 @@ suite("q grammar", () => {
       "a system command",
       "q)\\d .ns",
       [
-        ["q)", "meta.preprocessor.language.q"],
-        ["\\d", "meta.preprocessor.system.q"],
+        ["q)", "keyword.control.directive.language.q"],
+        ["\\d", "keyword.control.directive.system.q"],
         [".ns", "source.q"],
       ],
     ],
@@ -1323,7 +1323,7 @@ suite("q grammar", () => {
       "a slash alone, a comment, not a block",
       "q)/\na",
       [
-        ["q)", "meta.preprocessor.language.q"],
+        ["q)", "keyword.control.directive.language.q"],
         ["/", "comment.line.slash.q"],
         ["a", "source.q"],
       ],
@@ -1332,8 +1332,8 @@ suite("q grammar", () => {
       "a backslash alone, a command, not the script's end",
       "q)\\ \na",
       [
-        ["q)", "meta.preprocessor.language.q"],
-        ["\\", "meta.preprocessor.system.q"],
+        ["q)", "keyword.control.directive.language.q"],
+        ["\\", "keyword.control.directive.system.q"],
         ["a", "source.q"],
       ],
     ],
@@ -1341,7 +1341,7 @@ suite("q grammar", () => {
       "a space, then q",
       "q) \\d .ns",
       [
-        ["q)", "meta.preprocessor.language.q"],
+        ["q)", "keyword.control.directive.language.q"],
         ["\\", "keyword.operator.iterator.q"],
         ["d", "source.q"],
         [".ns", "source.q"],
@@ -1351,9 +1351,9 @@ suite("q grammar", () => {
       "a space, then a comment",
       "q) / c\nq)\t/ c",
       [
-        ["q)", "meta.preprocessor.language.q"],
+        ["q)", "keyword.control.directive.language.q"],
         ["/ c", "comment.line.slash.q"],
-        ["q)", "meta.preprocessor.language.q"],
+        ["q)", "keyword.control.directive.language.q"],
         ["/ c", "comment.line.slash.q"],
       ],
     ],
@@ -1361,7 +1361,7 @@ suite("q grammar", () => {
       "a space, then k) is q",
       "q) k)1",
       [
-        ["q)", "meta.preprocessor.language.q"],
+        ["q)", "keyword.control.directive.language.q"],
         ["k", "source.q"],
         [")", "source.q"],
         ["1", "constant.numeric.number.q"],
@@ -1371,8 +1371,8 @@ suite("q grammar", () => {
       "a k line",
       "q)k)+/1 2",
       [
-        ["q)", "meta.preprocessor.language.q"],
-        ["k)", "meta.preprocessor.language.q"],
+        ["q)", "keyword.control.directive.language.q"],
+        ["k)", "keyword.control.directive.language.q"],
         ["+/1 2", "source.q"],
       ],
     ],
@@ -1380,7 +1380,7 @@ suite("q grammar", () => {
       "a string over lines",
       'q)a:"x\n  y"',
       [
-        ["q)", "meta.preprocessor.language.q"],
+        ["q)", "keyword.control.directive.language.q"],
         ["a", "source.q"],
         [":", "keyword.operator.assignment.q"],
         ['"', "string.quoted.double.q"],
