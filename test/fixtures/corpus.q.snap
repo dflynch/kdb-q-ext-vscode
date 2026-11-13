@@ -8,7 +8,7 @@
   0 "/ After a change, run npm run fixtures and UPDATE_SNAPSHOT=1 npm test" comment.line.slash.q
 > 
 > \d .corpus
-  0 "\\d" meta.preprocessor.system.q
+  0 "\\d" keyword.control.directive.system.q
   2 " .corpus" -
 > 
 > / Atoms, one per type
@@ -826,11 +826,11 @@
 > symbol.handle:`:data/trades.csv
   0 "symbol.handle" -
   13 ":" keyword.operator.assignment.q
-  14 "`:data/trades.csv" support.class.handle.q
+  14 "`:data/trades.csv" constant.language.symbol.handle.q
 > symbol.hostPort:`:localhost:5000
   0 "symbol.hostPort" -
   15 ":" keyword.operator.assignment.q
-  16 "`:localhost:5000" support.class.handle.q
+  16 "`:localhost:5000" constant.language.symbol.handle.q
 > symbol.cast:`$"with space"
   0 "symbol.cast" -
   11 ":" keyword.operator.assignment.q
@@ -1237,10 +1237,10 @@
 >   r:select from t where size>n;
   2 "r" -
   3 ":" keyword.operator.assignment.q
-  4 "select" keyword.other.qsql.q
-  11 "from" keyword.other.qsql.q
+  4 "select" keyword.control.qsql.q
+  11 "from" keyword.control.qsql.q
   16 "t" -
-  18 "where" keyword.other.qsql.q
+  18 "where" keyword.control.qsql.q
   24 "size" -
   28 ">" keyword.operator.comparison.q
   29 "n" -
@@ -1769,40 +1769,40 @@
 > qsql.select:select price by sym from table.trades where size>100
   0 "qsql.select" -
   11 ":" keyword.operator.assignment.q
-  12 "select" keyword.other.qsql.q
+  12 "select" keyword.control.qsql.q
   19 "price" -
-  25 "by" keyword.other.qsql.q
+  25 "by" keyword.control.qsql.q
   28 "sym" -
-  32 "from" keyword.other.qsql.q
+  32 "from" keyword.control.qsql.q
   37 "table.trades" -
-  50 "where" keyword.other.qsql.q
+  50 "where" keyword.control.qsql.q
   56 "size" -
   60 ">" keyword.operator.comparison.q
   61 "100" constant.numeric.number.q
 > qsql.exec:exec sum size from table.trades
   0 "qsql.exec" -
   9 ":" keyword.operator.assignment.q
-  10 "exec" keyword.other.qsql.q
+  10 "exec" keyword.control.qsql.q
   15 "sum" support.function.builtin.q
   19 "size" -
-  24 "from" keyword.other.qsql.q
+  24 "from" keyword.control.qsql.q
   29 "table.trades" -
 > qsql.update:update price*2 from table.trades
   0 "qsql.update" -
   11 ":" keyword.operator.assignment.q
-  12 "update" keyword.other.qsql.q
+  12 "update" keyword.control.qsql.q
   19 "price" -
   24 "*" keyword.operator.arithmetic.q
   25 "2" constant.numeric.number.q
-  27 "from" keyword.other.qsql.q
+  27 "from" keyword.control.qsql.q
   32 "table.trades" -
 > qsql.delete:delete from table.trades where sym=`b
   0 "qsql.delete" -
   11 ":" keyword.operator.assignment.q
-  12 "delete" keyword.other.qsql.q
-  19 "from" keyword.other.qsql.q
+  12 "delete" keyword.control.qsql.q
+  19 "from" keyword.control.qsql.q
   24 "table.trades" -
-  37 "where" keyword.other.qsql.q
+  37 "where" keyword.control.qsql.q
   43 "sym" -
   46 "=" keyword.operator.comparison.q
   47 "`b" constant.language.symbol.q
@@ -1926,14 +1926,14 @@
   19 "1" constant.numeric.number.q
 > 
 > \d .corpus.nested.deeper
-  0 "\\d" meta.preprocessor.system.q
+  0 "\\d" keyword.control.directive.system.q
   2 " .corpus.nested.deeper" -
 > answer:42
   0 "answer" -
   6 ":" keyword.operator.assignment.q
   7 "42" constant.numeric.number.q
 > \d .
-  0 "\\d" meta.preprocessor.system.q
+  0 "\\d" keyword.control.directive.system.q
   2 " ." -
 > .corpus.nested.direct:{.corpus.nested.deeper.answer}[]
   0 ".corpus.nested.direct" -
@@ -1946,24 +1946,24 @@
 > / System commands
   0 "/ System commands" comment.line.slash.q
 > \t:10 til 1000
-  0 "\\t:10" meta.preprocessor.system.q
+  0 "\\t:10" keyword.control.directive.system.q
   6 "til" support.function.builtin.q
   10 "1000" constant.numeric.number.q
 > \ts til 1000 / timing with a comment
-  0 "\\ts" meta.preprocessor.system.q
+  0 "\\ts" keyword.control.directive.system.q
   4 "til" support.function.builtin.q
   8 "1000" constant.numeric.number.q
   13 "/ timing with a comment" comment.line.slash.q
 > \c 25 80
-  0 "\\c" meta.preprocessor.system.q
+  0 "\\c" keyword.control.directive.system.q
   3 "25" constant.numeric.number.q
   6 "80" constant.numeric.number.q
 > \P 7
-  0 "\\P" meta.preprocessor.system.q
+  0 "\\P" keyword.control.directive.system.q
   3 "7" constant.numeric.number.q
 > 
 > k).corpus.k:+/1 2 3
-  0 "k)" meta.preprocessor.language.q
+  0 "k)" keyword.control.directive.language.q
   2 ".corpus.k:+/1 2 3" -
 > 
 > / A lone backslash ends the script: q ignores everything below it
