@@ -768,7 +768,7 @@ suite("modules by file name", () => {
   }
 });
 
-// Each file's text with \n as the line ending
+// Each file's text, written with \n, with the given line ending
 const ended = (files: Files, eol: string): Files =>
   Object.fromEntries(
     Object.entries(files).map(([f, t]) => [f, t.replaceAll("\n", eol)]),
@@ -839,6 +839,14 @@ suite("a module bound in another file", () => {
       "read in a module's own namespace, none; after \\d, as any global",
       (bind, ns) => ({ "/w/a.q": bind("mod"), "/w/b.q": `${own}${ns}READ` }),
       (form) => (form === "under \\d" ? [impl] : []),
+    ],
+    [
+      "read after \\d . in a module binding its own, the root's",
+      (bind, ns) => ({
+        "/w/a.q": bind("mod"),
+        "/w/b.q": `s:use\`other\n${own}\\d .\n${ns}READ`,
+      }),
+      () => [impl],
     ],
     [
       "a view at top level in another file, a key only, as q 5.0 reads it",

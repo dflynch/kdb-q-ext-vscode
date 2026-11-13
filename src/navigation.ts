@@ -310,6 +310,10 @@ export type Target = {
   inLambda: boolean;
   // A global named by a symbol, as `t in `t insert x
   passed: boolean;
+  // An export's global bound to its module, as m in m.f, and whether it's
+  // read by a key, as m`f, which q 5.0 also reads through a view
+  via?: string;
+  keyed?: boolean;
 };
 
 // Each annotation's, once: every request reads them, several times over
@@ -353,6 +357,7 @@ function targetsOf(a: Annotated): Target[] {
     sets: n.defines === true && !n.amends,
     inLambda: n.lambda !== undefined,
     passed: false,
+    ...(n.via === undefined ? {} : { via: n.via, keyed: false }),
   }));
   for (const h of a.handles) {
     out.push({
@@ -366,6 +371,7 @@ function targetsOf(a: Annotated): Target[] {
       sets: h.defines === true && !h.amends,
       inLambda: h.lambda !== undefined,
       passed: h.module === undefined,
+      ...(h.via === undefined ? {} : { via: h.via, keyed: true }),
     });
   }
   // m`f, for an m bound in another file, if any

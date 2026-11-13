@@ -516,9 +516,33 @@ for (const [ending, newline] of [
       }
     });
 
-    test("a view at top level, none", () => {
+    test("a view at top level, none, as q 5.0 reads no s.f through it", () => {
       const found = at({ ...mod, "/w/a.q": "s::use`mod", "/w/b.q": "x:s.|" });
       assert.deepStrictEqual(offered(found, ["s.f"]), { "s.f": "-" });
+      // In the file, it's the file's s, so none from another file's binding
+      const here = at({
+        ...mod,
+        ...other,
+        "/w/a.q": "s:use`mod",
+        "/w/b.q": "s::use`other\nx:s.|",
+      });
+      assert.deepStrictEqual(offered(here, ["s.f", "s.h"]), {
+        "s.f": "-",
+        "s.h": "-",
+      });
+    });
+
+    test("after \\d . in a module binding its own s, the root's", () => {
+      const found = at({
+        ...mod,
+        ...other,
+        "/w/a.q": "s:use`mod",
+        "/w/b.q": "s:use`other\nexport:([z:1])\n\\d .\nx:s.|",
+      });
+      assert.deepStrictEqual(offered(found, ["s.f", "s.h"]), {
+        "s.f": "function 1",
+        "s.h": "-",
+      });
     });
   });
 
