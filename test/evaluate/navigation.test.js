@@ -1,6 +1,8 @@
-// Part A: navigation scored against q's own `value f` on TorQ.
+// Navigation scored against q's own `value f` on TorQ (truth.json).
 // Run inside VS Code's test host with the TorQ deploy as the workspace; asks
 // our providers through VS Code's commands, as a user's keystrokes would.
+// Fails where a score falls below the recorded one; the details go to
+// results/navigation.json.
 const assert = require("node:assert");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -28,31 +30,17 @@ function resolveName(written, context) {
   return context ? `.${context}.${written}` : written;
 }
 
+// Each lambda once, its file relative to the deploy
 function loadTruth() {
   const rows = JSON.parse(
-    fs.readFileSync(path.join(RESULTS, "truth.json"), "utf8"),
+    fs.readFileSync(path.join(__dirname, "truth.json"), "utf8"),
   );
-  const lambdas = new Map(); // file|line|source -> lambda
-  for (const r of rows) {
-    const key = `${r.file}|${r.line}|${r.source}`;
-    let l = lambdas.get(key);
-    if (!l) {
-      l = {
-        file: r.file,
-        line: Number(r.line),
-        source: r.source,
-        context: r.context || "",
-        name: plainName(r.name),
-        globals: (r.globals || []).filter((g) => g !== ""),
-        paths: new Set(),
-        procs: new Set(),
-      };
-      lambdas.set(key, l);
-    }
-    l.paths.add(r.path);
-    l.procs.add(r.procname);
-  }
-  return [...lambdas.values()];
+  return rows.map((r) => ({
+    ...r,
+    file: path.join(ROOT, r.file),
+    name: plainName(r.name),
+    paths: new Set(r.paths),
+  }));
 }
 
 // --- reading the files as q does, enough to find tokens ------------------
@@ -265,6 +253,13 @@ suite("TorQ navigation, scored against q", function () {
       sourceNotFound: lambdas.filter((l) => !l.at).length,
       kFiles: lambdas.filter((l) => l.file.endsWith(".k")).length,
     };
+    // Each q lambda where q says it is, or the deploy isn't the pinned code
+    assert.deepStrictEqual(
+      lambdas
+        .filter((l) => !l.at && !l.file.endsWith(".k"))
+        .map((l) => `${rel(l.file)}:${l.line}`),
+      [],
+    );
     // Time to an index of the whole workspace: first workspace-symbol answer
     const t0 = performance.now();
     for (;;) {
@@ -359,6 +354,13 @@ suite("TorQ navigation, scored against q", function () {
     }
     out.definition = tally;
     out.timing.definition = stats(lat);
+    // Where q names the definition: exact, or with other real definitions
+    const bad = ["none", "wrong", "some of q's", "q's, plus wrong ones"];
+    assert.deepStrictEqual(
+      bad.filter((k) => tally[k]),
+      [],
+      JSON.stringify(cases.definition.filter((c) => bad.includes(c.score))),
+    );
   });
 
   test("references", async () => {
@@ -476,6 +478,12 @@ suite("TorQ navigation, scored against q", function () {
     }
     out.references = tally;
     out.timing.references = stats(lat);
+    // Every use q lists
+    assert.strictEqual(
+      tally.missing,
+      0,
+      JSON.stringify(cases.references.filter((c) => c.missing?.length)),
+    );
   });
 
   test("workspace symbols", async () => {
@@ -514,6 +522,11 @@ suite("TorQ navigation, scored against q", function () {
       }
     }
     out.symbols = tally;
+    // Every name q defines, but in k files, which are out of scope
+    const inQ = cases.symbols.filter((c) =>
+      c.truth.some((t) => !t.split(":")[0].endsWith(".k")),
+    );
+    assert.deepStrictEqual(inQ, []);
   });
 
   test("hover", async () => {
@@ -563,7 +576,7 @@ suite("TorQ navigation, scored against q", function () {
     }
     // q's words, at their first use in a loaded file's code
     const words = JSON.parse(
-      fs.readFileSync(path.join(RESULTS, "keywords.json"), "utf8"),
+      fs.readFileSync(path.join(__dirname, "keywords.json"), "utf8"),
     );
     for (const w of words) {
       let found = null;
@@ -598,6 +611,7 @@ suite("TorQ navigation, scored against q", function () {
     }
     out.hover = tally;
     out.timing.hover = stats(lat);
+    assert.deepStrictEqual(cases.hover, []);
   });
 
   test("completion latency, largest file", async () => {
@@ -628,10 +642,11 @@ suite("TorQ navigation, scored against q", function () {
   });
 
   suiteTeardown(() => {
+    fs.mkdirSync(RESULTS, { recursive: true });
     fs.writeFileSync(
       path.join(RESULTS, "navigation.json"),
       JSON.stringify({ summary: out, cases }, null, 1),
     );
-    assert.ok(true);
+    console.log(JSON.stringify(out, null, 1));
   });
 });

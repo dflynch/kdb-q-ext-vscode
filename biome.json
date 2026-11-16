@@ -12,6 +12,8 @@
       "!test/fixtures/corpus.ipc.json",
       "!test/fixtures/lexing.json",
       "!test/fixtures/scoping.json",
+      "!test/evaluate/truth.json",
+      "!test/evaluate/keywords.json",
       "!src/builtins.ts"
     ]
   },
@@ -37,17 +39,5 @@
         "organizeImports": "on"
       }
     }
-  },
-  "overrides": [
-    {
-      "includes": ["test/evaluate/**"],
-      "linter": {
-        "rules": {
-          "performance": {
-            "useDomNodeTextContent": "off"
-          }
-        }
-      }
-    }
-  ]
+  }
 }
