@@ -94,12 +94,19 @@ suite("syntax errors", function () {
       broken = vscode.Uri.joinPath(folder(), "syntax", name, "a.q");
       await write(broken, "a:(1;2\n");
     });
+    // Its own folder, not theirs: a late delete of a folder drops every
+    // file below it from the index
     teardown(async () => {
       await mode(undefined);
-      await vscode.workspace.fs
-        .delete(vscode.Uri.joinPath(folder(), "syntax"), { recursive: true })
-        .then(undefined, () => undefined);
+      await vscode.workspace.fs.delete(vscode.Uri.joinPath(broken, ".."), {
+        recursive: true,
+      });
     });
+    suiteTeardown(() =>
+      vscode.workspace.fs
+        .delete(vscode.Uri.joinPath(folder(), "syntax"), { recursive: true })
+        .then(undefined, () => undefined),
+    );
 
     test("an open file's, then as saved once its tab closes", async () => {
       await mode("workspace");

@@ -161,7 +161,7 @@ suite("workspace index", () => {
   // the watcher may not be telling of changes yet, so till the file is
   // read it's written again, as VS Code tells of the change. Deleted once
   // read, as a delete while its creation is still held back is lost
-  test("files created and deleted on disk", async function () {
+  test("files created and deleted on disk, as VS Code's watcher tells", async function () {
     this.timeout(15000);
     const made = file("made.q");
     const names = () =>
