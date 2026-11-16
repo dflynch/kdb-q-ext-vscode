@@ -29,9 +29,14 @@ jobs:
         if: runner.os == 'Linux'
 
   # Navigation on TorQ at pinned commits, scored against q's answers saved in
-  # test/evaluate/truth.json: no q needed
+  # test/evaluate/truth.json: no q needed. On every OS, for paths and line
+  # endings
   navigation:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -40,3 +45,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: xvfb-run -a npm run evaluate
+        if: runner.os == 'Linux'
+      - run: npm run evaluate
+        if: runner.os != 'Linux'
