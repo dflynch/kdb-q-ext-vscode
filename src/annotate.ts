@@ -638,9 +638,7 @@ export function annotate(
 
   const walk = (items: Item[], context: Context, called = false) => {
     // The qSQL queries open here, innermost last: columns before from and
-    // after where. A query in another's columns, by or where runs to the end
-    // of its own where, which a by or from at its depth ends, handing back
-    // to the query it's in, as q reads select c:exec x from s where y from t
+    // after where
     const open: Query[] = [];
     let column = context.column;
     for (let i = 0; i < items.length; i++) {
@@ -766,7 +764,6 @@ export function annotate(
       if (top && w === "from") {
         top.deleting = false;
         top.from = true;
-        top.clause = false;
         column = top.outer;
       } else if (top && starts) {
         top.clause = true;
