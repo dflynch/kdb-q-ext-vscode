@@ -1,7 +1,8 @@
 // Navigation scored against q's own `value f` on TorQ (truth.json).
 // Run inside VS Code's test host with the TorQ deploy as the workspace; asks
 // our providers through VS Code's commands, as a user's keystrokes would.
-// Fails where a score falls below the recorded one; the details go to
+// Fails on any miss q can confirm, and where an answer q can't confirm
+// grows worse than the counts recorded below; the details go to
 // results/navigation.json.
 const assert = require("node:assert");
 const fs = require("node:fs");
@@ -203,8 +204,32 @@ function assigns(file, line, name) {
   );
 }
 
-suite("TorQ navigation, scored against q", function () {
-  this.timeout(0);
+// Counts of answers q can't confirm, at most these: a use with no lambda in
+// q's truth (a variable, a built-in) that gets no definition, or a built-in
+// that gets one; references q doesn't list. Lower them when navigation
+// improves; raise one only for a change meant to answer more.
+const RECORDED = {
+  definition: {
+    "not a lambda (variable or table): none": 80,
+    "runtime alias (bound under another name): none": 4,
+    "bound while running (scored by hand): none": 0,
+    "a dictionary of lambdas (scored by hand): none": 0,
+    "q built-in: some": 2,
+  },
+  references: {
+    "symbol (`name), q doesn't list": 57,
+    "qSQL, unconfirmed by q": 39,
+    outsideLoaded: 983,
+  },
+};
+
+// The keys whose count is over the recorded one, with both
+const over = (counts, recorded) =>
+  Object.entries(recorded)
+    .filter(([k, n]) => (counts[k] ?? 0) > n)
+    .map(([k, n]) => `${k}: ${counts[k]} > ${n}`);
+
+suite("TorQ navigation, scored against q", () => {
   const out = {
     versions: { vscode: vscode.version },
     timing: {},
@@ -332,17 +357,7 @@ suite("TorQ navigation, scored against q", function () {
         else if (allFound && !extras.length) c.score = "exact";
         else if (allFound) {
           // extra definitions: are they assignments of the same name in source?
-          const last = full.split(".").pop();
-          const real = extras.every((o) => {
-            const ln = text(o.file).slice(
-              offsetOf(o.file, o.line - 1),
-              offsetOf(o.file, o.line),
-            );
-            return (
-              new RegExp(`(?<![A-Za-z0-9_])${literal(last)}\\s*:`).test(ln) ||
-              /\bset\b/.test(ln)
-            );
-          });
+          const real = extras.every((o) => assigns(o.file, o.line, full));
           c.score = real
             ? "q's, plus other definitions in source"
             : "q's, plus wrong ones";
@@ -361,6 +376,7 @@ suite("TorQ navigation, scored against q", function () {
       [],
       JSON.stringify(cases.definition.filter((c) => bad.includes(c.score))),
     );
+    assert.deepStrictEqual(over(tally, RECORDED.definition), []);
   });
 
   test("references", async () => {
@@ -484,6 +500,21 @@ suite("TorQ navigation, scored against q", function () {
       0,
       JSON.stringify(cases.references.filter((c) => c.missing?.length)),
     );
+    // Nothing q would list, as a use of the name, but doesn't
+    assert.strictEqual(
+      tally.extra.extra ?? 0,
+      0,
+      JSON.stringify(
+        cases.references.filter((c) => c.extra.some((e) => e.kind === "extra")),
+      ),
+    );
+    assert.deepStrictEqual(
+      over(
+        { ...tally.extra, outsideLoaded: tally.outsideLoaded },
+        RECORDED.references,
+      ),
+      [],
+    );
   });
 
   test("workspace symbols", async () => {
@@ -531,7 +562,7 @@ suite("TorQ navigation, scored against q", function () {
 
   test("hover", async () => {
     const tally = {
-      own: { shown: 0, empty: 0 },
+      own: { named: 0, other: 0 },
       builtin: { withLink: 0, without: 0, notUsed: 0 },
     };
     const lat = [];
@@ -562,13 +593,15 @@ suite("TorQ navigation, scored against q", function () {
           ),
         );
         lat.push(ms);
+        // The definition's name heads it, in a q code block
         const t = hoverText(v);
-        if (t.trim()) tally.own.shown++;
+        if (t.trimStart().startsWith(`\`\`\`q\n${full}`)) tally.own.named++;
         else {
-          tally.own.empty++;
+          tally.own.other++;
           cases.hover.push({
             own: full,
             at: `${rel(l.file)}:${pos.line + 1}:${pos.character + 1}`,
+            got: t.slice(0, 120),
           });
         }
         l.hovered = (l.hovered ?? new Set()).add(full);

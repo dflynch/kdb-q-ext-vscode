@@ -4,7 +4,8 @@
 //   its name, file, line, source and the globals it uses. Made once, with q
 //   and TorQ running, and committed, as the pinned commits never change.
 // - navigation.test.js asks our providers at every use and scores them
-//   against it; a score below the recorded one fails.
+//   against it; any miss q can confirm fails, as does an answer it can't
+//   confirm growing past the counts recorded there.
 // Not part of npm test:
 //   npm run evaluate                   fetch, then navigation (no q needed)
 //   npm run evaluate -- part ...       parts: fetch, navigation, and, to
@@ -57,11 +58,8 @@ const run = (cmd, args, opts = {}) =>
 
 // Only the pinned commit, as GitHub serves a commit by its hash
 function clone({ url, commit }, to) {
-  if (!fs.existsSync(to)) {
-    run("git", ["init", "--quiet", to]);
-    run("git", ["-C", to, "remote", "add", "origin", url]);
-  }
-  run("git", ["-C", to, "fetch", "--quiet", "--depth", "1", "origin", commit]);
+  run("git", ["init", "--quiet", to]);
+  run("git", ["-C", to, "fetch", "--quiet", "--depth", "1", url, commit]);
   run("git", ["-C", to, "checkout", "--quiet", commit]);
 }
 
