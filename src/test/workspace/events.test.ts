@@ -181,6 +181,13 @@ suite("the workspace index's file events", function () {
       assert.deepStrictEqual(shown(at("m", "a.q")), [") expected 1:6"]);
     });
 
+    test("a folder named like a q file created: its files found", async () => {
+      await write(at("lib.q", "a.q"), "a:(1;2\n");
+      tell.anything("create", at("lib.q"));
+      await waitFor(async () => (await indexed()).length > 0);
+      assert.deepStrictEqual(await indexed(), ["lib.q/a.q"]);
+    });
+
     test("a file other than q created: no search for q files", async () => {
       // A q file no event told of, which a search would find
       await write(at("a.q"), "a:(1;2\n");

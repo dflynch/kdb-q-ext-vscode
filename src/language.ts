@@ -310,9 +310,9 @@ export class Workspace implements vscode.Disposable {
       anything,
       // A folder moved here may come without its q files: once creating
       // pauses, if any was a folder, every q file the index hasn't got, as
-      // a checkout or a build may create many
+      // a checkout or a build may create many. Any name may be a folder's,
+      // lib.q too
       anything.onDidCreate((uri) => {
-        if (uri.path.endsWith(".q")) return;
         this.created.push(uri);
         clearTimeout(this.creating);
         this.creating = setTimeout(() => this.folders(), 250);
