@@ -27,16 +27,3 @@ jobs:
         if: runner.os != 'Linux'
       - run: npx vsce package
         if: runner.os == 'Linux'
-
-  # Navigation on TorQ at pinned commits, scored against q's answers saved in
-  # test/evaluate/truth.json: no q needed
-  navigation:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: xvfb-run -a npm run evaluate

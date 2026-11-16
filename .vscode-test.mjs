@@ -1,6 +1,11 @@
 import { cpSync, mkdirSync, rmSync } from "node:fs";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "@vscode/test-cli";
+
+const { fetch, dir, deploy } = createRequire(import.meta.url)(
+  "./test/evaluate/fetch.js",
+);
 
 // A folder for the workspace tests to write Workspace settings in, made
 // afresh for each run, outside the repo's own .vscode, with q files for the
@@ -17,6 +22,9 @@ cpSync(
   { recursive: true },
 );
 
+// TorQ for the navigation tests, deployed afresh: the first run fetches it
+fetch();
+
 export default defineConfig([
   {
     label: "unit",
@@ -27,5 +35,14 @@ export default defineConfig([
     label: "workspace",
     files: "out/test/workspace/*.test.js",
     workspaceFolder: workspace,
+  },
+  {
+    // Navigation on TorQ, scored against q's answers in truth.json
+    label: "navigation",
+    files: "test/evaluate/navigation.test.js",
+    workspaceFolder: deploy,
+    env: { EVALUATION_DIR: dir },
+    launchArgs: ["--disable-extensions"],
+    mocha: { timeout: 0 },
   },
 ]);
