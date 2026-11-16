@@ -27,24 +27,3 @@ jobs:
         if: runner.os != 'Linux'
       - run: npx vsce package
         if: runner.os == 'Linux'
-
-  # Navigation on TorQ at pinned commits, scored against q's answers saved in
-  # test/evaluate/truth.json: no q needed. On every OS, for paths and line
-  # endings
-  navigation:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: xvfb-run -a npm run evaluate
-        if: runner.os == 'Linux'
-      - run: npm run evaluate
-        if: runner.os != 'Linux'

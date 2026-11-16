@@ -5,9 +5,9 @@
 //   and TorQ running, and committed, as the pinned commits never change.
 // - navigation.test.js asks our providers at every use and scores them
 //   against it; any miss q can confirm fails, as does an answer it can't
-//   confirm growing past the counts recorded there.
-// Not part of npm test:
-//   npm run evaluate                   fetch, then navigation (no q needed)
+//   confirm growing past the counts recorded there. npm test runs it, with
+//   the other tests, after fetch.js has fetched TorQ.
+//   npm run evaluate                   navigation alone (no q needed)
 //   npm run evaluate -- part ...       parts: fetch, navigation, and, to
 //                                      remake truth.json when the pins
 //                                      change, start, truth, stop
@@ -20,20 +20,10 @@ const net = require("node:net");
 const os = require("node:os");
 const path = require("node:path");
 
-const repo = path.resolve(__dirname, "../..");
-const dir = path.join(repo, ".vscode-test", "evaluation");
-const deploy = path.join(dir, "deploy");
-const results = path.join(dir, "results");
+const { fetch, dir, deploy } = require("./fetch");
 
-// Pinned so every run measures the same code, and truth.json stays true
-const TORQ = {
-  url: "https://github.com/DataIntellectTech/TorQ.git",
-  commit: "4be4fc3457bf1a838e976ff2e9892b2babe8c1c3",
-};
-const FSP = {
-  url: "https://github.com/DataIntellectTech/TorQ-Finance-Starter-Pack.git",
-  commit: "50fcd5ad6d8e50fcd71965010ce38a1fccdad87b",
-};
+const repo = path.resolve(__dirname, "../..");
+const results = path.join(dir, "results");
 
 // Every process type the FSP's process.csv lists but kill (it stops the
 // others) and tickerlogreplay (it replays a log and exits)
@@ -55,26 +45,6 @@ const env = {
 };
 const run = (cmd, args, opts = {}) =>
   execFileSync(cmd, args, { stdio: "inherit", env, ...opts });
-
-// Only the pinned commit, as GitHub serves a commit by its hash
-function clone({ url, commit }, to) {
-  run("git", ["init", "--quiet", to]);
-  run("git", ["-C", to, "fetch", "--quiet", "--depth", "1", url, commit]);
-  run("git", ["-C", to, "checkout", "--quiet", commit]);
-}
-
-// TorQ, then the FSP over it, as TorQ's app install does
-function fetch() {
-  fs.mkdirSync(dir, { recursive: true });
-  clone(TORQ, path.join(dir, "torq"));
-  clone(FSP, path.join(dir, "fsp"));
-  fs.rmSync(deploy, { recursive: true, force: true });
-  for (const from of ["torq", "fsp"])
-    fs.cpSync(path.join(dir, from), deploy, {
-      recursive: true,
-      filter: (f) => path.basename(f) !== ".git",
-    });
-}
 
 const listening = (port) =>
   new Promise((resolve) => {
@@ -201,21 +171,13 @@ function truth() {
 }
 
 function navigation() {
-  run(
-    "npx",
-    [
-      "vscode-test",
-      "--config",
-      path.join(__dirname, "evaluate.vscode-test.mjs"),
-    ],
-    { cwd: repo },
-  );
+  run("npx", ["vscode-test", "--label", "navigation"], { cwd: repo });
 }
 
 const parts = { fetch, start, truth, navigation, stop };
 (async () => {
   const asked = process.argv.slice(2);
-  for (const p of asked.length ? asked : ["fetch", "navigation"]) {
+  for (const p of asked.length ? asked : ["navigation"]) {
     if (!parts[p])
       throw new Error(`no part ${p}: ${Object.keys(parts).join(", ")}`);
     await parts[p]();
