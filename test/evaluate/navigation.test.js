@@ -11,7 +11,9 @@ const vscode = require("vscode");
 
 const EVAL = process.env.EVALUATION_DIR;
 const RESULTS = path.join(EVAL, "results");
-const ROOT = path.join(EVAL, "deploy");
+// As VS Code spells it, to compare with what it gives: its fsPath has a
+// Windows drive letter in lower case
+const ROOT = vscode.Uri.file(path.join(EVAL, "deploy")).fsPath;
 
 const BUILTIN_NS = /^\.(q|Q|h|j|o|z)\./;
 
