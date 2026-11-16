@@ -651,14 +651,9 @@ export function annotate(
       if (isGroup(item)) {
         const c = text[item.open.start];
         const top = open.at(-1);
-        if (
-          c === "[" &&
-          isName(prev, "select") &&
-          nameOf(prev)?.end === item.open.start &&
-          top
-        ) {
-          // select[n;>c]: a row count, read where the query is, and a sort,
-          // by columns
+        if (c === "[" && isName(prev, "select") && top) {
+          // select[n;>c], or select [n;>c]: a row count, read where the query
+          // is, and a sort, by columns
           for (const s of segments(item.items)) {
             const sort = ["<", ">"].includes(word(s[0]));
             walk(s, { ...context, column: sort || top.outer });
@@ -730,8 +725,10 @@ export function annotate(
         });
         column = true;
       }
-      // A by or from ends the where of a query in another
-      if (
+      // A by or from ends the where of a query in another, and of each
+      // query that one is in the where of, as in
+      // select c:exec x from s where y in exec z from u where v from t
+      while (
         (w === "by" || w === "from") &&
         open.length > 1 &&
         open.at(-1)?.clause

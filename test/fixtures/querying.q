@@ -18,6 +18,7 @@ select by c:X from t where z
 select[n] c:X from t
 select[n;>e] c:X from t
 select[>e] c:X from t
+select [n;>e] c:X from t
 / in update's columns, in place too
 update c:X from t where z
 update c:X by g from t
@@ -35,7 +36,8 @@ select c:f X from t
 select c:f[X] from t
 select from t where a in f[X]
 / Inner: with and without by and where; commas and where as the function in
-/ its clause; a query of its own, as its table and in its column list
+/ its clause; a query of its own, as its table, in its column list and in its
+/ clause, where one by or from ends both clauses
 exec x from s
 exec x from s where y
 exec x by h from s where y
@@ -47,6 +49,8 @@ update x:1 from s where y
 delete from s where y
 delete x from s
 exec x from s where y in where w
+exec x from s where y in exec z from u where v
+exec x from s where y, d:exec z from u where v
 exec x from select from u where v
 exec d:select from u where v from s where y
 / in brackets

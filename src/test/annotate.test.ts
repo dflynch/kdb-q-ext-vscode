@@ -607,6 +607,11 @@ suite("annotate handles", () => {
       ["s=s", "t=t : amends", "u=u : amends", "v=v"],
     ],
     [
+      "from, in place after a query in the clause of one in update's columns",
+      "update c:exec x from `s where y in exec z from `u where v from `t",
+      ["s=s", "u=u", "t=t : amends"],
+    ],
+    [
       "bracket forms",
       "value[`a]; set[`b;1]; insert[`c;x]; upsert[`d]",
       ["a=a", "b=b :", "c=c : amends", "d=d : amends"],
