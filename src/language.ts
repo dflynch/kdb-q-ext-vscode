@@ -100,9 +100,7 @@ function positions(text: string): (offset: number) => vscode.Position {
 // A document opened without a tab, as for a preview of references, is the
 // index's, not open to the user. A tab VS Code hasn't loaded yet, as those
 // behind the active one as VS Code starts, shows its q file as saved
-class Problems implements vscode.Disposable {
-  private readonly collection =
-    vscode.languages.createDiagnosticCollection("q");
+export class Problems implements vscode.Disposable {
   // q documents open in tabs, by URI, which show their own text as typed
   private readonly open = new Map<string, vscode.TextDocument>();
   // Tabs of q files not loaded yet, by URI
@@ -113,7 +111,11 @@ class Problems implements vscode.Disposable {
   // A document no longer open in a tab, for the index to show as it has it
   left: (uri: vscode.Uri) => void = () => undefined;
 
-  constructor() {
+  constructor(
+    private readonly collection = vscode.languages.createDiagnosticCollection(
+      "q",
+    ),
+  ) {
     const refresh = () => this.refresh();
     this.disposables = [
       this.collection,
@@ -261,26 +263,38 @@ async function included(uri: vscode.Uri): Promise<boolean> {
   return found.length > 0;
 }
 
+// What the index asks of VS Code's file watcher, so tests can tell it of
+// events themselves
+export type Watch = (
+  glob: string,
+  ignoreChange?: boolean,
+) => Pick<
+  vscode.FileSystemWatcher,
+  "onDidCreate" | "onDidChange" | "onDidDelete" | "dispose"
+>;
+
+const watchFiles: Watch = (glob, ignoreChange = false) =>
+  vscode.workspace.createFileSystemWatcher(glob, false, ignoreChange);
+
 // The workspace's q files, each as its open document has it, else as it's
 // saved; files.exclude leaves some out, as Explorer does. Built in the
 // background, as is each change on disk, in turn; each request waits for
 // them, and reads an open document's latest text when it's asked. Each file
 // it reads, and each it drops, goes to the problems, for workspace mode
-class Workspace implements vscode.Disposable {
+export class Workspace implements vscode.Disposable {
   private readonly files = new Map<string, Entry>();
   private readonly edited = new Set<vscode.TextDocument>();
   private done: Promise<void> = Promise.resolve();
   private readonly disposables: vscode.Disposable[];
 
-  constructor(private readonly problems: Problems) {
-    const watcher = vscode.workspace.createFileSystemWatcher("**/*.q");
+  constructor(
+    private readonly problems: Problems,
+    watch: Watch = watchFiles,
+  ) {
+    const watcher = watch("**/*.q");
     // Folders too, as a folder deleted or moved may be reported without
     // the files in it
-    const anything = vscode.workspace.createFileSystemWatcher(
-      "**",
-      false,
-      true,
-    );
+    const anything = watch("**", true);
     // A file new to the index only if findFiles would find it, as
     // files.exclude may leave it out
     const read = (uri: vscode.Uri) =>

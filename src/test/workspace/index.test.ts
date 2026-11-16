@@ -156,44 +156,45 @@ suite("workspace index", () => {
     ]);
   });
 
-  test("files created on disk, unless files.exclude leaves them out", async () => {
-    const files = vscode.workspace.getConfiguration("files");
-    await files.update(
-      "exclude",
-      { "**/skip": true },
-      vscode.ConfigurationTarget.Workspace,
-    );
+  // The one test of VS Code's watcher reaching the index, the rest of
+  // whose answers to file events are tested with stand-ins. Early in a run
+  // the watcher may not be telling of changes yet, so till the file is
+  // read it's written again, as VS Code tells of the change. Deleted once
+  // read, as a delete while its creation is still held back is lost
+  test("files created and deleted on disk", async function () {
+    this.timeout(15000);
     const made = file("made.q");
-    const skipped = file("skip/x.q");
-    try {
-      const write = (uri: vscode.Uri, text: string) =>
-        vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(text));
-      await write(skipped, ".skip.f:{x}");
-      await write(made, ".made.f:{x}");
-      // The watcher's events come a moment after
-      const names = () =>
-        vscode.commands
-          .executeCommand<vscode.SymbolInformation[]>(
-            "vscode.executeWorkspaceSymbolProvider",
-            ".made.f",
-          )
-          .then((found) => found.map((s) => s.name));
-      for (let i = 0; i < 50 && !(await names()).length; i++) {
+    const names = () =>
+      vscode.commands
+        .executeCommand<vscode.SymbolInformation[]>(
+          "vscode.executeWorkspaceSymbolProvider",
+          ".made.f",
+        )
+        .then((found) => found.map((s) => s.name));
+    const until = async (done: (n: string[]) => boolean, ms: number) => {
+      for (let i = 0; i < ms / 100 && !done(await names()); i++) {
         await new Promise((r) => setTimeout(r, 100));
       }
+      return done(await names());
+    };
+    try {
+      let read = false;
+      for (let i = 0; i < 8 && !read; i++) {
+        await vscode.workspace.fs.writeFile(
+          made,
+          new TextEncoder().encode(".made.f:{x}"),
+        );
+        read = await until((n) => n.length > 0, 1000);
+      }
+      assert.ok(read, "the watcher told of no change in 8 s");
       assert.deepStrictEqual(await names(), [".made.f"]);
-      const skip = await vscode.commands.executeCommand<
-        vscode.SymbolInformation[]
-      >("vscode.executeWorkspaceSymbolProvider", ".skip.f");
-      assert.deepStrictEqual(skip, []);
-    } finally {
       await vscode.workspace.fs.delete(made);
-      await vscode.workspace.fs.delete(file("skip"), { recursive: true });
-      await files.update(
-        "exclude",
-        undefined,
-        vscode.ConfigurationTarget.Workspace,
+      assert.ok(
+        await until((n) => n.length === 0, 5000),
+        "the watcher told of no delete in 5 s",
       );
+    } finally {
+      await vscode.workspace.fs.delete(made).then(undefined, () => undefined);
     }
   });
 

@@ -84,121 +84,59 @@ suite("syntax errors", function () {
     }
   });
 
+  // Each test's own file, read as the mode changes, not as VS Code's
+  // watcher tells of it: those events are the index's own tests'
   suite("workspace mode", () => {
-    const broken = () => vscode.Uri.joinPath(folder(), "broken", "a.q");
+    let broken: vscode.Uri;
 
-    const moved = () => vscode.Uri.joinPath(folder(), "moved", "a.q");
-
-    // Till the file watcher has told of the file: a delete soon after its
-    // creation, while the watcher still holds that, is folded into it, and
-    // no delete is told. The index may read it first, from disk, as the
-    // mode changes, so a test can't tell from the problems
-    setup(async () => {
-      const watcher = vscode.workspace.createFileSystemWatcher(
-        new vscode.RelativePattern(folder(), "broken/a.q"),
-      );
-      try {
-        const told = new Promise<void>((resolve) => {
-          watcher.onDidCreate(() => resolve());
-          watcher.onDidChange(() => resolve());
-        });
-        await write(broken(), "a:(1;2\n");
-        await told;
-      } finally {
-        watcher.dispose();
-      }
+    setup(async function () {
+      const name = this.currentTest?.title.replace(/\W+/g, "-") ?? "";
+      broken = vscode.Uri.joinPath(folder(), "syntax", name, "a.q");
+      await write(broken, "a:(1;2\n");
     });
     teardown(async () => {
       await mode(undefined);
-      for (const name of ["broken", "moved"]) {
-        const uri = vscode.Uri.joinPath(folder(), name);
-        await vscode.workspace.fs
-          .delete(uri, { recursive: true })
-          .then(undefined, () => undefined);
-      }
-    });
-
-    test("open files only by default: none for an unopened file", async () => {
-      // Long enough for the index to have read it
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      assert.deepStrictEqual(shown(broken()), []);
-    });
-
-    test("an unopened file's, till it's fixed", async () => {
-      await mode("workspace");
-      await waitFor(() => shown(broken()).length > 0);
-      assert.deepStrictEqual(shown(broken()), [
-        ") expected 1:6 (unclosed ( 1:3)",
-      ]);
-      await write(broken(), "a:(1;2)\n");
-      await waitFor(() => shown(broken()).length === 0);
+      await vscode.workspace.fs
+        .delete(vscode.Uri.joinPath(folder(), "syntax"), { recursive: true })
+        .then(undefined, () => undefined);
     });
 
     test("an open file's, then as saved once its tab closes", async () => {
       await mode("workspace");
-      await waitFor(() => shown(broken()).length > 0);
-      const d = await vscode.workspace.openTextDocument(broken());
+      await waitFor(() => shown(broken).length > 0);
+      const d = await vscode.workspace.openTextDocument(broken);
       await vscode.window.showTextDocument(d);
       const edit = new vscode.WorkspaceEdit();
       edit.insert(d.uri, new vscode.Position(0, 6), ")");
       await vscode.workspace.applyEdit(edit);
-      await waitFor(() => shown(broken()).length === 0);
+      await waitFor(() => shown(broken).length === 0);
       await vscode.commands.executeCommand(
         "workbench.action.revertAndCloseActiveEditor",
       );
-      await waitFor(() => shown(broken()).length > 0);
-      assert.deepStrictEqual(shown(broken()), [
+      await waitFor(() => shown(broken).length > 0);
+      assert.deepStrictEqual(shown(broken), [
         ") expected 1:6 (unclosed ( 1:3)",
       ]);
     });
 
-    test("till its folder is deleted", async () => {
-      await mode("workspace");
-      await waitFor(() => shown(broken()).length > 0);
-      await vscode.workspace.fs.delete(
-        vscode.Uri.joinPath(folder(), "broken"),
-        { recursive: true },
-      );
-      await waitFor(() => shown(broken()).length === 0);
-    });
-
-    test("in its folder's new place, once moved", async () => {
-      await mode("workspace");
-      await waitFor(() => shown(broken()).length > 0);
-      await vscode.workspace.fs.rename(
-        vscode.Uri.joinPath(folder(), "broken"),
-        vscode.Uri.joinPath(folder(), "moved"),
-      );
-      await waitFor(
-        () => shown(broken()).length === 0 && shown(moved()).length > 0,
-      );
-    });
-
-    test("till it's deleted", async () => {
-      await mode("workspace");
-      await waitFor(() => shown(broken()).length > 0);
-      await vscode.workspace.fs.delete(broken());
-      await waitFor(() => shown(broken()).length === 0);
-    });
-
     test("till the setting goes back", async () => {
       await mode("workspace");
-      await waitFor(() => shown(broken()).length > 0);
+      await waitFor(() => shown(broken).length > 0);
       await mode(undefined);
-      await waitFor(() => shown(broken()).length === 0);
+      await waitFor(() => shown(broken).length === 0);
     });
 
     test("till it's excluded", async () => {
       await mode("workspace");
-      await waitFor(() => shown(broken()).length > 0);
+      await waitFor(() => shown(broken).length > 0);
       const files = vscode.workspace.getConfiguration("files");
       await files.update(
         "exclude",
-        { "broken/**": true },
+        { [vscode.workspace.asRelativePath(broken, false)]: true },
         vscode.ConfigurationTarget.Workspace,
       );
       try {
-        await waitFor(() => shown(broken()).length === 0);
+        await waitFor(() => shown(broken).length === 0);
       } finally {
         await files.update(
           "exclude",
