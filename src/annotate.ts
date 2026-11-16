@@ -355,6 +355,20 @@ export function annotate(
     isSymbol(item) && word(item) === "`.";
 
   type Context = { namespace: string; lambda?: Lambda; column: boolean };
+  // A qSQL query being read
+  type Query = {
+    // update and delete, which amend a table named by a symbol in place
+    inPlace: boolean;
+    // Between delete and from, where q reads each name as a column's name
+    deleting: boolean;
+    // Past its from, and past the where that opens its clause: the first
+    // after its from at its depth, any other being the function, as in
+    // select c:where b from t or select from t where a in where b
+    from: boolean;
+    clause: boolean;
+    // Whether the query is itself in a clause, so all of it is
+    outer: boolean;
+  };
 
   const push = (
     element: Element,
@@ -623,22 +637,10 @@ export function annotate(
   };
 
   const walk = (items: Item[], context: Context, called = false) => {
-    // Within a qSQL query: columns before from and after where
-    let query = false;
-    // update and delete, which amend a table named by a symbol in place
-    let inPlace = false;
-    // Between delete and from, where q reads each name as a column's name
-    let deleting = false;
-    // Past a from, and past the where that opens its clause: a clause opens
-    // at the first where after the latest from, at the query's own depth,
-    // and any other where is the function, as in select c:where b from t
-    // or select from t where a in where b. A from ends a clause, as q
-    // reads select c:exec x from s where y from t where z
-    let from = false;
-    let clause = false;
+    // The qSQL queries open here, innermost last: columns before from and
+    // after where
+    const open: Query[] = [];
     let column = context.column;
-    // Whether the query is itself in a clause, so all of it is
-    let outer = column;
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       const prev = items[i - 1];
@@ -646,7 +648,15 @@ export function annotate(
       const here: Context = { ...context, column };
       if (isGroup(item)) {
         const c = text[item.open.start];
-        if (c === "{") {
+        const top = open.at(-1);
+        if (c === "[" && isName(prev, "select") && top) {
+          // select[n;>c], or select [n;>c]: a row count, read where the query
+          // is, and a sort, by columns
+          for (const s of segments(item.items)) {
+            const sort = ["<", ">"].includes(word(s[0]));
+            walk(s, { ...context, column: sort || top.outer });
+          }
+        } else if (c === "{") {
           lambda(item, here);
         } else if (c === "(" && opens(item.items[0], "[")) {
           literal(item, here);
@@ -693,28 +703,37 @@ export function annotate(
         continue;
       }
       if (item.kind === "separator") {
-        query = false;
-        deleting = false;
-        from = false;
-        clause = false;
+        open.length = 0;
         column = context.column;
         continue;
       }
       if (item.kind === "symbol") {
-        symbol(items, i, here, called, query && inPlace);
+        symbol(items, i, here, called, open.at(-1)?.inPlace ?? false);
         continue;
       }
       if (item.kind !== "name") continue;
       const w = word(item);
       if (queries.has(w)) {
-        outer = column;
-        query = true;
-        inPlace = w === "update" || w === "delete";
-        deleting = w === "delete";
-        from = false;
-        clause = false;
+        open.push({
+          inPlace: w === "update" || w === "delete",
+          deleting: w === "delete",
+          from: false,
+          clause: false,
+          outer: column,
+        });
         column = true;
       }
+      // A by or from ends the where of a query in another, and of each
+      // query that one is in the where of, as in
+      // select c:exec x from s where y in exec z from u where v from t
+      while (
+        (w === "by" || w === "from") &&
+        open.length > 1 &&
+        open.at(-1)?.clause
+      ) {
+        column = open.pop()?.outer ?? column;
+      }
+      const top = open.at(-1);
       // value[`a], set[`a;1], insert[`t;x]
       if (
         ["value", "get", "key", "set", "upsert", "insert"].includes(w) &&
@@ -728,27 +747,26 @@ export function annotate(
           dereference(s, here, sets ? write : undefined);
         }
       }
-      const starts = query && from && !clause && w === "where";
+      const starts = !!top?.from && !top.clause && w === "where";
       const entry = enter(
         item,
         here,
-        query
+        top
           ? {
               query: true,
-              ...(deleting ? { named: true } : {}),
+              ...(top.deleting ? { named: true } : {}),
               ...(starts ? { clause: true } : {}),
             }
           : {},
       );
       const assign = assignment(items, i);
       if (assign) entry.assign = assign;
-      if (query && w === "from") {
-        deleting = false;
-        from = true;
-        clause = false;
-        column = outer;
-      } else if (starts) {
-        clause = true;
+      if (top && w === "from") {
+        top.deleting = false;
+        top.from = true;
+        column = top.outer;
+      } else if (top && starts) {
+        top.clause = true;
         column = true;
       }
       // m:use`mod

@@ -118,6 +118,35 @@ const handles = (text: string) =>
       `${text.slice(h.start, h.end)}=${h.full}${h.defines ? " :" : ""}${h.amends ? " amends" : ""}${h.module ? ` from ${h.module}` : ""}`,
   );
 
+suite("annotate nested queries against q's parse", () => {
+  const fixture: {
+    querying: string;
+    script: string;
+    cases: { query: string; names: [string, string][] }[];
+  } = JSON.parse(read("querying.json").toString());
+
+  test("fixture is up to date (npm run fixtures)", () => {
+    assert.strictEqual(fixture.querying, md5(read("querying.q")));
+    assert.strictEqual(fixture.script, md5(read("query.q")));
+  });
+
+  // Each name q's parse has, as "name role": a column, or a global
+  const roles = (pairs: Iterable<[string, string]>) =>
+    sorted([...pairs].map(([n, r]) => `${n} ${r}`));
+  for (const { query, names: expected } of fixture.cases) {
+    test(query, () => {
+      const written = new Set(expected.map(([n]) => n));
+      const actual = annotate(query)
+        .names.map((n): [string, string] => [
+          query.slice(n.token.start, n.token.end),
+          n.role,
+        ])
+        .filter(([n]) => written.has(n));
+      assert.deepStrictEqual(roles(actual), roles(expected));
+    });
+  }
+});
+
 suite("annotate names", () => {
   const cases: [string, string, string[]][] = [
     [
@@ -216,6 +245,27 @@ suite("annotate names", () => {
         "column b ?global b",
         "builtin from",
         "column u ?global u",
+      ],
+    ],
+    [
+      "a row count, a sort and a nested query, in a lambda",
+      "{[t;s;n] select[n;>e] c:exec x from s where y from t}",
+      [
+        "param t :",
+        "param s :",
+        "param n :",
+        "builtin select",
+        "param n",
+        "column e ?global e",
+        "column c :",
+        "builtin exec",
+        "column x ?global x",
+        "builtin from",
+        "column s ?param s",
+        "builtin where",
+        "column y ?global y",
+        "builtin from",
+        "param t",
       ],
     ],
     [
@@ -550,6 +600,16 @@ suite("annotate handles", () => {
       "from, in place for update and delete",
       "select from `t; update a:1 from `u; delete from `v",
       ["t=t", "u=u : amends", "v=v : amends"],
+    ],
+    [
+      "from, in place after a query in update's columns, or in delete's clause",
+      "update c:exec first x from `s where y from `t where z; delete from `u where a in exec b from `v where c",
+      ["s=s", "t=t : amends", "u=u : amends", "v=v"],
+    ],
+    [
+      "from, in place after a query in the clause of one in update's columns",
+      "update c:exec x from `s where y in exec z from `u where v from `t",
+      ["s=s", "u=u", "t=t : amends"],
     ],
     [
       "bracket forms",

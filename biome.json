@@ -12,6 +12,7 @@
       "!test/fixtures/corpus.ipc.json",
       "!test/fixtures/lexing.json",
       "!test/fixtures/scoping.json",
+      "!test/fixtures/querying.json",
       "!test/evaluate/truth.json",
       "!test/evaluate/keywords.json",
       "!src/builtins.ts"
