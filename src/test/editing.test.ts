@@ -183,7 +183,11 @@ suite("q Run Selected Text in Terminal", () => {
   let received = "";
   let terminal: vscode.Terminal;
 
-  suiteSetup(async () => {
+  // VS Code starts the terminal, and delivers its first input, in its own
+  // time, which can be seconds on CI's macOS: a round trip here, so that no
+  // test is charged for it
+  suiteSetup(async function () {
+    this.timeout(10000);
     const write = new vscode.EventEmitter<string>();
     terminal = vscode.window.createTerminal({
       name: "q",
@@ -198,6 +202,8 @@ suite("q Run Selected Text in Terminal", () => {
     });
     terminal.show();
     await waitFor(() => vscode.window.activeTerminal === terminal);
+    terminal.sendText("");
+    await waitFor(() => received !== "");
   });
 
   suiteTeardown(() => terminal.dispose());
@@ -275,37 +281,17 @@ suite("q Run Selected Text in Terminal", () => {
       assert.strictEqual(statSync(second).mode & 0o777, 0o600);
     }
   });
-});
 
-suite("TerminalRun", () => {
   test("its files are removed when it's disposed", async () => {
     const editor = await open("a:1");
-    let sent = "";
-    const terminal = vscode.window.createTerminal({
-      name: "q",
-      pty: {
-        onDidWrite: new vscode.EventEmitter<string>().event,
-        open: () => {},
-        close: () => {},
-        handleInput: (data: string) => {
-          sent += data;
-        },
-      },
-    });
-    terminal.show();
-    try {
-      await waitFor(() => vscode.window.activeTerminal === terminal);
-      const runs = new TerminalRun();
-      runs.run(editor);
-      await waitFor(() => sent.includes(".q"));
-      const file = /^\\l (\S+\.q)/.exec(sent)?.[1] ?? "";
-      assert.ok(existsSync(file), file);
-      runs.dispose();
-      assert.ok(!existsSync(file), file);
-    } finally {
-      terminal.dispose();
-      await close();
-    }
+    received = "";
+    const runs = new TerminalRun();
+    runs.run(editor);
+    await waitFor(() => /\r\n?|\n/.test(received));
+    const file = /^\\l (\S+\.q)/.exec(received)?.[1] ?? "";
+    assert.ok(existsSync(file), file);
+    runs.dispose();
+    assert.ok(!existsSync(file), file);
   });
 });
 
