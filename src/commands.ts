@@ -17,40 +17,8 @@ import type { Results } from "./resultView";
 import type { ServerForms } from "./serverForm";
 import { scopes, scopesOf, write, writeEach } from "./serverForm";
 import * as servers from "./servers";
-import * as statements from "./statements";
 import { describe, type Status } from "./status";
 import { files, passphraseKey, type Secure, secure } from "./tls";
-// Send the selected text, or the current line, to the active terminal one
-// statement at a time. With several selections, each is sent in turn from the
-// top of the document.
-export function runSelectedText(editor: vscode.TextEditor) {
-  const terminal = vscode.window.activeTerminal;
-  if (!terminal) {
-    vscode.window.showWarningMessage(
-      "kdb+/q: No active terminal to run the selected text in.",
-    );
-    return;
-  }
-
-  const document = editor.document;
-  const selections = [...editor.selections].sort((a, b) =>
-    a.start.compareTo(b.start),
-  );
-  // Several cursors on one line run it once
-  const lines = new Set<number>();
-  for (const selection of selections) {
-    if (selection.isEmpty && lines.has(selection.start.line)) {
-      continue;
-    }
-    lines.add(selection.start.line);
-    const text = selection.isEmpty
-      ? document.lineAt(selection.start.line).text
-      : document.getText(selection);
-    for (const statement of statements.flatten(text)) {
-      terminal.sendText(statement);
-    }
-  }
-}
 
 // The console size, the precision and the row limit, read at each run; one
 // that's wrong is thrown

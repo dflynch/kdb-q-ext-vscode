@@ -14,12 +14,14 @@ import {
   ServersView,
 } from "./serversView";
 import { showStatus } from "./status";
+import { TerminalRun } from "./terminal";
 
 export function activate(context: vscode.ExtensionContext) {
   const open = commands.opener(context.secrets);
   const connections = new Connections(open);
   const results = new ResultView(context.extensionUri);
   const status = showStatus(connections);
+  const terminal = new TerminalRun();
   const forms = new ServerForms(
     context.extensionUri,
     context.secrets,
@@ -28,6 +30,7 @@ export function activate(context: vscode.ExtensionContext) {
   );
   context.subscriptions.push(
     status,
+    terminal,
     forms,
     new ServersView(connections, forms),
     connections,
@@ -90,7 +93,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("kdb-q-ext-vscode.runSelectedText", () => {
       const editor = vscode.window.activeTextEditor;
       if (editor) {
-        commands.runSelectedText(editor);
+        terminal.run(editor);
       }
     }),
     vscode.commands.registerCommand(
