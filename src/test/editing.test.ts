@@ -1,5 +1,7 @@
 import * as assert from "node:assert";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import * as vscode from "vscode";
+import { TerminalRun } from "../terminal";
 
 async function open(content: string) {
   const doc = await vscode.workspace.openTextDocument({
@@ -177,7 +179,7 @@ suite("q editing", () => {
 });
 
 suite("q Run Selected Text in Terminal", () => {
-  // What the terminal receives, one statement per line
+  // What the terminal receives
   let received = "";
   let terminal: vscode.Terminal;
 
@@ -202,52 +204,108 @@ suite("q Run Selected Text in Terminal", () => {
 
   teardown(close);
 
-  // The statements sent after running with the given selections
-  async function run(
-    content: string,
-    selections: vscode.Selection[],
-    expected: string[],
-  ) {
+  // The file q is asked to load after running with the given selections
+  async function run(content: string, selections: vscode.Selection[]) {
     const editor = await open(content);
     editor.selections = selections;
     received = "";
     await vscode.commands.executeCommand("kdb-q-ext-vscode.runSelectedText");
-    // Statements end in a carriage return, and nothing marks the last one,
-    // so wait for the expected count, then for any extra statements
-    const sent = () => received.match(/\r\n?|\n/g)?.length ?? 0;
-    for (let i = 0; i < 50 && sent() < expected.length; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    assert.deepStrictEqual(statements(), expected);
+    await waitFor(() => /\r\n?|\n/.test(received));
+    const match = /^\\l (\S+\.q)(?:\r\n?|\n)$/.exec(received);
+    assert.ok(match, `sent ${JSON.stringify(received)}`);
+    return match[1];
   }
 
-  function statements() {
-    return received.split(/\r\n?|\n/).filter((s) => s);
+  // The script q is asked to load
+  async function script(content: string, selections: vscode.Selection[]) {
+    return readFileSync(await run(content, selections), "utf8");
   }
 
   test("run the current line", async () => {
-    await run("a:1\nb:2", [new vscode.Selection(1, 1, 1, 1)], ["b:2"]);
+    assert.strictEqual(
+      await script("a:1\nb:2", [new vscode.Selection(1, 1, 1, 1)]),
+      "b:2",
+    );
   });
 
-  test("run a selection", async () => {
-    await run(
-      "f:{\n  x}\nb:2",
-      [new vscode.Selection(0, 0, 2, 3)],
-      ["f:{ x}", "b:2"],
+  test("run a selection as written", async () => {
+    const content = 'f:{\n  x} / f\n/ note\ns:"a\n b"\n\\d .foo\nb:2';
+    assert.strictEqual(
+      await script(content, [new vscode.Selection(0, 0, 6, 3)]),
+      content,
+    );
+  });
+
+  test("run a selection with CRLF line endings", async () => {
+    assert.strictEqual(
+      await script("f:{\r\n  x}\r\nb:2", [new vscode.Selection(0, 0, 2, 3)]),
+      "f:{\r\n  x}\r\nb:2",
     );
   });
 
   test("run several selections", async () => {
-    await run(
-      "a:1\nb:2\nc:3",
-      [
+    assert.strictEqual(
+      await script("a:1\nb:2\nc:3", [
         new vscode.Selection(2, 0, 2, 0),
         new vscode.Selection(0, 0, 0, 0),
         new vscode.Selection(0, 2, 0, 2),
-      ],
-      ["a:1", "c:3"],
+      ]),
+      "a:1\nc:3",
     );
+  });
+
+  test("run several selections with CRLF line endings", async () => {
+    assert.strictEqual(
+      await script("a:1\r\nb:2\r\nc:3", [
+        new vscode.Selection(2, 0, 2, 0),
+        new vscode.Selection(0, 0, 0, 0),
+      ]),
+      "a:1\r\nc:3",
+    );
+  });
+
+  test("each run has a file of its own", async () => {
+    const first = await run("a:1", [new vscode.Selection(0, 0, 0, 0)]);
+    await close();
+    const second = await run("b:2", [new vscode.Selection(0, 0, 0, 0)]);
+    assert.notStrictEqual(first, second);
+    assert.strictEqual(readFileSync(first, "utf8"), "a:1");
+    assert.strictEqual(readFileSync(second, "utf8"), "b:2");
+    if (process.platform !== "win32") {
+      assert.strictEqual(statSync(second).mode & 0o777, 0o600);
+    }
+  });
+});
+
+suite("TerminalRun", () => {
+  test("its files are removed when it's disposed", async () => {
+    const editor = await open("a:1");
+    let sent = "";
+    const terminal = vscode.window.createTerminal({
+      name: "q",
+      pty: {
+        onDidWrite: new vscode.EventEmitter<string>().event,
+        open: () => {},
+        close: () => {},
+        handleInput: (data: string) => {
+          sent += data;
+        },
+      },
+    });
+    terminal.show();
+    try {
+      await waitFor(() => vscode.window.activeTerminal === terminal);
+      const runs = new TerminalRun();
+      runs.run(editor);
+      await waitFor(() => sent.includes(".q"));
+      const file = /^\\l (\S+\.q)/.exec(sent)?.[1] ?? "";
+      assert.ok(existsSync(file), file);
+      runs.dispose();
+      assert.ok(!existsSync(file), file);
+    } finally {
+      terminal.dispose();
+      await close();
+    }
   });
 });
 

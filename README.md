@@ -41,7 +41,8 @@ read.
 - Run the file, the selected text or the current line on the connected
   server, and see the result as q's console shows it, with how long it took
 - Run the selected text, or the current line, in the active terminal (e.g. a
-  q session). With several selections, each runs in turn
+  q session), loaded as a script. Several selections make one script, from
+  the top of the file
 - Editing that keeps q's layout valid: pressing Enter between brackets keeps
   the closing bracket indented, Toggle Block Comment puts the `/` and `\`
   markers on lines of their own at column 0, and block comments fold
@@ -266,8 +267,8 @@ commands when clicked:
 
 **kdb+/q: Run File on Server**, also the ▶ in the editor's title bar, sends
 the whole file, including edits not yet saved, as one query, exactly as
-written, as a q client such as kdb Studio does. Unlike the terminal, nothing
-is split or removed: a server reads line breaks as spaces. With no
+written, as a q client such as kdb Studio does. Unlike in the terminal, it
+isn't read as a script: a server reads line breaks as spaces. With no
 connection open, it asks for a server, and with one opening, it waits.
 
 **kdb+/q: Run Selected Text on Server** sends the selection, or the current
@@ -349,16 +350,16 @@ q's:
 
 ### Running in a terminal
 
-**kdb+/q: Run Selected Text in Terminal** sends the selection, or the
-current line, to the active terminal, such as a q session. The q REPL only
-accepts single-line input, so the selected text is sent one statement at a
-time, following the same rules as a q script:
-- A line starting at column 0 begins a new statement, and an indented line
-  continues the previous one
-- Comments are removed, including block comments and everything after a lone
-  `\`
-- System commands, such as `\l`, are sent as is
-- A string that spans lines keeps its line breaks, as `\n`
+**kdb+/q: Run Selected Text in Terminal** (Shift+Enter) runs the selection,
+or the current line, in the active terminal, such as a q session, as a
+script. It writes the text as it is to a file in the temp folder, and sends
+`\l` with the file's path, so q reads it as it reads any script: an
+indented line continues the statement before, comments are skipped, and a
+`\d` lasts to the end. A run stops at the first error. Several selections
+make one script, from the top of the file.
+
+q must be able to read the file, so a q on another machine, such as one
+over ssh, can't load it. The files are removed when the window closes.
 
 ### Customizing colors
 

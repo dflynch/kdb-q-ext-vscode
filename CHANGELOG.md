@@ -128,6 +128,10 @@ All notable changes to the extension are documented in this file.
   Selected Text on Server
 - Ctrl/Cmd + Enter runs on the server, asking which one when none is
   connected, and Shift + Enter runs in the terminal
+- Run Selected Text in Terminal has q load the selection as a script, with
+  `\l` of a file in the temp folder, so q reads it as it reads any script,
+  and stops at the first error. A q that can't read this machine's temp
+  folder, such as one over ssh, can't load it
 - Both Run commands are on the editor's right-click menu, and clicking the
   status bar opens a menu of the server commands, with **kdb+/q: Open
   Settings**
