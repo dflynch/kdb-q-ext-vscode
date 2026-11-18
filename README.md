@@ -313,13 +313,13 @@ column, counted from 0, the row its index, however it's sorted or filtered,
 and the column as the result has it, keys first. Click a step, or press
 Alt+Left, to go back, to find it as you left it.
 
-**kdb+/q: Keep Result**, also the pin in the tab's title bar, opens the
+**kdb+/q: Pin Result**, also the pin in the tab's title bar, opens the
 latest result in an editor tab of its own, where the next query doesn't
 replace it, in the view it's shown in, on the cell drilled into, with the
 trail back. Above it are the server, the time
 and the query, all of it on hovering. Split the editor, or drag the tab to
-a window of its own, to compare results side by side. Kept tabs close with
-VS Code.
+a window of its own, to compare results side by side. Pinned results close
+with VS Code.
 
 **kdb+/q: Export Result to CSV**, also the export button in the tab's title
 bar, saves the Grid, of the result or a cell's value drilled into, where you
@@ -333,8 +333,8 @@ break is put in quotes, a quote in it doubled, as other programs read CSV,
 where q quotes only for a comma. A mixed list, such as a column of lists or
 tables, isn't written, as q won't write it either and no text would hold it
 whole: nothing is exported, and the message names the column. Hide it, or
-make it a column of strings in q, to export the rest. A kept tab has its own button, and **kdb+/q:
-Export Kept Result to CSV**.
+make it a column of strings in q, to export the rest. A pinned result has
+its own button, and **kdb+/q: Export Pinned Result to CSV**.
 
 There's more of it than q's console shows: 1000 lines of 1000 characters by
 default, set by `consoleSize` as `\c` takes them, with `..` where it's cut,
@@ -411,9 +411,9 @@ server commands on the status bar's and in the Servers view.
 | kdb+/q: Run File on Server            |                  |
 | kdb+/q: Run Selected Text on Server   | Ctrl/Cmd + Enter |
 | kdb+/q: Run Selected Text in Terminal | Shift + Enter    |
-| kdb+/q: Keep Result                   |                  |
+| kdb+/q: Pin Result                    |                  |
 | kdb+/q: Export Result to CSV          |                  |
-| kdb+/q: Export Kept Result to CSV     |                  |
+| kdb+/q: Export Pinned Result to CSV   |                  |
 | kdb+/q: Toggle Block Comment          | Shift + Alt + A  |
 | kdb+/q: Connect to Server             |                  |
 | kdb+/q: Disconnect from Server        |                  |
@@ -453,17 +453,18 @@ Open Keyboard Shortcuts**.
 many as each type holds, 17 for a float and 8 for a real. It applies wherever
 a result's floats and reals are written: the Console, the Grid, Copy, Export
 to CSV and the Chart's values at the cursor. Like `\P`, it applies from the
-next run; a result already shown, or kept, stays as it was.
+next run; a result already shown, or pinned, stays as it was.
 
 A result over `sizeLimit` is refused before it's read, and the connection
 closed. The extension holds the latest result as it arrived, and decodes it
-in the **KDB+/Q** tab, and in each kept tab, which have about 4 GB of memory.
+in the **KDB+/Q** tab, and in each pinned result's tab, which have about 4 GB
+of memory.
 The Grid takes about 250 bytes a row, whatever the columns, and a mixed
 list's items up to about 200 bytes more each, so a result, or a cell's value
 drilled into, of more rows than `rowLimit` is refused; like `precision`, it
 applies from the next run. A tab that runs out of memory, or crashes, turns
 grey, while VS Code and other extensions carry on. VS Code doesn't tell
 extensions when that happens, or let them restart it: **Developer: Reload
-Window** brings it back, but loses the latest result and closes kept tabs. A
-grey kept tab can only be closed. Kept tabs share one process, so when one
-turns grey, so do the rest.
+Window** brings it back, but loses the latest result and closes pinned
+results. A pinned result whose tab has turned grey can only be closed.
+Pinned results share one process, so when one turns grey, so do the rest.

@@ -2,7 +2,7 @@ import type { Column, Sheet } from "../table";
 
 // What the Chart view draws of a sheet: its type, then the columns in its
 // slots, by their place in the sheet, as two may share a name. The settings
-// panel edits it, and a kept tab carries it.
+// panel edits it, and a pinned result carries it.
 
 export type ChartType = "line" | "bar" | "histogram" | "scatter";
 
@@ -138,7 +138,7 @@ export function initial(sheet: Sheet): Spec | undefined {
 
 // A spec made to fit a sheet: as it is where it does, and otherwise, slot
 // by slot, the initial chart's choice. For a type chosen anew, where the
-// x may no longer fit, or a spec carried by a kept tab. A bar's labels are
+// x may no longer fit, or a spec carried by a pinned result. A bar's labels are
 // columns its x could be, each once, and never all the numbers, which
 // would leave no series; other types have none.
 export function fitted(spec: Spec, sheet: Sheet): Spec {
@@ -152,7 +152,7 @@ export function fitted(spec: Spec, sheet: Sheet): Spec {
       : xs.includes(spec.x)
         ? spec.x
         : initialX(sheet, spec.type);
-  // None in a kept tab's spec from before bars had them
+  // None in a pinned result's spec from before bars had them
   let labels =
     spec.type === "bar" && x !== null
       ? [...new Set(spec.labels ?? [])].filter((j) => j !== x && xs.includes(j))
@@ -171,7 +171,7 @@ export function fitted(spec: Spec, sheet: Sheet): Spec {
     const other = ys.find((j) => !used(j));
     y = other === undefined ? [] : [other];
   }
-  // A whole number of bins, as typed, as a kept tab may carry any
+  // A whole number of bins, as typed, as a pinned result may carry any
   const { bins } = spec;
   return {
     ...spec,

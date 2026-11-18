@@ -51,7 +51,7 @@ ModuleRegistry.registerModules([
   ColumnAutoSizeModule,
   // For a column of numbers or times, compared as q compares them
   CustomFilterModule,
-  // For how the grid is arranged, for a kept tab or a remade view
+  // For how the grid is arranged, for a pinned result or a remade view
   GridStateModule,
   // For showing which cells are selected
   RenderApiModule,
@@ -98,7 +98,7 @@ const theme = themeQuartz.withParams({
 // Short, int, long, real and float
 const numbers = [5, 6, 7, 8, 9];
 
-// What of the grid's state is its arrangement, carried to a kept tab: not
+// What of the grid's state is its arrangement, carried to a pinned result: not
 // its widths, fitted anew, its scroll or focus, nor its hidden columns, as
 // one hidden by mistake has no way back but running the query again
 const arrangement = ["sort", "filter", "columnOrder"] as const;
@@ -264,7 +264,7 @@ export class Grid {
   // So the keys work on coming to the grid. A cell drilled from may be
   // filtered out, by a filter typed half a second or less before drilling,
   // which ag-grid applies after its pause, while the grid is hidden; and a
-  // kept tab keeps that filter. Then nothing is focused.
+  // pinned result keeps that filter. Then nothing is focused.
   focus(cell?: Step) {
     if (!this.rendered) {
       this.focusWhenRendered = { cell };
