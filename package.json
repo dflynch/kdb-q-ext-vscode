@@ -29,8 +29,8 @@
         ],
         "configuration": "./language-configuration.json",
         "icon": {
-          "light": "./icons/q-light.svg",
-          "dark": "./icons/q-dark.svg"
+          "light": "./icons/q-file.svg",
+          "dark": "./icons/q-file.svg"
         }
       }
     ],
@@ -59,14 +59,14 @@
         {
           "id": "kdb-q-ext-vscode",
           "title": "KDB+/Q",
-          "icon": "icons/q-drop.svg"
+          "icon": "icons/q-prompt.svg"
         }
       ],
       "activitybar": [
         {
           "id": "kdb-q-ext-vscode-servers",
           "title": "KDB+/Q",
-          "icon": "icons/q-drop.svg"
+          "icon": "icons/q-prompt.svg"
         }
       ]
     },

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="-7.34 0.875 26 26">
+  <!-- Seti's purple, as Seti colours every file icon. The q is centred
+       9.75px across, not 8, to line up with Seti's icons: they are drawn
+       from a font at 150% and overflow their 16px box. -->
+  <title>q</title>
+  <g fill="none" stroke="#a074c4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12.5 7.5v13"/>
+    <path d="M12.5 9.5c-.7-1.4-2-2.25-3.75-2.25-2.5 0-4.25 2-4.25 4.75s1.75 4.75 4.25 4.75c1.75 0 3.05-.85 3.75-2.25"/>
+  </g>
+</svg>
