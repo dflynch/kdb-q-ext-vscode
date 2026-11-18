@@ -37,13 +37,13 @@ export function activate(context: vscode.ExtensionContext) {
     registerResultView(results),
     registerLanguage(),
     vscode.commands.registerCommand("kdb-q-ext-vscode.keepResult", () =>
-      results.keep(),
+      results.pin(),
     ),
     vscode.commands.registerCommand("kdb-q-ext-vscode.exportResult", async () =>
       saveCsv(await exporting(results.exportShown())),
     ),
     vscode.commands.registerCommand("kdb-q-ext-vscode.exportKept", async () =>
-      saveCsv(await exporting(results.exportKept())),
+      saveCsv(await exporting(results.exportPinned())),
     ),
     vscode.commands.registerCommand("kdb-q-ext-vscode.copyWithHeaders", () =>
       results.copyWithHeaders(),

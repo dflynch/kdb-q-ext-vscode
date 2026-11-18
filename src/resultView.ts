@@ -15,14 +15,14 @@ import type {
 
 // The Result view in the bottom panel: the latest result, shown in a webview
 export const viewId = "kdb-q-ext-vscode.result";
-// A result kept in an editor tab of its own
-export const keptType = "kdb-q-ext-vscode.kept";
-// Whether there's a result to keep, for the Keep Result command
+// A result pinned in an editor tab of its own
+export const pinnedType = "kdb-q-ext-vscode.kept";
+// Whether there's a result to pin, for the Pin Result command
 export const hasResult = "kdb-q-ext-vscode.hasResult";
-// Whether the Grid view is shown, in the Result view and in the kept tab
+// Whether the Grid view is shown, in the Result view and in the pinned result
 // that's active, for the Export to CSV commands
 export const exportable = "kdb-q-ext-vscode.exportable";
-export const keptExportable = "kdb-q-ext-vscode.keptExportable";
+export const pinnedExportable = "kdb-q-ext-vscode.keptExportable";
 
 // A Grid view, exported as CSV in UTF-8, and its rows; or its shown columns
 // that are mixed lists, which CSV can't hold; or nothing with another view
@@ -33,8 +33,8 @@ export type Exported = { csv?: Uint8Array; rows?: number; mixed?: string[] };
 // that are mixed lists, which it can't hold; or nothing with none selected
 export type Copied = { text?: string; mixed?: string[] };
 
-// A kept tab, and whether it shows the Grid view
-type Kept = { panel: vscode.WebviewPanel; exportable: boolean };
+// A pinned result, and whether it shows the Grid view
+type Pinned = { panel: vscode.WebviewPanel; exportable: boolean };
 
 // Makes an editor tab with a webview: VS Code's, or a stand-in for tests
 export type Panels = typeof vscode.window.createWebviewPanel;
@@ -51,15 +51,15 @@ export class ResultView implements vscode.WebviewViewProvider {
   private about?: About;
   // The view chosen last, whether the chart's settings are open, and the
   // cells drilled into in the latest and how each level is arranged, kept
-  // here too so a new webview, or a kept tab, opens on them
+  // here too so a new webview, or a pinned result, opens on them
   private chosen: View = "grid";
   private settings = true;
   private path: Step[] = [];
   private arranged: Arrangement[] = [];
   // Gives the latest's answer to whoever showed it
   private answer?: (execution: number | undefined) => void;
-  // The kept tab that's active, if one is
-  private active?: Kept;
+  // The pinned result that's active, if one is
+  private active?: Pinned;
   // The exports asked for and not yet answered, by number, and the webview
   // asked
   private exports = new Map<
@@ -154,12 +154,12 @@ export class ResultView implements vscode.WebviewViewProvider {
     return answered;
   }
 
-  // Keep the latest in an editor tab of its own, in the view it's shown in,
+  // Pin the latest in an editor tab of its own, in the view it's shown in,
   // on the cell drilled into and with its grids arranged as they are, where
   // the next result doesn't replace it.
   // The tab is kept alive when hidden, as the Result view is, and closes
   // with VS Code: nothing is saved.
-  keep() {
+  pin() {
     if (!this.latest || !this.about) {
       return;
     }
@@ -172,7 +172,7 @@ export class ResultView implements vscode.WebviewViewProvider {
       arranged: this.arranged,
     };
     const panel = this.panels(
-      keptType,
+      pinnedType,
       title(this.about),
       vscode.ViewColumn.Active,
       { retainContextWhenHidden: true },
@@ -181,7 +181,7 @@ export class ResultView implements vscode.WebviewViewProvider {
       light: vscode.Uri.joinPath(this.extensionUri, "icons", "q-light.svg"),
       dark: vscode.Uri.joinPath(this.extensionUri, "icons", "q-dark.svg"),
     };
-    const tab: Kept = { panel, exportable: false };
+    const tab: Pinned = { panel, exportable: false };
     // Active as it opens
     this.activate(tab);
     panel.onDidChangeViewState(() => {
@@ -225,8 +225,8 @@ export class ResultView implements vscode.WebviewViewProvider {
     return this.export(this.view?.webview);
   }
 
-  // The grid of the kept tab that's active, exported as CSV
-  exportKept(): Promise<Exported> {
+  // The grid of the pinned result that's active, exported as CSV
+  exportPinned(): Promise<Exported> {
     return this.export(this.active?.panel.webview);
   }
 
@@ -277,11 +277,11 @@ export class ResultView implements vscode.WebviewViewProvider {
     }
   }
 
-  private activate(tab: Kept) {
+  private activate(tab: Pinned) {
     this.active = tab;
     vscode.commands.executeCommand(
       "setContext",
-      keptExportable,
+      pinnedExportable,
       tab.exportable,
     );
   }
@@ -302,7 +302,7 @@ export class ResultView implements vscode.WebviewViewProvider {
 // Where a query's result is shown
 export type Results = Pick<ResultView, "reveal" | "show">;
 
-// A kept result's tab title: its query on one line, shortened, and the
+// A pinned result's tab title: its query on one line, shortened, and the
 // server. The tab has no tooltip; the page says the rest.
 export function title({ query, server }: Omit<About, "at">): string {
   const line = query.replace(/\s+/g, " ").trim();

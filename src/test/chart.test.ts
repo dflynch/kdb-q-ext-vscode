@@ -369,7 +369,7 @@ suite("the Chart", () => {
       fitted(spec({ type: "bar", x: 0, labels: [3, 1, 2], y: [2] }), trades),
       spec({ type: "bar", x: 0, labels: [3, 1], y: [2] }),
     );
-    // A kept tab's spec from before labels
+    // A pinned result's spec from before labels
     assert.deepStrictEqual(
       fitted(
         {
@@ -388,7 +388,7 @@ suite("the Chart", () => {
       [0, 1, 2].map((row) => plotted.label?.(row)),
       ["a 00:00:03.000", "b 00:00:01.000", "c 00:00:02.000"],
     );
-    // A kept tab's bar from before labels, come back to
+    // A pinned result's bar from before labels, come back to
     const old = {
       ...spec({ x: 1, y: [3] }),
       others: { bar: { x: 0, y: [3] } },

@@ -33,7 +33,7 @@ export type Arrangement = {
 // As posted, numbered, so that the webview's answer can be matched to it,
 // with the view chosen last, whether the chart's settings are open, the
 // cells drilled into, and how each level is arranged, the result's first,
-// for a webview that opens on them. A kept result also says what it
+// for a webview that opens on them. A pinned result also says what it
 // answers.
 export type Posted = ToView & {
   id: number;

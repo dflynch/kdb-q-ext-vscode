@@ -4,9 +4,9 @@ import { defaultSize } from "../format/console";
 import type { Copy, Export, FromView, Posted, ToView } from "../messages";
 import {
   type Copied,
-  keptType,
   type Panels,
   page,
+  pinnedType,
   ResultView,
   title,
   viewId,
@@ -327,13 +327,13 @@ suite("the Result view", () => {
       path: [[3, 1]],
       arranged: [filtered, {}],
     });
-    results.keep();
+    results.pin();
     made[0].view.ready();
     assert.deepStrictEqual(made[0].view.posted[0].path, [[3, 1]]);
     assert.deepStrictEqual(made[0].view.posted[0].arranged, [filtered, {}]);
   });
 
-  test("the Chart chosen, and its settings closed, are what a new webview and a kept tab open on", () => {
+  test("the Chart chosen, and its settings closed, are what a new webview and a pinned result open on", () => {
     const { made, panels } = tabs();
     const results = new ResultView(extension, panels);
     const first = resolved(results);
@@ -344,7 +344,7 @@ suite("the Result view", () => {
     second.ready();
     assert.strictEqual(second.posted[0].view, "chart");
     assert.strictEqual(second.posted[0].settings, false);
-    results.keep();
+    results.pin();
     made[0].view.ready();
     assert.strictEqual(made[0].view.posted[0].view, "chart");
     assert.strictEqual(made[0].view.posted[0].settings, false);
@@ -357,7 +357,7 @@ suite("the Result view", () => {
     view.say({ type: "chose", view: "console" });
     const before = Date.now();
     results.show(two, asked);
-    results.keep();
+    results.pin();
     assert.strictEqual(made.length, 1);
     const [{ title: named, options, view: kept }] = made;
     assert.strictEqual(named, "select from trade · prod");
@@ -379,11 +379,11 @@ suite("the Result view", () => {
     });
   });
 
-  test("a kept result stays as it was when the next is shown", () => {
+  test("a pinned result stays as it was when the next is shown", () => {
     const { made, panels } = tabs();
     const results = new ResultView(extension, panels);
     results.show(two, asked);
-    results.keep();
+    results.pin();
     results.show(one, { query: "1+", server: "dev" });
     const [{ view: kept }] = made;
     kept.ready();
@@ -398,11 +398,11 @@ suite("the Result view", () => {
 
   test("keeps nothing before the first result", () => {
     const { made, panels } = tabs();
-    new ResultView(extension, panels).keep();
+    new ResultView(extension, panels).pin();
     assert.deepStrictEqual(made, []);
   });
 
-  test("a kept tab's title is its query on one line, shortened, and the server", () => {
+  test("a pinned result's title is its query on one line, shortened, and the server", () => {
     assert.strictEqual(title({ query: " 1+1\n", server: "dev" }), "1+1 · dev");
     assert.strictEqual(
       title({
@@ -461,7 +461,7 @@ suite("the Result view", () => {
     }
   });
 
-  test("a kept result opens in an editor tab, where its webview shows it", async function () {
+  test("a pinned result opens in an editor tab, where its webview shows it", async function () {
     this.timeout(10000);
     const extension = vscode.extensions.getExtension(
       "dflynch3.kdb-q-ext-vscode",
@@ -489,7 +489,7 @@ suite("the Result view", () => {
         },
         asked,
       );
-      results.keep();
+      results.pin();
       assert.ok(panel);
       const kept = panel;
       const answer = await new Promise<FromView>((resolve) => {
@@ -551,27 +551,27 @@ suite("the Result view", () => {
     assert.deepStrictEqual(await reloading, {});
 
     const { made, panels } = tabs();
-    const keeping = new ResultView(extension, panels);
-    keeping.show(two, asked);
-    keeping.keep();
-    const kept = keeping.exportKept();
+    const pinning = new ResultView(extension, panels);
+    pinning.show(two, asked);
+    pinning.pin();
+    const pinned = pinning.exportPinned();
     made[0].close();
-    assert.deepStrictEqual(await kept, {});
+    assert.deepStrictEqual(await pinned, {});
   });
 
   test("exports nothing with no Result view", async () => {
     assert.deepStrictEqual(await new ResultView(extension).exportShown(), {});
   });
 
-  test("asks the kept tab that's active for its value as CSV", async () => {
+  test("asks the pinned result that's active for its value as CSV", async () => {
     const { made, panels } = tabs();
     const results = new ResultView(extension, panels);
-    assert.deepStrictEqual(await results.exportKept(), {});
+    assert.deepStrictEqual(await results.exportPinned(), {});
     results.show(two, asked);
-    results.keep();
-    results.keep();
+    results.pin();
+    results.pin();
     made[0].activate();
-    const exported = results.exportKept();
+    const exported = results.exportPinned();
     assert.deepStrictEqual(made[1].view.exports, []);
     assert.deepStrictEqual(made[0].view.exports, [
       { type: "export", request: 1 },
@@ -587,7 +587,7 @@ suite("the Result view", () => {
     const view = resolved(results);
     view.say({ type: "copied", text: "a\t1" });
     results.show(two, asked);
-    results.keep();
+    results.pin();
     made[0].view.say({ type: "copied", mixed: ["v"] });
     view.say({ type: "copied" });
     assert.deepStrictEqual(copied, [{ text: "a\t1" }, { mixed: ["v"] }, {}]);
@@ -599,7 +599,7 @@ suite("the Result view", () => {
     const view = resolved(results);
     results.copyWithHeaders();
     results.show(two, asked);
-    results.keep();
+    results.pin();
     view.say({ type: "menu" });
     made[0].view.say({ type: "menu" });
     results.copyWithHeaders();
@@ -615,7 +615,7 @@ suite("the Result view", () => {
     assert.deepStrictEqual(view.copies, []);
   });
 
-  test("Copy with Headers is in the menu of a grid, in the Result view and a kept tab", async () => {
+  test("Copy with Headers is in the menu of a grid, in the Result view and a pinned result", async () => {
     assert.ok(
       (await vscode.commands.getCommands(true)).includes(
         "kdb-q-ext-vscode.copyWithHeaders",
@@ -627,13 +627,13 @@ suite("the Result view", () => {
     assert.deepStrictEqual(manifest.contributes.menus["webview/context"], [
       {
         command: "kdb-q-ext-vscode.copyWithHeaders",
-        when: `webviewSection == grid && (webviewId == ${viewId} || webviewId == ${keptType})`,
+        when: `webviewSection == grid && (webviewId == ${viewId} || webviewId == ${pinnedType})`,
         group: "9_cutcopypaste",
       },
     ]);
   });
 
-  test("Keep Result is a command, pinned to the Result view", async () => {
+  test("Pin Result is a command, pinned to the Result view", async () => {
     assert.ok(
       (await vscode.commands.getCommands(true)).includes(
         "kdb-q-ext-vscode.keepResult",
@@ -656,7 +656,7 @@ suite("the Result view", () => {
     );
   });
 
-  test("Export to CSV is a command for the Result view and for a kept tab", async () => {
+  test("Export to CSV is a command for the Result view and for a pinned result", async () => {
     const commands = await vscode.commands.getCommands(true);
     assert.ok(commands.includes("kdb-q-ext-vscode.exportResult"));
     assert.ok(commands.includes("kdb-q-ext-vscode.exportKept"));
@@ -666,7 +666,7 @@ suite("the Result view", () => {
     assert.deepStrictEqual(manifest.contributes.menus["editor/title"], [
       {
         command: "kdb-q-ext-vscode.exportKept",
-        when: `activeWebviewPanelId == ${keptType}`,
+        when: `activeWebviewPanelId == ${pinnedType}`,
         group: "navigation",
       },
     ]);

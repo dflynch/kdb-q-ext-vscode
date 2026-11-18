@@ -1,4 +1,4 @@
-// The script of the Result view and of each kept result's tab, bundled into
+// The script of the Result view and of each pinned result's tab, bundled into
 // dist/webview.js. It runs in the webview, with the DOM but no Node and no
 // VS Code API, and talks to the extension only by messages
 import type { Size } from "../format/console";
@@ -31,7 +31,7 @@ const nonce = document.currentScript?.nonce ?? "";
 const empty = document.createElement("p");
 empty.className = "empty";
 // Until the first result, how to get one: Run Selected Text on Server's key.
-// A kept tab is posted its result as soon as it's ready.
+// A pinned result's tab is posted its result as soon as it's ready.
 const key = navigator.userAgent.includes("Mac") ? "Cmd+Enter" : "Ctrl+Enter";
 empty.textContent = `Run a query with ${key} to see its result here`;
 
@@ -77,7 +77,7 @@ settings.addEventListener("click", () => {
 });
 tabs.append(settings);
 
-// A kept result says what it answers, above the tabs: the server, when it
+// A pinned result says what it answers, above the tabs: the server, when it
 // was shown, and the query on one line, the whole of it on hovering
 const about = document.createElement("p");
 about.className = "about";
@@ -351,7 +351,7 @@ function drill(step: Step, told = true, view = chosen, arranged = {}) {
 // Go back to the level at i, as it was left, dropping those after it, with
 // the focus on the cell drilled into from it: the trail's next step. Its
 // view, the Grid, drilled from, is the one chosen now, for the next result
-// and for Keep Result.
+// and for Pin Result.
 function back(i: number) {
   const from = levels[i + 1].step as Step;
   for (const level of levels.splice(i + 1)) {
@@ -369,7 +369,7 @@ function back(i: number) {
 }
 
 // The extension keeps the cells drilled into, and how each level's grid
-// is arranged, so that a kept tab, or this view made anew, opens on the
+// is arranged, so that a pinned result, or this view made anew, opens on the
 // same value, arranged the same
 function tellLevels() {
   const path = levels.slice(1).map((level) => level.step as Step);
