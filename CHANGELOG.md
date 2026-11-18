@@ -122,8 +122,9 @@ All notable changes to the extension are documented in this file.
   qSQL and system commands, and one on `support.class` no longer colors
   handles
 - The extension is now named Ink: kdb+/q toolkit, with a new icon: an ink q
-  on paper, its tail ending in a drop. q files and the kdb+/q icon in the
-  Activity Bar and panel have the same q
+  on paper, its tail ending in a drop. The kdb+/q icon in the Activity Bar
+  and panel is q's prompt, `q)`, drawn in lines like VS Code's own icons,
+  and q files have a purple q, a color from VS Code's default file icons
 - Run Selected Text is now Run Selected Text in Terminal, beside Run
   Selected Text on Server
 - Ctrl/Cmd + Enter runs on the server, asking which one when none is
@@ -135,8 +136,6 @@ All notable changes to the extension are documented in this file.
 - Both Run commands are on the editor's right-click menu, and clicking the
   status bar opens a menu of the server commands, with **kdb+/q: Open
   Settings**
-- New icons: a rounded q tile in the Marketplace, and a file icon with
-  separate light and dark versions, so it stays clear in dark themes
 
 ### Fixed
 

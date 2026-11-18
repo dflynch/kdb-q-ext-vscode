@@ -177,10 +177,11 @@ export class ResultView implements vscode.WebviewViewProvider {
       vscode.ViewColumn.Active,
       { retainContextWhenHidden: true },
     );
-    panel.iconPath = {
-      light: vscode.Uri.joinPath(this.extensionUri, "icons", "q-light.svg"),
-      dark: vscode.Uri.joinPath(this.extensionUri, "icons", "q-dark.svg"),
-    };
+    panel.iconPath = vscode.Uri.joinPath(
+      this.extensionUri,
+      "icons",
+      "q-file.svg",
+    );
     const tab: Pinned = { panel, exportable: false };
     // Active as it opens
     this.activate(tab);

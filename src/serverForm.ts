@@ -295,10 +295,11 @@ export class ServerForms implements vscode.Disposable {
     const panel = this.panels(formType, title, vscode.ViewColumn.Active, {
       retainContextWhenHidden: true,
     });
-    panel.iconPath = {
-      light: vscode.Uri.joinPath(this.extensionUri, "icons", "q-light.svg"),
-      dark: vscode.Uri.joinPath(this.extensionUri, "icons", "q-dark.svg"),
-    };
+    panel.iconPath = vscode.Uri.joinPath(
+      this.extensionUri,
+      "icons",
+      "q-file.svg",
+    );
     const open: Open = { panel, ...of, closing: new AbortController() };
     this.forms.set(id, open);
     panel.onDidDispose(() => {
