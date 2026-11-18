@@ -457,8 +457,8 @@ next run; a result already shown, or pinned, stays as it was.
 
 A result over `sizeLimit` is refused before it's read, and the connection
 closed. The extension holds the latest result as it arrived, and decodes it
-in the **KDB+/Q** tab, and in each pinned result's, which have about 4 GB of
-memory.
+in the **KDB+/Q** tab, and in each pinned result's tab, which have about 4 GB
+of memory.
 The Grid takes about 250 bytes a row, whatever the columns, and a mixed
 list's items up to about 200 bytes more each, so a result, or a cell's value
 drilled into, of more rows than `rowLimit` is refused; like `precision`, it
@@ -466,5 +466,5 @@ applies from the next run. A tab that runs out of memory, or crashes, turns
 grey, while VS Code and other extensions carry on. VS Code doesn't tell
 extensions when that happens, or let them restart it: **Developer: Reload
 Window** brings it back, but loses the latest result and closes pinned
-results. A grey pinned result can only be closed. Pinned results share one
-process, so when one turns grey, so do the rest.
+results. A pinned result whose tab has turned grey can only be closed.
+Pinned results share one process, so when one turns grey, so do the rest.

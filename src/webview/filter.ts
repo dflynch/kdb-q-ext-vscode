@@ -18,7 +18,7 @@ export type Comparison =
   | "inRange"
   | "contains";
 
-// What a filter is set to, kept with a pinned result: what's typed or picked, as
+// What a filter is set to, carried by a pinned result: what's typed or picked, as
 // it is, and for a range its end
 export interface Condition {
   type: Comparison;

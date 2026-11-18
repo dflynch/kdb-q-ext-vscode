@@ -350,7 +350,7 @@ suite("the Result view", () => {
     assert.strictEqual(made[0].view.posted[0].settings, false);
   });
 
-  test("keeps the latest in an editor tab, with what it answers, in the view chosen", () => {
+  test("pins the latest in an editor tab, with what it answers, in the view chosen", () => {
     const { made, panels } = tabs();
     const results = new ResultView(extension, panels);
     const view = resolved(results);
@@ -359,13 +359,13 @@ suite("the Result view", () => {
     results.show(two, asked);
     results.pin();
     assert.strictEqual(made.length, 1);
-    const [{ title: named, options, view: kept }] = made;
+    const [{ title: named, options, view: pinned }] = made;
     assert.strictEqual(named, "select from trade · prod");
     assert.deepStrictEqual(options, { retainContextWhenHidden: true });
-    assert.strictEqual(kept.options.enableScripts, true);
-    assert.strictEqual(kept.posted.length, 0);
-    kept.ready();
-    const [posted] = kept.posted;
+    assert.strictEqual(pinned.options.enableScripts, true);
+    assert.strictEqual(pinned.posted.length, 0);
+    pinned.ready();
+    const [posted] = pinned.posted;
     const at = posted.about?.at ?? 0;
     assert.ok(at >= before && at <= Date.now());
     assert.deepStrictEqual(posted, {
@@ -385,18 +385,18 @@ suite("the Result view", () => {
     results.show(two, asked);
     results.pin();
     results.show(one, { query: "1+", server: "dev" });
-    const [{ view: kept }] = made;
-    kept.ready();
+    const [{ view: pinned }] = made;
+    pinned.ready();
     // Should its webview be made anew
-    kept.ready();
-    assert.strictEqual(kept.posted.length, 2);
-    for (const posted of kept.posted) {
+    pinned.ready();
+    assert.strictEqual(pinned.posted.length, 2);
+    for (const posted of pinned.posted) {
       assert.strictEqual(posted.id, 1);
       assert.strictEqual(posted.about?.query, "select from trade");
     }
   });
 
-  test("keeps nothing before the first result", () => {
+  test("pins nothing before the first result", () => {
     const { made, panels } = tabs();
     new ResultView(extension, panels).pin();
     assert.deepStrictEqual(made, []);
@@ -491,9 +491,9 @@ suite("the Result view", () => {
       );
       results.pin();
       assert.ok(panel);
-      const kept = panel;
+      const pinned = panel;
       const answer = await new Promise<FromView>((resolve) => {
-        kept.webview.onDidReceiveMessage((message: FromView) => {
+        pinned.webview.onDidReceiveMessage((message: FromView) => {
           if (message.type === "shown") {
             resolve(message);
           }
@@ -554,9 +554,9 @@ suite("the Result view", () => {
     const pinning = new ResultView(extension, panels);
     pinning.show(two, asked);
     pinning.pin();
-    const pinned = pinning.exportPinned();
+    const exported = pinning.exportPinned();
     made[0].close();
-    assert.deepStrictEqual(await pinned, {});
+    assert.deepStrictEqual(await exported, {});
   });
 
   test("exports nothing with no Result view", async () => {
@@ -633,7 +633,7 @@ suite("the Result view", () => {
     ]);
   });
 
-  test("Pin Result is a command, pinned to the Result view", async () => {
+  test("Pin Result is a command, and a button in the Result view's title bar", async () => {
     assert.ok(
       (await vscode.commands.getCommands(true)).includes(
         "kdb-q-ext-vscode.keepResult",

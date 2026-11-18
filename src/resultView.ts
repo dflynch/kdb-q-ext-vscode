@@ -42,7 +42,7 @@ export type Panels = typeof vscode.window.createWebviewPanel;
 // It shows the latest result only. The webview is kept alive when hidden,
 // but VS Code makes it anew if the view is closed and opened, so the latest
 // is kept here too, and posted once the webview says it's ready: anything
-// posted before then is lost. The latest can be kept in an editor tab,
+// posted before then is lost. The latest can be pinned in an editor tab,
 // where the next doesn't replace it.
 export class ResultView implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
@@ -163,7 +163,7 @@ export class ResultView implements vscode.WebviewViewProvider {
     if (!this.latest || !this.about) {
       return;
     }
-    const kept: Posted = {
+    const pinned: Posted = {
       ...this.latest,
       about: this.about,
       view: this.chosen,
@@ -203,7 +203,7 @@ export class ResultView implements vscode.WebviewViewProvider {
           this.activate(tab);
         }
         this.unanswered(panel.webview);
-        panel.webview.postMessage(kept);
+        panel.webview.postMessage(pinned);
       } else if (message.type === "exportable") {
         tab.exportable = message.exportable;
         if (this.active === tab) {
