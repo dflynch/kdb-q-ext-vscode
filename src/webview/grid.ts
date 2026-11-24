@@ -99,8 +99,7 @@ const theme = themeQuartz.withParams({
 const numbers = [5, 6, 7, 8, 9];
 
 // What of the grid's state is its arrangement, carried to a pinned result: not
-// its widths, fitted anew, its scroll or focus, nor its hidden columns, as
-// one hidden by mistake has no way back but running the query again
+// its widths, fitted anew, nor its scroll or focus
 const arrangement = ["sort", "filter", "columnOrder"] as const;
 
 // A row is its index in the result: the sheet reads the cells
@@ -197,6 +196,10 @@ export class Grid {
       columnDefs: [index, ...columnDefs],
       rowData: Array.from({ length: sheet.rows }, (_, row) => ({ row })),
       autoSizeStrategy: { type: "fitCellContents" },
+      // A header dragged out of the grid moves back, rather than hiding its
+      // column: a column hidden by mistake would have no way back but
+      // running the query again
+      suppressDragLeaveHidesColumns: true,
       initialState: arranged as GridState,
       onStateUpdated: ({ sources, state }) => {
         if (arrangement.some((part) => sources.includes(part))) {
