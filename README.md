@@ -1,470 +1,223 @@
 # Ink: kdb+/q toolkit
 
-A lightweight extension for kdb+/q programming.
+Ink is a VS Code extension for q. It runs your q code on the kdb+ processes you already have and shows the result as q's console display, a grid or a chart. It also reads the q code in your workspace to give hovers, Go to Definition, completion and syntax errors as you type.
 
-## Scope
+**Requirements:** VS Code 1.140 or later, and a kdb+ process to connect to, or a q session you start in VS Code's terminal. Ink doesn't start or bundle q.
 
-Ink is for writing q, and in time for querying kdb+ and reading what comes
-back, without leaving VS Code. It's one extension with nothing to install
-alongside it. Today it highlights q, edits it, runs it in a terminal, and
-connects to kdb+ to run queries and show their results as q's console does,
-and tables in a grid (see [Features](#features)).
+**Install:** search for "Ink: kdb+/q toolkit" in the Extensions view, or run `code --install-extension dflynch3.kdb-q-ext-vscode`.
 
-### Planned
+## Walkthrough
 
-- In the grid: copying a selection as the text you see
+The clips follow one piece of work in a small q codebase for transaction-cost analysis:
 
-### The query you send is the query you wrote
+- `src/tca.q` defines `.tca.bars`, `.tca.cost`, `.tca.spread` and `.tca.intraday`, and `src/patch.q` holds a later fix to `.tca.intraday`.
+- `src/init.q` loads test `trade` and `quote` tables and `src/tca.q`. A local q started with `q src/init.q -p 5010` is the server.
+- `scripts/spread.q` holds the queries, and `scripts/checks.q` some checks to run as a script.
 
-Ink never edits a query: it won't wrap it to fetch extra metadata, or add
-a row limit to it. With [protected evaluation](#protected-evaluation) on, the
-text is sent beside the function that traps its errors, unchanged; turn it
-off and a gateway that only allows listed calls sees exactly what you typed.
-A result over the size limit, `sizeLimit`, is refused before it's read, and
-the connection closed; one of more rows than `rowLimit` is refused once it's
-read.
+### 1. Add a server
 
-### Out of scope
+The first time you press Cmd+Enter (Ctrl+Enter) on a line, Ink says no servers are defined and offers **Add Server**. Test connects with what you've typed, and Save writes the server to your settings and adds it to the Servers view, under the `q)` icon in the Activity Bar, which holds your servers in folders. In the clip, the server is `local`, on `localhost:5010`.
 
-- Rename, formatting, diagnostics and `.k` files
-- Names built from strings at runtime, such as `value "f",string x`: q can't
-  resolve them until the code runs, so navigation won't either
-- Starting or bundling q: Ink connects to kdb+ processes you started, and
-  Run Selected Text in Terminal sends your code to a q session you started
+![Cmd+Enter with no servers defined offers Add Server; the form is filled in with local, localhost and 5010, Test reports Connected to localhost:5010, and Save adds local to the Servers view](media/add-server.gif)
 
-## Features
+- Passwords never go in settings: a server's password is kept in VS Code's secure storage, asked for at each connect, or supplied by your firm's sign-on extension.
 
-- Syntax highlighting for q, including the q 5 (KDB-X) keywords and
-  `.Q`/`.z`/`.h`/`.j` namespaces
-- Connect to kdb+ processes, over TLS if need be, with passwords kept in
-  VS Code's secure storage, asked for, or given by another extension
-- Run the file, the selected text or the current line on the connected
-  server, and see the result as q's console shows it, with how long it took
-- Run the selected text, or the current line, in the active terminal (e.g. a
-  q session), loaded as a script. Several selections make one script, from
-  the top of the file
-- Editing that keeps q's layout valid: pressing Enter between brackets keeps
-  the closing bracket indented, Toggle Block Comment puts the `/` and `\`
-  markers on lines of their own at column 0, and block comments fold
-- Navigation that follows q's namespaces and knows which names are local
-  to a lambda: the outline and breadcrumbs, highlighting a name where it
-  occurs, Go to Definition, Find All References, and **Go to Symbol in
-  Workspace** (Cmd+T / Ctrl+T) across every `.q` file in the workspace,
-  including q 5 modules' `use` and `export`. Find All References lists the
-  uses that pass a global by reference, naming it by a symbol as in
-  ``@[value;`.timer.enabled;0b]`` or `` `t insert x ``, under **Passed by
-  reference**, after the rest; the peek (Shift+F12) lists them with the
-  rest, as it has no groups. A definition sets the whole value, as `t:`,
-  `t::`, `` `t set x `` or ``@[`t;();:;x]`` do; an amend changes it, as
-  `t,:x`, `t[i]:x`, `` `t upsert x `` or ``update … from `t`` do, so is a
-  reference. What it can't know:
-  - Each file is read as if loaded in the root namespace: `\l` runs a file
-    in its loader's namespace, which the file doesn't say
-  - A global defined more than once, in a file or in several, such as a
-    setting with its defaults and overrides, has every definition, which
-    VS Code lists by file and line in a peek opened at the one nearest the
-    cursor: in the file's own, if it has one. Set
-    `editor.gotoLocation.multipleDefinitions` to `goto` to jump there
-  - ``use`foo`` goes to `foo.q` or `foo/init.q` anywhere in the
-    workspace, as `QPATH` isn't read. `s.f`, ``s`f`` and ``s[`f]`` follow
-    the module bound to `s`, as any global: by ``s:use`foo`` in the file,
-    if it defines `s`, else in every file that binds it, nearest first.
-    ``s`f`` and ``s[`f]`` also follow a top-level view ``s::use`foo``, as
-    q 5.0 does; `s.f` doesn't, as q doesn't. A module, a file that assigns
-    `export`, runs in `.m.foo` up to its first `\d`. Its globals there
-    without a leading dot are its own, followed only in the module, never
-    from another file; Go to Symbol in Workspace still lists them, as
-    written in the module. An `export` after a `\d` doesn't make the file
-    a module, as q then finds no export
-  - `\l path/util.q` goes to each `.q` file whose path ends with
-    `path/util.q`, with the cursor on the path, as `\l` loads from the
-    directory q runs in, which isn't known. `.` anywhere, any number of
-    leading `..`, and empty segments, as in `lib//util.q` or a leading `/`,
-    are dropped, and `x/..` cancels out, so an absolute path matches as a
-    suffix: `\l /opt/app/lib/util.q` finds any file ending in
-    `opt/app/lib/util.q`. Paths are split at `/` only, with no `\` or drive
-    letters, as the q process's platform isn't known. A `\l` with an
-    indented line after it goes nowhere, as q joins the line on and loads
-    nothing, unless the `\l` line ends in a comment, as q reads a command
-    only up to its first comment. A directory, as a database, isn't
-    followed
-  - Names q defines (`.z`, `.Q`), and globals defined outside the workspace
-- Hover: on a q keyword or a name in `.Q`, `.z`, `.h` or `.j`, its syntax
-  and what it does, from [KX's reference](https://code.kx.com/q/ref/),
-  linked. On a global, or a name a module exports, defined at the start
-  of a line, its signature, or its name, then the comment lines directly
-  above it, exactly as written, as parameter hints show them, and, if
-  it's another, the file it's in. A comment indented, as in a lambda, is
-  about the code it's in, and one trailing a line could be about either
-  line, so neither is shown. A global defined more than once shows the
-  nearest file's latest definition, what the global holds once that file
-  has loaded, with a link that peeks at all of them, as Go to Definition
-  does. A name in a query may be a column or a global, so, as Go to
-  Definition does, it shows the global of that name, if there is one.
-- Parameter hints: typing a call's arguments in brackets, as `f[a;b]`,
-  shows its signature with the current parameter highlighted, in VS Code's
-  own widget: each of q's forms for the name, then each definition's,
-  nearest file first and, in a file that defines it again, the latest
-  first, ↑ and ↓ to move between them. Inside an argument that indexes,
-  as ``t[`c]``, the call's own stays; inside a lambda, as in
-  `f[1;{x+y}]`, only the lambda's own calls show one. Ctrl+Shift+Space (Cmd+Shift+Space on
-  macOS) shows it again, and `editor.parameterHints.enabled` turns it off.
-  q's functions KX writes only in prefix notation, as `.Q.s1 x`, show in
-  bracket notation, `.Q.s1[x]`; a call written in prefix or infix notation,
-  as `count x` or `x bin y`, has none, nor has `select[2]`, a qSQL query's
-  row limit; a call in a query has its own
-- Syntax errors as you type, in the Problems panel, for the brackets and
-  strings q would refuse a script for: one left open, as `) expected` where
-  its close was expected (at the end of the statement, as q's own error
-  points, or at the close that ended it, as in `{(x+1}`), linked to where
-  it opened, and a close with nothing to close, as `unmatched ]`. A line at
-  column 0 starts a new statement, as in q, so a lambda's closing `}` there
-  is unmatched, and its `{` left open. Only files open in the editor's tabs
-  are checked; set `kdb-q-ext-vscode.diagnosticMode` to `workspace` to check
-  every `.q` file in the workspace too, as saved
-- Completion, in VS Code's own suggestions as you type: the innermost
-  lambda's parameters and locals first (q has no closures, so an outer
-  lambda's aren't in scope), then the workspace's globals in the root,
-  then q's keywords. After `\d .ns`, `.ns`'s globals, q's own in `.Q`, `.h` or
-  `.j`, and its namespaces are offered by their names in it instead
-  of the root's, as q reads names there. After a
-  dot, a namespace's members and the namespaces in it:
-  `.` gives the namespaces, `.Q.` q's own, with KX's line, and `.ns.` your
-  own, with each function's signature, and its comment as the hover shows it;
-  `s.` a module's exports, for `s` bound by ``s:use`mod``, as Go to
-  Definition follows it. A module's own globals are offered only in the
-  module, and there instead of the root's. A symbol
-  starting with a dot, as `` `.ns. ``, offers its members for passing by
-  reference; any other symbol is data, so offers nothing. Nothing is
-  offered in strings, comments, numbers, system commands or another
-  language's lines, nor in a lambda's parameter list. Picking one inserts its name, or replaces the whole
-  name with `editor.suggest.insertMode` set to `replace`; typing `[` then shows
-  its parameter hints. VS Code's word-based suggestions, every word in the
-  open files, comments included, are off for q, as
-  `editor.wordBasedSuggestions` in the `[q]` settings
+### 2. Run a query
 
-### Servers
+**kdb+/q: Run Selected Text on Server**, Cmd+Enter (Ctrl+Enter), runs the selection, or the current line. ▶ in the editor's title bar runs the whole file. The result shows in the **KDB+/Q** panel, and the status bar gives the time the query took on the server, as `\t` gives it, and the roundtrip. The first run asks which server to use, and later runs go to that server, the active one. In the clip, `.tca.intraday[trade;quote]` runs on `local`, then the Console shows the same table as q prints it.
 
-The **Servers** view, under the q in the activity bar, lists your servers
-in their folders, each with its connection's state and the active one
-marked. Hover over a server to connect, make it active, disconnect or edit
-it, and right-click for the rest; drag a server or a folder into another
-folder to move it. A folder says what's connected in it. A
-server with a problem in the settings is listed with a warning and the
-problem, and Edit opens it in the form to fix.
+![Cmd+Enter on .tca.intraday[trade;quote] asks for a server, connects to local, and shows a table in the KDB+/Q panel with the timing in the status bar; the Console tab then shows the same table as q prints it](media/run-query.gif)
 
-Add a server with **kdb+/q: Add Server**, or the + on the view or on a
-folder, which opens a form for its settings, or write it in
-`settings.json`. The form saves a server in the settings its folder is
-in. At the top level with a workspace open, or in a folder in both, you
-pick your user or workspace settings. **Edit Server** opens the same form
-for a server, where a password can be stored too, and **Remove Server**
-removes one, from every settings file it's in. **New Folder**, and Rename
-and Remove Folder on a folder's right-click menu, do the same for folders.
-They write the whole setting, as VS Code writes one, so a comment inside
-it isn't kept:
+- The text is sent as written, as one query, as a q client sends it. A server reads line breaks as spaces, so statements on separate lines need `;` between them. To run lines as a script, see [Run in a terminal](#9-run-in-a-terminal).
+- To switch servers, connect to another from the status bar menu or the Servers view, or click **Make Active** on an open server's row.
 
-```json
-"kdb-q-ext-vscode.servers": {
-  "dev": { "host": "localhost", "port": 5000 },
-  "gateway": {
-    "host": "gw.example.com",
-    "port": 6000,
-    "user": "admin",
-    "auth": "prompt",
-    "tls": true,
-    "protect": false
-  }
-}
-```
+### 3. Read the result
 
-- **Folders** group servers, to any depth. An object with a `host` or a
-  `port` is a server, and any other is a folder, holding servers and
-  folders, or nothing. A server is shown with its folders, as
-  `Prod › trades › TP`, and the same name can be used in different
-  folders. A folder in your user settings and one of the same name in the
-  workspace's are shown as one folder; anything else of the same name in
-  both is the workspace's, as it's written there, its fields not mixed with
-  the user's. For example:
+The Grid shows tables, keyed tables, dictionaries and lists, with cells as q prints them. Click a header to sort in q's order. Click it again to reverse the sort, and a third time to clear it. Filter a number or time column with the funnel in its header: it compares as q does, with nulls smallest. Empty the filter's box to clear it. In the clip, `spread` is sorted both ways, then filtered to the rows over 4.
 
-  ```json
-  "kdb-q-ext-vscode.servers": {
-    "Dev": { "TP": { "host": "localhost", "port": 5010 } },
-    "Prod": {
-      "trades": { "TP": { "host": "gw.example.com", "port": 5010 } }
-    },
-    "UAT": {}
-  }
-  ```
+![The Grid sorts the spread column up, then down, then a Greater than filter of 4 leaves 4 of 13 rows](media/grid.gif)
 
-- **Passwords** aren't kept in settings. A server with no `auth` sends
-  none. `"auth": "store"` sends the one the form, or **kdb+/q: Set Server
-  Password**, keeps in VS Code's secure storage for the user, host and
-  port, so that it's only ever sent where it was given. Every workspace
-  shares them, so editing or removing a server keeps its password, as a
-  server in another workspace may use it: **Clear Server Password** lists
-  the passwords stored, with the servers here that use each, and removes
-  the one picked. `"auth": "prompt"` asks for it at every connect instead, and
-  never keeps it
-- **`tls`** is `true` to connect with TLS. The files it needs besides the
-  system's are set once for every server, as q takes them for the whole
-  process: `tlsCaFile` to trust (q's `SSL_CA_CERT_FILE`), and a client
-  certificate as `tlsCertFile` and `tlsKeyFile` in PEM (`SSL_CERT_FILE`,
-  `SSL_KEY_FILE`). Paths are absolute or start with `~/`. An encrypted key's
-  passphrase is kept by **kdb+/q: Set Certificate Passphrase**
-- **`timeout`** is how long to wait to connect and log in, in milliseconds;
-  without one, it waits as long as it takes. A server added in the form
-  starts with 2000
+- Double-click a cell to drill into a nested value, and press Cmd+C (Ctrl+C) to copy cells. See [Running queries and reading results](docs/results.md).
 
-#### Protected evaluation
+### 4. Chart and pin
 
-On by default, each query runs under `.Q.trp`, so an error comes back with
-its backtrace, and the status bar can show the server's time running it.
-Turn it off with `"protect": false` when the server enforces an allowlist:
-the query is then sent as a string. An error protected evaluation should
-have caught, or a response it didn't give, comes with a hint to turn it
-off.
+The Chart draws the whole result as a line, bars, a histogram or a scatter. It opens on a line for a time series, and its settings, shown and hidden by the gear at the right, change the type and the columns. **kdb+/q: Pin Result**, the pin in the panel's title bar, keeps the result in an editor tab of its own, which the next run doesn't replace. Drag the tab beside your script to keep it in view. In the clip, the spread is charted, switched to bars and pinned.
 
-#### Sign-on from another extension
+![The Chart tab draws the spread as a line against time, Bar is picked in the chart's settings, then the pin in the panel's title bar opens the chart in an editor tab, which is dragged beside the script](media/chart-pin.gif)
 
-For a firm's own sign-on, name the extension that gives credentials once,
-in `authExtension`, and set a server's `"auth"` to `"extension"`. That
-extension is asked at every connect, so a token is always fresh.
+- A pinned result keeps its view, sort, filters and chart, and shows its server, time and query. Pinned results close with VS Code.
 
-```json
-"kdb-q-ext-vscode.authExtension": "acme.kdb-auth",
-"kdb-q-ext-vscode.servers": {
-  "gateway": { "host": "gw.example.com", "port": 6000, "auth": "extension" }
-}
-```
+### 5. Find your way around
 
-The extension exports `credentials(request)`, which returns, or resolves
-to, `{ user?, password }`; a user it gives replaces the server's. The
-request is `{ path, host, port, user? }`, where `path` is the server's
-folders and its own name, such as `["Prod", "trades", "TP"]`, for anything
-the extension keeps by server.
+A hover on your own function shows its signature and the comment lines above its definition. A hover on a q keyword or a `.Q` or `.z` name shows KX's reference, which works offline. Go to Definition (F12) follows q's namespaces across every `.q` file in the workspace, and for a name defined more than once, lists every definition in a peek. In the clip, `.tca.spread` and `xbar` are hovered, and F12 follows `.tca.spread` to its definition, and `.tca.intraday` to its two, in `src/tca.q` and `src/patch.q`. The pinned result stays open, hidden to make room.
 
-### Connecting
+![A hover on .tca.spread shows its signature and the comments above it; F12 opens src/tca.q; a hover on xbar shows KX's reference; F12 on .tca.intraday opens a peek listing its definitions in tca.q and patch.q](media/navigate.gif)
 
-**kdb+/q: Connect to Server** picks a server and makes its connection the
-active one, opening it if it isn't open. Several can be open at once.
-**Disconnect from Server** closes one. A connection that fails to open, or
-closes without being disconnected, is kept with why, and stays active, so
-that queries aren't sent elsewhere; connect again to retry, or **Dismiss
-Closed Connection** to forget it.
+- Find All References, the outline and Go to Symbol in Workspace (Cmd+T, Ctrl+T) follow namespaces too. See [Navigation and editing](docs/navigation.md).
 
-The status bar shows the active connection, and opens a menu of the server
-commands when clicked:
-- A plug, joined when connected and pulled apart when not, spinning while
-  it connects or runs a query, and a warning color while the connection is
-  closed, until it's dismissed or connected again
-- How long the last query took, as `2 ms (3 ms roundtrip)`: the server's
-  time, as `\t` gives, and the roundtrip. Without protected evaluation, only
-  the roundtrip is known
-- The server's settings in its tooltip, without secrets
+### 6. Write a call
+
+After `.tca.`, completion offers the namespace's functions with their signatures and comments. Inside the brackets, the parameter hint highlights the current parameter and moves on with each `;`. In the clip, `.tca.bars[trade;5]` is written this way, then run with Cmd+Enter.
+
+![Typing .tca. offers bars, cost, intraday and spread with their signatures; picking bars and typing [ shows the parameter hint, which moves from t to w after the ;. Cmd+Enter runs .tca.bars[trade;5], and the Grid shows VWAP and volume by sym in 5-minute bars](media/write-call.gif)
+
+- Completion also offers a lambda's parameters and locals, your globals and q's keywords.
+
+### 7. Change and compare
+
+Select a changed definition and press Cmd+Enter to redefine the function on the server. The Console shows nothing, as q shows nothing for an assignment. Run the query again: the new result replaces the last in the panel, and the pinned result keeps the old one, for comparison. A new result's chart is worked out afresh, so it opens on a line again. In the clip, `.tca.intraday` changes from 30-minute to 15-minute bars.
+
+![In src/tca.q, 30 xbar becomes 15 xbar; the definition is selected and run with Cmd+Enter; back in the script, the query runs again and is shown in the Chart, set to Bar: 26 bars below the 13 of the pinned result](media/change-compare.gif)
+
+### 8. Catch mistakes
+
+The editor marks a bracket or string left open, and a closing bracket with no opener, as you type. A failed query shows q's error in the Console, with a backtrace from the line that failed back to your query. In the clip, a `]` is deleted, then `.tca.spread` runs with its arguments swapped, to make it fail.
+
+![Deleting a ] from a query underlines the end of the line with "] expected"; then .tca.spread[quote;trade], its arguments swapped, runs and the Console shows 'ask with a backtrace through .tca.cost and .tca.spread](media/errors.gif)
+
+- Backtraces, and the time on the server in the status bar, come from protected evaluation, which is on by default. Turn it off for a gateway that allows only listed calls. See [Protected evaluation](#protected-evaluation).
+
+### 9. Run in a terminal
+
+**kdb+/q: Run Selected Text in Terminal**, Shift+Enter, sends the selection, or the current line, to the q session running in the active terminal. Ink writes the text to a temp file and sends `\l` with its path, so q loads it as a script: comments are skipped, an indented line continues the one before, and the run stops at the first error. In the clip, the q in VS Code's terminal was started with `q src/init.q`, apart from the server on 5010, and runs all of `scripts/checks.q`.
+
+![In a q session started in VS Code's terminal with q src/init.q, Shift+Enter on the lines of scripts/checks.q sends \l with a temp file, and q shows both tables](media/terminal.gif)
+
+- As in any script, a result prints on one line, in the form `-3!` writes, cut at the console's width. `show` prints it as the console does.
+- q must be able to read this machine's temp folder, so a q session on another machine, such as over ssh, can't load the file.
+
+## Reference
+
+### Servers and connections
+
+- Add servers with **kdb+/q: Add Server**, or in settings.json under `kdb-q-ext-vscode.servers`. In settings, an object with `host` or `port` is a server and any other object is a folder. A server's fields are `host`, `port`, `user`, `timeout`, `protect`, `tls` and `auth`.
+- The form saves to User settings, for all your workspaces, or Workspace settings, for anyone who opens this workspace. A server defined in both uses the Workspace definition; the two aren't merged.
+- Folders nest to any depth. Drag servers and folders to move them. Moving or renaming a server closes its connection.
+- A server with a problem in the settings, such as no host or an unknown field, shows a warning in the Servers view and isn't offered anywhere else until it's fixed.
+- A new server has protected evaluation on, TLS off and a connection timeout of 2000 ms. `timeout` covers connecting and logging in, not queries. Without it, Ink waits as long as it takes, as `hopen` does.
+- One connection is active, and runs go to it. Connecting to another server makes it active and leaves the first open. **Make Active** on a row switches back.
+- A connection that fails or drops stays active and is shown closed, with its reason, and the status bar turns to the warning colour. The next run asks for a server rather than going to another one. **kdb+/q: Dismiss Closed Connection** forgets it.
+- Each connection runs one query at a time. **kdb+/q: Disconnect from Server** closes a connection. A query running on it fails as `query cancelled`, though the server finishes it.
+- Connect errors use q's words, such as `hop. OS reports: Connection refused`, `access` and `timeout`.
+- The status bar shows the active server, and its tooltip lists the server's settings, without secrets. Click it for a menu of the server and password commands.
+
+### Passwords and sign-on
+
+- `auth` says where a password comes from:
+  - none, or `"none"`: no password is sent
+  - `"store"`: VS Code's secure storage
+  - `"prompt"`: asked for at each connect and never kept
+  - `"extension"`: your firm's sign-on extension
+- A stored password is keyed by `user@host:port`, not by the server's name, so it's only sent to the host it was given for. Store one from the form or with **kdb+/q: Set Server Password**.
+- Ink never deletes a stored password itself, not even when a server is removed, as another workspace may use it. **kdb+/q: Clear Server Password** lists stored passwords by login and deletes the one you pick.
+- For `"extension"`, set `kdb-q-ext-vscode.authExtension` to the extension's ID, `publisher.name`. That extension exports `credentials(request)`, where `request` has the server's `path` (its folders, then its name), `host`, `port` and `user`. It returns `{ user?, password }`. It's called at every connect, so a token is always fresh.
+
+### TLS
+
+- `"tls": true` ("Use TLS" in the form) connects with TLS, as `tcps://` does in q.
+- The server's certificate must chain to a CA that the system or Node trusts, or to one in `kdb-q-ext-vscode.tlsCaFile`. The host name isn't checked against the certificate, as q's client doesn't check it by default.
+- `tlsCaFile`, `tlsCertFile` and `tlsKeyFile` match q's `SSL_CA_CERT_FILE`, `SSL_CERT_FILE` and `SSL_KEY_FILE`. They apply to every server with `tls`, and take absolute paths or paths starting with `~/`. Set `tlsCertFile` and `tlsKeyFile` for a server that needs a client certificate.
+- **kdb+/q: Set Certificate Passphrase** stores an encrypted key's passphrase in secure storage. **kdb+/q: Clear Certificate Passphrase** removes it.
 
 ### Running on a server
 
-**kdb+/q: Run File on Server**, also the ▶ in the editor's title bar, sends
-the whole file, including edits not yet saved, as one query, exactly as
-written, as a q client such as kdb Studio does. Unlike in the terminal, it
-isn't read as a script: a server reads line breaks as spaces. With no
-connection open, it asks for a server, and with one opening, it waits.
+- **Run Selected Text on Server** sends the selection, or the current line. With several selections, only the primary one, the one made first, is sent. **Run File on Server** sends the whole file, unsaved edits included.
+- The query is sent exactly as written, as one string. Ink adds no row limit and no wrapper to fetch metadata.
+- With no open connection, a run asks for a server. While the active connection is opening, a run waits for it.
+- The status bar gives the timing as `2 ms (3 ms roundtrip)`: the server's own time, as `\t` gives it, then the roundtrip. Without protected evaluation, only the roundtrip is known.
+- A result larger than `sizeLimit` is refused before it's read, and the connection is closed. A result with more rows than `rowLimit` is refused once it's read.
+- A bad `consoleSize`, `precision` or `rowLimit` fails the run, and the **KDB+/Q** panel says why. Ink doesn't fall back to a default.
 
-**kdb+/q: Run Selected Text on Server** sends the selection, or the current
-line, the same way. With several selections, only the first is sent.
+#### Protected evaluation
 
-The result shows in the **KDB+/Q** tab of the bottom panel, beside Output and
-Terminal, as q's console prints it, replacing the last: an assignment shows
-nothing, and an error shows as `'type` with its backtrace. Running a query
-brings the tab into view and leaves the cursor in the editor. Switching away
-and back keeps the result, its sort, filter and scroll, as it was.
+`protect` ("Use protected evaluation" in the form) is on by default. Each query runs under `.Q.trp`, so an error comes back with its full text and a backtrace that starts at your query, and the server's time comes back too. The query text isn't changed: it's sent beside the function that traps its errors, for q's default `.z.pg` to evaluate.
 
-A table, a keyed table, a dictionary or a list also shows in a grid. The tab
-has two views of the result, **Console** and **Grid**, and the one you chose
-last is kept for the next result; anything else, an atom, a string or an
-error, shows in the Console. Cells read as q's console shows them in a
-column: symbols bare, strings in quotes, nulls blank, and numbers lined up
-on the right. A dictionary, a keyed table among them, is its keys, pinned on
-the left as it scrolls, then its values, as q's console lays it out: a
-table's columns, or a list as a `key` or a `value` column. A list is a
-`value` column, an item to a row. A table inside a cell shows as a table
-symbol and its shape, `3 × 2` for 3 rows of 2 columns, said in words on
-hover; a keyed table's symbol has its keys at the left. At the left is each
-row's index in the result, from 0. Click a header to sort, by q's order,
-with nulls first, or the index's to put the rows back as they came; tables
-in cells sort by their shapes, after any other values. A column's filter
-matches the text shown; a column of numbers or times also compares, as q
-does: equals, less than, greater than, between and the rest, with nulls
-smaller than any value. Numbers and timespans are typed as q writes them,
-such as `1.085` or `0D00:00:00.000001500`, and a real as `1.1e`, as q
-doesn't count the float `1.1` equal to it. Other times are picked, to the
-millisecond, a time of day within a day. Floats, reals and datetimes are
-equal within q's tolerance, and the rest exactly, so a timestamp of
-`09:30:00.000000001` doesn't equal `09:30` picked. Beside the tabs is
-the result's size, such as `312 of 1000000 rows, 5 columns` while
-filtered.
+Turn `protect` off for a server that allows only listed calls, such as a gateway. The query is then sent as a plain string, and you get q's error without a backtrace, and the roundtrip time only. If a protected query is refused, the error adds a hint to turn `protect` off.
 
-Double-click a cell, or press Enter on it, to see its value as a result of
-its own: a table or a list in a cell in the Grid, a long string in full in
-the Console. A trail above the tabs, such as `⌂ › [427, 1] › [0, 2]`, says
-where it came from: `⌂` is the result, and each step a cell's row and
-column, counted from 0, the row its index, however it's sorted or filtered,
-and the column as the result has it, keys first. Click a step, or press
-Alt+Left, to go back, to find it as you left it.
+### Results
 
-**kdb+/q: Pin Result**, also the pin in the tab's title bar, opens the
-latest result in an editor tab of its own, where the next query doesn't
-replace it, in the view it's shown in, on the cell drilled into, with the
-trail back. Above it are the server, the time
-and the query, all of it on hovering. Split the editor, or drag the tab to
-a window of its own, to compare results side by side. Pinned results close
-with VS Code.
+- Each result replaces the previous one in the **KDB+/Q** panel. It has three views: **Console**, **Grid** and **Chart**. The view you chose last is kept for the next result. An atom, a string or an error shows in the Console.
+- The Console shows q's console display: 1000 lines of 1000 characters by default, set by `consoleSize` as `\c` takes them.
+- The Grid shows each row's index, and the size beside the tabs, such as `4 of 13 rows, 2 columns` while filtered. A dictionary or keyed table keeps its keys pinned on the left. A table in a cell shows its shape, such as `3 × 2`.
+- Sort follows q's order, nulls first. Filters on numbers and times compare as q does, with nulls smaller than any value. In a filter, you type numbers and timespans as q writes them, and pick other times.
+- Double-click a cell, or press Enter, to drill into its value. A trail above the tabs leads back, and Alt+Left goes back a step.
+- Cmd+C (Ctrl+C) copies cells as tab-separated text. **Copy with Headers** on the Grid's right-click menu adds the column names.
+- **kdb+/q: Export Result to CSV**, in the panel's title bar, saves the Grid as shown, sorted and filtered, as q's `csv 0:` writes values. A pinned result has its own export button.
+- The Chart draws the whole result and says how many nulls and infinities it left out. Drag to zoom and double-click to zoom out. Times are drawn to the millisecond.
+- `precision` works as q's `\P`, and applies to the Console, the Grid, Copy, CSV and the Chart's cursor values.
+- The panel and each pinned result have about 4 GB of memory, and the Grid takes about 250 bytes a row. A tab that runs out turns grey. **Developer: Reload Window** brings it back, without the latest result or pinned results.
 
-**kdb+/q: Export Result to CSV**, also the export button in the tab's title
-bar, saves the Grid, of the result or a cell's value drilled into, where you
-choose: its rows as shown, sorted and filtered, and its columns in the order
-shown, under a line of their names, without the index. It's for the Grid
-only: with the Console shown, there's nothing to export. Values are written
-as q's `csv 0:` writes them: symbols and strings bare and whole, nulls
-blank, dates as `2026-10-26`, timestamps as `2026-10-26D12:00:00.000000001`,
-the rest as the Grid shows them. A value with a comma, a quote or a line
-break is put in quotes, a quote in it doubled, as other programs read CSV,
-where q quotes only for a comma. A mixed list, such as a column of lists or
-tables, isn't written, as q won't write it either and no text would hold it
-whole: nothing is exported, and the message names the column. Hide it, or
-make it a column of strings in q, to export the rest. A pinned result has
-its own button, and **kdb+/q: Export Pinned Result to CSV**.
+More in [Running queries and reading results](docs/results.md).
 
-There's more of it than q's console shows: 1000 lines of 1000 characters by
-default, set by `consoleSize` as `\c` takes them, with `..` where it's cut,
-as q has. Nulls are left blank as q leaves them. Where the text differs from
-q's:
-- A cell in a table, a matrix or a dictionary is cut at 256 characters, so
-  that one long value doesn't widen every line of its column
-- A table or matrix wider than the console ends in `..`, where q drops the
-  columns without saying so
-- A dictionary whose keys are a table is cut at the line limit, where q
-  counts its entries and can run two lines over
-- About 1 in 50,000 datetimes shows a millisecond less than q does
+### Writing and navigating q
 
-### Running in a terminal
+- Highlighting keeps keywords, built-ins, `.Q` and `.z` names, symbols and literals apart in VS Code's default themes. qSQL's `select`, `from`, `by` and `where` are coloured as `if`, and system commands such as `\l` as an import. A lambda's parameters and locals share the parameter colour, so a misspelt local stands out.
+- Hover shows KX's reference for q's keywords and `.Q`, `.z`, `.h` and `.j` names, and the signature and comments of your own globals.
+- Go to Definition, Find All References, the outline, breadcrumbs and Go to Symbol in Workspace follow q's namespaces across the workspace. They include q 5 modules (`use` and `export`) and the paths in `\l` lines. References that pass a global by name, as a symbol, are grouped under **Passed by reference**.
+- Completion and parameter hints come from the workspace and from KX's reference.
+- Syntax errors follow q's script rules, where a line at column 0 starts a new statement. They show for the files open in tabs. Set `diagnosticMode` to `workspace` to check every `.q` file.
+- **kdb+/q: Toggle Block Comment**, Shift+Alt+A, puts `/` and `\` on lines of their own at column 0, as q needs.
+- Enter between brackets keeps the closing bracket indented. Block comments fold.
+- Ink can't resolve names built from strings at runtime, or know the directory q runs in, so a navigation result can be a guess.
 
-**kdb+/q: Run Selected Text in Terminal** (Shift+Enter) runs the selection,
-or the current line, in the active terminal, such as a q session, as a
-script. It writes the text as it is to a file in the temp folder, and sends
-`\l` with the file's path, so q reads it as it reads any script: an
-indented line continues the statement before, comments are skipped, and a
-`\d` lasts to the end. A run stops at the first error. Several selections
-make one script, from the top of the file.
+More in [Navigation and editing](docs/navigation.md).
 
-q must be able to read the file, so a q on another machine, such as one
-over ssh, can't load it. The files are removed when the window closes.
+### Settings
 
-### Customizing colors
+All settings start `kdb-q-ext-vscode.`.
 
-VS Code's default themes have fewer colors than q has kinds of token, so
-some kinds share a color, such as casts and `.Q`/`.z`. Each kind has
-its own scope, so you can give it a color of your own in `settings.json`:
+| Setting | Default | What it does |
+|---|---|---|
+| `servers` | `{}` | Servers and folders, by name. Edit them with the form or in settings.json. |
+| `authExtension` | `""` | The sign-on extension, as `publisher.name`, for servers with `"auth": "extension"`. |
+| `tlsCaFile` | `""` | A CA certificate in PEM to trust as well as the system's and Node's, as `SSL_CA_CERT_FILE`. |
+| `tlsCertFile` | `""` | A client certificate in PEM, as `SSL_CERT_FILE`. Set with `tlsKeyFile`. |
+| `tlsKeyFile` | `""` | The client certificate's key in PEM, as `SSL_KEY_FILE`. |
+| `consoleSize` | `[1000, 1000]` | The Console's lines and width, as `\c` takes them, each 10 to 2000. |
+| `precision` | `7` | Significant digits for floats and reals, 0 to 17, as `\P`. 0 writes all of them. |
+| `sizeLimit` | `100` | The largest result to take, in MB, as q sends it, uncompressed. |
+| `rowLimit` | `5000000` | The most rows a result, or a value drilled into, can have. |
+| `diagnosticMode` | `openFilesOnly` | `workspace` also checks every `.q` file in the workspace, as saved. |
 
-```json
-"editor.tokenColorCustomizations": {
-  "textMateRules": [
-    { "scope": "constant.language.symbol.handle.q", "settings": { "foreground": "#d19a66" } },
-    { "scope": "constant.numeric.date.q", "settings": { "foreground": "#56b6c2" } }
-  ]
-}
-```
+`consoleSize`, `precision` and `rowLimit` apply from the next run. `sizeLimit`, the TLS files, `authExtension` and the servers apply from the next connect.
 
-Each scope below also covers the more specific scopes that start with it,
-such as `constant.numeric.date.q`, and `source.q` keeps a rule to q files.
+For q files, Ink sets `editor.wordBasedSuggestions` to `off`, so suggestions aren't padded with every word in the open files.
 
-| Tokens                                                  | Scope                                |
-| ------------------------------------------------------- | ------------------------------------ |
-| `if`, `$[`, `do`, `while`, `exit`, `'` (signal), `use`  | `source.q keyword.control`           |
-| `select`, `from`, `by`, `where`, …                      | `keyword.control.qsql.q`             |
-| `count`, `each`, `0:`, `-11!`, …                        | `source.q support.function.builtin`  |
-| `` `int$ ``, `"j"$`, `` `$ `` (casts)                   | `support.type.cast.q`                |
-| `` `s# ``, `` `u# ``, `` `p# ``, `` `g# `` (attributes) | `storage.modifier.attribute.q`       |
-| `.Q.dd`, `.z.p`, `.h.ht`, `.j.j`                        | `source.q support.class.namespace`   |
-| `` `sym `` and `` `:data/trades.csv `` (handles)        | `source.q constant.language.symbol`  |
-| Handles only, as `` `:data/trades.csv ``                | `constant.language.symbol.handle.q`  |
-| `0N`, `0w`, dates, times, numbers                       | `source.q constant.numeric`          |
-| `x`, `y`, `z` and `{[a;b]` parameters                   | `source.q variable.parameter`        |
-| `/ \ ' ': /: \:` (iterators)                            | `keyword.operator.iterator.q`        |
-| `\l`, `\t`, … and `k)`                                  | `source.q keyword.control.directive` |
+### Commands and keys
 
-A rule on `source.q keyword.control` also colors qSQL and system commands,
-as their scopes start with it.
+All commands are in the palette under **kdb+/q**. The Run commands and **Toggle Block Comment** show only in q files.
 
-Run **Developer: Inspect Editor Tokens and Scopes** to see the scope of any
-token.
+| Command | Key | Also on |
+|---|---|---|
+| Run Selected Text on Server | Cmd+Enter (Ctrl+Enter) | editor right-click menu |
+| Run File on Server | | ▶ in the editor's title bar, right-click menu |
+| Run Selected Text in Terminal | Shift+Enter | right-click menu |
+| Toggle Block Comment | Shift+Alt+A | |
+| Connect to Server | | Servers row, status bar menu |
+| Disconnect from Server | | Servers row, status bar menu |
+| Dismiss Closed Connection | | Servers row, status bar menu |
+| Make Active | | Servers row (an open server) |
+| Add Server | | Servers view title, folder row, status bar menu |
+| Edit Server | | Servers row (pencil), status bar menu |
+| Remove Server | | Servers row, status bar menu |
+| New Folder | | Servers view title, folder row |
+| Rename Folder, Remove Folder | | folder row |
+| Edit in settings.json | | a Servers row for a setting with a problem, the server form |
+| Open Settings | | Servers view title (gear), status bar menu |
+| Set Server Password, Clear Server Password | | status bar menu |
+| Set Certificate Passphrase, Clear Certificate Passphrase | | status bar menu |
+| Pin Result | | pin in the KDB+/Q panel's title bar |
+| Export Result to CSV | | KDB+/Q panel's title bar |
+| Export Pinned Result to CSV | | a pinned result's title bar |
+| Copy with Headers | | Grid right-click menu |
 
-## Commands
+Make Active, Rename Folder, Remove Folder, Edit in settings.json and Copy with Headers act on a row, a form or a grid, so they aren't in the palette.
 
-The Run and Toggle Block Comment commands, and their keybindings, apply in
-q files. The Run commands are on the editor's right-click menu, and the
-server commands on the status bar's and in the Servers view.
+In the Grid:
+- Enter or double-click drills into a cell, and Alt+Left goes back.
+- Click a cell, then drag or Shift+click for a range. Shift+arrows extend it. Ctrl+Space selects a column, Shift+Space a row, and Cmd+A (Ctrl+A) everything.
+- Cmd+C (Ctrl+C) copies.
 
-| Command                               | Keybinding       |
-| ------------------------------------- | ---------------- |
-| kdb+/q: Run File on Server            |                  |
-| kdb+/q: Run Selected Text on Server   | Ctrl/Cmd + Enter |
-| kdb+/q: Run Selected Text in Terminal | Shift + Enter    |
-| kdb+/q: Pin Result                    |                  |
-| kdb+/q: Export Result to CSV          |                  |
-| kdb+/q: Export Pinned Result to CSV   |                  |
-| kdb+/q: Toggle Block Comment          | Shift + Alt + A  |
-| kdb+/q: Connect to Server             |                  |
-| kdb+/q: Disconnect from Server        |                  |
-| kdb+/q: Dismiss Closed Connection     |                  |
-| kdb+/q: Add Server                    |                  |
-| kdb+/q: Edit Server                   |                  |
-| kdb+/q: Remove Server                 |                  |
-| kdb+/q: New Folder                    |                  |
-| kdb+/q: Open Settings                 |                  |
-| kdb+/q: Set Server Password           |                  |
-| kdb+/q: Clear Server Password         |                  |
-| kdb+/q: Set Certificate Passphrase    |                  |
-| kdb+/q: Clear Certificate Passphrase  |                  |
+---
 
-Shift + Enter stands aside while the suggestion list is open, where it
-accepts a suggestion. Ctrl/Cmd + Enter replaces VS Code's Insert Line Below
-in q files. Other extensions can bind it too, such as GitHub Copilot, to
-open its completions panel; if one does, choose which runs in **Preferences:
-Open Keyboard Shortcuts**.
-
-## Settings
-
-| Setting                           | Default           | What it does                                                 |
-| --------------------------------- | ----------------- | ------------------------------------------------------------ |
-| `kdb-q-ext-vscode.servers`        | `{}`              | The servers to connect to, by name (see [Servers](#servers)) |
-| `kdb-q-ext-vscode.authExtension`  | `""`              | The extension that gives credentials, as `publisher.name`    |
-| `kdb-q-ext-vscode.tlsCaFile`      | `""`              | A CA certificate to trust for TLS, as `SSL_CA_CERT_FILE`     |
-| `kdb-q-ext-vscode.tlsCertFile`    | `""`              | A client certificate for TLS, as `SSL_CERT_FILE`             |
-| `kdb-q-ext-vscode.tlsKeyFile`     | `""`              | The client certificate's key, as `SSL_KEY_FILE`              |
-| `kdb-q-ext-vscode.consoleSize`    | `[1000, 1000]`    | How much of a result to show, as lines then width            |
-| `kdb-q-ext-vscode.precision`      | `7`               | Significant digits of floats and reals, as `\P`; 0 for all   |
-| `kdb-q-ext-vscode.sizeLimit`      | `100`             | The largest result to take, in MB, uncompressed              |
-| `kdb-q-ext-vscode.rowLimit`       | `5000000`         | The most rows a result, or a cell drilled into, can have     |
-| `kdb-q-ext-vscode.diagnosticMode` | `"openFilesOnly"` | Syntax errors in open files only, or the `"workspace"` too   |
-
-`precision` works as q's `\P`: from 1 to 17 significant digits, or 0 for as
-many as each type holds, 17 for a float and 8 for a real. It applies wherever
-a result's floats and reals are written: the Console, the Grid, Copy, Export
-to CSV and the Chart's values at the cursor. Like `\P`, it applies from the
-next run; a result already shown, or pinned, stays as it was.
-
-A result over `sizeLimit` is refused before it's read, and the connection
-closed. The extension holds the latest result as it arrived, and decodes it
-in the **KDB+/Q** tab, and in each pinned result's tab, which have about 4 GB
-of memory.
-The Grid takes about 250 bytes a row, whatever the columns, and a mixed
-list's items up to about 200 bytes more each, so a result, or a cell's value
-drilled into, of more rows than `rowLimit` is refused; like `precision`, it
-applies from the next run. A tab that runs out of memory, or crashes, turns
-grey, while VS Code and other extensions carry on. VS Code doesn't tell
-extensions when that happens, or let them restart it: **Developer: Reload
-Window** brings it back, but loses the latest result and closes pinned
-results. A pinned result whose tab has turned grey can only be closed.
-Pinned results share one process, so when one turns grey, so do the rest.
+To report a problem or contribute, see [the repository](https://github.com/dflynch/kdb-q-ext-vscode). Ink is under the [MIT licence](LICENSE).
