@@ -145,7 +145,7 @@ Turn `protect` off for a server that allows only listed calls, such as a gateway
 - **kdb+/q: Export Result to CSV**, in the panel's title bar, saves the Grid as shown, sorted and filtered, as q's `csv 0:` writes values. A pinned result has its own export button.
 - The Chart draws the whole result and says how many nulls and infinities it left out. Drag to zoom and double-click to zoom out. Times are drawn to the millisecond.
 - `precision` works as q's `\P`, and applies to the Console, the Grid, Copy, CSV and the Chart's cursor values.
-- The panel and each pinned result have about 4 GB of memory, and the Grid takes about 250 bytes a row. A tab that runs out turns grey. **Developer: Reload Window** brings it back, without the latest result or pinned results.
+- The panel has about 4 GB of memory, and pinned results share one process and its memory. The Grid takes about 250 bytes a row. A panel or pinned result that runs out turns grey, and pinned results turn grey together. **Developer: Reload Window** brings them back, without the latest result or pinned results.
 
 More in [Running queries and reading results](docs/results.md).
 
@@ -153,7 +153,7 @@ More in [Running queries and reading results](docs/results.md).
 
 - Highlighting keeps keywords, built-ins, `.Q` and `.z` names, symbols and literals apart in VS Code's default themes. qSQL's `select`, `from`, `by` and `where` are coloured as `if`, and system commands such as `\l` as an import. A lambda's parameters and locals share the parameter colour, so a misspelt local stands out.
 - Hover shows KX's reference for q's keywords and `.Q`, `.z`, `.h` and `.j` names, and the signature and comments of your own globals.
-- Go to Definition, Find All References, the outline, breadcrumbs and Go to Symbol in Workspace follow q's namespaces across the workspace. They include q 5 modules (`use` and `export`) and the paths in `\l` lines. References that pass a global by name, as a symbol, are grouped under **Passed by reference**.
+- Go to Definition, Find All References, the outline, breadcrumbs and Go to Symbol in Workspace follow q's namespaces across the workspace. They include q 5 modules (`use` and `export`) and the paths in `\l` lines. References that pass a global by reference, naming it with a symbol, are grouped under **Passed by reference**.
 - Completion and parameter hints come from the workspace and from KX's reference.
 - Syntax errors follow q's script rules, where a line at column 0 starts a new statement. They show for the files open in tabs. Set `diagnosticMode` to `workspace` to check every `.q` file.
 - **kdb+/q: Toggle Block Comment**, Shift+Alt+A, puts `/` and `\` on lines of their own at column 0, as q needs.

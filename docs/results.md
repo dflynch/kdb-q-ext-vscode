@@ -5,190 +5,326 @@ Back to the [README](../README.md).
 
 ## Running on a server
 
-**kdb+/q: Run File on Server**, also the ▶ in the editor's title bar, sends
-the whole file, including edits not yet saved, as one query, exactly as
-written, as a q client such as kdb Studio does. Unlike in the terminal, it
-isn't read as a script: a server reads line breaks as spaces. With no
-connection open, it asks for a server, and with one opening, it waits.
+**kdb+/q: Run Selected Text on Server**, Cmd+Enter (Ctrl+Enter), sends the
+selection, or the current line. **kdb+/q: Run File on Server**, the ▶ in
+the editor's title bar, sends the whole file, including edits not yet
+saved.
 
-**kdb+/q: Run Selected Text on Server** (Ctrl/Cmd+Enter) sends the
-selection, or the current line, the same way. With several selections, only
-the primary one is sent, the one made first.
+- The text is sent as one query, exactly as written, as a q client sends
+  it.
+- It isn't read as a script, as it is in the terminal. A server reads line
+  breaks as spaces, so statements on separate lines need `;` between them.
+  To run lines as a script, see
+  [Running in a terminal](#running-in-a-terminal).
+- With several selections, only the primary one is sent: the one made
+  first.
+- If no connection is open, the run asks which server to use. If a
+  connection is still opening, the run waits for it.
 
-Ink doesn't edit a query: it doesn't wrap it to fetch extra metadata, or
-add a row limit to it. With [protected evaluation](../README.md#protected-evaluation)
-on, the text is sent beside the function that traps its errors, unchanged;
-with it off, a gateway that only allows listed calls sees exactly what you
-typed. A result over `sizeLimit` is refused before it's read, and the
-connection closed; one of more rows than `rowLimit` is refused once it's
-read.
+Ink doesn't change your query. It doesn't wrap it to fetch extra metadata,
+or add a row limit to it.
 
-The result shows in the **KDB+/Q** tab of the bottom panel, beside Output and
-Terminal, replacing the last. Running a query brings the tab into view and
-leaves the cursor in the editor. Switching away and back keeps the result,
-its sort, filter and scroll, as it was.
+- With [protected evaluation](../README.md#protected-evaluation) on, the
+  text is sent unchanged, beside the function that traps its errors.
+- With it off, a gateway that allows only listed calls sees exactly what
+  you typed.
 
-The status bar shows how long the last query took, as `2 ms (3 ms
-roundtrip)`: the server's time, as `\t` gives, and the roundtrip. Without
-protected evaluation, only the roundtrip is known.
+Large results are refused. See [Limits and memory](#limits-and-memory).
+
+## Running in a terminal
+
+**kdb+/q: Run Selected Text in Terminal**, Shift+Enter, runs the selection,
+or the current line, as a script in the active terminal, such as a q
+session. Ink writes the text as it is to a file in the temp folder and
+sends `\l` with the file's path. q reads the file as it reads any script:
+
+- An indented line continues the statement before it.
+- Comments are skipped.
+- A `\d` lasts to the end of the script.
+- The run stops at the first error.
+
+Unlike a run on a server, several selections are all sent. They make one
+script, in order from the top of the file.
+
+As in any script, a result prints on one line, in the form `-3!` writes,
+cut at the console's width. `show` prints it as the console does.
+
+q must be able to read the file, so a q session on another machine, such
+as one over ssh, can't load it. The files are removed when the window
+closes.
+
+## Timing
+
+The status bar shows how long the last query took, such as `2 ms (3 ms
+roundtrip)`. The first number is the time on the server, as `\t` gives it.
+The second is the roundtrip. Without [protected
+evaluation](../README.md#protected-evaluation), only the roundtrip is
+known.
+
+## The KDB+/Q panel
+
+The result shows in the **KDB+/Q** panel, at the bottom beside Output and
+Terminal, and replaces the last result. Running a query brings the panel
+into view and leaves the cursor in the editor. Switching away and back
+keeps the result as it was, with its sort, filters and scroll.
+
+The panel has three tabs: **Console**, **Grid** and **Chart**. The one you
+chose last is kept for the next result.
+
+- A table, a keyed table, a dictionary or a list shows in all three.
+- Anything else, such as an atom, a string or an error, shows in the
+  Console only.
 
 ## Console
 
-The Console shows the result as q's console prints it: an assignment shows
-nothing, and an error shows as `'type` with its backtrace.
+The Console shows the result as q's console prints it. An assignment shows
+nothing. An error shows as q's error, such as `'type`, with its backtrace
+when protected evaluation is on.
 
-There's more of it than q's console shows: 1000 lines of 1000 characters by
-default, set by `consoleSize` as `\c` takes them, with `..` where it's cut,
-as q has. Nulls are left blank as q leaves them. Where the text differs from
-q's:
+The Console is larger than q's default console of `\c 25 80`. It shows
+1000 lines of 1000 characters by default, set by `consoleSize` in the form
+`\c` takes. Where the text is cut, it shows `..`, as q does. Nulls are left
+blank, as q leaves them.
+
+### Where the Console differs from q
+
 - A cell in a table, a matrix or a dictionary is cut at 256 characters, so
-  that one long value doesn't widen every line of its column
-- A table or matrix wider than the console ends in `..`, where q drops the
-  columns without saying so
-- A dictionary whose keys are a table is cut at the line limit, where q
-  counts its entries and can run two lines over
-- About 1 in 50,000 datetimes shows a millisecond less than q does
+  that one long value doesn't widen every line of its column.
+- A table or matrix wider than the console ends in `..`. q drops the
+  columns without saying so.
+- A keyed table, or any dictionary whose keys are a table, is cut at the
+  line limit. q counts its entries instead, and can run two lines over.
+- About 1 in 50,000 datetimes shows a millisecond less than q does.
 
 ## Grid
 
-A table, a keyed table, a dictionary or a list also shows in a grid. The tab
-has its views of the result, **Console**, **Grid** and **Chart**, and the
-one you chose last is kept for the next result; anything else, an atom, a
-string or an error, shows in the Console.
-
 Cells read as q's console shows them in a column: symbols bare, strings in
-quotes, nulls blank, and numbers lined up on the right. A dictionary, a
-keyed table among them, is its keys, pinned on the left as it scrolls, then
-its values, as q's console lays it out: a table's columns, or a list as a
-`key` or a `value` column. A list is a `value` column, an item to a row. A
-table inside a cell shows as a table symbol and its shape, `3 × 2` for 3
-rows of 2 columns, said in words on hover; a keyed table's symbol has its
-keys at the left. At the left is each row's index in the result, from 0.
+quotes, nulls blank, and numbers lined up on the right.
 
-### Sorting and filtering
+- At the left is each row's index in the result, counted from 0.
+- A dictionary, including a keyed table, shows its keys on the left, pinned
+  as you scroll, then its values, as q's console lays it out. A key or value
+  that's a table shows as its columns. A list shows as one column, named
+  `key` or `value`.
+- A list on its own is a `value` column, one item to a row.
+- A table inside a cell shows as a table symbol and its shape, such as
+  `3 × 2` for 3 rows of 2 columns. Hover over it to see the shape in words.
+  A keyed table's symbol has its keys at the left.
 
-Click a header to sort, by q's order, with nulls first, or the index's to
-put the rows back as they came; tables in cells sort by their shapes, after
-any other values.
+Beside the tabs is the result's size, such as `312 of 1000000 rows,
+5 columns` while it's filtered.
 
-A column's filter matches the text shown; a column of numbers or times also
-compares, as q does: equals, less than, greater than, between and the rest,
-with nulls smaller than any value. Numbers and timespans are typed as q
-writes them, such as `1.085` or `0D00:00:00.000001500`, and a real as
-`1.1e`, as q doesn't count the float `1.1` equal to it. Other times are
-picked, to the millisecond, a time of day within a day. Floats, reals and
-datetimes are equal within q's tolerance, and the rest exactly, so a
-timestamp of `09:30:00.000000001` doesn't equal `09:30` picked. Beside the
-tabs is the result's size, such as `312 of 1000000 rows, 5 columns` while
-filtered.
+### Sorting
+
+Click a header to sort by that column, in q's order, with nulls first.
+Click again to reverse the sort, and a third time to clear it. Click the
+index's header to put the rows back in the order they came.
+
+Tables in cells sort by their shapes, after any other values.
+
+### Filtering
+
+Click the funnel in a column's header to filter it. Empty the filter's box
+to clear it.
+
+- Every column's filter can match the text shown.
+- A column of numbers or times can also compare, as q does. The
+  comparisons are equals, less than, greater than, between and the rest.
+  Nulls are smaller than any value.
+
+How you give a value:
+
+- Type numbers and timespans as q writes them, such as `1.085` or
+  `0D00:00:00.000001500`.
+- Type a real with its suffix, such as `1.1e`. q doesn't count the float
+  `1.1` equal to the real `1.1e`.
+- Pick other times with a picker: a month, a date, a date and time, or a
+  time of day, as fine as the column's type holds, down to the millisecond.
+- A value that can't be read matches no rows.
+
+How values compare:
+
+- Floats, reals and datetimes are equal within q's tolerance.
+- Everything else must be equal exactly. A timestamp of
+  `09:30:00.000000001` doesn't equal `09:30` picked in the filter.
 
 ### Drilling into a cell
 
 Double-click a cell, or press Enter on it, to see its value as a result of
-its own: a table or a list in a cell in the Grid, a long string in full in
-the Console. A trail above the tabs, such as `⌂ › [427, 1] › [0, 2]`, says
-where it came from: `⌂` is the result, and each step a cell's row and
-column, counted from 0, the row its index, however it's sorted or filtered,
-and the column as the result has it, keys first. Click a step, or press
-Alt+Left, to go back, to find it as you left it.
+its own. A table or a list in a cell shows in the Grid. A long string shows
+in full in the Console.
+
+A trail above the tabs, such as `⌂ › [427, 1] › [0, 2]`, says where the
+value came from. `⌂` is the result. Each step gives a cell's row and
+column, counted from 0:
+
+- The row is the row's index in the result, however the Grid is sorted or
+  filtered.
+- The column counts as the result has its columns, keys first.
+
+Click a step, or press Alt+Left, to go back. The Grid is as you left it.
 
 ### Copying
 
-Click a cell, then drag, Shift+click or Shift+arrows for a rectangle,
-scrolling as a drag reaches the edge; click a row's index for the row,
-Ctrl+Space for a column, Shift+Space for a row, Cmd+A (Ctrl+A) for all.
-Cmd+C (Ctrl+C) copies the cells as tab-separated text, the values Export to
-CSV writes, and **Copy with Headers** in the grid's menu adds the column
-names; neither copies a column of lists or tables.
+Select cells:
+
+- Click a cell, then drag, Shift+click or press Shift+arrows for a
+  rectangle.
+- Click a row's index for the row.
+- Ctrl+Space selects a column, Shift+Space a row, and Cmd+A (Ctrl+A)
+  everything.
+
+Cmd+C (Ctrl+C) copies the cells as tab-separated text, with the values that
+Export to CSV writes. **Copy with Headers**, on the Grid's right-click menu,
+adds the column names.
+
+Neither copies a column of lists or tables. If the selection includes one,
+nothing is copied, and a message names the column.
 
 ## Chart
 
-The Chart draws the result as:
-- a line, joining its points or as steps, of numeric columns by a time, a
-  number or each row's index
-- bars side by side for each row, labelled by any columns
-- a histogram of a numeric or time column, binned as numpy's `auto` bins,
-  in widths that read well, or into as many bins as typed
-- a scatter of numeric columns by another, a million points at a time
+The Chart draws the result as one of:
 
-It opens on bars where the first column is a label, labelled by it or a
-keyed table's keys, else a line by the first time or number, of one series.
-Its settings, at the right, choose the type and the columns, and its legend
-hides and shows a series. Drag across it to zoom, double-click to zoom out.
+- **a line** of numeric columns against a time, a number or each row's
+  index. It joins the points, or draws them as steps.
+- **bars**, side by side for each row, labelled by any columns.
+- **a histogram** of a numeric or time column. Ink picks the bin width from
+  the values, or uses as many bins as you type.
+- **a scatter** of numeric columns against another numeric column. Every
+  point is drawn, and a million points draw as fast as the pixels they
+  cover.
 
-It draws the whole result, as it came, a line sorted by its x, and says how
-many nulls and infinities it left out. A value at the cursor is as the Grid
-shows it, numbers on the axes as q writes them, and times as q writes them,
-never shifted to the machine's time zone. Times are drawn and binned to the
-millisecond, finer digits cut off as q casts, so a timespan under a
-millisecond, such as a latency, is drawn as 0, and zoomed no closer than
-ten milliseconds. Integers are written as q writes them, and a long past
-2^53 is drawn as nearly as a double holds it, as a float is.
+A result with no numbers or times has no chart.
+
+The Chart picks how it opens:
+
+- **Bars**, if the first column is neither a number nor a time, such as a
+  symbol, string or boolean column. The bars are labelled by that column,
+  or by a keyed table's keys.
+- **A histogram** of the first time column, if there are times but no
+  numbers.
+- **A line** otherwise, of one series: the first number column that isn't
+  the x. The x is the first time column, else the first number column, else
+  each row's index.
+
+The gear at the right shows and hides the Chart's settings, which choose
+the type and the columns. The legend hides and shows a series. Drag across
+the Chart to zoom, and double-click to zoom out.
+
+### How the Chart draws values
+
+- It draws the whole result, as it came. A line is sorted by its x.
+- It says how many nulls and infinities it left out.
+- A value at the cursor reads as the Grid shows it.
+- Numbers on the axes are written as q writes them.
+- Times are written as q writes them, and never shifted to the machine's
+  time zone.
+- Times are drawn and binned to the millisecond. Finer digits are cut off,
+  as a q cast cuts them. A timespan under a millisecond, such as a latency,
+  is therefore drawn as 0, and the Chart zooms no closer than ten
+  milliseconds.
+- Integers are written as q writes them. A long past 2^53 is drawn as
+  nearly as a double holds it, as a float is.
+
+### Histogram bins
+
+Unless you type a number of bins, Ink works out a bin width from the
+values. It takes the narrower of two standard rules:
+
+- the spread of the values divided by one more than log₂ of their count,
+  which suits few values
+- twice the interquartile range divided by the cube root of their count,
+  which suits many values
+
+The width is then rounded up to one that reads well, such as 0.5 rather
+than 0.48. Bins start at a whole number of widths, such as 1.5 rather than
+1.53. Bins of times use clock steps, such as 1, 5 or 15 minutes. A
+histogram has at most 10,000 bins.
 
 ## Pinning a result
 
-**kdb+/q: Pin Result**, also the pin in the tab's title bar, opens the
-latest result in an editor tab of its own, where the next query doesn't
-replace it, in the view it's shown in, on the cell drilled into, with the
-trail back, each grid's sort, filter and column order, and each chart's
-settings. Above it are the server, the time and the query, all of it on
-hovering. Split the editor, or drag the tab to a window of its own, to
-compare results side by side. Pinned results close with VS Code.
+**kdb+/q: Pin Result**, the pin in the panel's title bar, opens the latest
+result in an editor tab of its own. The next query doesn't replace it.
+
+The pinned result keeps:
+
+- the Console, Grid or Chart tab it's shown in
+- the cell drilled into, with the trail back
+- each Grid's sort, filters and column order
+- each Chart's settings
+
+Above it are the server, the time the result arrived and the query. Hover
+over the query to see all of it.
+
+Pinned results close with VS Code. They aren't kept for the next session.
 
 ## Exporting to CSV
 
-**kdb+/q: Export Result to CSV**, also the export button in the tab's title
-bar, saves the Grid, of the result or a cell's value drilled into, where you
-choose: its rows as shown, sorted and filtered, and its columns in the order
-shown, under a line of their names, without the index. It's for the Grid
-only: with the Console shown, there's nothing to export.
+**kdb+/q: Export Result to CSV**, the export button in the panel's title
+bar, saves the Grid to a file you choose. If you've drilled into a cell,
+it saves that value's Grid.
 
-Values are written as q's `csv 0:` writes them: symbols and strings bare and
-whole, nulls blank, dates as `2026-10-26`, timestamps as
-`2026-10-26D12:00:00.000000001`, the rest as the Grid shows them. A value
-with a comma, a quote or a line break is put in quotes, a quote in it
-doubled, as other programs read CSV, where q quotes only for a comma. A
-mixed list, such as a column of lists or tables, isn't written, as q won't
-write it either and no text would hold it whole: nothing is exported, and
-the message names the column. Hide it, or make it a column of strings in q,
-to export the rest. A pinned result has its own button, and **kdb+/q:
-Export Pinned Result to CSV**.
+- The rows are as shown, sorted and filtered.
+- The columns are in the order shown, under a line of their names, without
+  the index.
+- It exports only from the Grid. With the Console or the Chart shown,
+  there's nothing to export.
+
+A pinned result has its own export button, and **kdb+/q: Export Pinned
+Result to CSV**.
+
+Values are written as q's `csv 0:` writes them:
+
+- symbols and strings bare and whole
+- nulls blank
+- dates such as `2026-10-26`, and timestamps such as
+  `2026-10-26D12:00:00.000000001`
+- the rest as the Grid shows them
+
+A value with a comma, a quote or a line break is put in quotes, with any
+quote in it doubled, as other programs read CSV. q quotes only for a comma.
+
+A mixed list, such as a column of lists or tables, isn't written. q won't
+write one either, and no text would hold it whole. Nothing is exported, and
+the message names the column. To export the rest, make it a column of
+strings in q.
 
 ## Precision
 
-`precision` works as q's `\P`: from 1 to 17 significant digits, or 0 for as
-many as each type holds, 17 for a float and 8 for a real. It applies wherever
-a result's floats and reals are written: the Console, the Grid, Copy, Export
-to CSV and the Chart's values at the cursor. Like `\P`, it applies from the
-next run; a result already shown, or pinned, stays as it was.
+`precision` works as q's `\P`. It's 1 to 17 significant digits, or 0 for
+as many as each type holds: 17 for a float and 8 for a real.
+
+It applies wherever a result's floats and reals are written: the Console,
+the Grid, Copy, Export to CSV and the Chart's values at the cursor.
+
+Like `\P`, it applies from the next run. A result already shown, or
+pinned, stays as it was.
 
 ## Limits and memory
 
-A result over `sizeLimit` is refused before it's read, and the connection
-closed. The extension holds the latest result as it arrived, and decodes it
-in the **KDB+/Q** tab, and in each pinned result's tab, which have about 4 GB
-of memory.
-The Grid takes about 250 bytes a row, whatever the columns, and a mixed
-list's items up to about 200 bytes more each, so a result, or a cell's value
-drilled into, of more rows than `rowLimit` is refused; like `precision`, it
-applies from the next run.
+Two settings keep a result within the memory that shows it:
 
-A tab that runs out of memory, or crashes, turns grey, while VS Code and
-other extensions carry on. VS Code doesn't tell extensions when that
-happens, or let them restart it: **Developer: Reload Window** brings it
-back, but loses the latest result and closes pinned results. A pinned
-result whose tab has turned grey can only be closed. Pinned results share
-one process, so when one turns grey, so do the rest.
+- **`sizeLimit`**, 100 MB by default: a result larger than this, as q sends
+  it, is refused before it's read, and the connection is closed. It applies
+  from the next connect.
+- **`rowLimit`**, 5,000,000 by default: a result, or a cell's value drilled
+  into, with more rows than this is refused. Like `precision`, it applies
+  from the next run.
 
-## Running in a terminal
+Why there are limits:
 
-**kdb+/q: Run Selected Text in Terminal** (Shift+Enter) runs the selection,
-or the current line, in the active terminal, such as a q session, as a
-script. It writes the text as it is to a file in the temp folder, and sends
-`\l` with the file's path, so q reads it as it reads any script: an
-indented line continues the statement before, comments are skipped, and a
-`\d` lasts to the end. A run stops at the first error. Several selections
-make one script, from the top of the file.
+- The extension holds the latest result as it arrived. The **KDB+/Q** panel
+  decodes it, and so does each pinned result's tab.
+- The panel has about 4 GB of memory. Pinned results share one process, and
+  its memory, between them.
+- The Grid takes about 250 bytes a row, whatever the columns. A mixed
+  list's items take up to about 200 bytes more each.
 
-q must be able to read the file, so a q on another machine, such as one
-over ssh, can't load it. The files are removed when the window closes.
+If the panel or a pinned result runs out of memory, or crashes, it turns
+grey. VS Code and other extensions carry on.
+
+- **Developer: Reload Window** brings it back, but loses the latest result
+  and closes pinned results. Ink can't restart it itself, because VS Code
+  doesn't tell extensions when this happens.
+- A pinned result that has turned grey can only be closed.
+- Pinned results share one process, so when one turns grey, so do the rest.
