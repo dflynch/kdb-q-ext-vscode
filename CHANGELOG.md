@@ -2,7 +2,7 @@
 
 All notable changes to the extension are documented in this file.
 
-## [Unreleased]
+## [2.0.0]
 
 ### Added
 
@@ -11,7 +11,7 @@ All notable changes to the extension are documented in this file.
   any depth if you like, with TLS, passwords kept in VS Code's secure
   storage, asked for at every connect, or given by another extension, and
   protected evaluation
-- The **Servers** view, under the q in the activity bar: servers in their
+- The **Servers** view, under the `q)` icon in the Activity Bar: servers in their
   folders, with each connection's state; connect, disconnect, dismiss,
   edit and remove from a row, add servers and folders, rename and remove
   folders, and drag to move. A server with a problem in the settings is
@@ -22,19 +22,19 @@ All notable changes to the extension are documented in this file.
   connected again, or dismissed with **Dismiss Closed Connection**
 - **kdb+/q: Run File on Server**, also the ▶ in the editor's title bar,
   which sends the whole file as one query, and shows the result in the
-  **KDB+/Q** tab of the bottom panel as q's console prints it, and a
+  **KDB+/Q** panel as q's console prints it, and a
   table, keyed table, dictionary or list in a grid too, with each row's
   index, sorting, filters of the text shown, or of numbers and times
   compared as q compares them, typed as q writes them or picked, and a
   cell's value, double-clicked, as a result of its own
 - **kdb+/q: Run Selected Text on Server**, which sends the selection, or
   the current line, the same way
-- **kdb+/q: Pin Result**, also the pin in the **KDB+/Q** tab's title
-  bar, which opens the latest result in an editor tab of its own, where the
+- **kdb+/q: Pin Result**, also the pin in the **KDB+/Q** panel's
+  title bar, which opens the latest result in an editor tab of its own, where the
   next query doesn't replace it, for comparing results side by side; it
   opens as it was left: the view, the cell drilled into, each grid's sort,
   filter and column order, and each chart's settings
-- **kdb+/q: Export Result to CSV**, also a button in the **KDB+/Q** tab's
+- **kdb+/q: Export Result to CSV**, also a button in the **KDB+/Q** panel's
   title bar and a pinned result's, which saves the Grid shown, its rows as
   sorted and filtered, as q's `csv 0:` writes them, quoted as RFC 4180 has
   it; like q's, it won't write a column of lists or tables
