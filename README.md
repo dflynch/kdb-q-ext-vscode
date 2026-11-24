@@ -59,7 +59,7 @@ A hover on your own function shows its signature and the comment lines above its
 
 After `.tca.`, completion offers the namespace's functions with their signatures and comments. Inside the brackets, the parameter hint highlights the current parameter and moves on with each `;`. In the clip, `.tca.bars[trade;5]` is written this way, then run with Cmd+Enter.
 
-![Typing .tca. offers bars, cost, intraday and spread with their signatures; picking bars and typing [ shows the parameter hint, which moves from t to w after the ;. Cmd+Enter runs .tca.bars[trade;5], and the Grid shows VWAP and volume by sym in 5-minute bars](media/write-call.gif)
+![Typing .tca. offers bars, cost, intraday and spread with their signatures; picking bars and typing an opening bracket shows the parameter hint, which moves from t to w after the ;. Cmd+Enter runs .tca.bars[trade;5], and the Grid shows VWAP and volume by sym in 5-minute bars](media/write-call.gif)
 
 - Completion also offers a lambda's parameters and locals, your globals and q's keywords.
 
@@ -73,7 +73,7 @@ Select a changed definition and press Cmd+Enter to redefine the function on the 
 
 The editor marks a bracket or string left open, and a closing bracket with no opener, as you type. A failed query shows q's error in the Console, with a backtrace from the line that failed back to your query. In the clip, a `]` is deleted, then `.tca.spread` runs with its arguments swapped, to make it fail.
 
-![Deleting a ] from a query underlines the end of the line with "] expected"; then .tca.spread[quote;trade], its arguments swapped, runs and the Console shows 'ask with a backtrace through .tca.cost and .tca.spread](media/errors.gif)
+![Deleting a closing bracket from a query underlines the end of the line, saying a closing bracket is expected; then .tca.spread[quote;trade], its arguments swapped, runs and the Console shows 'ask with a backtrace through .tca.cost and .tca.spread](media/errors.gif)
 
 - Backtraces, and the time on the server in the status bar, come from protected evaluation, which is on by default. Turn it off for a gateway that allows only listed calls. See [Protected evaluation](#protected-evaluation).
 
