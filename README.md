@@ -9,7 +9,6 @@ Ink is a VS Code extension for q. It runs your q code on the kdb+ processes you 
 ## Walkthrough
 
 The clips follow one piece of work in a small q codebase for transaction-cost analysis:
-
 - `src/tca.q` defines `.tca.bars`, `.tca.cost`, `.tca.spread` and `.tca.intraday`, and `src/patch.q` holds a later fix to `.tca.intraday`.
 - `src/init.q` loads test `trade` and `quote` tables and `src/tca.q`. A local q started with `q src/init.q -p 5010` is the server.
 - `scripts/spread.q` holds the queries, and `scripts/checks.q` some checks to run as a script.
@@ -19,7 +18,6 @@ The clips follow one piece of work in a small q codebase for transaction-cost an
 The first time you press Cmd+Enter (Ctrl+Enter) on a line, Ink says no servers are defined and offers **Add Server**. Test connects with what you've typed, and Save writes the server to your settings and adds it to the Servers view, under the `q)` icon in the Activity Bar, which holds your servers in folders. In the clip, the server is `local`, on `localhost:5010`.
 
 ![Cmd+Enter with no servers defined offers Add Server; the form is filled in with local, localhost and 5010, Test reports Connected to localhost:5010, and Save adds local to the Servers view](media/add-server.gif)
-
 - Passwords never go in settings: a server's password is kept in VS Code's secure storage, asked for at each connect, or supplied by your firm's sign-on extension.
 
 ### 2. Run a query
@@ -27,7 +25,6 @@ The first time you press Cmd+Enter (Ctrl+Enter) on a line, Ink says no servers a
 **kdb+/q: Run Selected Text on Server**, Cmd+Enter (Ctrl+Enter), runs the selection, or the current line. ▶ in the editor's title bar runs the whole file. The result shows in the **KDB+/Q** panel, and the status bar gives the time the query took on the server, as `\t` gives it, and the roundtrip. The first run asks which server to use, and later runs go to that server, the active one. In the clip, `.tca.intraday[trade;quote]` runs on `local`, then the Console shows the same table as q prints it.
 
 ![Cmd+Enter on .tca.intraday[trade;quote] asks for a server, connects to local, and shows a table in the KDB+/Q panel with the timing in the status bar; the Console tab then shows the same table as q prints it](media/run-query.gif)
-
 - The text is sent as written, as one query, as a q client sends it. A server reads line breaks as spaces, so statements on separate lines need `;` between them. To run lines as a script, see [Run in a terminal](#9-run-in-a-terminal).
 - To switch servers, connect to another from the status bar menu or the Servers view, or click **Make Active** on an open server's row.
 
@@ -36,7 +33,6 @@ The first time you press Cmd+Enter (Ctrl+Enter) on a line, Ink says no servers a
 The Grid shows tables, keyed tables, dictionaries and lists, with cells as q prints them. Click a header to sort in q's order. Click it again to reverse the sort, and a third time to clear it. Filter a number or time column with the funnel in its header: it compares as q does, with nulls smallest. Empty the filter's box to clear it. In the clip, `spread` is sorted both ways, then filtered to the rows over 4.
 
 ![The Grid sorts the spread column up, then down, then a Greater than filter of 4 leaves 4 of 13 rows](media/grid.gif)
-
 - Double-click a cell to drill into a nested value, and press Cmd+C (Ctrl+C) to copy cells. See [Running queries and reading results](docs/results.md).
 
 ### 4. Chart and pin
@@ -44,7 +40,6 @@ The Grid shows tables, keyed tables, dictionaries and lists, with cells as q pri
 The Chart draws the whole result as a line, bars, a histogram or a scatter. It opens on a line for a time series, and its settings, shown and hidden by the gear at the right, change the type and the columns. **kdb+/q: Pin Result**, the pin in the panel's title bar, keeps the result in an editor tab of its own, which the next run doesn't replace. Drag the tab beside your script to keep it in view. In the clip, the spread is charted, switched to bars and pinned.
 
 ![The Chart tab draws the spread as a line against time, Bar is picked in the chart's settings, then the pin in the panel's title bar opens the chart in an editor tab, which is dragged beside the script](media/chart-pin.gif)
-
 - A pinned result keeps its view, sort, filters and chart, and shows its server, time and query. Pinned results close with VS Code.
 
 ### 5. Find your way around
@@ -52,7 +47,6 @@ The Chart draws the whole result as a line, bars, a histogram or a scatter. It o
 A hover on your own function shows its signature and the comment lines above its definition. A hover on a q keyword or a `.Q` or `.z` name shows KX's reference, which works offline. Go to Definition (F12) follows q's namespaces across every `.q` file in the workspace, and for a name defined more than once, lists every definition in a peek. In the clip, `.tca.spread` and `xbar` are hovered, and F12 follows `.tca.spread` to its definition, and `.tca.intraday` to its two, in `src/tca.q` and `src/patch.q`. The pinned result stays open, hidden to make room.
 
 ![A hover on .tca.spread shows its signature and the comments above it; F12 opens src/tca.q; a hover on xbar shows KX's reference; F12 on .tca.intraday opens a peek listing its definitions in tca.q and patch.q](media/navigate.gif)
-
 - Find All References, the outline and Go to Symbol in Workspace (Cmd+T, Ctrl+T) follow namespaces too. See [Navigation and editing](docs/navigation.md).
 
 ### 6. Write a call
@@ -60,7 +54,6 @@ A hover on your own function shows its signature and the comment lines above its
 After `.tca.`, completion offers the namespace's functions with their signatures and comments. Inside the brackets, the parameter hint highlights the current parameter and moves on with each `;`. In the clip, `.tca.bars[trade;5]` is written this way, then run with Cmd+Enter.
 
 ![Typing .tca. offers bars, cost, intraday and spread with their signatures; picking bars and typing an opening bracket shows the parameter hint, which moves from t to w after the ;. Cmd+Enter runs .tca.bars[trade;5], and the Grid shows VWAP and volume by sym in 5-minute bars](media/write-call.gif)
-
 - Completion also offers a lambda's parameters and locals, your globals and q's keywords.
 
 ### 7. Change and compare
@@ -74,7 +67,6 @@ Select a changed definition and press Cmd+Enter to redefine the function on the 
 The editor marks a bracket or string left open, and a closing bracket with no opener, as you type. A failed query shows q's error in the Console, with a backtrace from the line that failed back to your query. In the clip, a `]` is deleted, then `.tca.spread` runs with its arguments swapped, to make it fail.
 
 ![Deleting a closing bracket from a query underlines the end of the line, saying a closing bracket is expected; then .tca.spread[quote;trade], its arguments swapped, runs and the Console shows 'ask with a backtrace through .tca.cost and .tca.spread](media/errors.gif)
-
 - Backtraces, and the time on the server in the status bar, come from protected evaluation, which is on by default. Turn it off for a gateway that allows only listed calls. See [Protected evaluation](#protected-evaluation).
 
 ### 9. Run in a terminal
@@ -82,7 +74,6 @@ The editor marks a bracket or string left open, and a closing bracket with no op
 **kdb+/q: Run Selected Text in Terminal**, Shift+Enter, sends the selection, or the current line, to the q session running in the active terminal. Ink writes the text to a temp file and sends `\l` with its path, so q loads it as a script: comments are skipped, an indented line continues the one before, and the run stops at the first error. In the clip, the q in VS Code's terminal was started with `q src/init.q`, apart from the server on 5010, and runs all of `scripts/checks.q`.
 
 ![In a q session started in VS Code's terminal with q src/init.q, Shift+Enter on the lines of scripts/checks.q sends \l with a temp file, and q shows both tables](media/terminal.gif)
-
 - As in any script, a result prints on one line, in the form `-3!` writes, cut at the console's width. `show` prints it as the console does.
 - q must be able to read this machine's temp folder, so a q session on another machine, such as over ssh, can't load the file.
 
@@ -166,18 +157,18 @@ More in [Navigation and editing](docs/navigation.md).
 
 All settings start `kdb-q-ext-vscode.`.
 
-| Setting | Default | What it does |
-|---|---|---|
-| `servers` | `{}` | Servers and folders, by name. Edit them with the form or in settings.json. |
-| `authExtension` | `""` | The sign-on extension, as `publisher.name`, for servers with `"auth": "extension"`. |
-| `tlsCaFile` | `""` | A CA certificate in PEM to trust as well as the system's and Node's, as `SSL_CA_CERT_FILE`. |
-| `tlsCertFile` | `""` | A client certificate in PEM, as `SSL_CERT_FILE`. Set with `tlsKeyFile`. |
-| `tlsKeyFile` | `""` | The client certificate's key in PEM, as `SSL_KEY_FILE`. |
-| `consoleSize` | `[1000, 1000]` | The Console's lines and width, as `\c` takes them, each 10 to 2000. |
-| `precision` | `7` | Significant digits for floats and reals, 0 to 17, as `\P`. 0 writes all of them. |
-| `sizeLimit` | `100` | The largest result to take, in MB, as q sends it, uncompressed. |
-| `rowLimit` | `5000000` | The most rows a result, or a value drilled into, can have. |
-| `diagnosticMode` | `openFilesOnly` | `workspace` also checks every `.q` file in the workspace, as saved. |
+| Setting          | Default         | What it does                                                                                |
+| ---------------- | --------------- | ------------------------------------------------------------------------------------------- |
+| `servers`        | `{}`            | Servers and folders, by name. Edit them with the form or in settings.json.                  |
+| `authExtension`  | `""`            | The sign-on extension, as `publisher.name`, for servers with `"auth": "extension"`.         |
+| `tlsCaFile`      | `""`            | A CA certificate in PEM to trust as well as the system's and Node's, as `SSL_CA_CERT_FILE`. |
+| `tlsCertFile`    | `""`            | A client certificate in PEM, as `SSL_CERT_FILE`. Set with `tlsKeyFile`.                     |
+| `tlsKeyFile`     | `""`            | The client certificate's key in PEM, as `SSL_KEY_FILE`.                                     |
+| `consoleSize`    | `[1000, 1000]`  | The Console's lines and width, as `\c` takes them, each 10 to 2000.                         |
+| `precision`      | `7`             | Significant digits for floats and reals, 0 to 17, as `\P`. 0 writes all of them.            |
+| `sizeLimit`      | `100`           | The largest result to take, in MB, as q sends it, uncompressed.                             |
+| `rowLimit`       | `5000000`       | The most rows a result, or a value drilled into, can have.                                  |
+| `diagnosticMode` | `openFilesOnly` | `workspace` also checks every `.q` file in the workspace, as saved.                         |
 
 `consoleSize`, `precision` and `rowLimit` apply from the next run. `sizeLimit`, the TLS files, `authExtension` and the servers apply from the next connect.
 
@@ -187,29 +178,29 @@ For q files, Ink sets `editor.wordBasedSuggestions` to `off`, so suggestions are
 
 All commands are in the palette under **kdb+/q**. The Run commands and **Toggle Block Comment** show only in q files.
 
-| Command | Key | Also on |
-|---|---|---|
-| Run Selected Text on Server | Cmd+Enter (Ctrl+Enter) | editor right-click menu |
-| Run File on Server | | ▶ in the editor's title bar, right-click menu |
-| Run Selected Text in Terminal | Shift+Enter | right-click menu |
-| Toggle Block Comment | Shift+Alt+A | |
-| Connect to Server | | Servers row, status bar menu |
-| Disconnect from Server | | Servers row, status bar menu |
-| Dismiss Closed Connection | | Servers row, status bar menu |
-| Make Active | | Servers row (an open server) |
-| Add Server | | Servers view title, folder row, status bar menu |
-| Edit Server | | Servers row (pencil), status bar menu |
-| Remove Server | | Servers row, status bar menu |
-| New Folder | | Servers view title, folder row |
-| Rename Folder, Remove Folder | | folder row |
-| Edit in settings.json | | a Servers row for a setting with a problem, the server form |
-| Open Settings | | Servers view title (gear), status bar menu |
-| Set Server Password, Clear Server Password | | status bar menu |
-| Set Certificate Passphrase, Clear Certificate Passphrase | | status bar menu |
-| Pin Result | | pin in the KDB+/Q panel's title bar |
-| Export Result to CSV | | KDB+/Q panel's title bar |
-| Export Pinned Result to CSV | | a pinned result's title bar |
-| Copy with Headers | | Grid right-click menu |
+| Command                                                  | Key                    | Also on                                                     |
+| -------------------------------------------------------- | ---------------------- | ----------------------------------------------------------- |
+| Run Selected Text on Server                              | Cmd+Enter (Ctrl+Enter) | editor right-click menu                                     |
+| Run File on Server                                       |                        | ▶ in the editor's title bar, right-click menu               |
+| Run Selected Text in Terminal                            | Shift+Enter            | right-click menu                                            |
+| Toggle Block Comment                                     | Shift+Alt+A            |                                                             |
+| Connect to Server                                        |                        | Servers row, status bar menu                                |
+| Disconnect from Server                                   |                        | Servers row, status bar menu                                |
+| Dismiss Closed Connection                                |                        | Servers row, status bar menu                                |
+| Make Active                                              |                        | Servers row (an open server)                                |
+| Add Server                                               |                        | Servers view title, folder row, status bar menu             |
+| Edit Server                                              |                        | Servers row (pencil), status bar menu                       |
+| Remove Server                                            |                        | Servers row, status bar menu                                |
+| New Folder                                               |                        | Servers view title, folder row                              |
+| Rename Folder, Remove Folder                             |                        | folder row                                                  |
+| Edit in settings.json                                    |                        | a Servers row for a setting with a problem, the server form |
+| Open Settings                                            |                        | Servers view title (gear), status bar menu                  |
+| Set Server Password, Clear Server Password               |                        | status bar menu                                             |
+| Set Certificate Passphrase, Clear Certificate Passphrase |                        | status bar menu                                             |
+| Pin Result                                               |                        | pin in the KDB+/Q panel's title bar                         |
+| Export Result to CSV                                     |                        | KDB+/Q panel's title bar                                    |
+| Export Pinned Result to CSV                              |                        | a pinned result's title bar                                 |
+| Copy with Headers                                        |                        | Grid right-click menu                                       |
 
 Make Active, Rename Folder, Remove Folder, Edit in settings.json and Copy with Headers act on a row, a form or a grid, so they aren't in the palette.
 

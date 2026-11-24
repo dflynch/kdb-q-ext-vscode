@@ -9,7 +9,6 @@ Back to the [README](../README.md).
 selection, or the current line. **kdb+/q: Run File on Server**, the ▶ in
 the editor's title bar, sends the whole file, including edits not yet
 saved.
-
 - The text is sent as one query, exactly as written, as a q client sends
   it.
 - It isn't read as a script, as it is in the terminal. A server reads line
@@ -23,7 +22,6 @@ saved.
 
 Ink doesn't change your query. It doesn't wrap it to fetch extra metadata,
 or add a row limit to it.
-
 - With [protected evaluation](../README.md#protected-evaluation) on, the
   text is sent unchanged, beside the function that traps its errors.
 - With it off, a gateway that allows only listed calls sees exactly what
@@ -37,7 +35,6 @@ Large results are refused. See [Limits and memory](#limits-and-memory).
 or the current line, as a script in the active terminal, such as a q
 session. Ink writes the text as it is to a file in the temp folder and
 sends `\l` with the file's path. q reads the file as it reads any script:
-
 - An indented line continues the statement before it.
 - Comments are skipped.
 - A `\d` lasts to the end of the script.
@@ -70,7 +67,6 @@ keeps the result as it was, with its sort, filters and scroll.
 
 The panel has three tabs: **Console**, **Grid** and **Chart**. The one you
 chose last is kept for the next result.
-
 - A table, a keyed table, a dictionary or a list shows in all three.
 - Anything else, such as an atom, a string or an error, shows in the
   Console only.
@@ -100,7 +96,6 @@ blank, as q leaves them.
 
 Cells read as q's console shows them in a column: symbols bare, strings in
 quotes, nulls blank, and numbers lined up on the right.
-
 - At the left is each row's index in the result, counted from 0.
 - A dictionary, including a keyed table, shows its keys on the left, pinned
   as you scroll, then its values, as q's console lays it out. A key or value
@@ -126,14 +121,12 @@ Tables in cells sort by their shapes, after any other values.
 
 Click the funnel in a column's header to filter it. Empty the filter's box
 to clear it.
-
 - Every column's filter can match the text shown.
 - A column of numbers or times can also compare, as q does. The
   comparisons are equals, less than, greater than, between and the rest.
   Nulls are smaller than any value.
 
 How you give a value:
-
 - Type numbers and timespans as q writes them, such as `1.085` or
   `0D00:00:00.000001500`.
 - Type a real with its suffix, such as `1.1e`. q doesn't count the float
@@ -143,7 +136,6 @@ How you give a value:
 - A value that can't be read matches no rows.
 
 How values compare:
-
 - Floats, reals and datetimes are equal within q's tolerance.
 - Everything else must be equal exactly. A timestamp of
   `09:30:00.000000001` doesn't equal `09:30` picked in the filter.
@@ -157,7 +149,6 @@ in full in the Console.
 A trail above the tabs, such as `⌂ › [427, 1] › [0, 2]`, says where the
 value came from. `⌂` is the result. Each step gives a cell's row and
 column, counted from 0:
-
 - The row is the row's index in the result, however the Grid is sorted or
   filtered.
 - The column counts as the result has its columns, keys first.
@@ -167,7 +158,6 @@ Click a step, or press Alt+Left, to go back. The Grid is as you left it.
 ### Copying
 
 Select cells:
-
 - Click a cell, then drag, Shift+click or press Shift+arrows for a
   rectangle.
 - Click a row's index for the row.
@@ -184,7 +174,6 @@ nothing is copied, and a message names the column.
 ## Chart
 
 The Chart draws the result as one of:
-
 - **a line** of numeric columns against a time, a number or each row's
   index. It joins the points, or draws them as steps.
 - **bars**, side by side for each row, labelled by any columns.
@@ -197,7 +186,6 @@ The Chart draws the result as one of:
 A result with no numbers or times has no chart.
 
 The Chart picks how it opens:
-
 - **Bars**, if the first column is neither a number nor a time, such as a
   symbol, string or boolean column. The bars are labelled by that column,
   or by a keyed table's keys.
@@ -230,7 +218,6 @@ the Chart to zoom, and double-click to zoom out.
 
 Unless you type a number of bins, Ink works out a bin width from the
 values. It takes the narrower of two standard rules:
-
 - the spread of the values divided by one more than log₂ of their count,
   which suits few values
 - twice the interquartile range divided by the cube root of their count,
@@ -247,7 +234,6 @@ histogram has at most 10,000 bins.
 result in an editor tab of its own. The next query doesn't replace it.
 
 The pinned result keeps:
-
 - the Console, Grid or Chart tab it's shown in
 - the cell drilled into, with the trail back
 - each Grid's sort, filters and column order
@@ -263,7 +249,6 @@ Pinned results close with VS Code. They aren't kept for the next session.
 **kdb+/q: Export Result to CSV**, the export button in the panel's title
 bar, saves the Grid to a file you choose. If you've drilled into a cell,
 it saves that value's Grid.
-
 - The rows are as shown, sorted and filtered.
 - The columns are in the order shown, under a line of their names, without
   the index.
@@ -274,7 +259,6 @@ A pinned result has its own export button, and **kdb+/q: Export Pinned
 Result to CSV**.
 
 Values are written as q's `csv 0:` writes them:
-
 - symbols and strings bare and whole
 - nulls blank
 - dates such as `2026-10-26`, and timestamps such as
@@ -303,7 +287,6 @@ pinned, stays as it was.
 ## Limits and memory
 
 Two settings keep a result within the memory that shows it:
-
 - **`sizeLimit`**, 100 MB by default: a result larger than this, as q sends
   it, is refused before it's read, and the connection is closed. It applies
   from the next connect.
@@ -312,7 +295,6 @@ Two settings keep a result within the memory that shows it:
   from the next run.
 
 Why there are limits:
-
 - The extension holds the latest result as it arrived. The **KDB+/Q** panel
   decodes it, and so does each pinned result's tab.
 - The panel has about 4 GB of memory. Pinned results share one process, and
@@ -322,7 +304,6 @@ Why there are limits:
 
 If the panel or a pinned result runs out of memory, or crashes, it turns
 grey. VS Code and other extensions carry on.
-
 - **Developer: Reload Window** brings it back, but loses the latest result
   and closes pinned results. Ink can't restart it itself, because VS Code
   doesn't tell extensions when this happens.

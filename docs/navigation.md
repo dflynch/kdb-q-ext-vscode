@@ -41,7 +41,6 @@ current file if that file has one. To jump straight there instead, set
 
 Go to Definition, hover, parameter hints and modules all order files by
 how near they are:
-
 1. the current file
 2. files in the same directory
 3. files that share more of the current file's directories, in order of
@@ -64,7 +63,6 @@ Within a file, the latest definition comes first.
   Symbol in Workspace still lists them, as written in the module.
 
 Edge cases:
-
 - ``s`f`` and ``s[`f]`` also follow a view at top level, ``s::use`foo``, as
   q does. `s.f` doesn't, and neither does q.
 - An `export` after a `\d` doesn't make the file a module, because q then
@@ -77,7 +75,6 @@ F12 on the path in a `\l` line, such as `\l path/util.q`, goes to every
 from the directory q runs in, which Ink doesn't know.
 
 Edge cases:
-
 - Ink drops `.` anywhere in a path, any number of leading `..`, and empty
   segments, such as the one in `lib//util.q` or a leading `/`. `x/..`
   cancels out. An absolute path therefore matches as a suffix:
@@ -107,7 +104,6 @@ syntax and what it does from [KX's reference](https://code.kx.com/q/ref/).
 The text comes with Ink, so it works offline, and links to code.kx.com.
 
 On your own global, or a name a module exports, hover shows:
-
 - its signature if it's a function, or else its name
 - the comment lines directly above its definition, exactly as written, as
   parameter hints show them
@@ -131,7 +127,6 @@ hover shows the global of that name, if there is one.
 
 Typing a call's arguments in brackets, such as `f[a;b]`, shows the
 function's signature with the current parameter highlighted.
-
 - A name can have several signatures: q's own forms for it, then each of
   your definitions. Your definitions come nearest file first, and the
   latest first within a file. Press ↑ and ↓ to move between them.
@@ -139,7 +134,6 @@ function's signature with the current parameter highlighted.
   `editor.parameterHints.enabled` turns hints off.
 
 Which calls get a hint:
-
 - Only calls written with brackets. A call in prefix or infix notation,
   such as `count x` or `x bin y`, has none.
 - q's functions that KX writes only in prefix notation, such as `.Q.s1 x`,
@@ -155,7 +149,6 @@ Which calls get a hint:
 
 Completion appears in VS Code's suggestions as you type. It offers, in this
 order:
-
 1. the innermost lambda's parameters and locals. q has no closures, so an
    outer lambda's aren't in scope.
 2. the workspace's globals in the root namespace
@@ -168,7 +161,6 @@ same way.
 
 After a dot, completion offers a namespace's members and the namespaces in
 it:
-
 - `.` gives the namespaces.
 - `.Q.` or `.z.` gives q's own names, each with KX's one-line summary.
 - `.ns.` gives your own names, each function with its signature and its
@@ -185,7 +177,6 @@ Picking a suggestion inserts its name. Typing `[` then shows its parameter
 hints.
 
 Nothing is offered in:
-
 - strings, comments or numbers
 - system commands
 - lines q hands to another language, such as `k)`, `p)` or `s)` lines, and
@@ -202,7 +193,6 @@ included.
 As you type, the editor underlines brackets and strings that q would
 refuse a script for, and lists them in the Problems panel. There are two
 kinds:
-
 - **A bracket or string left open.** The error, such as `) expected`, is
   placed where the close was expected. That's at the end of the statement,
   where q's own error points, or at the close that ended it too early, as
