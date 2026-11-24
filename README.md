@@ -24,7 +24,7 @@ The first time you press Cmd+Enter (Ctrl+Enter) on a line, Ink says no servers a
 
 **kdb+/q: Run Selected Text on Server**, Cmd+Enter (Ctrl+Enter), runs the selection, or the current line. ▶ in the editor's title bar runs the whole file. The result shows in the **KDB+/Q** panel, and the status bar gives the time the query took on the server, as `\t` gives it, and the roundtrip. The first run asks which server to use, and later runs go to that server, the active one. In the clip, `.tca.intraday[trade;quote]` runs on `local`, then the Console shows the same table as q prints it.
 
-![Cmd+Enter on .tca.intraday[trade;quote] asks for a server, connects to local, and shows a table in the KDB+/Q panel with the timing in the status bar; the Console tab then shows the same table as q prints it](media/run-query.gif)
+![Cmd+Enter on the .tca.intraday line asks for a server, connects to local, and shows a table in the KDB+/Q panel with the timing in the status bar; the Console tab then shows the same table as q prints it](media/run-query.gif)
 - The text is sent as written, as one query, as a q client sends it. A server reads line breaks as spaces, so statements on separate lines need `;` between them. To run lines as a script, see [Run in a terminal](#9-run-in-a-terminal).
 - To switch servers, connect to another from the status bar menu or the Servers view, or click **Make Active** on an open server's row.
 
@@ -53,7 +53,7 @@ A hover on your own function shows its signature and the comment lines above its
 
 After `.tca.`, completion offers the namespace's functions with their signatures and comments. Inside the brackets, the parameter hint highlights the current parameter and moves on with each `;`. In the clip, `.tca.bars[trade;5]` is written this way, then run with Cmd+Enter.
 
-![Typing .tca. offers bars, cost, intraday and spread with their signatures; picking bars and typing an opening bracket shows the parameter hint, which moves from t to w after the ;. Cmd+Enter runs .tca.bars[trade;5], and the Grid shows VWAP and volume by sym in 5-minute bars](media/write-call.gif)
+![Typing .tca. offers bars, cost, intraday and spread with their signatures; picking bars and typing an opening bracket shows the parameter hint, which moves from t to w after the ;. Cmd+Enter runs the call on trade with 5-minute bars, and the Grid shows VWAP and volume by sym in 5-minute bars](media/write-call.gif)
 - Completion also offers a lambda's parameters and locals, your globals and q's keywords.
 
 ### 7. Change and compare
@@ -66,7 +66,7 @@ Select a changed definition and press Cmd+Enter to redefine the function on the 
 
 The editor marks a bracket or string left open, and a closing bracket with no opener, as you type. A failed query shows q's error in the Console, with a backtrace from the line that failed back to your query. In the clip, a `]` is deleted, then `.tca.spread` runs with its arguments swapped, to make it fail.
 
-![Deleting a closing bracket from a query underlines the end of the line, saying a closing bracket is expected; then .tca.spread[quote;trade], its arguments swapped, runs and the Console shows 'ask with a backtrace through .tca.cost and .tca.spread](media/errors.gif)
+![Deleting a closing bracket from a query underlines the end of the line, saying a closing bracket is expected; then .tca.spread runs with its arguments swapped and the Console shows 'ask with a backtrace through .tca.cost and .tca.spread](media/errors.gif)
 - Backtraces, and the time on the server in the status bar, come from protected evaluation, which is on by default. Turn it off for a gateway that allows only listed calls. See [Protected evaluation](#protected-evaluation).
 
 ### 9. Run in a terminal
