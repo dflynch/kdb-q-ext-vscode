@@ -221,6 +221,10 @@ form.append(
   tested,
 );
 document.body.append(title, where, note, banner, form);
+// Nothing shows until the first load says what applies: the note only for
+// a server connected, the banner only with a message in it
+note.hidden = true;
+banner.hidden = true;
 form.hidden = true;
 
 // The form as typed
